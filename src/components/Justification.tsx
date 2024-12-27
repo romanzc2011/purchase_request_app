@@ -1,6 +1,6 @@
 import React from 'react';
 import { UseFormRegister, FieldErrors } from 'react-hook-form';
-import { FormValues } from '../PurchaseForm';
+import { FormValues } from './PurchaseForm';
 
 interface JustificationProps {
   register: UseFormRegister<FormValues>;

@@ -1,7 +1,7 @@
 import { FieldErrors, useForm, useFieldArray } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
-import "./learn_dev_radio/LearningDev";
-import LearningDev from "./learn_dev_radio/LearningDev";
+import "./LearningDev";
+import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
 import BKSeal from "../assets/seal_no_border.png";
 import { useEffect, useRef } from "react";
@@ -104,10 +104,6 @@ export const PurchaseForm: React.FC = () => {
   const onError = (errors: FieldErrors<FormValues>) => {
     console.log("Form errors", errors);
   };
-
-  function checkIfFileNull() {
-    const myFile = useRef(null);
-  }
 
   return (
     <div>
