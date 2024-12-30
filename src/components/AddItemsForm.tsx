@@ -4,35 +4,19 @@ import "./LearningDev";
 import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
 import BKSeal from "../assets/seal_no_border.png";
+import PickerFilter from "./PickerFilter";
+import FundFilter from "./FundFilter";
+import LocationFilter from "./LocationFilter";
 import { useEffect, useRef } from "react";
+import { FormValues } from "../types/formTypes";
+import { Box, AppBar, Toolbar, Typography } from "@mui/material";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 /*************************************************************************************** */
-/* Form Data Structure */
-/*************************************************************************************** */
-export type FormValues = {
-  requester: string;
-  phoneext: string;
-  datereq: Date | null;
-  dateneed: Date | null;
-  orderType: string;
-  fileAttachments: {
-    attachment: File | null;
-  }[];
-  itemDescription: string;
-  justification: string;
-  addComments: string;
-  learnAndDev: {
-    trainNotAval: string;
-    needsNotMeet: string;
-  };
-};
-
-/*************************************************************************************** */
 /* Default form values */
 /*************************************************************************************** */
-export const PurchaseForm: React.FC = () => {
+export const AddItemsForm: React.FC = () => {
   const form = useForm<FormValues>({
     defaultValues: {
       requester: "",
@@ -78,7 +62,7 @@ export const PurchaseForm: React.FC = () => {
   /* Form submission function */
   /*************************************************************************************** */
   const onSubmit = (data: FormValues) => {
-    console.log("Form submitted", data);
+    console.log("ITEMS ADDED", data);
   };
 
   useEffect(() => {
@@ -107,7 +91,6 @@ export const PurchaseForm: React.FC = () => {
 
   return (
     <div>
-      
       {/*************************************************************************************** */}
       {/* FORM SECTION */}
       {/*************************************************************************************** */}
@@ -338,17 +321,94 @@ export const PurchaseForm: React.FC = () => {
         </div>
 
         {/************************************************************************************ */}
-        {/* BUTTONS: Submit Form, Print Form, Clear */}
+        {/* BUDGET OBJECT CODE */}
+        <Box sx={{ my: 3 }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: 2,
+              alignItems: "center",
+              flexWrap: "nowrap",
+            }}
+          >
+            <label
+              htmlFor="budgetObjCode"
+              style={{
+                display: "block",
+                minWidth: "200px",
+                whiteSpace: "nowrap",
+                textAlign: "right",
+                marginRight: "8px",
+              }}
+            >
+              <strong>Budget Object Code (BOC)</strong>
+            </label>
+            <PickerFilter
+              onSelectCategory={(category) => console.log(category)}
+            />
+
+            {/************************************************************************************ */}
+            {/* FUND SELECT */}
+            <label
+              htmlFor="fund"
+              style={{ display: "block", width: "100px", whiteSpace: "nowrap" }}
+            >
+              <strong>Fund</strong>
+            </label>
+            <FundFilter onSelectFund={(fund) => console.log(fund)} />
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 5, alignItems: "center", mt: 3 }}>
+            <label
+              htmlFor="location"
+              style={{ minWidth: "50px", whiteSpace: "nowrap" }}
+            >
+              {/************************************************************************************ */}
+              {/* LOCATION */}
+              <strong>Location</strong>
+            </label>
+            <LocationFilter
+              onSelectLocation={(location) => console.log(location)}
+            />
+
+            {/************************************************************************************ */}
+            {/* PRICE */}
+
+            <label htmlFor="requester" style={{ display: "block", width: "100px", whiteSpace: "nowrap"}}>
+              <strong>Price</strong>
+            </label>
+            <input
+              id="price"
+              type="text"
+              className="form-control"
+              {...register("requester", {
+                required: {
+                  value: true,
+                  message: "Price required",
+                },
+              })}
+            />
+            <p className="error">{errors.requester?.message}</p>
+          </Box>
+        </Box>
+
         {/************************************************************************************ */}
-        <div>
-          <Buttons disabled={!isDirty || !isValid} label="Submit Form" />
-          <Buttons label="Print Form" />
+        {/* BUTTONS: ADD ITEM, Clear */}
+        {/************************************************************************************ */}
+        <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+          {/* Capture all data pertaining to the request temporarily to allow for addition of additional items
+              SUBMIT button will handle gathering and sending the data to proper supervisors */}
+          <Buttons
+            className="me-3 btn btn-success"
+            disabled={!isDirty || !isValid}
+            label="Add Item"
+          />
           <Buttons
             label="Reset Form"
             className="btn btn-warning"
             onClick={() => reset()}
           />
-        </div>
+        </Box>
         <hr
           style={{
             backgroundColor: "white",
@@ -363,4 +423,4 @@ export const PurchaseForm: React.FC = () => {
   );
 };
 
-export default PurchaseForm;
+export default AddItemsForm;

@@ -2,7 +2,7 @@ import React from "react";
 import Justification from "./Justification";
 import AddComments from "./AddComments";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { FormValues } from "./PurchaseForm";
+import { FormValues } from "./AddItemsForm";
 
 interface LearningDevProps {
   register: UseFormRegister<FormValues>;

@@ -27,6 +27,7 @@ export default function PurchaseSideBar() {
         sx={{
           ml: `${drawerWidth}px`,
           background: "linear-gradient(to top, #2c2c2c, #800000)",
+          boxShadow: "none",
         }}
       >
         <Toolbar>

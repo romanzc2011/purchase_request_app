@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
-import PurchasePicker from "./components/PurchasePickerTable";
+import PurchasePicker from "./components/SubmitApprovalForm";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
-import PurchaseForm from "./components/PurchaseForm";
-import PickerFilter from "./components/PickerFilter";
-import FundFilter from "./components/FundFilter";
-import LocationFilter from "./components/LocationFilter";
+import PurchaseForm from "./components/AddItemsForm";
 import PurchaseSidenav from "./components/PurchaseSideBar";
-import { Box, AppBar, Toolbar, Typography } from "@mui/material";
+import { Box, Toolbar } from "@mui/material";
 
 function App() {
   // Update the title and icon of app
@@ -17,6 +14,7 @@ function App() {
   });
   const [currentTime, setCurrentTime] = useState(0);
 
+  /* React example of send a request to python backend */
   useEffect(() => {
     fetch("http://127.0.0.1:5000/time")
       .then((res) => {
@@ -53,54 +51,8 @@ function App() {
       {/* MAIN SECTION */}
       <Box component={"main"} sx={{ flexGrow: 1, p: 3 }}>
         <Toolbar /> {/* Space to offset AppBar */}
-
         {/* Form Section */}
         <PurchaseForm />
-
-        {/********************************************************************* */}
-        {/* PURCHASE PICKER */}
-        {/********************************************************************* */}
-        {/* BUDGET OBJECT CODE */}
-
-        <Box sx={{ my: 3 }}>
-          <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-            <label htmlFor="budgetObjCode">
-              <strong>Budget Object Code (BOC)</strong>
-            </label>
-            <PickerFilter onSelectCategory={(category) => console.log(category)} />
-
-            <label htmlFor="fund">
-              <strong>Fund</strong>
-            </label>
-            <FundFilter onSelectFund={(fund) => console.log(fund)} />
-          </Box>
-
-          <Box sx={{ display: "flex", gap: 2, alignItems: "center", mt: 2 }}>
-            <label htmlFor="location">
-              <strong>Location</strong>
-            </label>
-            <LocationFilter
-              onSelectLocation={(location) => console.log(location)}
-            />
-          </Box>
-        </Box>
-
-        {/********************************************************************* */}
-        {/* LOCATION */}
-        <div className="row col-sm-12">
-          <label
-            htmlFor="location"
-            className="col-sm-2 col-form-label"
-            style={{ paddingLeft: "80px" }}
-          >
-            <strong>Location</strong>
-          </label>
-          <div className="col-sm-6" style={{ paddingLeft: "110px" }}>
-            <LocationFilter
-              onSelectLocation={(location) => console.log(location)}
-            />
-          </div>
-        </div>
         <div className="col-md-12" style={{ marginTop: "20px" }}>
           <PurchasePicker
             purchases={purchases}
@@ -113,7 +65,6 @@ function App() {
       {/********************************************************************* */}
       {/* FORM SECTION */}
       {/********************************************************************* */}
-      {/* Layout for Form and Table */}
     </div>
   );
 }
