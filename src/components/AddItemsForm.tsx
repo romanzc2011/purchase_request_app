@@ -32,6 +32,8 @@ export const AddItemsForm: React.FC = () => {
         trainNotAval: "",
         needsNotMeet: "",
       },
+      fund: "",
+      price: 0,
     },
     mode: "onSubmit",
   });
@@ -355,7 +357,17 @@ export const AddItemsForm: React.FC = () => {
             >
               <strong>Fund</strong>
             </label>
-            <FundFilter onSelectFund={(fund) => console.log(fund)} />
+            <FundFilter
+              value="fund"
+              onSelectFund={(fund) => console.log(fund)}
+              {...register("fund", {
+                required: {
+                  value: true,
+                  message: "Select proper fund.",
+                },
+              })}
+            />
+            <p className="error">{errors.fund?.message}</p>
           </Box>
 
           <Box sx={{ display: "flex", gap: 5, alignItems: "center", mt: 3 }}>
@@ -369,26 +381,35 @@ export const AddItemsForm: React.FC = () => {
             </label>
             <LocationFilter
               onSelectLocation={(location) => console.log(location)}
+              {...register("location", {
+                required: {
+                  value: true,
+                  message: "Location is required.",
+                },
+              })}
             />
+            <p className="error">{errors.location?.message}</p>
 
             {/************************************************************************************ */}
             {/* PRICE */}
-
-            <label htmlFor="requester" style={{ display: "block", width: "100px", whiteSpace: "nowrap"}}>
+            <label
+              htmlFor="price"
+              style={{ display: "block", width: "100px", whiteSpace: "nowrap" }}
+            >
               <strong>Price</strong>
             </label>
             <input
               id="price"
               type="text"
               className="form-control"
-              {...register("requester", {
+              {...register("price", {
                 required: {
                   value: true,
-                  message: "Price required",
+                  message: "Price of item required.",
                 },
               })}
             />
-            <p className="error">{errors.requester?.message}</p>
+            <p className="error">{errors.price?.message}</p>
           </Box>
         </Box>
 
