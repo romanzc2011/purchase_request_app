@@ -7,7 +7,13 @@ import PickerFilter from "./components/PickerFilter";
 import FundFilter from "./components/FundFilter";
 import LocationFilter from "./components/LocationFilter";
 import PurchaseSidenav from "./components/PurchaseSideBar";
-import { Box, AppBar, Toolbar, Typography } from "@mui/material";
+import {
+  Box,
+  AppBar,
+  Toolbar,
+  Typography,
+} from "@mui/material";
+
 
 function App() {
   // Update the title and icon of app
@@ -47,43 +53,47 @@ function App() {
   ]);
 
   return (
-    <div>
+
+    <div className="container-fluid">
       <PurchaseSidenav />
-
-      {/* MAIN SECTION */}
-      <Box component={"main"} sx={{ flexGrow: 1, p: 3 }}>
-        <Toolbar /> {/* Space to offset AppBar */}
-
+      {/********************************************************************* */}
+      {/* FORM SECTION */}
+      {/********************************************************************* */}
+      {/* Layout for Form and Table */}
+      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <Typography variant="body1">
+          
+        </Typography>
+      </Box>
+      <div className="row d-flex">
         {/* Form Section */}
-        <PurchaseForm />
+        <div className="col-md-12">
+          <PurchaseForm />
+        </div>
 
         {/********************************************************************* */}
         {/* PURCHASE PICKER */}
         {/********************************************************************* */}
         {/* BUDGET OBJECT CODE */}
+        <div className="row col-sm-12 mb-3">
+          <label htmlFor="budgetObjCode" className="col-sm-3 col-form-label">
+            <strong>Budget Object Code (BOC)</strong>
+          </label>
+          <div className="col-sm-8 d-flex" style={{ paddingRight: "71px" }}>
+            <PickerFilter
+              onSelectCategory={(category) => console.log(category)}
+            />
 
-        <Box sx={{ my: 3 }}>
-          <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-            <label htmlFor="budgetObjCode">
-              <strong>Budget Object Code (BOC)</strong>
-            </label>
-            <PickerFilter onSelectCategory={(category) => console.log(category)} />
-
-            <label htmlFor="fund">
+            {/********************************************************************* */}
+            {/* FUND */}
+            <label htmlFor="fund" className="col-sm-2 col-form-label">
               <strong>Fund</strong>
             </label>
-            <FundFilter onSelectFund={(fund) => console.log(fund)} />
-          </Box>
-
-          <Box sx={{ display: "flex", gap: 2, alignItems: "center", mt: 2 }}>
-            <label htmlFor="location">
-              <strong>Location</strong>
-            </label>
-            <LocationFilter
-              onSelectLocation={(location) => console.log(location)}
-            />
-          </Box>
-        </Box>
+            <div className="col-sm-2">
+              <FundFilter onSelectFund={(fund) => console.log(fund)} />
+            </div>
+          </div>
+        </div>
 
         {/********************************************************************* */}
         {/* LOCATION */}
@@ -101,19 +111,13 @@ function App() {
             />
           </div>
         </div>
-        <div className="col-md-12" style={{ marginTop: "20px" }}>
-          <PurchasePicker
-            purchases={purchases}
-            onDelete={(id) =>
-              setPurchases(purchases.filter((e) => e.BOC !== id))
-            }
-          />
-        </div>
-      </Box>
-      {/********************************************************************* */}
-      {/* FORM SECTION */}
-      {/********************************************************************* */}
-      {/* Layout for Form and Table */}
+      </div>
+      <div className="col-md-12" style={{ marginTop: "20px" }}>
+        <PurchasePicker
+          purchases={purchases}
+          onDelete={(id) => setPurchases(purchases.filter((e) => e.BOC !== id))}
+        />
+      </div>
     </div>
   );
 }

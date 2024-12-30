@@ -11,7 +11,7 @@ const LocationFilter = ({ onSelectLocation }: LocationProps) => {
         <option id={'LAFY/C'} value={"LAFY/C"}>LAFY/C</option>
         <option id={'LAFY/J'} value={"LAFY/J"}>LAFY/J</option>
         <option id={'LKCH/C'} value={"LKCH/C"}>LKCH/C</option>
-        <option id={'LKCC/J'} value={"LKCC/J"}>LKCC/J</option>
+        <option id={'LKCC/JA'} value={"LKCC/J"}>LKCC/J</option>
         <option id={'MONR/C'} value={"MONR/C"}>MONR/C</option>
         <option id={'MONR/J'} value={"MONR/J"}>MONR/J</option>
         <option id={'SHVT/C'} value={"SHVT/C"}>SHVT/C</option>
