@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   Drawer,
@@ -11,14 +11,22 @@ import {
   CssBaseline,
   ListItemButton,
   ListItemIcon,
+  IconButton,
 } from "@mui/material";
 import BKSeal from "../assets/seal_no_border.png";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import MenuIcon from "@mui/icons-material/Menu";
 
-const drawerWidth = 240;
-const appBarHeight = 101;
+const drawerWidth = 195;
+const appBarHeight = 96;
 
 export default function PurchaseSideBar() {
+  const [open, setOpen] = useState(true); // State to toggle Drawer
+
+  const toggleDrawer = () => {
+    setOpen(!open); // Toggle open
+  };
+
   return (
     <Box sx={{ display: "flex" }}>
       {/* HEADER */}
@@ -31,6 +39,16 @@ export default function PurchaseSideBar() {
         }}
       >
         <Toolbar>
+          {/* TOGGLE BUTTON */}
+          <IconButton
+            edge="start"
+            color="inherit"
+            aria-label="menu"
+            onClick={toggleDrawer}
+            sx={{ mr: 2 }}
+          >
+            <MenuIcon />
+          </IconButton>
           <Typography variant="h6" noWrap component="div">
             <Box
               sx={{
@@ -62,17 +80,19 @@ export default function PurchaseSideBar() {
       {/* Side Nav Bar */}
       <Drawer
         variant="permanent"
+        open={open}
         sx={{
-          width: drawerWidth,
+          width: open ? drawerWidth : 60,
           top: `${appBarHeight}px`,
           flexShrink: 0,
           [`& .MuiDrawer-paper`]: {
-            width: drawerWidth,
+            width: open ? drawerWidth : 60,
             boxSizing: "border-box",
             top: `${appBarHeight}px`,
             height: `calc(100% - ${appBarHeight})`,
             background: "linear-gradient(to bottom, #2c2c2c, #800000)", // Gradient background
             color: "white", // Text color for contrast
+            transition: "width 0.3s ease",
           },
         }}
       >
@@ -81,11 +101,20 @@ export default function PurchaseSideBar() {
           <List>
             {/* LIST BUTTON DIVIDER **************************************************************** */}
             <ListItem divider sx={{ borderBottom: "2px solid #800000" }}>
-              <ListItemButton>
-                <ListItemIcon sx={{ color: "white" }}>
+              <ListItemButton
+                sx={{ justifyContent: open ? "flex-start" : "center" }} // Center icon when collapsed
+              >
+                <ListItemIcon
+                  sx={{
+                    color: "white",
+                    minWidth: open ? "40px" : "0",
+                    justifyContent: open ? "flex-start" : "center",
+                  }}
+                >
                   <VerifiedIcon />
                 </ListItemIcon>
-                <ListItemText primary="REQUESTS" />
+                {/* Show text only when open */}
+                {open && <ListItemText primary="REQUESTS" />}
               </ListItemButton>
             </ListItem>
             {/* LIST BUTTON DIVIDER **************************************************************** */}

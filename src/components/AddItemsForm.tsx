@@ -1,5 +1,6 @@
 import { FieldErrors, useForm, useFieldArray } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
+import React, { useState } from "react";
 import "./LearningDev";
 import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
@@ -10,13 +11,33 @@ import LocationFilter from "./LocationFilter";
 import { useEffect, useRef } from "react";
 import { FormValues } from "../types/formTypes";
 import { Box, AppBar, Toolbar, Typography } from "@mui/material";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import Grid from "@mui/material/Grid";
 
 /*************************************************************************************** */
 /* Default form values */
 /*************************************************************************************** */
 export const AddItemsForm: React.FC = () => {
+  const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
+  const [item, setItem] = useState<FormValues>({
+    requester: "", 
+    phoneext: "",
+    datereq: null,
+    dateneed: null,
+    orderType: "",
+    fileAttachments: [{ attachment: null }],
+    itemDescription: "",
+    justification: "",
+    addComments: "",
+    learnAndDev: {
+      trainNotAval: "",
+      needsNotMeet: "",
+    },
+    budgetObjCode: "",
+    fund: "",
+    price: 0,
+    location: "",
+  });
+
   const form = useForm<FormValues>({
     defaultValues: {
       requester: "",
@@ -48,24 +69,21 @@ export const AddItemsForm: React.FC = () => {
     isSubmitSuccessful,
   } = formState;
 
-  console.log({ isSubmitting, isSubmitted, isSubmitSuccessful });
-
-  //console.log({ touchedFields, dirtyFields, isDirty, isValid });
-
   /*************************************************************************************** */
-  /* File upload input element */
+  /* HANDLE ADD ITEM function */
   /*************************************************************************************** */
-  const { fields, append, remove } = useFieldArray({
-    name: "fileAttachments",
-    control,
-  });
+  const onAddItem = (data: FormValues) => {
+    setDataBuffer((prevItems => [...prevItems, data]));
+    reset(); // Clear form
+    console.log("Item Added: ", data);
+  };
 
   /*************************************************************************************** */
   /* Form submission function */
   /*************************************************************************************** */
-  const onSubmit = (data: FormValues) => {
-    console.log("ITEMS ADDED", data);
-  };
+  // const onSubmit = (data: FormValues) => {
+  //   console.log("ITEMS ADDED", data);
+  // };
 
   useEffect(() => {
     const subscription = watch((value) => {
@@ -91,18 +109,27 @@ export const AddItemsForm: React.FC = () => {
     console.log("Form errors", errors);
   };
 
+  /*************************************************************************************** */
+  /* File upload input element */
+  /*************************************************************************************** */
+  const { fields, append, remove } = useFieldArray({
+    name: "fileAttachments",
+    control,
+  });
+
   return (
-    <div>
+    <Grid>
       {/*************************************************************************************** */}
-      {/* FORM SECTION */}
+      {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
+          once user has finished adding items and reviewed everything */}
       {/*************************************************************************************** */}
-      <form onSubmit={handleSubmit(onSubmit, onError)} noValidate>
+      <form onSubmit={handleSubmit(onAddItem, onError)} noValidate>
         {/** REQUESTER ****************************************************************** */}
-        <div className="m-2 row">
+        <Grid className="m-2 row">
           <label htmlFor="requester" className="col-sm-2 col-form-label">
             <strong>Requester</strong>
           </label>
-          <div className="col-sm-5">
+          <Grid className="col-sm-5">
             <input
               id="requester"
               type="text"
@@ -115,15 +142,15 @@ export const AddItemsForm: React.FC = () => {
               })}
             />
             <p className="error">{errors.requester?.message}</p>
-          </div>
-        </div>
+          </Grid>
+        </Grid>
 
         {/** PHONE EXT ****************************************************************** */}
-        <div className="m-2 row align-items-left">
+        <Grid className="m-2 row align-items-left">
           <label htmlFor="phoneext" className="col-sm-2 col-form-label">
             <strong>Phone Extension</strong>
           </label>
-          <div className="col-sm-2">
+          <Grid className="col-sm-2">
             <input
               id="phoneext"
               type="text"
@@ -136,15 +163,15 @@ export const AddItemsForm: React.FC = () => {
               })}
             ></input>
             <p className="error">{errors.phoneext?.message}</p>
-          </div>
-        </div>
+          </Grid>
+        </Grid>
 
         {/** DATE OF REQ ****************************************************************** */}
-        <div className="m-2 row align-items-center">
+        <Grid className="m-2 row align-items-center">
           <label htmlFor="datereq" className="col-sm-2 col-form-label">
             <strong>Date of Request</strong>
           </label>
-          <div className="col-sm-2">
+          <Grid className="col-sm-2">
             <input
               id="datereq"
               type="date"
@@ -157,17 +184,19 @@ export const AddItemsForm: React.FC = () => {
               })}
             ></input>
             <p className="error">{errors.datereq?.message}</p>
-          </div>
-        </div>
+          </Grid>
+        </Grid>
         {/*************************************************************************************** */}
 
         {/** DATE ITEMS NEEDED ****************************************************************** */}
-        <div className="m-2 row align-items-center">
+        <Grid className="m-2 row align-items-center">
           <label htmlFor="dateneed" className="col-sm-2 col-form-label">
             <strong>Date Item(s) Needed</strong>
           </label>
-          <div className="col-sm-4">
-            <div style={{ display: "flex", alignItems: "center", gap: "30px" }}>
+          <Grid className="col-sm-4">
+            <Grid
+              style={{ display: "flex", alignItems: "center", gap: "30px" }}
+            >
               <input
                 id="dateneed"
                 type="date"
@@ -182,7 +211,7 @@ export const AddItemsForm: React.FC = () => {
                 })}
               />
               <strong>OR</strong>
-              <div>
+              <Grid>
                 <label
                   htmlFor="quarterlyOrder"
                   style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
@@ -196,7 +225,7 @@ export const AddItemsForm: React.FC = () => {
                   />
                   Inclusion w/quarterly office supply order
                 </label>
-              </div>
+              </Grid>
               <strong>OR</strong>
               <label
                 htmlFor="noRush"
@@ -211,15 +240,15 @@ export const AddItemsForm: React.FC = () => {
                 />
                 No Rush
               </label>
-            </div>
+            </Grid>
             <p className="error">{errors.dateneed?.message}</p>
 
             {/************************************************************************************ */}
-          </div>
-        </div>
+          </Grid>
+        </Grid>
 
         {/** ATTACHMENTS INCLUDED? ****************************************************************** */}
-        <div className="m-3 align-items-center row">
+        <Grid className="m-3 align-items-center row">
           <label
             style={{ fontSize: "0.8rem" }}
             htmlFor="fileAttachments"
@@ -234,12 +263,12 @@ export const AddItemsForm: React.FC = () => {
           {/********************************************************************************************* */}
           {/** ATTACHMENTS FIELD ARRAY ****************************************************************** */}
           {/********************************************************************************************* */}
-          <div className="col-sm-6">
+          <Grid className="col-sm-6">
             {fields.map((field, index) => {
               const fileValue = watch(`fileAttachments.${index}.attachment`);
 
               return (
-                <div className="mt-2 d-flex align-items-center" key={field.id}>
+                <Grid className="mt-2 d-flex align-items-center" key={field.id}>
                   <input
                     type="file"
                     className="form-control me-2"
@@ -267,11 +296,11 @@ export const AddItemsForm: React.FC = () => {
                       label="Remove"
                     />
                   )}
-                </div>
+                </Grid>
               );
             })}
 
-            <div className="d-flex align-items-center mt-3">
+            <Grid className="d-flex align-items-center mt-3">
               {/* Conditionally render "Add File" button */}
               {fields.every(
                 (field, index) => !!watch(`fileAttachments.${index}.attachment`) // Check if all fields have files uploaded
@@ -282,12 +311,12 @@ export const AddItemsForm: React.FC = () => {
                   label="Add File"
                 />
               )}
-            </div>
-          </div>
-        </div>
+            </Grid>
+          </Grid>
+        </Grid>
 
         {/** ITEM DESCRIPTION ****************************************************************** */}
-        <div className="m-3 align-items-center row">
+        <Grid className="m-3 align-items-center row">
           <label
             style={{ fontSize: "0.8rem" }}
             htmlFor="itemDescription"
@@ -300,7 +329,7 @@ export const AddItemsForm: React.FC = () => {
             <br /> NOTE: If request is for office supplies needed before the
             next quarterly order, please state the justification.
           </label>
-          <div className="col-sm-4">
+          <Grid className="col-sm-4">
             <textarea
               style={{ fontSize: "0.8rem" }}
               id="itemDescription"
@@ -314,13 +343,13 @@ export const AddItemsForm: React.FC = () => {
               })}
             />
             <p className="error">{errors.itemDescription?.message}</p>
-          </div>
-        </div>
+          </Grid>
+        </Grid>
 
         {/** FOR LEARNING OR DEV? ****************************************************************** */}
-        <div>
+        <Grid>
           <LearningDev register={register} errors={errors} />
-        </div>
+        </Grid>
 
         {/************************************************************************************ */}
         {/* BUDGET OBJECT CODE */}
@@ -345,6 +374,7 @@ export const AddItemsForm: React.FC = () => {
             >
               <strong>Budget Object Code (BOC)</strong>
             </label>
+            {/* This is the select that picks the budget code */}
             <PickerFilter
               onSelectCategory={(category) => console.log(category)}
             />
@@ -360,14 +390,8 @@ export const AddItemsForm: React.FC = () => {
             <FundFilter
               value="fund"
               onSelectFund={(fund) => console.log(fund)}
-              {...register("fund", {
-                required: {
-                  value: true,
-                  message: "Select proper fund.",
-                },
-              })}
+              {...register("fund")}
             />
-            <p className="error">{errors.fund?.message}</p>
           </Box>
 
           <Box sx={{ display: "flex", gap: 5, alignItems: "center", mt: 3 }}>
@@ -381,14 +405,8 @@ export const AddItemsForm: React.FC = () => {
             </label>
             <LocationFilter
               onSelectLocation={(location) => console.log(location)}
-              {...register("location", {
-                required: {
-                  value: true,
-                  message: "Location is required.",
-                },
-              })}
+              {...register("location")}
             />
-            <p className="error">{errors.location?.message}</p>
 
             {/************************************************************************************ */}
             {/* PRICE */}
@@ -402,14 +420,8 @@ export const AddItemsForm: React.FC = () => {
               id="price"
               type="text"
               className="form-control"
-              {...register("price", {
-                required: {
-                  value: true,
-                  message: "Price of item required.",
-                },
-              })}
+              {...register("price")}
             />
-            <p className="error">{errors.price?.message}</p>
           </Box>
         </Box>
 
@@ -423,6 +435,7 @@ export const AddItemsForm: React.FC = () => {
             className="me-3 btn btn-success"
             disabled={!isDirty || !isValid}
             label="Add Item"
+            onClick={handleSubmit(onAddItem)}
           />
           <Buttons
             label="Reset Form"
@@ -440,7 +453,7 @@ export const AddItemsForm: React.FC = () => {
         />
       </form>
       <DevTool control={control} />
-    </div>
+    </Grid>
   );
 };
 
