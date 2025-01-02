@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { FormValues } from "../types/formTypes";
+import { convertBOC } from "../utils/bocUtils";
 
 /* INTERFACE */
 interface SubmitApprovalTableProps {
@@ -19,10 +20,25 @@ interface SubmitApprovalTableProps {
   onDelete: (id: number) => void;
 }
 
+/************************************************************************************ */
+/* QUANTITY HOOK --- Update price base on quantity */
+const useQuantityPrice = (initialPrice: number, incrementQuantity: number) => {
+  const [price, setPrice] = useState(initialPrice);
+  const quantity = () => setPrice(price * incrementQuantity);
+
+  return [price, quantity] as const;
+}
+
 const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   dataBuffer,
   onDelete,
+
 }) => {
+  // Preprocess data to calculate price
+  const processedData = dataBuffer.map((item) => ({
+    ...item,
+    calculatedPrice: (item.price || 0) * (item.quantity || 1), // Calculating based on quantity
+  }))
   return (
     <TableContainer
       component={Paper}
@@ -63,16 +79,16 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
           </TableRow>
         </TableHead>
         <TableBody>
-          {dataBuffer.map((item) => (
+          {processedData.map((item) => (
             <TableRow key={item.id}>
               <TableCell sx={{ color: "white" }}>{item.id}</TableCell>
               <TableCell sx={{ color: "white" }}>
-                {item.budgetObjCode}
+                {convertBOC(item.budgetObjCode)}
               </TableCell>
               <TableCell sx={{ color: "white" }}>{item.fund}</TableCell>
               <TableCell sx={{ color: "white" }}>{item.location}</TableCell>
               <TableCell sx={{ color: "white" }}>{item.quantity}</TableCell>
-              <TableCell sx={{ color: "white" }}>{item.price}</TableCell>
+              <TableCell sx={{ color: "white" }}>{item.calculatedPrice.toFixed(2)}</TableCell>
               <TableCell>
                 <Button
                   variant="contained"
@@ -113,8 +129,8 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
             </TableCell>
             <TableCell colSpan={2} sx={{ color: "white", fontWeight: "bold" }}>
               $
-              {dataBuffer
-                .reduce((acc, item) => acc + (Number(item.price) || 0), 0)
+              {processedData
+                .reduce((acc, item) => acc + (Number(item.calculatedPrice) || 0), 0)
                 .toFixed(2)}
             </TableCell>
           </TableRow>

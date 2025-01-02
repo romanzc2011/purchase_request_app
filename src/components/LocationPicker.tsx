@@ -18,7 +18,7 @@ const LocationFilter = ({
         htmlFor="location"
         style={{ minWidth: "50px", whiteSpace: "nowrap" }}
       >
-        <strong>Location</strong>
+        <strong>Location:</strong>
       </label>
       <select
         className="form-select"

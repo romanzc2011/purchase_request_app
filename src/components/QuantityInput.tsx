@@ -1,30 +1,30 @@
 import { UseFormRegister, FieldErrors } from "react-hook-form";
 import { FormValues } from "../types/formTypes";
 
-interface PriceInputProps {
+interface QuantityInputProps {
   register: ReturnType<UseFormRegister<FormValues>>;
   errors: FieldErrors<FormValues>;
 }
 
-const PriceInput = ({ register, errors }: PriceInputProps) => {
+const QuantityInput = ({ register, errors }: QuantityInputProps) => {
   return (
     <>
       <label
-        htmlFor="price"
+        htmlFor="quantity"
         style={{ display: "block", width: "100px", whiteSpace: "nowrap" }}
       >
-        <strong>Price:</strong>
+        <strong>Quantity:</strong>
       </label>
       <input
-        id="price"
+        id="quantity"
         type="number"
         className="form-control"
-        placeholder="Enter price"
+        placeholder="Enter quantity"
         {...register}
       />
-      {errors.price && <p className="error">{errors.price.message}</p>}
+      {errors.quantity && <p className="error">{errors.quantity.message}</p>}
     </>
   );
 };
 
-export default PriceInput;
+export default QuantityInput;

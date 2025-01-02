@@ -25,7 +25,7 @@ const BudgetCodePicker = ({
           marginRight: "8px",
         }}
       >
-        <strong>Budget Object Code (BOC)</strong>
+        <strong>Budget Object Code (BOC):</strong>
       </label>
 
       <select

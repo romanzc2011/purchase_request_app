@@ -12,6 +12,7 @@ import Grid from "@mui/material/Grid";
 import LocationPicker from "./LocationPicker";
 import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
+import QuantityInput from "./QuantityInput";
 
 /*************************************************************************************** */
 /* ADD ITEMS FORM */
@@ -29,7 +30,7 @@ export const AddItemsForm: React.FC<{
       id: generateRandomID(),
       price: Number(newItem.price) || 0,
       fund: newItem.fund || "",
-      budgetObjCode: newItem.budgetObjCode || ""
+      budgetObjCode: newItem.budgetObjCode || "",
     };
 
     setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
@@ -50,7 +51,7 @@ export const AddItemsForm: React.FC<{
   for finance */
   const generateRandomID = () => {
     const min = 1;
-    const max = Number.MAX_SAFE_INTEGER;
+    const max = 5000;
     return Math.floor(Math.random() * (max - min + 1)) + min;
   };
 
@@ -393,6 +394,17 @@ export const AddItemsForm: React.FC<{
                 required: "Price is required.",
                 validate: (value) =>
                   value >= 0 || "Price cannot be less than $0.",
+              })}
+              errors={errors}
+            />
+
+            {/************************************************************************************ */}
+            {/* QUANTITY */}
+            <QuantityInput
+              register={register("quantity", {
+                required: "Quantity is required.",
+                validate: (value) =>
+                  value > 0 || "Quantity must be greater than 0.",
               })}
               errors={errors}
             />

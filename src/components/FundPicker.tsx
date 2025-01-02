@@ -14,7 +14,7 @@ const FundPicker = ({ onSelectFund, register, errors }: FundPickerProps) => {
         htmlFor="fund"
         style={{ display: "block", width: "100px", whiteSpace: "nowrap" }}
       >
-        <strong>Fund</strong>
+        <strong>Fund:</strong>
       </label>
       <select
         className="form-select"
