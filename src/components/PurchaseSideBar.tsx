@@ -18,7 +18,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import MenuIcon from "@mui/icons-material/Menu";
 
 const drawerWidth = 195;
-const appBarHeight = 96;
+const appBarHeight = 100;
 
 export default function PurchaseSideBar() {
   const [open, setOpen] = useState(true); // State to toggle Drawer

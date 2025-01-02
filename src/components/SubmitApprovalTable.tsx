@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import Buttons from "./Buttons";
 import {
   Table,
@@ -11,25 +11,18 @@ import {
   Button,
   Typography,
 } from "@mui/material";
+import { FormValues } from "../types/formTypes";
 
-interface Purchase {
-  BOC: number;
-  fund: string;
-  location: string;
-  description: string;
-  quantity: number;
-  price: number;
-  estimatedCost: number;
-  justification: string;
+/* INTERFACE */
+interface SubmitApprovalTableProps {
+  dataBuffer: FormValues[];
+  onDelete: (id: number) => void;
 }
 
-interface PurchaseProps {
-  purchases: Purchase[];
-  onDelete: (BOC: number) => void;
-}
-
-const PurchaseList = ({ purchases, onDelete }: PurchaseProps) => {
-  if (purchases.length === 0) return null;
+const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
+  dataBuffer,
+  onDelete,
+}) => {
   return (
     <TableContainer
       component={Paper}
@@ -38,15 +31,19 @@ const PurchaseList = ({ purchases, onDelete }: PurchaseProps) => {
         color: "white", // Ensure text contrast
         borderRadius: "10px",
         overflow: "hidden", // Ensure rounded corners
+        width: "100%",
       }}
     >
-      <Table>
+      <Table sx={{ width: "100%", tableLayout: "auto" }}>
         <TableHead
           sx={{ background: "linear-gradient(to bottom, #2c2c2c, #800000)" }}
         >
           <TableRow>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-              BOC
+              id
+            </TableCell>
+            <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              Budget Object Code
             </TableCell>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Fund
@@ -55,19 +52,10 @@ const PurchaseList = ({ purchases, onDelete }: PurchaseProps) => {
               Location
             </TableCell>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-              Description
-            </TableCell>
-            <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Quantity
             </TableCell>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Price
-            </TableCell>
-            <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-              Estimated Cost
-            </TableCell>
-            <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-              Justification
             </TableCell>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Actions
@@ -75,27 +63,21 @@ const PurchaseList = ({ purchases, onDelete }: PurchaseProps) => {
           </TableRow>
         </TableHead>
         <TableBody>
-          {purchases.map((purchase) => (
-            <TableRow key={purchase.BOC}>
-              <TableCell sx={{ color: "white" }}>{purchase.BOC}</TableCell>
-              <TableCell sx={{ color: "white" }}>{purchase.fund}</TableCell>
-              <TableCell sx={{ color: "white" }}>{purchase.location}</TableCell>
+          {dataBuffer.map((item) => (
+            <TableRow key={item.id}>
+              <TableCell sx={{ color: "white" }}>{item.id}</TableCell>
               <TableCell sx={{ color: "white" }}>
-                {purchase.description}
+                {item.budgetObjCode}
               </TableCell>
-              <TableCell sx={{ color: "white" }}>{purchase.quantity}</TableCell>
-              <TableCell sx={{ color: "white" }}>{purchase.price}</TableCell>
-              <TableCell sx={{ color: "white" }}>
-                {purchase.estimatedCost}
-              </TableCell>
-              <TableCell sx={{ color: "white" }}>
-                {purchase.justification}
-              </TableCell>
+              <TableCell sx={{ color: "white" }}>{item.fund}</TableCell>
+              <TableCell sx={{ color: "white" }}>{item.location}</TableCell>
+              <TableCell sx={{ color: "white" }}>{item.quantity}</TableCell>
+              <TableCell sx={{ color: "white" }}>{item.price}</TableCell>
               <TableCell>
                 <Button
                   variant="contained"
                   color="error"
-                  onClick={() => onDelete(purchase.BOC)}
+                  onClick={() => onDelete(item.id)}
                 >
                   Delete
                 </Button>
@@ -105,18 +87,22 @@ const PurchaseList = ({ purchases, onDelete }: PurchaseProps) => {
         </TableBody>
         <tfoot>
           <TableRow>
-            <TableCell>
+            <TableCell colSpan={4}>
               {/************************************************************************************ */}
               {/* BUTTONS: SUBMIT/PRINT */}
               {/************************************************************************************ */}
               {/* Submit data to proper destination, email to supervisor or notify sup that there's a request for them to approve */}
-              <Buttons label="Submit Form" />
+              <Buttons
+                label="Submit Form"
+                className=" me-3 btn btn-maroon"
+                disabled={dataBuffer.length === 0}
+              />
 
-              {/* This button will print out Purchase Request */}
-              <Buttons label="Print Form" />
+              {/* This button will print out item Request */}
+              <Buttons label="Print Form" className="btn btn-maroon" />
             </TableCell>
 
-            <TableCell colSpan={7} sx={{ color: "white", textAlign: "right" }}>
+            <TableCell colSpan={2} sx={{ color: "white", textAlign: "right" }}>
               <Typography
                 variant="h6"
                 component="div"
@@ -127,8 +113,8 @@ const PurchaseList = ({ purchases, onDelete }: PurchaseProps) => {
             </TableCell>
             <TableCell colSpan={2} sx={{ color: "white", fontWeight: "bold" }}>
               $
-              {purchases
-                .reduce((acc, purchase) => purchase.estimatedCost + acc, 0)
+              {dataBuffer
+                .reduce((acc, item) => acc + (Number(item.price) || 0), 0)
                 .toFixed(2)}
             </TableCell>
           </TableRow>
@@ -138,4 +124,4 @@ const PurchaseList = ({ purchases, onDelete }: PurchaseProps) => {
   );
 };
 
-export default PurchaseList;
+export default SubmitApprovalTable;

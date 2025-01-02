@@ -5,7 +5,10 @@
   text-align: center;
 }
 
-.main-content {
+.btn-maroon {
+  background-color: maroon;
+  color: white;
+  border-color: maroon;
 }
 
 .app-container {

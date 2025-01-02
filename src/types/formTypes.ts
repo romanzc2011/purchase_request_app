@@ -1,4 +1,5 @@
 export type FormValues = {
+    id: number;
     requester: string;
     phoneext: string;
     datereq: Date | null;
@@ -14,6 +15,7 @@ export type FormValues = {
       trainNotAval: string;
       needsNotMeet: string;
     };
+    quantity: number;
     price: number;
     fund: string;
     location: string;

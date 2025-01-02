@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import PurchasePicker from "./components/SubmitApprovalForm";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
-import PurchaseForm from "./components/AddItemsForm";
+import { AddItemsForm } from "./components/AddItemsForm";
+import SubmitApprovalTable from "./components/SubmitApprovalTable";
 import PurchaseSidenav from "./components/PurchaseSideBar";
 import { Box, Toolbar } from "@mui/material";
+import { FormValues } from "./types/formTypes";
 
 function App() {
   // Update the title and icon of app
@@ -12,6 +13,10 @@ function App() {
     document.title =
       "Puchase Request - Bankruptcy Court Wester District of Louisiana";
   });
+
+  /* *********************************************************************************** */
+  /* SHARED DATA BUFFER */
+  const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
 
   /* React example of send a request to python backend */
@@ -30,42 +35,32 @@ function App() {
       .catch((err) => console.error("Error fetching time:", err));
   }, []);
 
-  /* TEST DATA *********************************************************** */
-  const [purchases, setPurchases] = useState([
-    {
-      BOC: 1,
-      fund: "aaa",
-      location: "Shreveport, LA",
-      description: "Utilities",
-      quantity: 3,
-      price: 10,
-      estimatedCost: 100,
-      justification: "need",
-    },
-  ]);
-
   return (
-    <div>
+    <Box>
       <PurchaseSidenav />
 
+      {/********************************************************************* */}
       {/* MAIN SECTION */}
+      {/********************************************************************* */}
       <Box component={"main"} sx={{ flexGrow: 1, p: 3 }}>
         <Toolbar /> {/* Space to offset AppBar */}
-        {/* Form Section */}
-        <PurchaseForm />
-        <div className="col-md-12" style={{ marginTop: "20px" }}>
-          <PurchasePicker
-            purchases={purchases}
-            onDelete={(id) =>
-              setPurchases(purchases.filter((e) => e.BOC !== id))
+        {/* Add Items Form */}
+        <AddItemsForm dataBuffer={dataBuffer} setDataBuffer={setDataBuffer} />
+        
+        {/********************************************************************* */}
+        {/* TABLE SECTION --- where items will be reviewed and submitted for
+             approval*/}
+        {/********************************************************************* */}
+        <Box className="col-md-12" style={{ marginTop: "20px" }}>
+          <SubmitApprovalTable
+            dataBuffer={dataBuffer}
+            onDelete={(id: number) =>
+              setDataBuffer(dataBuffer.filter((item) => item.id !== id))
             }
           />
-        </div>
+        </Box>
       </Box>
-      {/********************************************************************* */}
-      {/* FORM SECTION */}
-      {/********************************************************************* */}
-    </div>
+    </Box>
   );
 }
 
