@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useForm } from "react-hook-form";
 import Buttons from "./Buttons";
 import {
   Table,
@@ -18,27 +19,56 @@ import { convertBOC } from "../utils/bocUtils";
 interface SubmitApprovalTableProps {
   dataBuffer: FormValues[];
   onDelete: (id: number) => void;
-}
-
-/************************************************************************************ */
-/* QUANTITY HOOK --- Update price base on quantity */
-const useQuantityPrice = (initialPrice: number, incrementQuantity: number) => {
-  const [price, setPrice] = useState(initialPrice);
-  const quantity = () => setPrice(price * incrementQuantity);
-
-  return [price, quantity] as const;
+  resetTable: () => void;
 }
 
 const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   dataBuffer,
   onDelete,
-
+  resetTable,
 }) => {
   // Preprocess data to calculate price
   const processedData = dataBuffer.map((item) => ({
     ...item,
     calculatedPrice: (item.price || 0) * (item.quantity || 1), // Calculating based on quantity
-  }))
+  }));
+
+  /************************************************************************************ */
+  /* SUBMIT DATA --- send to backend to add to database */
+  /************************************************************************************ */
+  const handleSubmitData = (dataBuffer: FormValues[]) => {
+    fetch("http://127.0.0.1:5000/sendData", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ dataBuffer }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log("Response from POST request: ", data);
+        resetTable();
+      })
+      .catch((err) => console.error("Error sending data:", err));
+  };
+
+  /************************************************************************************ */
+  /* QUANTITY HOOK --- Update price base on quantity */
+  const useQuantityPrice = (
+    initialPrice: number,
+    incrementQuantity: number
+  ) => {
+    const [price, setPrice] = useState(initialPrice);
+    const quantity = () => setPrice(price * incrementQuantity);
+
+    return [price, quantity] as const;
+  };
+
   return (
     <TableContainer
       component={Paper}
@@ -88,7 +118,9 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
               <TableCell sx={{ color: "white" }}>{item.fund}</TableCell>
               <TableCell sx={{ color: "white" }}>{item.location}</TableCell>
               <TableCell sx={{ color: "white" }}>{item.quantity}</TableCell>
-              <TableCell sx={{ color: "white" }}>{item.calculatedPrice.toFixed(2)}</TableCell>
+              <TableCell sx={{ color: "white" }}>
+                {item.calculatedPrice.toFixed(2)}
+              </TableCell>
               <TableCell>
                 <Button
                   variant="contained"
@@ -112,6 +144,9 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
                 label="Submit Form"
                 className=" me-3 btn btn-maroon"
                 disabled={dataBuffer.length === 0}
+                onClick={() => {
+                  handleSubmitData(dataBuffer);
+                }}
               />
 
               {/* This button will print out item Request */}
@@ -130,7 +165,10 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
             <TableCell colSpan={2} sx={{ color: "white", fontWeight: "bold" }}>
               $
               {processedData
-                .reduce((acc, item) => acc + (Number(item.calculatedPrice) || 0), 0)
+                .reduce(
+                  (acc, item) => acc + (Number(item.calculatedPrice) || 0),
+                  0
+                )
                 .toFixed(2)}
             </TableCell>
           </TableRow>

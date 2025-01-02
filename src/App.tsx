@@ -12,8 +12,12 @@ function App() {
   /* *********************************************************************************** */
   /* SHARED DATA BUFFER */
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
-  const [currentTime, setCurrentTime] = useState(0);
-  
+
+  // Reset the Submit Table after submission
+  const resetTable = () => {
+    setDataBuffer([]);
+  }
+
   // Update the title and icon of app
   useEffect(() => {
     document.title =
@@ -24,24 +28,6 @@ function App() {
   useEffect(() => {
     console.log("UPDATE dataBuffer: ", dataBuffer);
   }, [dataBuffer]);
-
-  
-
-  /* React example of send a request to python backend */
-  useEffect(() => {
-    fetch("http://127.0.0.1:5000/time")
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data) => {
-        console.log("Fetched time:", data.time);
-        setCurrentTime(data.time);
-      })
-      .catch((err) => console.error("Error fetching time:", err));
-  }, []);
 
   return (
     <Box>
@@ -65,6 +51,7 @@ function App() {
             onDelete={(id: number) =>
               setDataBuffer(dataBuffer.filter((item) => item.id !== id))
             }
+            resetTable={resetTable}
           />
         </Box>
       </Box>
