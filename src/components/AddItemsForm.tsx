@@ -1,6 +1,6 @@
 import { FieldErrors, useForm, useFieldArray, Field } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
-import React, { useState } from "react";
+import React from "react";
 import "./LearningDev";
 import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
@@ -20,7 +20,7 @@ import QuantityInput from "./QuantityInput";
 export const AddItemsForm: React.FC<{
   dataBuffer: FormValues[];
   setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
-}> = ({ dataBuffer, setDataBuffer }) => {
+}> = ({ setDataBuffer }) => {
   /*************************************************************************************** */
   /* HANDLE ADD ITEM function */
   /*************************************************************************************** */
@@ -43,6 +43,18 @@ export const AddItemsForm: React.FC<{
   /*************************************************************************************** */
   const onError = (errors: FieldErrors<FormValues>) => {
     console.log("Form errors", errors);
+  };
+
+    /*************************************************************************************** */
+  /* HANDLE ADD FILE ATTACHMENT function */
+  /*************************************************************************************** */
+  const handleAddFile = () => {
+    const currentValues = watch(); // Gets current form values
+    append({ attachment: null });
+    reset({
+      ...currentValues,
+      fileAttachments: [...currentValues.fileAttachments, { attachment: null}],
+    });
   };
 
   /* RANDOM ID GENERATOR 
@@ -80,14 +92,7 @@ export const AddItemsForm: React.FC<{
   });
 
   const { register, control, handleSubmit, formState, watch, reset } = form;
-  const {
-    errors,
-    isDirty,
-    isValid,
-    isSubmitting,
-    isSubmitted,
-    isSubmitSuccessful,
-  } = formState;
+  const { errors, isDirty, isValid, isSubmitSuccessful } = formState;
 
   /*************************************************************************************** */
   /* Form submission function */
@@ -166,8 +171,9 @@ export const AddItemsForm: React.FC<{
             <p className="error">{errors.phoneext?.message}</p>
           </Grid>
         </Grid>
-
-        {/** DATE OF REQ ****************************************************************** */}
+        {/*************************************************************************************** */}
+        {/** DATE OF REQ ************************************************************************ */}
+        {/*************************************************************************************** */}
         <Grid className="m-2 row align-items-center">
           <label htmlFor="datereq" className="col-sm-2 col-form-label">
             <strong>Date of Request</strong>
@@ -187,9 +193,10 @@ export const AddItemsForm: React.FC<{
             <p className="error">{errors.datereq?.message}</p>
           </Grid>
         </Grid>
-        {/*************************************************************************************** */}
 
+        {/*************************************************************************************** */}
         {/** DATE ITEMS NEEDED ****************************************************************** */}
+        {/*************************************************************************************** */}
         <Grid className="m-2 row align-items-center">
           <label htmlFor="dateneed" className="col-sm-2 col-form-label">
             <strong>Date Item(s) Needed</strong>
@@ -266,8 +273,6 @@ export const AddItemsForm: React.FC<{
           {/********************************************************************************************* */}
           <Grid className="col-sm-6">
             {fields.map((field, index) => {
-              const fileValue = watch(`fileAttachments.${index}.attachment`);
-
               return (
                 <Grid className="mt-2 d-flex align-items-center" key={field.id}>
                   <input
@@ -275,25 +280,23 @@ export const AddItemsForm: React.FC<{
                     className="form-control me-2"
                     style={{ width: "350px" }}
                     multiple
-                    {...register(
-                      `fileAttachments.${index}.attachment` as const,
-                      {
-                        validate: (value) =>
-                          value instanceof File ||
-                          value === null ||
-                          "File is required",
-                      }
-                    )}
+                    {...register(`fileAttachments.${index}.attachment`)}
                   />
-                  <p className="error">
-                    {errors.fileAttachments?.[index]?.attachment?.message}
-                  </p>
 
                   {/* Only show REMOVE button if more than 1 file/attachment */}
                   {index > 0 && (
                     <Buttons
                       className="btn btn-danger me-2"
-                      onClick={() => remove(index)}
+                      onClick={() => {
+                        const currentValues = watch();
+                        remove(index);
+                        reset({
+                          ...currentValues,
+                          fileAttachments: currentValues.fileAttachments.filter(
+                            (_, i) => i !== index
+                          ),
+                        })
+                      }}
                       label="Remove"
                     />
                   )}
@@ -302,16 +305,18 @@ export const AddItemsForm: React.FC<{
             })}
 
             <Grid className="d-flex align-items-center mt-3">
-              {/* Conditionally render "Add File" button */}
-              {fields.every(
-                (field, index) => !!watch(`fileAttachments.${index}.attachment`) // Check if all fields have files uploaded
-              ) && (
-                <Buttons
-                  className="btn btn-primary me-2"
-                  onClick={() => append({ attachment: null })}
-                  label="Add File"
-                />
-              )}
+              <Buttons
+                className="btn btn-maroon me-2"
+                onClick={() => {
+                  const currentValues = watch();
+                  append({ attachment: null });
+                  reset({
+                    ...currentValues,
+                    fileAttachments: [...currentValues.fileAttachments, { attachment: null }],
+                  });
+                }}
+                label="Add File"
+              />
             </Grid>
           </Grid>
         </Grid>
@@ -419,7 +424,9 @@ export const AddItemsForm: React.FC<{
               SUBMIT button will handle gathering and sending the data to proper supervisors */}
           <Buttons
             className="me-3 btn btn-maroon"
-            disabled={!isDirty || !isValid}
+            disabled={
+              !isDirty || !isValid 
+            }
             label="Add Item"
             onClick={handleSubmit(handleAddItem)}
           />

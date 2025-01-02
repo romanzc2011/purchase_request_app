@@ -8,16 +8,24 @@ import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 
 function App() {
+
+  /* *********************************************************************************** */
+  /* SHARED DATA BUFFER */
+  const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
+  const [currentTime, setCurrentTime] = useState(0);
+  
   // Update the title and icon of app
   useEffect(() => {
     document.title =
       "Puchase Request - Bankruptcy Court Wester District of Louisiana";
   });
 
-  /* *********************************************************************************** */
-  /* SHARED DATA BUFFER */
-  const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
-  const [currentTime, setCurrentTime] = useState(0);
+  /* Runs everytime dataBuffer changes */
+  useEffect(() => {
+    console.log("UPDATE dataBuffer: ", dataBuffer);
+  }, [dataBuffer]);
+
+  
 
   /* React example of send a request to python backend */
   useEffect(() => {
