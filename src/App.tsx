@@ -1,62 +1,21 @@
-import { useEffect, useState } from "react";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "./App.css";
-import { AddItemsForm } from "./components/AddItemsForm";
-import SubmitApprovalTable from "./components/SubmitApprovalTable";
-import PurchaseSidenav from "./components/PurchaseSideBar";
-import { Box, Toolbar } from "@mui/material";
-import { FormValues } from "./types/formTypes";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import PurchaseRequestForm from './components/purchase_req/PurchaseRequestForm';
+import RequestsWaiting from './components/requests/RequestsWaiting';
 
-function App() {
-
-  /* *********************************************************************************** */
-  /* SHARED DATA BUFFER */
-  const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
-
-  // Reset the Submit Table after submission
-  const resetTable = () => {
-    setDataBuffer([]);
-  }
-
-  // Update the title and icon of app
-  useEffect(() => {
-    document.title =
-      "Puchase Request - Bankruptcy Court Wester District of Louisiana";
-  });
-
-  /* Runs everytime dataBuffer changes */
-  useEffect(() => {
-    console.log("UPDATE dataBuffer: ", dataBuffer);
-  }, [dataBuffer]);
-
-  return (
-    <Box>
-      <PurchaseSidenav />
-
-      {/********************************************************************* */}
-      {/* MAIN SECTION */}
-      {/********************************************************************* */}
-      <Box component={"main"} sx={{ flexGrow: 1, p: 3 }}>
-        <Toolbar /> {/* Space to offset AppBar */}
-        {/* Add Items Form */}
-        <AddItemsForm dataBuffer={dataBuffer} setDataBuffer={setDataBuffer} />
-        
-        {/********************************************************************* */}
-        {/* TABLE SECTION --- where items will be reviewed and submitted for
-             approval*/}
-        {/********************************************************************* */}
-        <Box className="col-md-12" style={{ marginTop: "20px" }}>
-          <SubmitApprovalTable
-            dataBuffer={dataBuffer}
-            onDelete={(id: number) =>
-              setDataBuffer(dataBuffer.filter((item) => item.id !== id))
-            }
-            resetTable={resetTable}
-          />
-        </Box>
-      </Box>
-    </Box>
-  );
-}
-
-export default App;
+const App = () => {
+    return (
+      <Router>
+        <nav>
+          <Link to="/purchase-request">New Request</Link>
+          <Link to="/requests-table">Requests Table</Link>
+        </nav>
+        <Routes>
+          <Route path="/purchase-request" element={<PurchaseRequestForm />} />
+          <Route path="/requests-table" element={<RequestsWaiting />} />
+        </Routes>
+      </Router>
+    );
+  };
+  
+  export default App;

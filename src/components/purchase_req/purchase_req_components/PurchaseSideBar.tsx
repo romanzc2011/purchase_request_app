@@ -13,8 +13,8 @@ import {
   ListItemIcon,
   IconButton,
 } from "@mui/material";
-import BKSeal from "../assets/seal_no_border.png";
-import VerifiedIcon from "@mui/icons-material/Verified";
+import BKSeal from "../../../assets/seal_no_border.png";
+import CheckCircleSharpIcon from '@mui/icons-material/CheckCircleSharp';
 import MenuIcon from "@mui/icons-material/Menu";
 
 const drawerWidth = 195;
@@ -111,7 +111,7 @@ export default function PurchaseSideBar() {
                     justifyContent: open ? "flex-start" : "center",
                   }}
                 >
-                  <VerifiedIcon />
+                  <CheckCircleSharpIcon />
                 </ListItemIcon>
                 {/* Show text only when open */}
                 {open && <ListItemText primary="REQUESTS" />}

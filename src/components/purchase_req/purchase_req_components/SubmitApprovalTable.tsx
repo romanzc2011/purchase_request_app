@@ -12,8 +12,8 @@ import {
   Button,
   Typography,
 } from "@mui/material";
-import { FormValues } from "../types/formTypes";
-import { convertBOC } from "../utils/bocUtils";
+import { FormValues } from "../../../types/formTypes";
+import { convertBOC } from "../../../utils/bocUtils";
 
 /* INTERFACE */
 interface SubmitApprovalTableProps {

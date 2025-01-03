@@ -6,7 +6,7 @@ import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
 import BudgetCodePicker from "./BudgetCodePicker";
 import { useEffect } from "react";
-import { FormValues } from "../types/formTypes";
+import { FormValues } from "../../../types/formTypes";
 import { Box } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import LocationPicker from "./LocationPicker";
