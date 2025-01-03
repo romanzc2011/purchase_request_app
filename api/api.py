@@ -38,9 +38,8 @@ def getPurchaseRequest():
             return jsonify({"error": "Invalid data"}), 400  
     
     for item in data['dataBuffer']:
-        if isinstance(item, dict):
-            for k,v in item.items():
-                print(f"{k}: {v}")
+        for k,v in item.items():
+            print(f"{k}: {v}")
                 
     return jsonify(data)
        
