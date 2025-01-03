@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
 import os
+import purchase_request_database as db
 import threading
 
 """
@@ -12,8 +13,9 @@ Will be used to keep track of purchase requests digitally through a central UI. 
 the UI.
 """
 
-db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 lock = threading.Lock()
+processed_data_shared = None
+db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 
 app = Flask(__name__)
 CORS(app)
@@ -50,7 +52,7 @@ def getPurchaseRequest():
             return jsonify({'error': 'Invalid data'}), 400
         
         # Start thread
-        thread = threading.Thread(target=purchase_bg_task, args=(data,))
+        thread = threading.Thread(target=purchase_bg_task, args=(data,db_path))
         thread.start()
         
         return jsonify({"message": "Processing started in background"})
@@ -75,11 +77,24 @@ def process_purchase_data(data):
     return purchase_cols
 
 # Purchase col background thread
-def purchase_bg_task(data):
+def purchase_bg_task(data, db_path):
+    global processed_data_shared
     processed_data = process_purchase_data(data)
     
+    # Update shared data
+    with lock:
+        processed_data_shared = processed_data
+        
     for k, v in processed_data.items():
         print(f"{k}: {v}")
+    
+    # Start new thread to insert data into db
+    insert_thread = threading.Thread(target=insert_data, args=(processed_data,))
+    insert_thread.start()
+
+# Insert data into database
+def insert_data(processed_data):
+    db.insertPurchaseReq(processed_data)
 
 ##########################################################################
 ## MAIN CONTROL FLOW

@@ -51,7 +51,7 @@ function App() {
             onDelete={(id: number) =>
               setDataBuffer(dataBuffer.filter((item) => item.id !== id))
             }
-            //resetTable={resetTable}
+            resetTable={resetTable}
           />
         </Box>
       </Box>

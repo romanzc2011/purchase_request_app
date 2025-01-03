@@ -106,7 +106,7 @@ export default function PurchaseSideBar() {
               >
                 <ListItemIcon
                   sx={{
-                    color: "white",
+                    color: "green",
                     minWidth: open ? "40px" : "0",
                     justifyContent: open ? "flex-start" : "center",
                   }}
