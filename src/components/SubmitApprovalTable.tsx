@@ -37,7 +37,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   /* SUBMIT DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    fetch("http://127.0.0.1:5000/sendData", {
+    fetch("http://127.0.0.1:5000/getPurchaseData", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
