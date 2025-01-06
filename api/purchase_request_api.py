@@ -55,11 +55,37 @@ def getPurchaseRequest():
             return jsonify({'error': 'Invalid data'}), 400
         
         # Start thread
-        thread = threading.Thread(target=purchase_bg_task, args=(data,db_path))
+        thread = threading.Thread(target=purchase_bg_task, args=(data,db_path,"sendToApprovals"))
         thread.start()
         
         return jsonify({"message": "Processing started in background"})
-
+    
+##########################################################################
+## GET APPROVAL DATA
+@app.route('/getApprovalData', methods=['GET'])
+def getApprovalData():
+    try:
+        # Fetch data
+        connection = db.getDBConnection(db_path)
+        db.createApprovalsTbl(connection)
+        
+        cursor = connection.cursor()
+        query = "SELECT * FROM approvals"
+        cursor.execute(query)
+        
+        # Fetch rows
+        rows = cursor.fetchall()
+        data = [dict(row) for row in rows]
+        
+        return jsonify(data),  200
+    
+    except Exception as e:
+        print(f"Error fetching approval data: {e}")
+        return jsonify({"error": "Failed to fetch data"}), 500
+    
+    finally:
+        connection.close()
+    
 ##########################################################################
 ## PROCESS PURCHASE DATA
 def process_purchase_data(data):
@@ -102,27 +128,26 @@ def process_purchase_data(data):
 
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
-def purchase_bg_task(data, db_path):
+def purchase_bg_task(data, db_path, api_call):
     global processed_data_shared
-    processed_data = process_purchase_data(data)
     
-    # Update shared data
-    with lock:
-        processed_data_shared = processed_data
+    if api_call == "sendToApprovals":
+        processed_data = process_purchase_data(data)
         
-    for k, v in processed_data.items():
-        print(f"{k}: {v}")
+        # Update shared data
+        with lock:
+            processed_data_shared = processed_data
+            
+        for k, v in processed_data.items():
+            print(f"{k}: {v}")
+        
+        # Start new thread to insert data into db
+        insert_thread = threading.Thread(target=db.insertPurchaseReq, args=(processed_data,))
+        insert_thread.start()
     
-    # Start new thread to insert data into db
-    insert_thread = threading.Thread(target=insert_data, args=(processed_data,))
-    insert_thread.start()
-    
-##########################################################################
-## INSERT DATA
-# Insert data into database
-def insert_data(processed_data):
-    db.insertPurchaseReq(processed_data)
-    
+    elif  api_call ==  "getApproveData":
+        fetch_approve_thread =  threading.Thread(target=getApprovalData, args=(db_path,))
+        fetch_approve_thread.start()
 
 ##########################################################################
 ## MAIN CONTROL FLOW

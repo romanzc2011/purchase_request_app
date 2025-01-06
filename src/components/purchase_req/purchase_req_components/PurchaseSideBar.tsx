@@ -23,11 +23,35 @@ interface PurchaseSideBarProps {
   toggleSidebar: () => void;
 }
 
+/**************************************************************************/
+/* Request data from approval table */
+const fetchRequestData = () => {
+  fetch("http://127.0.0.1:5000/getApprovalData", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`HTTP error: ${res.status}`);
+      }
+      return res.json(); // Parse  JSON response
+    })
+    .then((data) => {
+      console.log("GET RESPONSE: ", data);
+    })
+    .catch((err) => console.error("Error catching data: ", err));
+};
+
 const drawerWidth = 195;
 const appBarHeight = 100;
 const collapseWidth = 60;
 
-const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({ isOpen, toggleSidebar }) => {
+const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
+  isOpen,
+  toggleSidebar,
+}) => {
   return (
     <Box sx={{ display: "flex" }}>
       {/* HEADER */}
@@ -125,6 +149,9 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({ isOpen, toggleSidebar
             {/* REQUESTS */}
             <ListItem divider sx={{ borderBottom: "2px solid #800000" }}>
               <ListItemButton
+                onClick={()   => {
+                  fetchRequestData();
+                }}
                 component={Link}
                 to="/approvals-table"
                 sx={{ justifyContent: isOpen ? "flex-start" : "center" }}

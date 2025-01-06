@@ -7,7 +7,7 @@ import SubmitApprovalTable from "./components/purchase_req/purchase_req_componen
 import PurchaseSidenav from "./components/purchase_req/purchase_req_components/PurchaseSideBar";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
-import ApprovalsWaiting from "./components/approvals/ApprovalsWaiting";
+import ApprovalsTable from "./components/approvals/ApprovalTable";
 
 const drawerWidth = 195;
 
@@ -48,16 +48,32 @@ function App() {
         {/********************************************************************* */}
         {/* MAIN SECTION */}
         {/********************************************************************* */}
-        <Box component={"main"} sx={{
+        <Box
+          component={"main"}
+          sx={{
             padding: 3,
             marginLeft: sidebarOpen ? `${drawerWidth}px` : "60px", // Adjust dynamically
             transition: "margin 0.3s ease", // Smooth transition
             overflow: "auto", // Enable scrolling if content overflows
-          }}>
+          }}
+        >
           <Toolbar /> {/* Space to offset AppBar */}
           <Routes>
             {/* Define Routes */}
-            <Route path="/approvals-table" element={<ApprovalsWaiting />} />
+            <Route
+              path="/approvals-table"
+              element={
+                <ApprovalsTable
+                  dataBuffer={dataBuffer}
+                  onDelete={(req_id: number) =>
+                    setDataBuffer(
+                      dataBuffer.filter((item) => item.req_id !== req_id)
+                    )
+                  }
+                  resetTable={resetTable}
+                />
+              }
+            />
             <Route
               path="/purchase-request"
               element={

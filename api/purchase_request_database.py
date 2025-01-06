@@ -89,6 +89,8 @@ def insertPurchaseReq(processed_data):
         
         query = f"INSERT INTO purchase_requests ({columns}) VALUES ({valueholder})"
         
+        print(f"{query}")
+        
         # Establish database connection
         connection = getDBConnection(db_path)
         createPurchaseReqTbl(connection)
@@ -107,13 +109,13 @@ def insertPurchaseReq(processed_data):
 
 ###############################################################################################
 ## FETCH ALL ROWS    
-def fetch_all_rows(db_path):
+def fetch_all_rows(db_path, table):
         connection = getDBConnection(db_path)
         connection.row_factory = sqlite3.Row
         cursor = connection.cursor()
         
         # Execute SELECT * query to fetch all rows from the table
-        query = "SELECT * FROM purchase_requests"
+        query = f"SELECT * FROM {table}"
         cursor.execute(query)
         
         # fetch all rows
