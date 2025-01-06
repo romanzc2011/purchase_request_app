@@ -1,6 +1,6 @@
-import React from "react";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
 import { FormValues } from "../../../types/formTypes";
+import { Box } from "@mui/material";
 
 interface BudgetPickerProps {
   onSelectBudgetCode: (budgetObjCode: string) => void;
@@ -14,7 +14,7 @@ const BudgetCodePicker = ({
   errors,
 }: BudgetPickerProps) => {
   return (
-    <>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "700px" }}>
       <label
         htmlFor="budgetObjCode"
         style={{
@@ -56,7 +56,7 @@ const BudgetCodePicker = ({
         </option>
       </select>
       {errors.budgetObjCode && <p className="error">{errors.budgetObjCode.message}</p>}
-    </>
+      </Box>
   );
 };
 

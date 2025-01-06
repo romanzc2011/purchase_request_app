@@ -1,5 +1,6 @@
 import { UseFormRegister, FieldErrors } from "react-hook-form";
 import { FormValues } from "../../../types/formTypes";
+import { Box } from "@mui/material";
 
 interface QuantityInputProps {
   register: ReturnType<UseFormRegister<FormValues>>;
@@ -8,7 +9,7 @@ interface QuantityInputProps {
 
 const QuantityInput = ({ register, errors }: QuantityInputProps) => {
   return (
-    <>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "400px" }}>
       <label
         htmlFor="quantity"
         style={{ display: "block", width: "100px", whiteSpace: "nowrap" }}
@@ -23,7 +24,7 @@ const QuantityInput = ({ register, errors }: QuantityInputProps) => {
         {...register}
       />
       {errors.quantity && <p className="error">{errors.quantity.message}</p>}
-    </>
+    </Box>
   );
 };
 

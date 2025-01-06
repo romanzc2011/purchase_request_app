@@ -49,7 +49,6 @@ function App() {
         {/* MAIN SECTION */}
         {/********************************************************************* */}
         <Box component={"main"} sx={{
-            flexGrow: 1, // Take remaining space
             padding: 3,
             marginLeft: sidebarOpen ? `${drawerWidth}px` : "60px", // Adjust dynamically
             transition: "margin 0.3s ease", // Smooth transition

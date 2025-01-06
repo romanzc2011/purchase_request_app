@@ -1,4 +1,4 @@
-import { FieldErrors, useForm, useFieldArray, Field } from "react-hook-form";
+import { FieldErrors, useForm, useFieldArray } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
 import React from "react";
 import "./LearningDev";
@@ -8,7 +8,6 @@ import BudgetCodePicker from "./BudgetCodePicker";
 import { useEffect } from "react";
 import { FormValues } from "../../../types/formTypes";
 import { Box } from "@mui/material";
-import Grid from "@mui/material/Grid";
 import LocationPicker from "./LocationPicker";
 import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
@@ -21,7 +20,6 @@ export const AddItemsForm: React.FC<{
   dataBuffer: FormValues[];
   setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
 }> = ({ setDataBuffer }) => {
-  
   /*************************************************************************************** */
   /* HANDLE ADD ITEM function */
   /*************************************************************************************** */
@@ -54,7 +52,7 @@ export const AddItemsForm: React.FC<{
     append({ attachment: null });
     reset({
       ...currentValues,
-      fileAttachments: [...currentValues.fileAttachments, { attachment: null}],
+      fileAttachments: [...currentValues.fileAttachments, { attachment: null }],
     });
   };
 
@@ -124,18 +122,18 @@ export const AddItemsForm: React.FC<{
   });
 
   return (
-    <Grid>
+    <Box>
       {/*************************************************************************************** */}
       {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
           once user has finished adding items and reviewed everything */}
       {/*************************************************************************************** */}
       <form onSubmit={handleSubmit(handleAddItem, onError)} noValidate>
         {/** REQUESTER ****************************************************************** */}
-        <Grid className="m-2 row">
-          <label htmlFor="requester" className="col-sm-2 col-form-label mt-4">
+        <Box className="m-2 row">
+          <label htmlFor="requester" className="col-sm-1 col-form-label mt-4">
             <strong>Requester</strong>
           </label>
-          <Grid className="col-sm-5">
+          <Box className="col-sm-3">
             <input
               id="requester"
               type="text"
@@ -148,18 +146,19 @@ export const AddItemsForm: React.FC<{
               })}
             />
             <p className="error">{errors.requester?.message}</p>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {/** PHONE EXT ****************************************************************** */}
-        <Grid className="m-2 row align-items-left">
-          <label htmlFor="phoneext" className="col-sm-2 col-form-label">
+        <Box className="m-2 row">
+          <label htmlFor="phoneext" className="col-sm-1 col-form-label">
             <strong>Phone Extension</strong>
           </label>
-          <Grid className="col-sm-2">
+          <Box className="col-sm-2">
             <input
               id="phoneext"
               type="text"
+              style={{ width: "150px" }}
               className="form-control"
               {...register("phoneext", {
                 required: {
@@ -169,20 +168,21 @@ export const AddItemsForm: React.FC<{
               })}
             ></input>
             <p className="error">{errors.phoneext?.message}</p>
-          </Grid>
-        </Grid>
-        
+          </Box>
+        </Box>
+
         {/*************************************************************************************** */}
         {/** DATE OF REQ ************************************************************************ */}
         {/*************************************************************************************** */}
-        <Grid className="m-2 row align-items-center">
-          <label htmlFor="datereq" className="col-sm-2 col-form-label">
+        <Box className="m-2 row align-items-center">
+          <label htmlFor="datereq" className="col-sm-1 col-form-label">
             <strong>Date of Request</strong>
           </label>
-          <Grid className="col-sm-2">
+          <Box className="col-sm-1">
             <input
               id="datereq"
               type="date"
+              style={{ width: "150px" }}
               className="form-control"
               {...register("datereq", {
                 required: {
@@ -192,23 +192,24 @@ export const AddItemsForm: React.FC<{
               })}
             ></input>
             <p className="error">{errors.datereq?.message}</p>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {/*************************************************************************************** */}
         {/** DATE ITEMS NEEDED ****************************************************************** */}
         {/*************************************************************************************** */}
-        <Grid className="m-2 row align-items-center">
-          <label htmlFor="dateneed" className="col-sm-2 col-form-label">
+        <Box className="m-2 row align-items-center">
+          <label htmlFor="dateneed" className="col-sm-1 col-form-label">
             <strong>Date Item(s) Needed</strong>
           </label>
-          <Grid className="col-sm-4">
-            <Grid
+          <Box className="col-sm-2">
+            <Box
               style={{ display: "flex", alignItems: "center", gap: "30px" }}
             >
               <input
                 id="dateneed"
                 type="date"
+                style={{ width: "150px" }}
                 className="form-control"
                 {...register("dateneed", {
                   validate: (value, { orderType }) => {
@@ -220,7 +221,7 @@ export const AddItemsForm: React.FC<{
                 })}
               />
               <strong>OR</strong>
-              <Grid>
+              <Box>
                 <label
                   htmlFor="quarterlyOrder"
                   style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
@@ -234,7 +235,7 @@ export const AddItemsForm: React.FC<{
                   />
                   Inclusion w/quarterly office supply order
                 </label>
-              </Grid>
+              </Box>
               <strong>OR</strong>
               <label
                 htmlFor="noRush"
@@ -249,15 +250,15 @@ export const AddItemsForm: React.FC<{
                 />
                 No Rush
               </label>
-            </Grid>
+            </Box>
             <p className="error">{errors.dateneed?.message}</p>
 
             {/************************************************************************************ */}
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {/** ATTACHMENTS INCLUDED? ****************************************************************** */}
-        <Grid className="m-3 align-items-center row">
+        <Box className="m-1 align-items-center row">
           <label
             style={{ fontSize: "0.8rem" }}
             htmlFor="fileAttachments"
@@ -272,13 +273,13 @@ export const AddItemsForm: React.FC<{
           {/********************************************************************************************* */}
           {/** ATTACHMENTS FIELD ARRAY ****************************************************************** */}
           {/********************************************************************************************* */}
-          <Grid className="col-sm-6">
+          <Box className="col-sm-6">
             {fields.map((field, index) => {
               return (
-                <Grid className="mt-2 d-flex align-items-center" key={field.id}>
+                <Box className="mt-2 d-flex align-items-center" key={field.id}>
                   <input
                     type="file"
-                    className="form-control me-2"
+                    className="form-control"
                     style={{ width: "350px" }}
                     multiple
                     {...register(`fileAttachments.${index}.attachment`)}
@@ -296,16 +297,16 @@ export const AddItemsForm: React.FC<{
                           fileAttachments: currentValues.fileAttachments.filter(
                             (_, i) => i !== index
                           ),
-                        })
+                        });
                       }}
                       label="Remove"
                     />
                   )}
-                </Grid>
+                </Box>
               );
             })}
 
-            <Grid className="d-flex align-items-center mt-3">
+            <Box className="d-flex align-items-center mt-3">
               <Buttons
                 className="btn btn-maroon me-2"
                 onClick={() => {
@@ -313,17 +314,20 @@ export const AddItemsForm: React.FC<{
                   append({ attachment: null });
                   reset({
                     ...currentValues,
-                    fileAttachments: [...currentValues.fileAttachments, { attachment: null }],
+                    fileAttachments: [
+                      ...currentValues.fileAttachments,
+                      { attachment: null },
+                    ],
                   });
                 }}
                 label="Add File"
               />
-            </Grid>
-          </Grid>
-        </Grid>
+            </Box>
+          </Box>
+        </Box>
 
         {/** ITEM DESCRIPTION ****************************************************************** */}
-        <Grid className="m-3 align-items-center row">
+        <Box className="m-3 align-items-center row">
           <label
             style={{ fontSize: "0.8rem" }}
             htmlFor="itemDescription"
@@ -336,7 +340,7 @@ export const AddItemsForm: React.FC<{
             <br /> NOTE: If request is for office supplies needed before the
             next quarterly order, please state the justification.
           </label>
-          <Grid className="col-sm-4">
+          <Box className="col-sm-4">
             <textarea
               style={{ fontSize: "0.8rem" }}
               id="itemDescription"
@@ -350,15 +354,15 @@ export const AddItemsForm: React.FC<{
               })}
             />
             <p className="error">{errors.itemDescription?.message}</p>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
 
         {/** FOR LEARNING OR DEV? ****************************************************************** */}
-        <Grid>
+        <Box>
           <LearningDev register={register} errors={errors} />
-        </Grid>
+        </Box>
 
-        <Box sx={{ my: 3 }}>
+        <Box sx={{ my: 2 }} >
           <Box
             sx={{
               display: "flex",
@@ -373,6 +377,7 @@ export const AddItemsForm: React.FC<{
               onSelectBudgetCode={(budgetObjCode) => console.log(budgetObjCode)}
               register={register("budgetObjCode")}
               errors={errors}
+                            
             />
 
             {/************************************************************************************ */}
@@ -382,9 +387,7 @@ export const AddItemsForm: React.FC<{
               register={register("fund")}
               errors={errors}
             />
-          </Box>
 
-          <Box sx={{ display: "flex", gap: 5, alignItems: "center", mt: 3 }}>
             {/************************************************************************************ */}
             {/* LOCATION */}
             <LocationPicker
@@ -392,6 +395,9 @@ export const AddItemsForm: React.FC<{
               register={register("location")}
               errors={errors}
             />
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 5, alignItems: "center", mt: 5 }}>
 
             {/************************************************************************************ */}
             {/* PRICE */}
@@ -425,9 +431,7 @@ export const AddItemsForm: React.FC<{
               SUBMIT button will handle gathering and sending the data to proper supervisors */}
           <Buttons
             className="me-3 btn btn-maroon"
-            disabled={
-              !isDirty || !isValid 
-            }
+            disabled={!isDirty || !isValid}
             label="Add Item"
             onClick={handleSubmit(handleAddItem)}
           />
@@ -447,7 +451,7 @@ export const AddItemsForm: React.FC<{
         />
       </form>
       <DevTool control={control} />
-    </Grid>
+    </Box>
   );
 };
 

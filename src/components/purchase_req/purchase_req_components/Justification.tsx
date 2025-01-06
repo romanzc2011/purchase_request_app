@@ -12,7 +12,7 @@ const Justification: React.FC<JustificationProps> = ({ register, errors }) => {
     <div className='m-3 row align-items-center'>
       {/** JUSTIFICATION ****************************************************************** */}
       <div className="m-1 row">
-        <label htmlFor="justification" className="col-sm-3 col-form-label">
+        <label htmlFor="justification" className="col-sm-2 col-form-label">
           <strong>Justification/Business Purpose</strong>
         </label>
         <div className="col-sm-5">

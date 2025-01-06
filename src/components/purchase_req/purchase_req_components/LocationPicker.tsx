@@ -1,5 +1,6 @@
 import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { FormValues } from "../../types/formTypes";
+import { FormValues } from "../../../types/formTypes";
+import { Box } from "@mui/material";
 
 interface LocationProps {
   onSelectLocation: (location: string) => void;
@@ -13,10 +14,10 @@ const LocationFilter = ({
   errors,
 }: LocationProps) => {
   return (
-    <>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "300px" }}>
       <label
         htmlFor="location"
-        style={{ minWidth: "50px", whiteSpace: "nowrap" }}
+        style={{ display: "block", width: "100px", whiteSpace: "nowrap" }}
       >
         <strong>Location:</strong>
       </label>
@@ -57,7 +58,7 @@ const LocationFilter = ({
         </option>
       </select>
       {errors.location && <p className="error">{errors.location.message}</p>}
-    </>
+    </Box>
   );
 };
 
