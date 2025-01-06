@@ -100,8 +100,11 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Quantity
             </TableCell>
+            <TableCell sx={{ color: "white", fontWeight: "bold"}}>
+              Price Each
+            </TableCell>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-              Price
+              Estimated Price
             </TableCell>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Actions
@@ -118,6 +121,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
               <TableCell sx={{ color: "white" }}>{item.fund}</TableCell>
               <TableCell sx={{ color: "white" }}>{item.location}</TableCell>
               <TableCell sx={{ color: "white" }}>{item.quantity}</TableCell>
+              <TableCell sx={{ color: "white"}}>{item.price.toFixed(2)}</TableCell>
               <TableCell sx={{ color: "white" }}>
                 {item.calculatedPrice.toFixed(2)}
               </TableCell>

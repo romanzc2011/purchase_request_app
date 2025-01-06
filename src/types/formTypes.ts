@@ -17,6 +17,7 @@ export type FormValues = {
     };
     quantity: number;
     price: number;
+    priceEach: number;
     fund: string;
     location: string;
     budgetObjCode: string;
