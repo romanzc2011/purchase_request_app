@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import PurchaseRequestForm from './components/purchase_req/PurchaseRequestForm.tsx'
+import PurchaseRequestForm from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

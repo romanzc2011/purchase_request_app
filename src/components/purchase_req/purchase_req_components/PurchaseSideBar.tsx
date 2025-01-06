@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Box,
   Drawer,
@@ -8,33 +8,35 @@ import {
   AppBar,
   Toolbar,
   Typography,
-  CssBaseline,
   ListItemButton,
   ListItemIcon,
   IconButton,
 } from "@mui/material";
 import BKSeal from "../../../assets/seal_no_border.png";
-import CheckCircleSharpIcon from '@mui/icons-material/CheckCircleSharp';
+import CheckCircleSharpIcon from "@mui/icons-material/CheckCircleSharp";
+import Inventory2Icon from "@mui/icons-material/Inventory2";
+import { Link } from "react-router-dom";
 import MenuIcon from "@mui/icons-material/Menu";
+
+interface PurchaseSideBarProps {
+  isOpen: boolean;
+  toggleSidebar: () => void;
+}
 
 const drawerWidth = 195;
 const appBarHeight = 100;
+const collapseWidth = 60;
 
-export default function PurchaseSideBar() {
-  const [open, setOpen] = useState(true); // State to toggle Drawer
-
-  const toggleDrawer = () => {
-    setOpen(!open); // Toggle open
-  };
-
+const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({ isOpen, toggleSidebar }) => {
   return (
     <Box sx={{ display: "flex" }}>
       {/* HEADER */}
       <AppBar
         position="fixed"
         sx={{
-          ml: `${drawerWidth}px`,
+          ml: isOpen ? `${drawerWidth}px` : `${collapseWidth}px`,
           background: "linear-gradient(to top, #2c2c2c, #800000)",
+          transition: "margin 0.3s ease",
           boxShadow: "none",
         }}
       >
@@ -43,13 +45,13 @@ export default function PurchaseSideBar() {
           <IconButton
             edge="start"
             color="inherit"
-            aria-label="menu"
-            onClick={toggleDrawer}
+            aria-label="toggle sidebar"
+            onClick={toggleSidebar}
             sx={{ mr: 2 }}
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
+          <Typography variant="h6" noWrap>
             <Box
               sx={{
                 display: "flex",
@@ -80,16 +82,15 @@ export default function PurchaseSideBar() {
       {/* Side Nav Bar */}
       <Drawer
         variant="permanent"
-        open={open}
         sx={{
-          width: open ? drawerWidth : 60,
-          top: `${appBarHeight}px`,
+          width: isOpen ? drawerWidth : collapseWidth,
+          position: "fixed", // Fix the Drawer to the left side
           flexShrink: 0,
           [`& .MuiDrawer-paper`]: {
-            width: open ? drawerWidth : 60,
+            width: isOpen ? drawerWidth : collapseWidth,
             boxSizing: "border-box",
-            top: `${appBarHeight}px`,
-            height: `calc(100% - ${appBarHeight})`,
+            height: `calc(100vh - ${appBarHeight}px)`,
+            marginTop: `${appBarHeight}px`, // Proper alignment below the header
             background: "linear-gradient(to bottom, #2c2c2c, #800000)", // Gradient background
             color: "white", // Text color for contrast
             transition: "width 0.3s ease",
@@ -99,28 +100,53 @@ export default function PurchaseSideBar() {
         <Toolbar />
         <Box>
           <List>
-            {/* LIST BUTTON DIVIDER **************************************************************** */}
+            {/* PURCHASE REQUESTS */}
             <ListItem divider sx={{ borderBottom: "2px solid #800000" }}>
               <ListItemButton
-                sx={{ justifyContent: open ? "flex-start" : "center" }} // Center icon when collapsed
+                component={Link}
+                to="/purchase-request"
+                sx={{
+                  justifyContent: isOpen ? "flex-start" : "center",
+                }}
+                aria-label="Purchase Requests"
               >
                 <ListItemIcon
                   sx={{
-                    color: "green",
-                    minWidth: open ? "40px" : "0",
-                    justifyContent: open ? "flex-start" : "center",
+                    color: "white",
+                    minWidth: isOpen ? "40px" : "0",
+                    justifyContent: isOpen ? "flex-start" : "center",
+                  }}
+                >
+                  <Inventory2Icon />
+                </ListItemIcon>
+                {isOpen && <ListItemText primary="PURCHASES" />}
+              </ListItemButton>
+            </ListItem>
+            {/* REQUESTS */}
+            <ListItem divider sx={{ borderBottom: "2px solid #800000" }}>
+              <ListItemButton
+                component={Link}
+                to="/requests-table"
+                sx={{ justifyContent: isOpen ? "flex-start" : "center" }}
+                aria-label="Requests Table"
+              >
+                <ListItemIcon
+                  sx={{
+                    color: "white",
+                    minWidth: isOpen ? "40px" : "0",
+                    justifyContent: isOpen ? "flex-start" : "center",
                   }}
                 >
                   <CheckCircleSharpIcon />
                 </ListItemIcon>
-                {/* Show text only when open */}
-                {open && <ListItemText primary="REQUESTS" />}
+                {isOpen && <ListItemText primary="APPROVALS" />}
               </ListItemButton>
             </ListItem>
-            {/* LIST BUTTON DIVIDER **************************************************************** */}
           </List>
         </Box>
       </Drawer>
     </Box>
   );
-}
+};
+
+export default PurchaseSideBar;

@@ -21,6 +21,7 @@ export const AddItemsForm: React.FC<{
   dataBuffer: FormValues[];
   setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
 }> = ({ setDataBuffer }) => {
+  
   /*************************************************************************************** */
   /* HANDLE ADD ITEM function */
   /*************************************************************************************** */
@@ -131,14 +132,14 @@ export const AddItemsForm: React.FC<{
       <form onSubmit={handleSubmit(handleAddItem, onError)} noValidate>
         {/** REQUESTER ****************************************************************** */}
         <Grid className="m-2 row">
-          <label htmlFor="requester" className="col-sm-2 col-form-label">
+          <label htmlFor="requester" className="col-sm-2 col-form-label mt-4">
             <strong>Requester</strong>
           </label>
           <Grid className="col-sm-5">
             <input
               id="requester"
               type="text"
-              className="form-control"
+              className="form-control mt-4"
               {...register("requester", {
                 required: {
                   value: true,
@@ -170,6 +171,7 @@ export const AddItemsForm: React.FC<{
             <p className="error">{errors.phoneext?.message}</p>
           </Grid>
         </Grid>
+        
         {/*************************************************************************************** */}
         {/** DATE OF REQ ************************************************************************ */}
         {/*************************************************************************************** */}
