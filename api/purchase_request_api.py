@@ -22,7 +22,7 @@ CORS(app)
 
 # Dictionary for sql column
 purchase_cols = {
-    'id': None,
+    'req_id': None,
     'requester': None,
     'phoneext': None,
     'datereq': None,
@@ -43,7 +43,10 @@ purchase_cols = {
 ##########################################################################
 ## API FUNCTIONS
 ##########################################################################
-@app.route('/getPurchaseData', methods=['POST'])
+
+##########################################################################
+## SEND TO APPROVALS -- being sent from the purchase req submit
+@app.route('/sendToApprovals', methods=['POST'])
 def getPurchaseRequest():
     if request.method == 'POST':
         data = request.json
@@ -58,8 +61,7 @@ def getPurchaseRequest():
         return jsonify({"message": "Processing started in background"})
 
 ##########################################################################
-## PROGRAM FUNCTIONS
-##########################################################################
+## PROCESS PURCHASE DATA
 def process_purchase_data(data):
     with lock:
         # Populate purchase_cols with appropriate data from api call
@@ -73,10 +75,33 @@ def process_purchase_data(data):
             purchase_cols['trainNotAval'] = purchase_cols['learnAndDev']['trainNotAval']
             purchase_cols['needsNotMeet'] = purchase_cols['learnAndDev']['needsNotMeet']
             del purchase_cols['learnAndDev']
+          
+        # Calc and separate price of each and total
+        if 'price' in purchase_cols and 'quantity' in purchase_cols:
+            try:
+                purchase_cols['priceEach'] = float(purchase_cols['price'])
+                purchase_cols['quantity'] = int(purchase_cols['quantity'])
+                
+                # Validate ranges
+                if purchase_cols['priceEach'] < 0 or purchase_cols['quantity'] <= 0:
+                    raise ValueError("Price must be non-negative, and quantity must be greater than zero.")
+                
+                # Calculate totalPrice
+                purchase_cols['totalPrice'] = round(purchase_cols['priceEach'] * purchase_cols['quantity'], 2)
+            except ValueError as e:
+                print("Invalid price or quantity:")
+                purchase_cols['totalPrice'] = 0
+            
+            del purchase_cols['price']
+        
+        # Show this is a new request 0=FALSE 1=TRUE
+        purchase_cols['new_request'] = 1
+        purchase_cols['approved'] = 0
         
     return purchase_cols
 
-# Purchase col background thread
+##########################################################################
+## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
 def purchase_bg_task(data, db_path):
     global processed_data_shared
     processed_data = process_purchase_data(data)
@@ -91,10 +116,13 @@ def purchase_bg_task(data, db_path):
     # Start new thread to insert data into db
     insert_thread = threading.Thread(target=insert_data, args=(processed_data,))
     insert_thread.start()
-
+    
+##########################################################################
+## INSERT DATA
 # Insert data into database
 def insert_data(processed_data):
     db.insertPurchaseReq(processed_data)
+    
 
 ##########################################################################
 ## MAIN CONTROL FLOW

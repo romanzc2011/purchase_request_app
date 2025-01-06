@@ -7,7 +7,7 @@ import SubmitApprovalTable from "./components/purchase_req/purchase_req_componen
 import PurchaseSidenav from "./components/purchase_req/purchase_req_components/PurchaseSideBar";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
-import RequestsWaiting from "./components/requests/RequestsWaiting";
+import ApprovalsWaiting from "./components/approvals/ApprovalsWaiting";
 
 const drawerWidth = 195;
 
@@ -57,7 +57,7 @@ function App() {
           <Toolbar /> {/* Space to offset AppBar */}
           <Routes>
             {/* Define Routes */}
-            <Route path="/requests-table" element={<RequestsWaiting />} />
+            <Route path="/approvals-table" element={<ApprovalsWaiting />} />
             <Route
               path="/purchase-request"
               element={
@@ -69,9 +69,9 @@ function App() {
                   <Box className="col-md-12" style={{ marginTop: "20px" }}>
                     <SubmitApprovalTable
                       dataBuffer={dataBuffer}
-                      onDelete={(id: number) =>
+                      onDelete={(req_id: number) =>
                         setDataBuffer(
-                          dataBuffer.filter((item) => item.id !== id)
+                          dataBuffer.filter((item) => item.req_id !== req_id)
                         )
                       }
                       resetTable={resetTable}

@@ -126,9 +126,9 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({ isOpen, toggleSidebar
             <ListItem divider sx={{ borderBottom: "2px solid #800000" }}>
               <ListItemButton
                 component={Link}
-                to="/requests-table"
+                to="/approvals-table"
                 sx={{ justifyContent: isOpen ? "flex-start" : "center" }}
-                aria-label="Requests Table"
+                aria-label="Approvals Table"
               >
                 <ListItemIcon
                   sx={{

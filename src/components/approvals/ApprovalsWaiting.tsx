@@ -1,6 +1,6 @@
 import React from 'react'
 
-const RequestsWaiting = () => {
+const ApprovalsWaiting = () => {
   return (
     <>
     <div>RequestsWaiting</div>
@@ -10,4 +10,4 @@ const RequestsWaiting = () => {
   )
 }
 
-export default RequestsWaiting
+export default ApprovalsWaiting

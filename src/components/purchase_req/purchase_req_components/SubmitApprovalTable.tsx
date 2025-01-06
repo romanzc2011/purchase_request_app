@@ -18,7 +18,7 @@ import { convertBOC } from "../../../utils/bocUtils";
 /* INTERFACE */
 interface SubmitApprovalTableProps {
   dataBuffer: FormValues[];
-  onDelete: (id: number) => void;
+  onDelete: (req_id: number) => void;
   resetTable: () => void;
 }
 
@@ -37,7 +37,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   /* SUBMIT DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    fetch("http://127.0.0.1:5000/getPurchaseData", {
+    fetch("http://127.0.0.1:5000/sendToApprovals", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -57,18 +57,6 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
       .catch((err) => console.error("Error sending data:", err));
   };
 
-  /************************************************************************************ */
-  /* QUANTITY HOOK --- Update price base on quantity */
-  const useQuantityPrice = (
-    initialPrice: number,
-    incrementQuantity: number
-  ) => {
-    const [price, setPrice] = useState(initialPrice);
-    const quantity = () => setPrice(price * incrementQuantity);
-
-    return [price, quantity] as const;
-  };
-
   return (
     <TableContainer
       component={Paper}
@@ -86,7 +74,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
         >
           <TableRow>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-              id
+              Requisition ID
             </TableCell>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Budget Object Code
@@ -113,8 +101,8 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
         </TableHead>
         <TableBody>
           {processedData.map((item) => (
-            <TableRow key={item.id}>
-              <TableCell sx={{ color: "white" }}>{item.id}</TableCell>
+            <TableRow key={item.req_id}>
+              <TableCell sx={{ color: "white" }}>{item.req_id}</TableCell>
               <TableCell sx={{ color: "white" }}>
                 {convertBOC(item.budgetObjCode)}
               </TableCell>
@@ -129,7 +117,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
                 <Button
                   variant="contained"
                   color="error"
-                  onClick={() => onDelete(item.id)}
+                  onClick={() => onDelete(item.req_id)}
                 >
                   Delete
                 </Button>

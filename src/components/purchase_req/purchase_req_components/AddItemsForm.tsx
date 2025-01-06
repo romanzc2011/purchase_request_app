@@ -26,7 +26,7 @@ export const AddItemsForm: React.FC<{
   const handleAddItem = (newItem: FormValues) => {
     const updatedItem = {
       ...newItem,
-      id: generateRandomID(),
+      req_id: generateRandomID(),
       price: Number(newItem.price) || 0,
       fund: newItem.fund || "",
       budgetObjCode: newItem.budgetObjCode || "",
@@ -68,7 +68,7 @@ export const AddItemsForm: React.FC<{
 
   const form = useForm<FormValues>({
     defaultValues: {
-      id: 0,
+      req_id: 0,
       requester: "",
       phoneext: "",
       datereq: null,

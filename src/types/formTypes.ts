@@ -1,5 +1,5 @@
 export type FormValues = {
-    id: number;
+    req_id: number;
     requester: string;
     phoneext: string;
     datereq: Date | null;
