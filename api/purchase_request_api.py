@@ -3,9 +3,11 @@ from flask_cors import CORS
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
+import pdb
 import purchase_request_database as db
 import queue
 import threading
+import sys
 
 """
 AUTHOR: Roman Campbell
@@ -45,6 +47,7 @@ purchase_cols = {
 # Dictionary for approval data
 approvals_cols = {
     'req_id': None,
+    'requester': None,
     'budgetObjCode': None,
     'fund': None,
     'location': None,
@@ -58,6 +61,13 @@ approvals_cols = {
 ## API FUNCTIONS
 ##########################################################################
 
+###############################################################################################
+## INIT TABLES
+def init_tables():
+    connection = db.getDBConnection(db_path)
+    db.createPurchaseReqTbl(connection)
+    db.createApprovalsTbl(connection)
+    connection.close()
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
 @app.route('/sendToPurchaseReq', methods=['POST'])
@@ -67,8 +77,8 @@ def setPurchaseRequest():
         return jsonify({'error': 'Invalid data'}), 400
     
     # Submit the task to thread executor
-    future = executor.submit(purchase_bg_task, data, db_path, "sendToPurchaseReq")
-    future = executor.submit(purchase_bg_task, data, db_path, "insertApprovalData")
+    executor.submit(purchase_bg_task, data, db_path, "sendToPurchaseReq")
+    executor.submit(purchase_bg_task, data, db_path, "insertApprovalData")
     
     return jsonify({"message": "Processing started in background"})
     
@@ -77,18 +87,11 @@ def setPurchaseRequest():
 @app.route('/getApprovalData', methods=['GET'])
 def getApprovalData():
     try:
-        db.createApprovalsTbl(db_path)
-        table = "approvals"
-        query = f"SELECT * FROM {table}"
-        data = db.fetch_rows(db_path, query, table)
-        print(f"{data}")
-        
-        getApprovalStatus(table)
-        return jsonify(data), 200
-    
+        data = fetchApprovalData()
+        return jsonify({"approval_data": data})
     except Exception as e:
         print(f"Error fetching approval data: {e}")
-        return jsonify({"error": "Failed to fetch data"}), 500
+        return jsonify({"error": "Failed to  fetch data"}), 500
     
 ##########################################################################
 ## PROCESS PURCHASE DATA
@@ -133,15 +136,18 @@ def process_purchase_data(data):
 
 ##########################################################################
 ## PROCESS APPROVAL DATA --- send new request  to approvals
-def processApprovalsData():
+def processApprovalsData(data):
+    
+    if  not  isinstance(data, dict):
+        raise ValueError("Data must be a dictionary")
+    
     approved = None
     # Is this a new request or has it been approved already
     if purchase_cols['new_request'] == 1:
         approvals_cols['status'] == "NEW REQUEST"
-        # Not new? Was it approved or denied?
+    # Not new? Was it approved or denied?
     elif purchase_cols['new_request'] == 0:
-        
-        approved = getApprovalStatus("approvals", purchase_cols['req_id'])
+        approved = getApprovalStatus("approvals", data['req_id'])
         if approved == 1:
             approvals_cols['status'] = "APPROVED"
         if approved == 0:
@@ -149,49 +155,68 @@ def processApprovalsData():
     
     # Populate approval data 
     with lock:
-        for item in purchase_cols:
-            for k, v in item.items():
-                if k in approvals_cols:
-                    approvals_cols[k] = v
+        for k, v in purchase_cols.items():
+            if k in approvals_cols:
+                approvals_cols[k] = v
+                    
+    return approvals_cols
 
 ##########################################################################
 ## GET STATUS OF APPROVALS
 def getApprovalStatus(table, req_id):
-    query = """SELECT approved FROM {table}
-               WHERE req_id = {req_id}
+    query = """SELECT approved FROM ?
+               WHERE req_id = ?
             """
+    connection = db.getDBConnection(db_path)
+    cursor = connection.cursor()
+    cursor.execute(query, (table, req_id))
     
-    approved_data = db.fetch_rows(db_path, query, table)
-    return approved_data
+##########################################################################
+## GET STATUS OF APPROVALS
+def fetchApprovalData():
+    query = "SELECT * FROM approvals"
+    connection = db.getDBConnection(db_path)
+    cursor = connection.cursor()
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    connection.close()
+    
+    return rows
     
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
 def purchase_bg_task(data, db_path, api_call):
-    if api_call == "sendToPurchaseReq":
-        processed_data = process_purchase_data(data)
-        table =  "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
-        
-        # Insert data into db
-        db.insertData(processed_data, table)
-        print(f"Data processed into {table}: {processed_data}")
 
-    elif api_call == "getApproveData":
-        data = getApprovalData()
-        print(f"Fetched approval data: {data}")
-        
-    elif api_call == "insertApprovalData":
-        processed_data = processApprovalsData(data)
-        db.insertData(processed_data, "approvals")
-        print(f"Data processed into approvals: {processed_data}")        
+    try:
+        print(f"Background task {api_call} data: {data}")
+        if api_call == "sendToPurchaseReq":
+            processed_data = process_purchase_data(data)
+            table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
+            
+            # Insert data into db
+            db.insertData(processed_data, table)
 
+            # Send to Approvals table as well
+            approval_data = processApprovalsData(processed_data)
+            if processed_data['new_request'] == 1:
+                approval_data['status'] = "NEW REQUEST"
+                processed_data['new_request'] = 0
+                print(f"APPROVAL DATA: {approval_data}")
+                
+                # Update the purchase_req table
+                updated_data = {'new_request': 0}
+                condition = f"req_id = {processed_data['req_id']}"
+                db.updateDB(updated_data, table, condition)
+                
+            table = "approvals"
+            db.insertData(approval_data, table)
+            
+    except Exception as e:
+        print(f"Error in background task {api_call}: {e}")
+        
 ##########################################################################
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
+    init_tables()
     app.run(debug=True)
-    
-    
-        
-    
-        
-    

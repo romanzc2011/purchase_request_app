@@ -55,6 +55,7 @@ def createApprovalsTbl(connection):
                 requester TEXT NOT NULL,
                 budgetObjCode TEXT,
                 fund TEXT,
+                quantity INTEGER,
                 totalPrice REAL,
                 priceEach REAL,
                 location TEXT,
@@ -64,6 +65,7 @@ def createApprovalsTbl(connection):
                 )
     """)
     connection.commit()
+
 
 ###############################################################################################
 ## INSERT PURCHASE REQ
@@ -88,12 +90,7 @@ def insertData(processed_data, table):
         
         # Establish database connection
         connection = getDBConnection(db_path)
-        
-        if table == "purchase_requests":
-            createPurchaseReqTbl(connection)
-        elif table == "approvals":
-            createApprovalsTbl(connection)
-        
+
         with connection:
             cursor = connection.cursor()
             cursor.execute(query, values)
@@ -104,6 +101,37 @@ def insertData(processed_data, table):
     finally:
         connection.commit()
         connection.close()
+        
+###############################################################################################
+## UPDATE DATABASE
+def updateDB(data, table, condition):
+    if not data or not isinstance(data, dict):
+        raise ValueError("data must be non-empty dictionary")
+    
+    if not condition:
+        raise ValueError("A WHERE condition is required to update specific row(s)")
+    
+    # SET CLAUSE
+    set_clause = ", ".join([f"{column} = ?" for column in data.keys()])
+    query = f"UPDATE {table} SET {set_clause} WHERE {condition}"
+    
+    # Combine the values for SET and condition
+    values = list(data.values())
+    
+    # Execute the query
+    connection = getDBConnection(db_path)
+    try:
+        with connection:
+            cursor = connection.cursor()
+            cursor.execute(query, values)
+            connection.commit()
+            
+    except sqlite3.Error as e:
+        print(f"An error occured: {e}")
+        return 0
+    finally:
+        connection.close()
+    
 
 ###############################################################################################
 ## FETCH ALL ROWS    

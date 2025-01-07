@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import Buttons from "../purchase_req/purchase_req_components/Buttons";
 import {
@@ -24,16 +24,29 @@ interface ApprovalTableProps {
 }
 
 const ApprovalsTable: React.FC<ApprovalTableProps> = ({
-  dataBuffer,
   onDelete,
   resetTable,
 }) => {
-  // Preprocess data to calculate price
+  const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
+
+  /* Fetch data from backend to populate Approvals Table */
+  useEffect(() => {
+    fetch("http://127.0.0.1:5000/getApprovalData").then((res) => {
+      if(!res.ok) {
+        throw new Error(`HTTP error: ${res.status}`);
+      }
+
+      return res.json();
+
+    }).then((data) => {
+      console.log("Fetched data:", data);
+      setDataBuffer(data) // populate table
+    }).catch((err) => console.error("Error fetching data: ", err));
+  }, []); // Empty dependency arr ensure this runs once 
+
   const processedData = dataBuffer.map((item) => ({
     ...item,
-    calculatedPrice: (item.price || 0) * (item.quantity || 1), // Calculating based on quantity
-  }));
-
+  }))
   /************************************************************************************ */
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
@@ -107,7 +120,9 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
               <TableCell sx={{ color: "white", fontWeight: "bold" }}>
                 STATUS
               </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 ACTIONS
               </TableCell>
             </TableRow>
@@ -140,20 +155,18 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
                 {/**************************************************************************/}
                 {/* PRICE */}
                 <TableCell sx={{ color: "white" }}>
-                  {item.price.toFixed(2)}
+                  {item.priceEach.toFixed(2)}
                 </TableCell>
 
                 {/**************************************************************************/}
                 {/* ESTIMATED PRICE */}
                 <TableCell sx={{ color: "white" }}>
-                  {item.calculatedPrice.toFixed(2)}
+                  {item.totalPrice.toFixed(2)}
                 </TableCell>
 
                 {/**************************************************************************/}
                 {/* STATUS */}
-                <TableCell sx={{ color: "white"}}>
-                  {item.status}
-                </TableCell>
+                <TableCell sx={{ color: "white" }}>{item.status}</TableCell>
 
                 {/**************************************************************************/}
                 {/* APPROVE/DENY BUTTONS */}
@@ -217,7 +230,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
                 $
                 {processedData
                   .reduce(
-                    (acc, item) => acc + (Number(item.calculatedPrice) || 0),
+                    (acc, item) => acc + (Number(item.totalPrice) || 0),
                     0
                   )
                   .toFixed(2)}
