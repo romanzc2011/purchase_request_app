@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import purchase_request_database as db
+import queue
 import threading
 
 """
@@ -12,10 +14,10 @@ NAME: PURCHASE REQUEST APP
 Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
 the UI.
 """
-
 lock = threading.Lock()
 processed_data_shared = None
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
+executor = ThreadPoolExecutor(max_workers=5)
 
 app = Flask(__name__)
 CORS(app)
@@ -37,7 +39,19 @@ purchase_cols = {
     'fund': None,
     'price': None,
     'location': None,
-    'quantity': None
+    'quantity': None,
+}
+
+# Dictionary for approval data
+approvals_cols = {
+    'req_id': None,
+    'budgetObjCode': None,
+    'fund': None,
+    'location': None,
+    'quantity': None,
+    'priceEach': None,
+    'totalPrice': None,
+    'status': None
 }
 
 ##########################################################################
@@ -46,45 +60,35 @@ purchase_cols = {
 
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
-@app.route('/sendToApprovals', methods=['POST'])
-def getPurchaseRequest():
-    if request.method == 'POST':
-        data = request.json
-        
-        if not data:
-            return jsonify({'error': 'Invalid data'}), 400
-        
-        # Start thread
-        thread = threading.Thread(target=purchase_bg_task, args=(data,db_path,"sendToApprovals"))
-        thread.start()
-        
-        return jsonify({"message": "Processing started in background"})
+@app.route('/sendToPurchaseReq', methods=['POST'])
+def setPurchaseRequest():
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Invalid data'}), 400
+    
+    # Submit the task to thread executor
+    future = executor.submit(purchase_bg_task, data, db_path, "sendToPurchaseReq")
+    future = executor.submit(purchase_bg_task, data, db_path, "insertApprovalData")
+    
+    return jsonify({"message": "Processing started in background"})
     
 ##########################################################################
 ## GET APPROVAL DATA
 @app.route('/getApprovalData', methods=['GET'])
 def getApprovalData():
     try:
-        # Fetch data
-        connection = db.getDBConnection(db_path)
-        db.createApprovalsTbl(connection)
+        db.createApprovalsTbl(db_path)
+        table = "approvals"
+        query = f"SELECT * FROM {table}"
+        data = db.fetch_rows(db_path, query, table)
+        print(f"{data}")
         
-        cursor = connection.cursor()
-        query = "SELECT * FROM approvals"
-        cursor.execute(query)
-        
-        # Fetch rows
-        rows = cursor.fetchall()
-        data = [dict(row) for row in rows]
-        
-        return jsonify(data),  200
+        getApprovalStatus(table)
+        return jsonify(data), 200
     
     except Exception as e:
         print(f"Error fetching approval data: {e}")
         return jsonify({"error": "Failed to fetch data"}), 500
-    
-    finally:
-        connection.close()
     
 ##########################################################################
 ## PROCESS PURCHASE DATA
@@ -114,6 +118,7 @@ def process_purchase_data(data):
                 
                 # Calculate totalPrice
                 purchase_cols['totalPrice'] = round(purchase_cols['priceEach'] * purchase_cols['quantity'], 2)
+                
             except ValueError as e:
                 print("Invalid price or quantity:")
                 purchase_cols['totalPrice'] = 0
@@ -127,27 +132,57 @@ def process_purchase_data(data):
     return purchase_cols
 
 ##########################################################################
+## PROCESS APPROVAL DATA --- send new request  to approvals
+def processApprovalsData():
+    approved = None
+    # Is this a new request or has it been approved already
+    if purchase_cols['new_request'] == 1:
+        approvals_cols['status'] == "NEW REQUEST"
+        # Not new? Was it approved or denied?
+    elif purchase_cols['new_request'] == 0:
+        
+        approved = getApprovalStatus("approvals", purchase_cols['req_id'])
+        if approved == 1:
+            approvals_cols['status'] = "APPROVED"
+        if approved == 0:
+            approvals_cols['status'] = "DENIED"
+    
+    # Populate approval data 
+    with lock:
+        for item in purchase_cols:
+            for k, v in item.items():
+                if k in approvals_cols:
+                    approvals_cols[k] = v
+
+##########################################################################
+## GET STATUS OF APPROVALS
+def getApprovalStatus(table, req_id):
+    query = """SELECT approved FROM {table}
+               WHERE req_id = {req_id}
+            """
+    
+    approved_data = db.fetch_rows(db_path, query, table)
+    return approved_data
+    
+##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
 def purchase_bg_task(data, db_path, api_call):
-    global processed_data_shared
-    
-    if api_call == "sendToApprovals":
+    if api_call == "sendToPurchaseReq":
         processed_data = process_purchase_data(data)
+        table =  "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
         
-        # Update shared data
-        with lock:
-            processed_data_shared = processed_data
-            
-        for k, v in processed_data.items():
-            print(f"{k}: {v}")
+        # Insert data into db
+        db.insertData(processed_data, table)
+        print(f"Data processed into {table}: {processed_data}")
+
+    elif api_call == "getApproveData":
+        data = getApprovalData()
+        print(f"Fetched approval data: {data}")
         
-        # Start new thread to insert data into db
-        insert_thread = threading.Thread(target=db.insertPurchaseReq, args=(processed_data,))
-        insert_thread.start()
-    
-    elif  api_call ==  "getApproveData":
-        fetch_approve_thread =  threading.Thread(target=getApprovalData, args=(db_path,))
-        fetch_approve_thread.start()
+    elif api_call == "insertApprovalData":
+        processed_data = processApprovalsData(data)
+        db.insertData(processed_data, "approvals")
+        print(f"Data processed into approvals: {processed_data}")        
 
 ##########################################################################
 ## MAIN CONTROL FLOW

@@ -90,7 +90,7 @@ function App() {
                           dataBuffer.filter((item) => item.req_id !== req_id)
                         )
                       }
-                      resetTable={resetTable}
+                      //resetTable={resetTable}
                     />
                   </Box>
                 </>

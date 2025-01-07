@@ -10,12 +10,12 @@ def getDBConnection(db):
     connection = sqlite3.connect(db)
     connection.execute("PRAGMA foreign_key = ON;")
     connection.row_factory = sqlite3.Row
+    
     return connection
     
 ###############################################################################################
 ## CREATE PURCHASE REQ DATABASE
 def createPurchaseReqTbl(connection):
-    
     # SQLLITE 3 DATABASE CREATION
     cursor = connection.cursor() 
     cursor.execute("""
@@ -55,11 +55,10 @@ def createApprovalsTbl(connection):
                 requester TEXT NOT NULL,
                 budgetObjCode TEXT,
                 fund TEXT,
-                estPrice REAL,
+                totalPrice REAL,
                 priceEach REAL,
                 location TEXT,
-                approved_by TEXT,
-                approved BOOLEAN,
+                status TEXT,
                 FOREIGN KEY (req_id) REFERENCES purchase_requests(req_id)
                     ON UPDATE CASCADE                    
                 )
@@ -67,12 +66,8 @@ def createApprovalsTbl(connection):
     connection.commit()
 
 ###############################################################################################
-## PROCESS DATA
-
-
-###############################################################################################
 ## INSERT PURCHASE REQ
-def insertPurchaseReq(processed_data):
+def insertData(processed_data, table):
     # Convert list-type values to strings
     for key, value in processed_data.items():
         if isinstance(value, list): 
@@ -87,13 +82,17 @@ def insertPurchaseReq(processed_data):
         valueholder = ", ".join(["?"] * len(col_key)) # (?,?,?)
         columns = ", ".join(col_key)
         
-        query = f"INSERT INTO purchase_requests ({columns}) VALUES ({valueholder})"
+        query = f"INSERT INTO {table} ({columns}) VALUES ({valueholder})"
         
         print(f"{query}")
         
         # Establish database connection
         connection = getDBConnection(db_path)
-        createPurchaseReqTbl(connection)
+        
+        if table == "purchase_requests":
+            createPurchaseReqTbl(connection)
+        elif table == "approvals":
+            createApprovalsTbl(connection)
         
         with connection:
             cursor = connection.cursor()
@@ -105,24 +104,23 @@ def insertPurchaseReq(processed_data):
     finally:
         connection.commit()
         connection.close()
-        print("Purchase request added successfully...")
 
 ###############################################################################################
 ## FETCH ALL ROWS    
-def fetch_all_rows(db_path, table):
+def fetch_rows(db_path, query, table):
+    try:
         connection = getDBConnection(db_path)
         connection.row_factory = sqlite3.Row
         cursor = connection.cursor()
         
         # Execute SELECT * query to fetch all rows from the table
-        query = f"SELECT * FROM {table}"
         cursor.execute(query)
         
         # fetch all rows
         rows = cursor.fetchall()
-        
-        column_names = [description[0] for description in cursor.description]
-        print("Columns:", column_names)
-        print("Rows:")
-        for row in rows:
-            print(dict(row))
+        return [dict(row) for row in rows]
+    except sqlite3.Error as e:
+        print(f"Error fetching rows from {table}: {e}")
+        return []
+    finally:
+        connection.close()

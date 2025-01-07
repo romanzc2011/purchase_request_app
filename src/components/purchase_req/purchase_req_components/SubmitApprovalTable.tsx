@@ -19,13 +19,13 @@ import { convertBOC } from "../../../utils/bocUtils";
 interface SubmitApprovalTableProps {
   dataBuffer: FormValues[];
   onDelete: (req_id: number) => void;
-  resetTable: () => void;
+  //resetTable: () => void;
 }
 
 const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   dataBuffer,
   onDelete,
-  resetTable,
+  //resetTable,
 }) => {
   // Preprocess data to calculate price
   const processedData = dataBuffer.map((item) => ({
@@ -37,7 +37,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   /* SUBMIT DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    fetch("http://127.0.0.1:5000/sendToApprovals", {
+    fetch("http://127.0.0.1:5000/sendToPurchaseReq", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -52,7 +52,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
       })
       .then((data) => {
         console.log("Response from POST request: ", data);
-        resetTable();
+        //resetTable();
       })
       .catch((err) => console.error("Error sending data:", err));
   };

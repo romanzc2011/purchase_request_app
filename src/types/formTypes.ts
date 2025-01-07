@@ -21,4 +21,5 @@ export type FormValues = {
     fund: string;
     location: string;
     budgetObjCode: string;
+    status: string;
   };
