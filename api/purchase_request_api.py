@@ -4,10 +4,10 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import pdb
+import pickle
 import purchase_request_database as db
 import queue
 import threading
-import sys
 
 """
 AUTHOR: Roman Campbell
@@ -61,13 +61,14 @@ approvals_cols = {
 ## API FUNCTIONS
 ##########################################################################
 
-###############################################################################################
+##########################################################################
 ## INIT TABLES
 def init_tables():
     connection = db.getDBConnection(db_path)
     db.createPurchaseReqTbl(connection)
     db.createApprovalsTbl(connection)
     connection.close()
+    
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
 @app.route('/sendToPurchaseReq', methods=['POST'])
@@ -88,6 +89,7 @@ def setPurchaseRequest():
 def getApprovalData():
     try:
         data = fetchApprovalData()
+        print(f"{data}")
         return jsonify({"approval_data": data})
     except Exception as e:
         print(f"Error fetching approval data: {e}")
@@ -95,7 +97,7 @@ def getApprovalData():
     
 ##########################################################################
 ## PROCESS PURCHASE DATA
-def process_purchase_data(data):
+def processPurchaseData(data):
     with lock:
         # Populate purchase_cols with appropriate data from api call
         for item in data['dataBuffer']:
@@ -142,6 +144,7 @@ def processApprovalsData(data):
         raise ValueError("Data must be a dictionary")
     
     approved = None
+    
     # Is this a new request or has it been approved already
     if purchase_cols['new_request'] == 1:
         approvals_cols['status'] == "NEW REQUEST"
@@ -179,9 +182,14 @@ def fetchApprovalData():
     cursor = connection.cursor()
     cursor.execute(query)
     rows = cursor.fetchall()
+    
+    # Convert rows to a list of dictionaries
+    column_names = [desc[0] for desc in cursor.description] # Get column names
+    result = [dict(zip(column_names, row)) for row in rows] # Map colmns->rows
+    
     connection.close()
     
-    return rows
+    return result
     
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
@@ -190,7 +198,7 @@ def purchase_bg_task(data, db_path, api_call):
     try:
         print(f"Background task {api_call} data: {data}")
         if api_call == "sendToPurchaseReq":
-            processed_data = process_purchase_data(data)
+            processed_data = processPurchaseData(data)
             table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
             
             # Insert data into db

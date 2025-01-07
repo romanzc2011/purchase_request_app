@@ -40,7 +40,12 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
 
     }).then((data) => {
       console.log("Fetched data:", data);
-      setDataBuffer(data) // populate table
+      // Extract approval_data array
+      if(data.approval_data && Array.isArray(data.approval_data)) {
+        setDataBuffer(data.approval_data);
+      } else {
+        console.error("Unexpect data format:", data);
+      }
     }).catch((err) => console.error("Error fetching data: ", err));
   }, []); // Empty dependency arr ensure this runs once 
 

@@ -89,13 +89,21 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
                 alt="Seal"
               />
               <Box>
-                <h3 style={{ fontWeight: "bold", margin: 0 }}>
+                <h3
+                  style={{ fontWeight: "bold", margin: 0, textAlign: "center" }}
+                >
                   <div>UNITED STATES BANKRUPTCY COURT</div>
                   WESTERN DISTRICT OF LOUISIANA
                   <br />
-                  <span style={{ fontSize: "1.2rem" }}>
-                    PURCHASE REQUEST FORM
-                  </span>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "center",
+                      fontSize: "1.2rem",
+                    }}
+                  >
+                    PURCHASE REQUEST
+                  </Box>
                 </h3>
               </Box>
             </Box>
@@ -149,7 +157,7 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
             {/* REQUESTS */}
             <ListItem divider sx={{ borderBottom: "2px solid #800000" }}>
               <ListItemButton
-                onClick={()   => {
+                onClick={() => {
                   fetchRequestData();
                 }}
                 component={Link}
