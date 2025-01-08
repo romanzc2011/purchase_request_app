@@ -33,25 +33,25 @@ const BudgetCodePicker = ({
         {...register}
         onChange={(e) => onSelectBudgetCode(e.target.value)}
       >
-        <option id={"generalOfficeEq"} value={"generalOfficeEq"}>
+        <option id={"generalOfficeEq"} value={"3101 - General Office Equipment"}>
           3101 - General Office Equipment
         </option>
-        <option id={"audioRecording"} value={"audioRecordingEq"}>
+        <option id={"audioRecording"} value={"3107 - Audio Recording Equipment"}>
           3107 - Audio Recording Equipment
         </option>
-        <option id={"furnitureFix"} value={"furnitureFix"}>
+        <option id={"furnitureFix"} value={"3111 - Furniture and Fixtures"}>
           3111 - Furniture and Fixtures
         </option>
-        <option id={"mailingEq"} value={"mailingEq"}>
+        <option id={"mailingEq"} value={"3113 - Mailing Equipment"}>
           3113 - Mailing Equipment
         </option>
-        <option id={"newPrintDigi"} value={"newPrintDigi"}>
+        <option id={"newPrintDigi"} value={"3121 - Legal Resources - New Print and Digital Purchases"}>
           3121 - Legal Resources - New Print and Digital Purchases
         </option>
-        <option id={"printDigiCont"} value={"printDigiCont"}>
+        <option id={"printDigiCont"} value={"3122 - Legal Resources - Print and Digital Continuations"}>
           3122 - Legal Resources - Print and Digital Continuations
         </option>
-        <option id={"lawEnforceEq"} value={"lawEnforceEq"}>
+        <option id={"lawEnforceEq"} value={"3130 - Law Enforcement Equipment"}>
           3130 - Law Enforcement Equipment
         </option>
       </select>

@@ -1,3 +1,5 @@
+from database_manager import DatabaseManager
+from notification_manager import NotificationManager
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from concurrent.futures import ThreadPoolExecutor
@@ -23,8 +25,17 @@ processed_data_shared = None
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 executor = ThreadPoolExecutor(max_workers=5)
 
+to_recipient = "roman_campbell@lawb.uscourts.gov"
+from_recipient = "Purchase Request"
+this_subject = "Purchase Request Notification"
+
 app = Flask(__name__)
 CORS(app)
+
+notifyManager = NotificationManager(msg_body=None, 
+                                    to_recipient=to_recipient, 
+                                    from_sender=from_recipient, 
+                                    subject=this_subject)
 
 # Dictionary for sql column
 purchase_cols = {
@@ -62,14 +73,6 @@ approvals_cols = {
 ##########################################################################
 ## API FUNCTIONS
 ##########################################################################
-
-##########################################################################
-## INIT TABLES
-def init_tables():
-    connection = db.getDBConnection(db_path)
-    db.createPurchaseReqTbl(connection)
-    db.createApprovalsTbl(connection)
-    connection.close()
     
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
@@ -80,8 +83,8 @@ def setPurchaseRequest():
         return jsonify({'error': 'Invalid data'}), 400
     
     # Submit the task to thread executor
-    executor.submit(purchase_bg_task, data, db_path, "sendToPurchaseReq")
-    executor.submit(purchase_bg_task, data, db_path, "insertApprovalData")
+    executor.submit(purchase_bg_task, data, "sendToPurchaseReq")
+    executor.submit(purchase_bg_task, data, "insertApprovalData")
     
     return jsonify({"message": "Processing started in background"})
     
@@ -90,9 +93,10 @@ def setPurchaseRequest():
 @app.route('/getApprovalData', methods=['GET'])
 def getApprovalData():
     try:
-        data = fetchApprovalData()
-        print(f"{data}")
-        return jsonify({"approval_data": data})
+        query = "SELECT * FROM approvals"
+        approval_data = dbManager.fetch_rows(query)
+        return jsonify({"approval_data": approval_data})
+    
     except Exception as e:
         print(f"Error fetching approval data: {e}")
         return jsonify({"error": "Failed to  fetch data"}), 500
@@ -137,6 +141,7 @@ def processPurchaseData(data):
             del purchase_cols['price']
         
         # Show this is a new request 0=FALSE 1=TRUE
+        print("PROCESSING DATA")
         purchase_cols['new_request'] = 1
         purchase_cols['approved'] = 0
         
@@ -154,7 +159,6 @@ def processApprovalsData(data):
     # Is this a new request or has it been approved already
     if purchase_cols['new_request'] == 1:
         approvals_cols['status'] == "NEW REQUEST"
-        pe.sendNewNotification()
         
     # Not new? Was it approved or denied?
     elif purchase_cols['new_request'] == 0:
@@ -169,57 +173,44 @@ def processApprovalsData(data):
         for k, v in purchase_cols.items():
             if k in approvals_cols:
                 approvals_cols[k] = v
+    
+    ##########################################################################
+    ## SENDING NOTIFICATION OF NEW REQUEST
+    # Create email body and send to approver
+    purchase_cols['link'] = link
+    email_template = notifyManager.load_email_template("./notification_template.html")
+    email_body = email_template.format(**purchase_cols)
+    notifyManager.send_email(email_body)
+    del purchase_cols['link']
                     
     return approvals_cols
 
 ##########################################################################
 ## GET STATUS OF APPROVALS
 def getApprovalStatus(table, req_id):
-    query = """SELECT approved FROM ?
-               WHERE req_id = ?
-            """
-    connection = db.getDBConnection(db_path)
-    cursor = connection.cursor()
-    cursor.execute(query, (table, req_id))
-    
-##########################################################################
-## GET STATUS OF APPROVALS
-def fetchApprovalData():
-    query = "SELECT * FROM approvals"
-    connection = db.getDBConnection(db_path)
-    cursor = connection.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    
-    # Convert rows to a list of dictionaries
-    column_names = [desc[0] for desc in cursor.description] # Get column names
-    result = [dict(zip(column_names, row)) for row in rows] # Map colmns->rows
-    
-    connection.close()
-    
-    return result
-    
+    condition = f"req_id = %s"
+    columns = "approved"
+    table = "approvals"
+    params = (req_id,)
+    dbManager.fetch_single_row(table, columns, condition, params)
+
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
-def purchase_bg_task(data, db_path, api_call):
-
+def purchase_bg_task(data, api_call):
     try:
-        
-        
         print(f"Background task {api_call} data: {data}")
         if api_call == "sendToPurchaseReq":
             processed_data = processPurchaseData(data)
             table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
             
             # Insert data into db
-            db.insertData(processed_data, table)
-
+            dbManager.insert_data(processed_data, table)
+            
             # Send to Approvals table as well
             approval_data = processApprovalsData(processed_data)
             if processed_data['new_request'] == 1:
                 approval_data['status'] = "NEW REQUEST"
                 processed_data['new_request'] = 0
-                print(f"APPROVAL DATA: {approval_data}")
                 
                 # Update the purchase_req table
                 updated_data = {'new_request': 0}
@@ -236,5 +227,12 @@ def purchase_bg_task(data, db_path, api_call):
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
-    init_tables()
+    # Create approvals and purchase req tables if not already created
+    dbManager = DatabaseManager(db_path)
+    
+    dbManager.create_purchase_req_table()
+    dbManager.create_approvals_table()
+    
+    # Run Flask
     app.run(debug=True)
+    

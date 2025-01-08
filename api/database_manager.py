@@ -88,6 +88,7 @@ class DatabaseManager:
                 
         columns = ", ".join(processed_data.keys())
         placeholders = ", ".join(["?"] * len(processed_data))
+        print("INSERT")
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         
         self._execute_query(query, list(processed_data.values()))
@@ -113,13 +114,16 @@ class DatabaseManager:
     ## FETCH ROWS
     def fetch_rows(self, query):
         # Fetch all rows from specified table
-        
         connection = self.get_connection()
         try:
             cursor = connection.cursor()
             cursor.execute(query)
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            
+            # Convert to dictionary to display in table
+            column_names = [desc[0] for desc in cursor.description]
+            result = [dict(zip(column_names, row)) for row in rows]
+            return result
         
         except sqlite3.Error as e:
             print(f"Error fetching rows: {e}")
@@ -127,6 +131,30 @@ class DatabaseManager:
         
         finally:
             connection.close()
+            
+    #####################################################################################
+    ## FETCH INDIVIDUAL
+    def fetch_single_row(self, table, columns, condition, params):
+        
+        if not columns or not isinstance(columns, list):
+            raise ValueError("Columns must be a non-empty list")
+        
+        from_clause = ", ".join(columns)
+        
+        if not table.isidentifier():
+            raise ValueError("Invalid table name")
+        
+        connection = self.get_connection()
+        
+        query = f"SELECT {from_clause} FROM {table} WHERE {condition}"
+        
+        cursor = connection.cursor()
+        cursor.execute(query, params)
+        row = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        
+        return row
             
     #####################################################################################
     ## EXECUTE QUERY (internal function)

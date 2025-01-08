@@ -45,7 +45,7 @@ const fetchRequestData = () => {
 };
 
 const drawerWidth = 195;
-const appBarHeight = 100;
+const appBarHeight = 90;
 const collapseWidth = 60;
 
 const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
