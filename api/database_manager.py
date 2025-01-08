@@ -88,7 +88,6 @@ class DatabaseManager:
                 
         columns = ", ".join(processed_data.keys())
         placeholders = ", ".join(["?"] * len(processed_data))
-        print("INSERT")
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         
         self._execute_query(query, list(processed_data.values()))

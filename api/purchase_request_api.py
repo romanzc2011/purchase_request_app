@@ -6,9 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import pdb
-import pickle
 import purchase_request_database as db
-import purchase_request_email as pe
 import queue
 import threading
 
@@ -25,12 +23,11 @@ processed_data_shared = None
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 executor = ThreadPoolExecutor(max_workers=5)
 
+#########################################################################
+## EMAIL FIELDS for notifications
 to_recipient = "roman_campbell@lawb.uscourts.gov"
 from_recipient = "Purchase Request"
 this_subject = "Purchase Request Notification"
-
-app = Flask(__name__)
-CORS(app)
 
 notifyManager = NotificationManager(msg_body=None, 
                                     to_recipient=to_recipient, 
@@ -73,7 +70,9 @@ approvals_cols = {
 ##########################################################################
 ## API FUNCTIONS
 ##########################################################################
-    
+app = Flask(__name__)
+CORS(app)
+
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
 @app.route('/sendToPurchaseReq', methods=['POST'])
