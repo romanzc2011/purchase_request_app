@@ -88,7 +88,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Quantity
             </TableCell>
-            <TableCell sx={{ color: "white", fontWeight: "bold"}}>
+            <TableCell sx={{ color: "white", fontWeight: "bold" }}>
               Price Each
             </TableCell>
             <TableCell sx={{ color: "white", fontWeight: "bold" }}>
@@ -109,7 +109,9 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
               <TableCell sx={{ color: "white" }}>{item.fund}</TableCell>
               <TableCell sx={{ color: "white" }}>{item.location}</TableCell>
               <TableCell sx={{ color: "white" }}>{item.quantity}</TableCell>
-              <TableCell sx={{ color: "white"}}>{item.price.toFixed(2)}</TableCell>
+              <TableCell sx={{ color: "white" }}>
+                {item.price.toFixed(2)}
+              </TableCell>
               <TableCell sx={{ color: "white" }}>
                 {item.calculatedPrice.toFixed(2)}
               </TableCell>
@@ -117,7 +119,9 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
                 <Button
                   variant="contained"
                   color="error"
-                  onClick={() => onDelete(item.req_id)}
+                  onClick={() => {
+                    onDelete(item.req_id);
+                  }}
                 >
                   Delete
                 </Button>
@@ -145,17 +149,15 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
               <Buttons label="Print Form" className="btn btn-maroon" />
             </TableCell>
 
-            <TableCell colSpan={2} sx={{ color: "white", textAlign: "right" }}>
-              <Typography
-                variant="h6"
-                component="div"
-                sx={{ fontWeight: "bold" }}
-              >
-                Total:
-              </Typography>
-            </TableCell>
-            <TableCell colSpan={2} sx={{ color: "white", fontWeight: "bold" }}>
-              $
+            <TableCell
+              colSpan={2}
+              sx={{ color: "white", textAlign: "right" }}
+            ></TableCell>
+            <TableCell
+              colSpan={2}
+              sx={{ color: "white", fontWeight: "bold", textAlign: "right" }}
+            >
+              Total: $
               {processedData
                 .reduce(
                   (acc, item) => acc + (Number(item.calculatedPrice) || 0),

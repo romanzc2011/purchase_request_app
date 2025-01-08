@@ -76,7 +76,7 @@ CORS(app)
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
 @app.route('/sendToPurchaseReq', methods=['POST'])
-def setPurchaseRequest():
+def set_purchase_request():
     data = request.json
     if not data:
         return jsonify({'error': 'Invalid data'}), 400
@@ -90,7 +90,7 @@ def setPurchaseRequest():
 ##########################################################################
 ## GET APPROVAL DATA
 @app.route('/getApprovalData', methods=['GET'])
-def getApprovalData():
+def get_approval_data():
     try:
         query = "SELECT * FROM approvals"
         approval_data = dbManager.fetch_rows(query)
@@ -99,6 +99,47 @@ def getApprovalData():
     except Exception as e:
         print(f"Error fetching approval data: {e}")
         return jsonify({"error": "Failed to  fetch data"}), 500
+    
+##########################################################################
+## DELETE PURCHASE REQUEST table, condition, params
+@app.route('/deletePurchaseReq', methods=['POST'])
+def delete_purchase_req():
+    data = request.json
+    if not data:
+        return jsonify({"error": "Invalid data"}), 400
+    
+    # Validate input
+    req_id = data.get("req_id")
+    if not req_id:
+        return jsonify({"error": "Missing 'req_id' in request data"}), 400
+    
+    # Define table and condition
+    table = "purchase_requests"
+    condition = "req_id = ?"
+    params = (req_id,)
+    
+    try:
+        # Delete operation
+        dbManager.delete_data(table, condition, params)
+        return jsonify({"message": f"Purchase request with req_id {req_id} deleted successfully"}), 200
+    
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+##########################################################################
+## HANDLE FILE UPLOAD
+@app.route('/handleFileAttachments', methods=['POST'])
+def handlle_file_upload():
+    files = request.files
+    for key in files:
+        file = files[key]
+        
+        # Save file somehwere
+        
+        print(f"Received file: {file.filename}")
+    return jsonify({"message": "Files uploaded successfully"})
+        
+
 
 ##########################################################################
 ## PROGRAM FUNCTIONS
@@ -106,7 +147,7 @@ def getApprovalData():
 
 ##########################################################################
 ## PROCESS PURCHASE DATA
-def processPurchaseData(data):
+def process_purchase_data(data):
     with lock:
         # Populate purchase_cols with appropriate data from api call
         for item in data['dataBuffer']:
@@ -148,7 +189,7 @@ def processPurchaseData(data):
 
 ##########################################################################
 ## PROCESS APPROVAL DATA --- send new request to approvals
-def processApprovalsData(data):
+def process_approvals_data(data):
     
     if not isinstance(data, dict):
         raise ValueError("Data must be a dictionary")
@@ -161,7 +202,7 @@ def processApprovalsData(data):
         
     # Not new? Was it approved or denied?
     elif purchase_cols['new_request'] == 0:
-        approved = getApprovalStatus("approvals", data['req_id'])
+        approved = get_approval_status("approvals", data['req_id'])
         if approved == 1:
             approvals_cols['status'] = "APPROVED"
         if approved == 0:
@@ -186,7 +227,7 @@ def processApprovalsData(data):
 
 ##########################################################################
 ## GET STATUS OF APPROVALS
-def getApprovalStatus(table, req_id):
+def get_approval_status(table, req_id):
     condition = f"req_id = %s"
     columns = "approved"
     table = "approvals"
@@ -199,14 +240,14 @@ def purchase_bg_task(data, api_call):
     try:
         print(f"Background task {api_call} data: {data}")
         if api_call == "sendToPurchaseReq":
-            processed_data = processPurchaseData(data)
+            processed_data = process_purchase_data(data)
             table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
             
             # Insert data into db
             dbManager.insert_data(processed_data, table)
             
             # Send to Approvals table as well
-            approval_data = processApprovalsData(processed_data)
+            approval_data = process_approvals_data(processed_data)
             if processed_data['new_request'] == 1:
                 approval_data['status'] = "NEW REQUEST"
                 processed_data['new_request'] = 0
@@ -214,10 +255,10 @@ def purchase_bg_task(data, api_call):
                 # Update the purchase_req table
                 updated_data = {'new_request': 0}
                 condition = f"req_id = {processed_data['req_id']}"
-                db.updateDB(updated_data, table, condition)
+                dbManager.update_data(updated_data, table, condition)
                 
             table = "approvals"
-            db.insertData(approval_data, table)
+            dbManager.insert_data(approval_data, table)
             
     except Exception as e:
         print(f"Error in background task {api_call}: {e}")

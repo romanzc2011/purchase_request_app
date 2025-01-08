@@ -154,6 +154,25 @@ class DatabaseManager:
         connection.close()
         
         return row
+    
+    #####################################################################################
+    ## DELETE DATA
+    def delete_data(self, table, condition, params):
+        if not table.isidentifier():
+            raise ValueError("Invalid table name")
+        
+        if not condition:
+            raise ValueError("A condition is required")
+        
+        query = f"DELETE FROM {table} WHERE  {condition}"
+        
+        try:
+            self._execute_query(query, params)
+            print("Delete operation successful")
+        
+        except sqlite3.Error as e:
+            print(f"Error during delete operation: {e}")
+                        
             
     #####################################################################################
     ## EXECUTE QUERY (internal function)

@@ -30,7 +30,19 @@ export const AddItemsForm: React.FC<{
       price: Number(newItem.price) || 0,
       fund: newItem.fund || "",
       budgetObjCode: newItem.budgetObjCode || "",
+      fileAttachments: newItem.fileAttachments.map((fileAttachment) => {
+        const file = fileAttachment.attachment;
+        return {
+          attachment: file,
+          name: file?.name || "",
+          size: file?.size || 0,
+          type: file?.type || "",
+        };
+      }),
     };
+
+    // Upload files to server
+    uploadFiles(updatedItem.fileAttachments);
 
     setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
     reset(); // Clear form
@@ -38,22 +50,45 @@ export const AddItemsForm: React.FC<{
   };
 
   /*************************************************************************************** */
+  /* UPLOAD FILES TO SERVER */
+  /*************************************************************************************** */
+  const uploadFiles = (fileAttachments: { attachment: File | null }[]) => {
+    // Create new FormData obj
+    const formData = new FormData();
+
+    // Add each file to obj
+    fileAttachments.forEach((fileAttachment, index) => {
+      if (fileAttachment.attachment) {
+        formData.append(`fileAttachments[${index}]`, fileAttachment.attachment);
+      }
+    });
+
+    console.log("Uploading file:", formData);
+
+    // Submit files with fetch
+    fetch("http://127.0.0.1:5000/handleFileAttachments", {
+      method: "POST",
+      body: formData,
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Error uploading files");
+        }
+        return res.json();
+      })
+      .then((result) => {
+        console.log("Files uploaded successfully:", result);
+      })
+      .catch((error) => {
+        console.error("File upload error: ", error);
+      });
+  };
+
+  /*************************************************************************************** */
   /* HANDLE ADD ITEM ERRORS function */
   /*************************************************************************************** */
   const onError = (errors: FieldErrors<FormValues>) => {
     console.log("Form errors", errors);
-  };
-
-  /*************************************************************************************** */
-  /* HANDLE ADD FILE ATTACHMENT function */
-  /*************************************************************************************** */
-  const handleAddFile = () => {
-    const currentValues = watch(); // Gets current form values
-    append({ attachment: null });
-    reset({
-      ...currentValues,
-      fileAttachments: [...currentValues.fileAttachments, { attachment: null }],
-    });
   };
 
   /* RANDOM ID GENERATOR 
@@ -117,8 +152,8 @@ export const AddItemsForm: React.FC<{
   /* File upload input element */
   /*************************************************************************************** */
   const { fields, append, remove } = useFieldArray({
-    name: "fileAttachments",
-    control,
+    name: "fileAttachments", // This matches the field in your form state
+    control, // From useForm
   });
 
   return (
@@ -203,9 +238,7 @@ export const AddItemsForm: React.FC<{
             <strong>Date Item(s) Needed</strong>
           </label>
           <Box className="col-sm-2">
-            <Box
-              style={{ display: "flex", alignItems: "center", gap: "30px" }}
-            >
+            <Box style={{ display: "flex", alignItems: "center", gap: "30px" }}>
               <input
                 id="dateneed"
                 type="date"
@@ -362,7 +395,7 @@ export const AddItemsForm: React.FC<{
           <LearningDev register={register} errors={errors} />
         </Box>
 
-        <Box sx={{ my: 2 }} >
+        <Box sx={{ my: 2 }}>
           <Box
             sx={{
               display: "flex",
@@ -377,7 +410,6 @@ export const AddItemsForm: React.FC<{
               onSelectBudgetCode={(budgetObjCode) => console.log(budgetObjCode)}
               register={register("budgetObjCode")}
               errors={errors}
-                            
             />
 
             {/************************************************************************************ */}
@@ -398,7 +430,6 @@ export const AddItemsForm: React.FC<{
           </Box>
 
           <Box sx={{ display: "flex", gap: 5, alignItems: "center", mt: 5 }}>
-
             {/************************************************************************************ */}
             {/* PRICE */}
             <PriceInput
