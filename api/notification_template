@@ -1,0 +1,17 @@
+A new purchase request has been submitted and requires your attention. Below are the details of the request:
+
+**Request ID:** {req_id}  
+**Requester:** {requester}  
+**Date Requested:** {date_req}  
+**Date Needed:** {date_needed}  
+**Budget Code:** {budget_obj_code}  
+**Fund:** {fund}  
+**Location:** {location}  
+**Quantity:** {quantity}  
+**Price (Per Item):** ${price}  
+**Total Price:** ${total_price}  
+
+Please review the request and take appropriate action.
+
+**To Approve or Deny This Request:**  
+{link}

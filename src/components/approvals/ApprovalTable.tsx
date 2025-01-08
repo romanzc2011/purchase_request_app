@@ -31,27 +31,29 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
 
   /* Fetch data from backend to populate Approvals Table */
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/getApprovalData").then((res) => {
-      if(!res.ok) {
-        throw new Error(`HTTP error: ${res.status}`);
-      }
+    fetch("http://127.0.0.1:5000/getApprovalData")
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error: ${res.status}`);
+        }
 
-      return res.json();
-
-    }).then((data) => {
-      console.log("Fetched data:", data);
-      // Extract approval_data array
-      if(data.approval_data && Array.isArray(data.approval_data)) {
-        setDataBuffer(data.approval_data);
-      } else {
-        console.error("Unexpect data format:", data);
-      }
-    }).catch((err) => console.error("Error fetching data: ", err));
-  }, []); // Empty dependency arr ensure this runs once 
+        return res.json();
+      })
+      .then((data) => {
+        console.log("Fetched data:", data);
+        // Extract approval_data array
+        if (data.approval_data && Array.isArray(data.approval_data)) {
+          setDataBuffer(data.approval_data);
+        } else {
+          console.error("Unexpect data format:", data);
+        }
+      })
+      .catch((err) => console.error("Error fetching data: ", err));
+  }, []); // Empty dependency arr ensure this runs once
 
   const processedData = dataBuffer.map((item) => ({
     ...item,
-  }))
+  }));
   /************************************************************************************ */
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
@@ -101,28 +103,44 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
             sx={{ background: "linear-gradient(to bottom, #2c2c2c, #800000)" }}
           >
             <TableRow>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 REQUISITION ID
               </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 BUDGET OBJECT CODE
               </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 FUND
               </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 LOCATION
               </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 QUANTITY
               </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 PRICE EACH
               </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 ESTIMATED PRICE
               </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+              <TableCell
+                sx={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+              >
                 STATUS
               </TableCell>
               <TableCell
@@ -132,7 +150,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
               </TableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
+          <TableBody sx={{ textAlign: "center" }}>
             {processedData.map((item) => (
               <TableRow key={item.req_id}>
                 {/**************************************************************************/}
@@ -155,17 +173,17 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
 
                 {/**************************************************************************/}
                 {/* QUANTITY */}
-                <TableCell sx={{ color: "white" }}>{item.quantity}</TableCell>
+                <TableCell sx={{ color: "white", textAlign: "center"}}>{item.quantity}</TableCell>
 
                 {/**************************************************************************/}
                 {/* PRICE */}
-                <TableCell sx={{ color: "white" }}>
+                <TableCell sx={{ color: "white", textAlign: "center"}}>
                   {item.priceEach.toFixed(2)}
                 </TableCell>
 
                 {/**************************************************************************/}
                 {/* ESTIMATED PRICE */}
-                <TableCell sx={{ color: "white" }}>
+                <TableCell sx={{ color: "white", textAlign: "center" }}>
                   {item.totalPrice.toFixed(2)}
                 </TableCell>
 
@@ -223,16 +241,14 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
                 <Typography
                   variant="h6"
                   component="div"
-                  sx={{ fontWeight: "bold" }}
-                >
-                  Total:
-                </Typography>
+                  sx={{ fontWeight: "bold", textAlign: "right" }}
+                ></Typography>
               </TableCell>
               <TableCell
-                colSpan={2}
-                sx={{ color: "white", fontWeight: "bold" }}
+                colSpan={4}
+                sx={{ color: "white", fontWeight: "bold", textAlign: "right" }}
               >
-                $
+                Total: $
                 {processedData
                   .reduce(
                     (acc, item) => acc + (Number(item.totalPrice) || 0),

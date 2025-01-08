@@ -6,6 +6,7 @@ import os
 import pdb
 import pickle
 import purchase_request_database as db
+import purchase_request_email as pe
 import queue
 import threading
 
@@ -17,6 +18,7 @@ Will be used to keep track of purchase requests digitally through a central UI. 
 the UI.
 """
 lock = threading.Lock()
+link = "http://localhost:5173/approvals-table"
 processed_data_shared = None
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 executor = ThreadPoolExecutor(max_workers=5)
@@ -94,7 +96,11 @@ def getApprovalData():
     except Exception as e:
         print(f"Error fetching approval data: {e}")
         return jsonify({"error": "Failed to  fetch data"}), 500
-    
+
+##########################################################################
+## PROGRAM FUNCTIONS
+##########################################################################
+
 ##########################################################################
 ## PROCESS PURCHASE DATA
 def processPurchaseData(data):
@@ -137,10 +143,10 @@ def processPurchaseData(data):
     return purchase_cols
 
 ##########################################################################
-## PROCESS APPROVAL DATA --- send new request  to approvals
+## PROCESS APPROVAL DATA --- send new request to approvals
 def processApprovalsData(data):
     
-    if  not  isinstance(data, dict):
+    if not isinstance(data, dict):
         raise ValueError("Data must be a dictionary")
     
     approved = None
@@ -148,6 +154,8 @@ def processApprovalsData(data):
     # Is this a new request or has it been approved already
     if purchase_cols['new_request'] == 1:
         approvals_cols['status'] == "NEW REQUEST"
+        pe.sendNewNotification()
+        
     # Not new? Was it approved or denied?
     elif purchase_cols['new_request'] == 0:
         approved = getApprovalStatus("approvals", data['req_id'])
@@ -196,6 +204,8 @@ def fetchApprovalData():
 def purchase_bg_task(data, db_path, api_call):
 
     try:
+        
+        
         print(f"Background task {api_call} data: {data}")
         if api_call == "sendToPurchaseReq":
             processed_data = processPurchaseData(data)
