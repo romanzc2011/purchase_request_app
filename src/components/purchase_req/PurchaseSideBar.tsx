@@ -12,7 +12,7 @@ import {
   ListItemIcon,
   IconButton,
 } from "@mui/material";
-import BKSeal from "../../../assets/seal_no_border.png";
+import BKSeal from "../../assets/seal_no_border.png";
 import CheckCircleSharpIcon from "@mui/icons-material/CheckCircleSharp";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import { Link } from "react-router-dom";

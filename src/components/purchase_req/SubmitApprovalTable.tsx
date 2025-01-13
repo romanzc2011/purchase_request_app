@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { useForm } from "react-hook-form";
+import React from "react";
 import Buttons from "./Buttons";
 import {
   Table,
@@ -12,8 +11,8 @@ import {
   Button,
   Typography,
 } from "@mui/material";
-import { FormValues } from "../../../types/formTypes";
-import { convertBOC } from "../../../utils/bocUtils";
+import { FormValues } from "../../types/formTypes";
+import { convertBOC } from "../../utils/bocUtils";
 
 /* INTERFACE */
 interface SubmitApprovalTableProps {

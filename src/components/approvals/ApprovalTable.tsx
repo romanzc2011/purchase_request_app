@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import Buttons from "../purchase_req/purchase_req_components/Buttons";
+import Buttons from "../purchase_req/Buttons";
 import {
   Table,
   TableBody,
