@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import os
+db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 
 class DatabaseManager:
     """
@@ -11,6 +12,10 @@ class DatabaseManager:
     def __init__(self, db_path):
         # Init Database Manager
         self.db_path = db_path
+        
+        # Create tables when initializing database manager
+        self.create_purchase_req_table()
+        self.create_approvals_table()
        
     #####################################################################################
     ## CREATE AND GET CONNECTION 
@@ -25,6 +30,7 @@ class DatabaseManager:
     ## CREATE PURCHASE REQUEST TABLE
     def create_purchase_req_table(self):
         # Create purchase_requests if not already done so
+        print("CREATING TABLE purchase_requests")
         query = """
         CREATE TABLE IF NOT EXISTS purchase_requests (
             req_id INTEGER PRIMARY KEY NOT NULL,
@@ -55,6 +61,7 @@ class DatabaseManager:
     ## CREATE APPROVALS TABLE
     def create_approvals_table(self):
         # Create approvals table if not already existing
+        print("CREATING TABLE approvals")
         query = """
         CREATE TABLE IF NOT EXISTS approvals (
             req_id INTEGER PRIMARY KEY NOT NULL,

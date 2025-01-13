@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import pdb
-import purchase_request_database as db
 import queue
 import threading
 
@@ -217,6 +216,7 @@ def process_approvals_data(data):
     ##########################################################################
     ## SENDING NOTIFICATION OF NEW REQUEST
     # Create email body and send to approver
+    print("SENDING EMAIL...")
     purchase_cols['link'] = link
     email_template = notifyManager.load_email_template("./notification_template.html")
     email_body = email_template.format(**purchase_cols)
@@ -242,6 +242,7 @@ def purchase_bg_task(data, api_call):
         if api_call == "sendToPurchaseReq":
             processed_data = process_purchase_data(data)
             table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
+            
             
             # Insert data into db
             dbManager.insert_data(processed_data, table)
@@ -269,9 +270,6 @@ def purchase_bg_task(data, api_call):
 if __name__ == "__main__":
     # Create approvals and purchase req tables if not already created
     dbManager = DatabaseManager(db_path)
-    
-    dbManager.create_purchase_req_table()
-    dbManager.create_approvals_table()
     
     # Run Flask
     app.run(debug=True)

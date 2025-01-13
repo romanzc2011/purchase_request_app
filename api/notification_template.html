@@ -1,79 +1,96 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <style>
         table {{
-            border-collapse: collapse;
-            width: 30%; /* Table width will be 100% of its container */
+          border-collapse: collapse;
+          width: 30%; /* Table width will be 100% of its container */
         }}
         col {{
-            width: 30%; /* Adjust column width as needed */
+          width: 30%; /* Adjust column width as needed */
         }}
-        th, td {{
-            text-align: left;
-            padding: 8px;
-            border: 1px solid #ddd;
-            width: 20%; /* Adjust this to make columns narrower or wider */
+        th,
+        td {{
+          text-align: left;
+          padding: 8px;
+          border: 1px solid #ddd;
+          width: 20%; /* Adjust this to make columns narrower or wider */
         }}
         th {{
-            background-color: #f4f4f4;
+          background-color: #f4f4f4;
         }}
-    </style>
-</head>
-<body>
-    <p>A new purchase request has been submitted and requires your attention. Below are the details of the request:</p>
+      </style>
+  </head>
+  <body>
+    <p>
+      A new purchase request has been submitted and requires your attention.
+      Below are the details of the request:
+    </p>
     <table>
+        <thead>
+          <tr>
+            <th class="maroon-header">
+              <img src="../src/assets/seal_no_border.png" />
+              UNITED STATES BANKRUPTCY COURT
+            </th>
+          </tr>
+          <tr>
+            <th class="maroon-header">Statement of Need</th>
+          </tr>
+        </thead>
         <colgroup>
-            <col style="width: 30%;"> <!-- Adjusts the width of the first column -->
-            <col style="width: 70%;"> <!-- Adjusts the width of the second column -->
+          <col style="width: 30%" />
+          <!-- Adjusts the width of the first column -->
+          <col style="width: 70%" />
+          <!-- Adjusts the width of the second column -->
         </colgroup>
         <tr>
-            <th>Field</th>
-            <th>Details</th>
+          <th>Field</th>
+          <th>Details</th>
         </tr>
         <tr>
-            <td>Requistion ID</td>
-            <td>{req_id}</td>
+          <td>Requistion ID</td>
+          <td>{req_id}</td>
         </tr>
         <tr>
-            <td>Requester</td>
-            <td>{requester}</td>
+          <td>Requester</td>
+          <td>{requester}</td>
         </tr>
         <tr>
-            <td>Date Requested</td>
-            <td>{datereq}</td>
+          <td>Date Requested</td>
+          <td>{datereq}</td>
         </tr>
         <tr>
-            <td>Date Needed</td>
-            <td>{dateneed}</td>
+          <td>Date Needed</td>
+          <td>{dateneed}</td>
         </tr>
         <tr>
-            <td>Budget Code</td>
-            <td>{budgetObjCode}</td>
+          <td>Budget Code</td>
+          <td>{budgetObjCode}</td>
         </tr>
         <tr>
-            <td>Fund</td>
-            <td>{fund}</td>
+          <td>Fund</td>
+          <td>{fund}</td>
         </tr>
         <tr>
-            <td>Location</td>
-            <td>{location}</td>
+          <td>Location</td>
+          <td>{location}</td>
         </tr>
         <tr>
-            <td>Quantity</td>
-            <td>{quantity}</td>
+          <td>Quantity</td>
+          <td>{quantity}</td>
         </tr>
         <tr>
-            <td>Price (Per Item)</td>
-            <td>${priceEach}</td>
+          <td>Price (Per Item)</td>
+          <td>${priceEach}</td>
         </tr>
         <tr>
-            <td>Total Price</td>
-            <td>${totalPrice}</td>
+          <td>Total Price</td>
+          <td>${totalPrice}</td>
         </tr>
-    </table>
-    <p>Please review the request and take appropriate action.</p>
-    <p><strong>To Approve or Deny This Request:</strong></p>
-    <p><a href="{link}">Click here to review the request</a></p>
-</body>
-</html>
+      </table>
+      <p>Please review the request and take appropriate action.</p>
+      <p><strong>To Approve or Deny This Request:</strong></p>
+      <p><a href="{link}">Click here to review the request</a></p>
+    </body>
+  </html>

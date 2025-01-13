@@ -58,7 +58,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    fetch("http://127.0.0.1:5000/getRequests", {
+    fetch("http://127.0.0.1:5000/getApprovalData", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
