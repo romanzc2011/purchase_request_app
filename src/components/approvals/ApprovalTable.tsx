@@ -54,7 +54,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   const processedData = dataBuffer.map((item) => ({
     ...item,
   }));
-  
+
   /************************************************************************************ */
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
@@ -79,6 +79,34 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
       .catch((err) => console.error("Error sending data:", err));
   };
 
+  /************************************************************************************ */
+  /* SEND CRENDENTIAL DATA --- send credentials to login  */
+  /************************************************************************************ */
+  const authenticateUser = async (username: string, password: string) => {
+    try {
+      const res = await fetch("http://127.0.0.1:5000/authenticateUser", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+  
+      if (!res.ok) {
+        throw new Error(`HTTP error: ${res.status}`);
+      }
+  
+      const data = await res.json();
+      console.log("Authentication successful:", data);
+  
+      // Example: Handle token storage or redirect
+      if (data.token) {
+        localStorage.setItem("authToken", data.token); // Store token securely
+      }
+    } catch (err) {
+      console.error("Error authenticating user:", err);
+    }
+  };
   /************************************************************************************ */
   /* APPROVE OR DENY */
   /************************************************************************************ */
@@ -174,11 +202,13 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
 
                 {/**************************************************************************/}
                 {/* QUANTITY */}
-                <TableCell sx={{ color: "white", textAlign: "center"}}>{item.quantity}</TableCell>
+                <TableCell sx={{ color: "white", textAlign: "center" }}>
+                  {item.quantity}
+                </TableCell>
 
                 {/**************************************************************************/}
                 {/* PRICE */}
-                <TableCell sx={{ color: "white", textAlign: "center"}}>
+                <TableCell sx={{ color: "white", textAlign: "center" }}>
                   {item.priceEach.toFixed(2)}
                 </TableCell>
 

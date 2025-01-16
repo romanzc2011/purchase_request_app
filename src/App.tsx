@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { AddItemsForm } from "./components/purchase_req/AddItemsForm";
 import SubmitApprovalTable from "./components/purchase_req/SubmitApprovalTable";
 import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
@@ -42,20 +49,31 @@ function App() {
     console.log("UPDATE dataBuffer: ", dataBuffer);
   }, [dataBuffer]);
 
+  /* *********************************************************************************** */
+  /* Get current route of user / redirect user to specified location */
+  const location = useLocation();
+  const navigate = useNavigate();
+
   return (
-    <Router>
       <Box sx={{ display: "flex", height: "100vh" }}>
         {/* Sidebar Navigation */}
         <PurchaseSidenav isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
 
-        <LoginDialog
-          open={!isLoggedIn} // Shows dialog if not logged in
-          onClose={() => setIsLoggedIn(true)}
-          onLogin={(username: string, password: string) => {
-            console.log(`Username: ${username}, Password: ${password}`);
-            setIsLoggedIn(true);
-          }}
-        />
+        {/* *********************************************************************************** */}
+        {/* Show login on /approvals-table if not logged in */}
+        {location.pathname === "/approvals-table" && !isLoggedIn && (
+          <LoginDialog
+            open={!isLoggedIn} // Shows dialog if not logged in
+            onClose={() => {
+              // Redirecting to /purchase-request if not logged in and login dialog closed
+              navigate("/purchase-request");
+            }}
+            onLogin={(username: string, password: string) => {
+              console.log(`Username: ${username}, Password: ${password}`);
+              setIsLoggedIn(true);
+            }}
+          />
+        )}
 
         {/********************************************************************* */}
         {/* MAIN SECTION */}
@@ -119,7 +137,6 @@ function App() {
           </Routes>
         </Box>
       </Box>
-    </Router>
   );
 }
 

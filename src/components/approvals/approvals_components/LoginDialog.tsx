@@ -45,10 +45,22 @@ export default function LoginDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Login</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
+    <Dialog sx={{ background: "#2c2c2c" }} open={open} onClose={onClose}>
+      <DialogTitle
+        sx={{
+          background: "linear-gradient(to bottom, #2c2c2c, #800000)",
+          color: "white",
+        }}
+      >
+        Login
+      </DialogTitle>
+      <DialogContent
+        sx={{
+          background: " #2c2c2c",
+          color: "white",
+        }}
+      >
+        <DialogContentText sx={{ color: "white" }}>
           Please enter your username and password to log in.
         </DialogContentText>
 
@@ -61,6 +73,21 @@ export default function LoginDialog({
           fullWidth
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          sx={{
+            input: { color: "white" }, // Input text color
+            "& .MuiInputLabel-root": { color: "white" }, // Label color
+            "& .MuiOutlinedInput-root": {
+              "& fieldset": {
+                borderColor: "white", // Default border color
+              },
+              "&:hover fieldset": {
+                borderColor: "gray", // Border color on hover
+              },
+              "&.Mui-focused fieldset": {
+                borderColor: "white", // Border color when focused
+              },
+            },
+          }}
         />
 
         {/* PASSWORD INPUT */}
@@ -71,12 +98,36 @@ export default function LoginDialog({
           fullWidth
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          sx={{
+            input: { color: "white" }, // Input text color
+            "& .MuiInputLabel-root": { color: "white" }, // Label color
+            "& .MuiOutlinedInput-root": {
+              "& fieldset": {
+                borderColor: "white", // Default border color
+              },
+              "&:hover fieldset": {
+                borderColor: "gray", // Border color on hover
+              },
+              "&.Mui-focused fieldset": {
+                borderColor: "white", // Border color when focused
+              },
+            },
+          }}
         />
         {error && <p style={{ color: "red" }}>{error}</p>}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleLogin}>Login</Button>
+      <DialogActions
+        sx={{
+          background: " #2c2c2c",
+          color: "white",
+        }}
+      >
+        <Button sx={{ color: "white" }} onClick={onClose}>
+          Cancel
+        </Button>
+        <Button sx={{ color: "white" }} onClick={handleLogin}>
+          Login
+        </Button>
       </DialogActions>
     </Dialog>
   );
