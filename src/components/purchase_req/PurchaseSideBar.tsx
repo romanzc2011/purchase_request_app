@@ -132,7 +132,10 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
         <Toolbar />
         <Box>
           <List>
-            {/* PURCHASE REQUESTS */}
+
+            {/************************************************************************/}
+            {/* PURCHASES */}
+            {/************************************************************************/}
             <ListItem divider sx={{ borderBottom: "2px solid #800000" }}>
               <ListItemButton
                 component={Link}
@@ -154,7 +157,10 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
                 {isOpen && <ListItemText primary="PURCHASES" />}
               </ListItemButton>
             </ListItem>
-            {/* REQUESTS */}
+
+            {/************************************************************************/}
+            {/* APPROVALS */}
+            {/************************************************************************/}
             <ListItem divider sx={{ borderBottom: "2px solid #800000" }}>
               <ListItemButton
                 onClick={() => {

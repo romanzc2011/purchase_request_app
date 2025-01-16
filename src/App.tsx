@@ -5,7 +5,9 @@ import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { AddItemsForm } from "./components/purchase_req/AddItemsForm";
 import SubmitApprovalTable from "./components/purchase_req/SubmitApprovalTable";
 import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
-import { Box, Toolbar } from "@mui/material";
+import LoginDialog from "./components/approvals/approvals_components/LoginDialog";
+import AlertMessage from "./components/AlertMessage";
+import { Alert, Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 import ApprovalsTable from "./components/approvals/ApprovalTable";
 
@@ -16,6 +18,7 @@ function App() {
   /* SHARED DATA BUFFER */
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Function to toggle the sidebar
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -45,6 +48,15 @@ function App() {
         {/* Sidebar Navigation */}
         <PurchaseSidenav isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
 
+        <LoginDialog
+          open={!isLoggedIn} // Shows dialog if not logged in
+          onClose={() => setIsLoggedIn(true)}
+          onLogin={(username: string, password: string) => {
+            console.log(`Username: ${username}, Password: ${password}`);
+            setIsLoggedIn(true);
+          }}
+        />
+
         {/********************************************************************* */}
         {/* MAIN SECTION */}
         {/********************************************************************* */}
@@ -60,18 +72,26 @@ function App() {
           <Toolbar /> {/* Space to offset AppBar */}
           <Routes>
             {/* Define Routes */}
+            {/* Password protect the routes, only authorized users can visit Approvals table */}
             <Route
               path="/approvals-table"
               element={
-                <ApprovalsTable
-                  dataBuffer={dataBuffer}
-                  onDelete={(req_id: number) =>
-                    setDataBuffer(
-                      dataBuffer.filter((item) => item.req_id !== req_id)
-                    )
-                  }
-                  resetTable={resetTable}
-                />
+                isLoggedIn ? (
+                  <ApprovalsTable
+                    dataBuffer={dataBuffer}
+                    onDelete={(req_id: number) =>
+                      setDataBuffer(
+                        dataBuffer.filter((item) => item.req_id !== req_id)
+                      )
+                    }
+                    resetTable={resetTable}
+                  />
+                ) : (
+                  <AlertMessage
+                    severity="error"
+                    alertText="Please log in to view this page."
+                  />
+                )
               }
             />
             <Route

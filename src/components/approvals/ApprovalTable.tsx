@@ -54,6 +54,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   const processedData = dataBuffer.map((item) => ({
     ...item,
   }));
+  
   /************************************************************************************ */
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
