@@ -138,9 +138,6 @@ export const AddItemsForm: React.FC<{
     return () => subscription.unsubscribe();
   }, [watch]);
 
-  /* Watch all values in Form */
-  const watchForm = watch();
-
   /* Reset form after successful submission */
   useEffect(() => {
     if (isSubmitSuccessful) {

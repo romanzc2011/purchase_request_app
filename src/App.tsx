@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import {
-  BrowserRouter as Router,
   Routes,
   Route,
-  Link,
   useLocation,
   useNavigate,
 } from "react-router-dom";
@@ -14,7 +12,7 @@ import SubmitApprovalTable from "./components/purchase_req/SubmitApprovalTable";
 import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
 import LoginDialog from "./components/approvals/approvals_components/LoginDialog";
 import AlertMessage from "./components/AlertMessage";
-import { Alert, Box, Toolbar } from "@mui/material";
+import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 import ApprovalsTable from "./components/approvals/ApprovalTable";
 

@@ -1,5 +1,5 @@
 import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { FormValues } from "../../../types/formTypes";
+import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
 
 interface BudgetPickerProps {
