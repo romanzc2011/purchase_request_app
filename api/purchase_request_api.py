@@ -1,7 +1,7 @@
 from database_manager import DatabaseManager
 from notification_manager import NotificationManager
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -69,6 +69,7 @@ approvals_cols = {
 ##########################################################################
 ## API FUNCTIONS
 ##########################################################################
+context = ("../ssl/cert.pem", "../ssl/key.pem")
 app = Flask(__name__)
 CORS(app)
 
@@ -272,5 +273,5 @@ if __name__ == "__main__":
     dbManager = DatabaseManager(db_path)
     
     # Run Flask
-    app.run(debug=True)
+    app.run(host='127.0.0.1', ssl_context=context, threaded=True, debug=True)
     
