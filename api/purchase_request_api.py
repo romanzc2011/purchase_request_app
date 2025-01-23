@@ -2,6 +2,7 @@ from database_manager import DatabaseManager
 from notification_manager import NotificationManager
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
+from waitress import serve
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -69,14 +70,20 @@ approvals_cols = {
 ##########################################################################
 ## API FUNCTIONS
 ##########################################################################
-context = ("../ssl/cert.pem", "../ssl/key.pem")
 app = Flask(__name__)
 CORS(app)
+
+@app.route('/debug')
+def debug_headers():
+    return jsonify(dict(request.headers))
 
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
 @app.route('/sendToPurchaseReq', methods=['POST'])
 def set_purchase_request():
+    user = request.environ.get('REMOTE_USER')
+    print("REMOTE USER TEST")
+    print(f"Authenticated user: {user}")
     data = request.json
     if not data:
         return jsonify({'error': 'Invalid data'}), 400
@@ -241,9 +248,9 @@ def purchase_bg_task(data, api_call):
     try:
         print(f"Background task {api_call} data: {data}")
         if api_call == "sendToPurchaseReq":
+            
             processed_data = process_purchase_data(data)
             table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
-            
             
             # Insert data into db
             dbManager.insert_data(processed_data, table)
@@ -271,7 +278,8 @@ def purchase_bg_task(data, api_call):
 if __name__ == "__main__":
     # Create approvals and purchase req tables if not already created
     dbManager = DatabaseManager(db_path)
-    
+    print(app.url_map)
     # Run Flask
-    app.run(host='0.0.0.0', port=5000, ssl_context=context, threaded=True, debug=True)
+    #app.run(debug=True)
+    serve(app, host="0.0.0.0", port=5000)
     

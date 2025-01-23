@@ -1,5 +1,4 @@
 import os
-import pandas as pd
 import pythoncom
 import win32com.client as win32
 
