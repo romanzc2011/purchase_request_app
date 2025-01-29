@@ -16,6 +16,7 @@ __pycache__
 
 # Editor directories and files
 .vscode/*
+api/PurchaseReqFlaskAPI/*
 !.vscode/extensions.json
 .idea
 .DS_Store

@@ -1,6 +1,7 @@
 from database_manager import DatabaseManager
 import win32security
 from notification_manager import NotificationManager
+from ldap_manager import LDAPManager
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 from waitress import serve
@@ -301,6 +302,11 @@ if __name__ == "__main__":
     # Create approvals and purchase req tables if not already created
     dbManager = DatabaseManager(db_path)
     print(app.url_map)
+    
+    # Test ldaps
+    ldap_mgr = LDAPManager("adu.dcn", 636, True, "ADU\\RomanCampbell", "zZryderkile506!@a")
+    print(ldap_mgr.connection)
+    
     # Run Flask
     app.run(host="127.0.0.1", debug=True, port=5000)
     #serve(app, host="127.0.0.1", port=5010)
