@@ -117,7 +117,6 @@ def get_user_info():
 ##########################################################################
 ## GET APPROVAL DATA
 @app.route('/getApprovalData', methods=['GET', 'OPTIONS'])
-@cross_origin(origins="*", headers=['Content-Type','Authorization'])
 def get_approval_data():
     if request.method == "OPTIONS":
         return jsonify({"status": "OK"})
