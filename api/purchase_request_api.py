@@ -1,4 +1,5 @@
 from database_manager import DatabaseManager
+import win32security
 from notification_manager import NotificationManager
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
@@ -71,7 +72,12 @@ approvals_cols = {
 ## API FUNCTIONS
 ##########################################################################
 app = Flask(__name__)
-CORS(app)
+app
+CORS(app, supports_credentials=True)
+
+@app.route('/hello', methods=['GET'])
+def hello():
+    return jsonify({"message": "Hello from Flask running on IIS..."})
 
 @app.route('/debug')
 def debug_headers():
@@ -93,11 +99,27 @@ def set_purchase_request():
     executor.submit(purchase_bg_task, data, "insertApprovalData")
     
     return jsonify({"message": "Processing started in background"})
+
+##########################################################################
+## GET USER INFO
+@app.route('/userinfo', methods=['GET'])
+def get_user_info():
+    # Extract user info
+    print("REMOTE_USER:", request.environ.get('REMOTE_USER', None))
+    remote_user = request.environ.get('REMOTE_USER', None)
+    
+    if remote_user:
+        return jsonify({"user": remote_user, "authenticated": True})
+    else:
+        return jsonify({"error": "User not authenticated"}), 401
     
 ##########################################################################
 ## GET APPROVAL DATA
-@app.route('/getApprovalData', methods=['GET'])
+@app.route('/getApprovalData', methods=['GET', 'OPTIONS'])
+@cross_origin(origins="*", headers=['Content-Type','Authorization'])
 def get_approval_data():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "OK"})
     try:
         query = "SELECT * FROM approvals"
         approval_data = dbManager.fetch_rows(query)
@@ -280,6 +302,6 @@ if __name__ == "__main__":
     dbManager = DatabaseManager(db_path)
     print(app.url_map)
     # Run Flask
-    #app.run(debug=True)
-    serve(app, host="0.0.0.0", port=5000)
+    app.run(host="127.0.0.1", debug=True, port=5000)
+    #serve(app, host="127.0.0.1", port=5010)
     
