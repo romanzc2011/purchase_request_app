@@ -303,7 +303,7 @@ if __name__ == "__main__":
     print(app.url_map)
     
     # Test ldaps
-    ldap_mgr = LDAPManager("adu.dcn", 636, True, "ADU\\RomanCampbell", "zZryderkile506!@a")
+    ldap_mgr = LDAPManager("adu.dcn", 636, True, ")
     
     # Run Flask
     # 5004 only during Testing, switch back to 5000 on prod, iis takes care of redirects for https
