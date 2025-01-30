@@ -306,6 +306,8 @@ if __name__ == "__main__":
     ldap_mgr = LDAPManager("adu.dcn", 636, True, "ADU\\RomanCampbell", "zZryderkile506!@a")
     
     # Run Flask
-    app.run(host="127.0.0.1", debug=True, port=5000)
-    #serve(app, host="127.0.0.1", port=5010)
+    # 5004 only during Testing, switch back to 5000 on prod, iis takes care of redirects for https
+    app.run(ssl_context=('test_cert.pem', 'test_key.pem'), host="localhost", port=5004)
+    #app.run(host="localhost", debug=True, port=5000)
+    #serve(app, host="127.0.0.1", port=5000)
     

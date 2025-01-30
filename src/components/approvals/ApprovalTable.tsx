@@ -27,9 +27,11 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
 }) => {
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
 
+  /************************************************************************************ */
   /* Fetch data from backend to populate Approvals Table */
+  /************************************************************************************ */
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/getApprovalData")
+    fetch("https://localhost:5004/getApprovalData")
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP error: ${res.status}`);
@@ -57,7 +59,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    fetch("http://127.0.0.1:5000/getApprovalData", {
+    fetch("https://localhost:5004/sendToPurchaseReq", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -82,7 +84,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   /************************************************************************************ */
   // const authenticateUser = async (username: string, password: string) => {
   //   try {
-  //     const res = await fetch("http://127.0.0.1:5000/authenticateUser", {
+  //     const res = await fetch("http://localhost:5000/authenticateUser", {
   //       method: "POST",
   //       headers: {
   //         "Content-Type": "application/json",
