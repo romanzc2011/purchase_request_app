@@ -4,8 +4,8 @@ import "./App.css";
 import { Routes, Route } from "react-router-dom";
 import { AddItemsForm } from "./components/purchase_req/AddItemsForm";
 import SubmitApprovalTable from "./components/purchase_req/SubmitApprovalTable";
-import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
 //import LoginDialog from "./components/approvals/approvals_components/LoginDialog";
+import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
 import AlertMessage from "./components/AlertMessage";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
@@ -58,36 +58,6 @@ function App() {
     })
     .catch((error) => console.error("Error fetching hello message:", error));
   }, []);
-
-  /* *********************************************************************************** */
-  /* USER INFO */
-    // useEffect(() => {
-    //   // Fetch the user info from the backend
-    //   fetch("https://localhost:5004/userinfo", { 
-    //     method: "GET",
-    //     credentials: "include",
-    //    })
-    //     .then((response) => {
-    //       if (response.ok) {
-    //         return response.json();
-    //       } else {
-    //         throw new Error("Failed to authenticate");
-    //       }
-    //     })
-    //     .then((data) => {
-    //       //setUserInfo(data); // Save the user data
-    //       console.log("User Info:", data); // Log user info to console
-    //     })
-    //     .catch((error) => console.error("Error fetching user info:", error));
-    // }, []); // Empty dependency array to fetch on mount
-  
-  //   return null; // This component only fetches data; it doesn't render UI
-  // };
-  
-  /* *********************************************************************************** */
-  /* Get current route of user / redirect user to specified location */
-  // const location = useLocation();
-  // const navigate = useNavigate();
 
   /* *********************************************************************************** */
   /* Determine if ApprovalTable requires a login or not */

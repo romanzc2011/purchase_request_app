@@ -304,7 +304,6 @@ if __name__ == "__main__":
     
     # Test ldaps
     ldap_mgr = LDAPManager("adu.dcn", 636, True, "ADU\\RomanCampbell", "zZryderkile506!@a")
-    print(ldap_mgr.connection)
     
     # Run Flask
     app.run(host="127.0.0.1", debug=True, port=5000)
