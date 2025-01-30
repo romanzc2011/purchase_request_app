@@ -3,7 +3,7 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
-import LoginDialog from "./components/approvals/approvals_components/LoginDialog.tsx";
+import LoginDialog from "./components/LoginDialog.tsx";
 
 function Root() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -24,22 +24,20 @@ function Root() {
   /* HELLO MSG - check if api is responding */
   /********************************************************************/
   useEffect(() => {
-    setIsByPassed(true);
     fetch("https://localhost:5004/hello")
-    .then((response) => {
-      if(!response.ok) {
-        throw new Error(`HTTPS error: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then((data) => {
-      console.log("Fetched data:", data);
-    })
-    .catch((error) => {
-      console.error("Fetch error: ", error);
-    });
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTPS error: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        console.log("Fetched data:", data);
+      })
+      .catch((error) => {
+        console.error("Fetch error: ", error);
+      });
   }, []); // slow to connect to the chat after every re-render, so you add the dependency array
-
 
   return (
     /********************************************************************/
@@ -47,16 +45,13 @@ function Root() {
     /********************************************************************/
     <StrictMode>
       <Router>
-        {isLoggedIn || isBypassed ? ( /* If logged in then show App if not then display LoginDialog */
+        {isLoggedIn || isBypassed ? (
           <App />
         ) : (
           <LoginDialog
             open={!isLoggedIn && !isBypassed}
-            onClose={() => console.log("HANDLE DIALOG CLOSED")}
-            onLogin={(username: string, password: string) => {
-              console.log(`Username: ${username}, Password: ${password}`);
-              setIsLoggedIn(true);
-            }}
+            onClose={() => console.log("Login dialog closed")}
+            onLoginSuccess={() => setIsLoggedIn(true)}
           />
         )}
       </Router>

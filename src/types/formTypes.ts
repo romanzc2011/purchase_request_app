@@ -1,3 +1,6 @@
+/********************************************************/
+/* FORM VALUES */
+/********************************************************/
 export type FormValues = {
   req_id: number;
   requester: string;
@@ -27,3 +30,11 @@ export type FormValues = {
   budgetObjCode: string;
   status: string;
 };
+
+/********************************************************/
+/* USER CREDENTIALS */
+/********************************************************/
+export type UserCredentials = {
+  username: string;
+  password: string;
+}

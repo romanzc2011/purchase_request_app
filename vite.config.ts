@@ -7,8 +7,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     https: {
-      key: fs.readFileSync('api/test_key.pem'),
-      cert: fs.readFileSync('api/test_cert.pem'),
+      key: fs.readFileSync('tls_certs/test_key.pem'),
+      cert: fs.readFileSync('tls_certs/test_cert.pem'),
     },
     host: "localhost",
     port: 5173,

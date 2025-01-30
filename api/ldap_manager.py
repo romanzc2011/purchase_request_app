@@ -1,3 +1,4 @@
+from flask import jsonify
 from ldap3 import Server, Connection, Tls, ALL
 from ldap3.core.exceptions import LDAPExceptionError, LDAPBindError
 from requests_ntlm import HttpNtlmAuth
@@ -13,9 +14,6 @@ class LDAPManager:
     server_name: str
     port: int
     using_tls: bool
-    user: str
-    password: str
-    connection: Connection = field(init=False) # Exclusion from __init__
     
     #####################################################################################
     ## POST INIT function
@@ -33,19 +31,20 @@ class LDAPManager:
     
     #####################################################################################
     ## GET CONNECTION of ldaps
-    def get_connection(self):
+    def get_connection(self, username, password):
         tls = None
         if(self.using_tls):
             tls = self.tls_config()
             
         server = Server(self.server_name, get_info=ALL)
-        conn = Connection(server,user=self.user, password=self.password, authentication="NTLM")
+        conn = Connection(server,user=username, password=password, authentication="NTLM")
         
         # Print Loading # until connection successful
         print("\n#####################################")
         print("\nAttempting to authenticate to LDAP...", end="", flush=True)
-        if not conn.bind():
-            raise LDAPBindError("❌ LDAP Authentication Failed!")
+        if conn.bind():
+            return jsonify({"message": "Logged in successfully"})
+        
         self.i_am = conn.extend.standard.who_am_i()
         
         print(f"\n✅ --- Successfully authenticated to {self.server_name}")

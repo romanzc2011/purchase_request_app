@@ -4,6 +4,8 @@ from notification_manager import NotificationManager
 from ldap_manager import LDAPManager
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
+from dotenv import load_dotenv
 from waitress import serve
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -19,6 +21,9 @@ NAME: PURCHASE REQUEST APP
 Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
 the UI.
 """
+load_dotenv()
+LDAP_SERVER = os.getenv("LDAP_SERVER")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 lock = threading.Lock()
 link = "http://localhost:5173/approvals-table"
 processed_data_shared = None
@@ -73,17 +78,27 @@ approvals_cols = {
 ## API FUNCTIONS
 ##########################################################################
 app = Flask(__name__)
-app
 CORS(app, supports_credentials=True)
+app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
+jwt = JWTManager(app)
 
 @app.route('/hello', methods=['GET'])
 def hello():
     return jsonify({"message": "Hello from Flask running on IIS..."})
 
-@app.route('/debug')
-def debug_headers():
-    return jsonify(dict(request.headers))
-
+##########################################################################
+## LOGIN -- auth users and return JWTs
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.json.get("username", None)
+    password = request.json.get("password", None)
+    
+    ldap_mgr = LDAPManager(LDAP_SERVER, 636, True, username, password)
+    
+    
+    print(f"\nUSERNAME: {username}")
+    print(f"\nPASSWORD: {password}")
+    
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
 @app.route('/sendToPurchaseReq', methods=['POST'])
@@ -164,11 +179,8 @@ def handlle_file_upload():
         file = files[key]
         
         # Save file somehwere
-        
         print(f"Received file: {file.filename}")
     return jsonify({"message": "Files uploaded successfully"})
-        
-
 
 ##########################################################################
 ## PROGRAM FUNCTIONS
@@ -303,11 +315,10 @@ if __name__ == "__main__":
     print(app.url_map)
     
     # Test ldaps
-    ldap_mgr = LDAPManager("adu.dcn", 636, True, ")
     
     # Run Flask
     # 5004 only during Testing, switch back to 5000 on prod, iis takes care of redirects for https
-    app.run(ssl_context=('test_cert.pem', 'test_key.pem'), host="localhost", port=5004)
+    app.run(ssl_context=('../tls_certs/test_cert.pem', '../tls_certs/test_key.pem'), host="localhost", port=5004)
     #app.run(host="localhost", debug=True, port=5000)
     #serve(app, host="127.0.0.1", port=5000)
     
