@@ -1,9 +1,10 @@
 from database_manager import DatabaseManager
-import win32security
 from notification_manager import NotificationManager
 from ldap_manager import LDAPManager
-from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin
+from flask import Flask, request, jsonify, session
+from flask_cors import CORS
+from ldap3.core.exceptions import LDAPBindError
+from flask_session import Session
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
 from dotenv import load_dotenv
 from waitress import serve
@@ -13,6 +14,7 @@ import os
 import pdb
 import queue
 import threading
+import time
 
 """
 AUTHOR: Roman Campbell
@@ -78,8 +80,10 @@ approvals_cols = {
 ## API FUNCTIONS
 ##########################################################################
 app = Flask(__name__)
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
 CORS(app, supports_credentials=True)
-app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 jwt = JWTManager(app)
 
 @app.route('/hello', methods=['GET'])
@@ -93,11 +97,52 @@ def login():
     username = request.json.get("username", None)
     password = request.json.get("password", None)
     
-    ldap_mgr = LDAPManager(LDAP_SERVER, 636, True, username, password)
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
     
+    try:
+        ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
+        connection = ldap_mgr.get_connection(username, password)
+        print("Attempting BIND")
+        
+        if connection.bind():
+            ldap_mgr.print_login_banner(username)
+            session["users"] = username
+            access_token = create_access_token(username)
+            return jsonify({"message": "Login successful", "access_token": access_token})
+        else:
+            return jsonify({"error":" Invalid credentials"}), 401
+        
+    except LDAPBindError as e:
+        return jsonify({"error": "Invalid username or password"}), 401
     
-    print(f"\nUSERNAME: {username}")
-    print(f"\nPASSWORD: {password}")
+    except Exception as e:
+        print(f"LDAP authentication error: {e}")
+        return jsonify({"error": "LDAP authentication failed"}), 500
+
+##########################################################################
+## PROGRESS BAR
+def progress_bar(iterable, prefix="", suffix="", decimals=1, length=100, fill='█', printEnd="\r"):
+    """
+    Loop for terminal progress bar
+    """
+    total = len(iterable)
+    
+    # Progress bar printing function
+    def print_progress_bar(iteration):
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filled_length = int(length * iteration // total)
+        bar = fill * filled_length + '-' * (lenght - filled_length)
+        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+        
+        # init call
+        print_progress_bar(0)
+        
+        # Update progress bar
+        for i, item in enumerate(iterable):
+            yield item
+            print_progress_bar(i + 1)
+        print()
     
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
@@ -115,19 +160,6 @@ def set_purchase_request():
     executor.submit(purchase_bg_task, data, "insertApprovalData")
     
     return jsonify({"message": "Processing started in background"})
-
-##########################################################################
-## GET USER INFO
-@app.route('/userinfo', methods=['GET'])
-def get_user_info():
-    # Extract user info
-    print("REMOTE_USER:", request.environ.get('REMOTE_USER', None))
-    remote_user = request.environ.get('REMOTE_USER', None)
-    
-    if remote_user:
-        return jsonify({"user": remote_user, "authenticated": True})
-    else:
-        return jsonify({"error": "User not authenticated"}), 401
     
 ##########################################################################
 ## GET APPROVAL DATA
@@ -313,12 +345,9 @@ if __name__ == "__main__":
     # Create approvals and purchase req tables if not already created
     dbManager = DatabaseManager(db_path)
     print(app.url_map)
-    
-    # Test ldaps
-    
+
     # Run Flask
     # 5004 only during Testing, switch back to 5000 on prod, iis takes care of redirects for https
     app.run(ssl_context=('../tls_certs/test_cert.pem', '../tls_certs/test_key.pem'), host="localhost", port=5004)
-    #app.run(host="localhost", debug=True, port=5000)
     #serve(app, host="127.0.0.1", port=5000)
     
