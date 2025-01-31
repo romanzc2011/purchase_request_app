@@ -27,7 +27,7 @@ load_dotenv()
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 lock = threading.Lock()
-link = "http://localhost:5173/approvals-table"
+link = "https://localhost:5173/approvals-table"
 processed_data_shared = None
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 executor = ThreadPoolExecutor(max_workers=5)
@@ -97,13 +97,15 @@ def login():
     username = request.json.get("username", None)
     password = request.json.get("password", None)
     
+    # Append ADU\ to username to match AD structure
+    username = "ADU\\"+username
+    
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
     
     try:
         ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
         connection = ldap_mgr.get_connection(username, password)
-        print("Attempting BIND")
         
         if connection.bind():
             ldap_mgr.print_login_banner(username)
@@ -132,7 +134,7 @@ def progress_bar(iterable, prefix="", suffix="", decimals=1, length=100, fill='â
     def print_progress_bar(iteration):
         percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
         filled_length = int(length * iteration // total)
-        bar = fill * filled_length + '-' * (lenght - filled_length)
+        bar = fill * filled_length + '-' * (length - filled_length)
         print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
         
         # init call
