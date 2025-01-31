@@ -97,12 +97,29 @@ def login():
     username = request.json.get("username", None)
     password = request.json.get("password", None)
     
+<<<<<<< HEAD
+    # Append ADU\ to username to match AD structure
+    username = "ADU\\"+username
+=======
+<<<<<<< HEAD
+    ldap_mgr = LDAPManager(LDAP_SERVER, 636, True, username, password)
+>>>>>>> clean-version
+    
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
+    
+<<<<<<< HEAD
+=======
+    print(f"\nUSERNAME: {username}")
+    print(f"\nPASSWORD: {password}")
+=======
     # Append ADU\ to username to match AD structure
     username = "ADU\\"+username
     
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
     
+>>>>>>> clean-version
     try:
         ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
         connection = ldap_mgr.get_connection(username, password)
@@ -145,6 +162,10 @@ def progress_bar(iterable, prefix="", suffix="", decimals=1, length=100, fill='â
             yield item
             print_progress_bar(i + 1)
         print()
+<<<<<<< HEAD
+=======
+>>>>>>> ad4655d (username alter)
+>>>>>>> clean-version
     
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
