@@ -99,19 +99,14 @@ def login():
     
     # Append ADU\ to username to match AD structure
     username = "ADU\\"+username
-    ldap_mgr = LDAPManager(LDAP_SERVER, 636, True, username, password)
     
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
     
-    print(f"\nUSERNAME: {username}")
-    print(f"\nPASSWORD: {password}")
-    # Append ADU\ to username to match AD structure
-    username = "ADU\\"+username
-    
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
     
+    # Connect to LDAPS server and attempt to bind which involves authentication    
     try:
         ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
         connection = ldap_mgr.get_connection(username, password)
@@ -131,30 +126,6 @@ def login():
         print(f"LDAP authentication error: {e}")
         return jsonify({"error": "LDAP authentication failed"}), 500
 
-##########################################################################
-## PROGRESS BAR
-def progress_bar(iterable, prefix="", suffix="", decimals=1, length=100, fill='█', printEnd="\r"):
-    """
-    Loop for terminal progress bar
-    """
-    total = len(iterable)
-    
-    # Progress bar printing function
-    def print_progress_bar(iteration):
-        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-        filled_length = int(length * iteration // total)
-        bar = fill * filled_length + '-' * (length - filled_length)
-        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
-        
-        # init call
-        print_progress_bar(0)
-        
-        # Update progress bar
-        for i, item in enumerate(iterable):
-            yield item
-            print_progress_bar(i + 1)
-        print()
-    
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
 @app.route('/sendToPurchaseReq', methods=['POST'])
