@@ -19,6 +19,7 @@ __pycache__
 api/PurchaseReqFlaskAPI/*
 api/flask_session/*
 tls_certs/*
+documentation
 .env
 !.vscode/extensions.json
 .idea
