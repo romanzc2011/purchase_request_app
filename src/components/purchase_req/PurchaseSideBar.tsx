@@ -111,7 +111,6 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
         <Toolbar />
         <Box>
           <List>
-
             {/************************************************************************/}
             {/* PURCHASES */}
             {/************************************************************************/}
@@ -121,19 +120,32 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
                 to="/purchase-request"
                 sx={{
                   justifyContent: isOpen ? "flex-start" : "center",
+                  width: "100%",
                 }}
                 aria-label="Purchase Requests"
               >
                 <ListItemIcon
                   sx={{
                     color: "white",
-                    minWidth: isOpen ? "40px" : "0",
+                    minWidth: isOpen ? "35px" : "0",
                     justifyContent: isOpen ? "flex-start" : "center",
                   }}
                 >
                   <Inventory2Icon />
                 </ListItemIcon>
-                {isOpen && <ListItemText primary="PURCHASES" />}
+                {isOpen && (
+                  <ListItemText
+                    primary="CREATE REQUEST"
+                    slotProps={{
+                      primary: {
+                        sx: {
+                          fontSize: ".9rem",
+                          whiteSpace: "nowrap", // Prevents text wrapping
+                        },
+                      },
+                    }}
+                  />
+                )}
               </ListItemButton>
             </ListItem>
 
