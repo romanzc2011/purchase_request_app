@@ -112,10 +112,10 @@ def login():
         connection = ldap_mgr.get_connection(adu_username, password)
         
         if connection.bound:
-            ldap_mgr.check_user_membership(connection, username)
+            AD_groups = ldap_mgr.check_user_membership(connection, username)
             session["users"] = username
             access_token = create_access_token(username)
-            return jsonify({"message": "Login successful", "access_token": access_token})
+            return jsonify({"message": "Login successful", "access_token": access_token, "AD_groups": AD_groups})
         else:
             return jsonify({"error":" Invalid credentials"}), 401
         

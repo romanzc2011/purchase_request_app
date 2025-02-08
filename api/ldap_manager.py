@@ -25,6 +25,13 @@ group_dns = [
     ACCESS_GROUP_DNS
 ]
 
+# Send this array of groups to frontend
+user_groups = {
+    "ACCESS_GROUP" : False,
+    "CUE_GROUP" : False,
+    "IT_GROUP" : False
+}
+
 @dataclass
 class LDAPManager:
     server_name: str
@@ -111,19 +118,24 @@ class LDAPManager:
                                 # Which group does user belong to
                                 if "PurchaseRequest_IT" in group_name:
                                     self.it_group_dns = True
+                                    user_groups["IT_GROUP"] = self.it_group_dns
                                     continue
                                     
                                 elif "PurchaseRequest_CUE" in group_name:
                                     self.cue_group_dns = True
+                                    user_groups["CUE_GROUP"] = self.cue_group_dns
                                     continue
                                     
                                 elif "PurchaseRequest_Access" in group_name:
                                     self.access_group_dns = True
+                                    user_groups["ACCESS_GROUP"] = self.access_group_dns
                                     continue
                                     
             print(f"\n{self.it_group_dns}")
             print(f"{self.cue_group_dns}")
             print(f"{self.access_group_dns}")
+            
+            return user_groups
 
         except Exception as e:
             print(f"Error: {e}")
