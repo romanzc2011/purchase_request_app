@@ -98,7 +98,7 @@ def login():
     password = request.json.get("password", None)
     
     # Append ADU\ to username to match AD structure
-    username = "ADU\\"+username
+    adu_username = "ADU\\"+username
     
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
@@ -109,10 +109,10 @@ def login():
     # Connect to LDAPS server and attempt to bind which involves authentication    
     try:
         ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
-        connection = ldap_mgr.get_connection(username, password)
+        connection = ldap_mgr.get_connection(adu_username, password)
         
-        if connection.bind():
-            ldap_mgr.print_login_banner(username)
+        if connection.bound:
+            ldap_mgr.check_user_membership(connection, username)
             session["users"] = username
             access_token = create_access_token(username)
             return jsonify({"message": "Login successful", "access_token": access_token})

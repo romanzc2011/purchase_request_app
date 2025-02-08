@@ -10,11 +10,21 @@ import { CircularProgress } from "@mui/material";
 
 interface LoginDialogProps {
   open: boolean;
+  isAccessGrp: boolean; // Access Group from the AD, if true no access to Approvals
+  isCUEGrp: boolean; // CUE Group from the AD, if true, they do have access to Approvals
+  isITGrp: boolean; // IT Group from the AD, if true they do have access to Approvals
   onClose: () => void;
   onLoginSuccess: () => void;
 }
 
-export default function LoginDialog({ open, onClose, onLoginSuccess }: LoginDialogProps) {
+export default function LoginDialog({
+  open,
+  onClose,
+  onLoginSuccess,
+  isAccessGrp,
+  isCUEGrp,
+  isITGrp,
+}: LoginDialogProps) {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
