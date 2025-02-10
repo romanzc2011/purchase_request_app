@@ -37,6 +37,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   const handleSubmitData = (dataBuffer: FormValues[]) => {
     fetch("https://localhost:5004/sendToPurchaseReq", {
       method: "POST",
+      credentials: "include",  // Ensures cookies are sent with request
       headers: {
         "Content-Type": "application/json",
       },

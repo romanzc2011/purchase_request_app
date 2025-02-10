@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from ldap3.core.exceptions import LDAPBindError
 from flask_session import Session
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, JWTManager, set_access_cookies
 from dotenv import load_dotenv
 from waitress import serve
 from concurrent.futures import ThreadPoolExecutor
@@ -80,10 +80,12 @@ approvals_cols = {
 ## API FUNCTIONS
 ##########################################################################
 app = Flask(__name__)
+CORS(app, supports_credentials=True)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
-CORS(app, supports_credentials=True)
+app.config["JWT_TOKEN_LOCATION"] = ["cookies"];
+app.config["JWT_COOKIE_SECURE"] = True  # Cookies will only be sent via HTTPS
+
 jwt = JWTManager(app)
 
 ##########################################################################
@@ -111,7 +113,19 @@ def login():
             AD_groups = ldap_mgr.check_user_membership(connection, username)
             session["users"] = username
             access_token = create_access_token(username)
-            return jsonify({"message": "Login successful", "access_token": access_token, "AD_groups": AD_groups})
+            
+            # Create response
+            response = jsonify({
+                "message": "Login successful",
+                "access_token": access_token,
+                "AD_groups": AD_groups
+            })
+            
+            set_access_cookies(response, access_token)
+            
+            # Set access token in secure cookie
+            return response
+        
         else:
             return jsonify({"error":" Invalid credentials"}), 401
         
@@ -121,10 +135,24 @@ def login():
     except Exception as e:
         print(f"LDAP authentication error: {e}")
         return jsonify({"error": "LDAP authentication failed"}), 500
+    
+##########################################################################
+## REFRESH TOKEN
+@app.route("/refresh_token", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh_token():
+    current_user = get_jwt_identity()
+    new_access_token = create_access_token(identity=current_user)
+    response = jsonify(access_token=new_access_token)
+    
+    # Set new token as cookie
+    set_access_cookies(response, new_access_token)
+    return response
 
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
 @app.route('/sendToPurchaseReq', methods=['POST'])
+@jwt_required()
 def set_purchase_request():
     user = request.environ.get('REMOTE_USER')
     print("REMOTE USER TEST")
@@ -326,6 +354,6 @@ if __name__ == "__main__":
 
     # Run Flask
     # 5004 only during Testing, switch back to 5000 on prod, iis takes care of redirects for https
-    app.run(ssl_context=('../tls_certs/test_cert.pem', '../tls_certs/test_key.pem'), host="localhost", port=5004)
+    app.run(debug=True, ssl_context=('../tls_certs/test_cert.pem', '../tls_certs/test_key.pem'), host="localhost", port=5004)
     #serve(app, host="127.0.0.1", port=5000)
     
