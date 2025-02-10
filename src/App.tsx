@@ -13,13 +13,18 @@ import ApprovalsTable from "./components/approvals/ApprovalTable";
 
 const drawerWidth = 195;
 
-function App() {
+interface AppProps {
+  isLoggedIn: boolean;
+  ACCESS_GROUP: boolean;
+  CUE_GROUP: boolean;
+  IT_GROUP: boolean;
+}
+
+function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
   /* *********************************************************************************** */
   /* SHARED DATA BUFFER */
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isLoggedIn] = useState(false);
-  const [isBypassed] = useState(true);
 
   // Function to toggle the sidebar
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -38,31 +43,9 @@ function App() {
   }, []);
 
   /* *********************************************************************************** */
-  /* Runs everytime dataBuffer changes */
-  // const UserInfo = () => {
-  //   const [userInfo, setUserInfo] = useState(null);
-
-  /* *********************************************************************************** */
-  /* Test the hello flask api */
-  useEffect(() => {
-    fetch("https://localhost:5004/hello")
-    .then((response) => {
-      if(response.ok) {
-        return response.json();
-      } else {
-        throw new Error("Failed to get hello");
-      }
-    })
-    .then((data) => {
-      console.log("MESSAGE: ", data);
-    })
-    .catch((error) => console.error("Error fetching hello message:", error));
-  }, []);
-
-  /* *********************************************************************************** */
   /* Determine if ApprovalTable requires a login or not */
   let element;
-  if (isLoggedIn || isBypassed) {
+  if (isLoggedIn) {
     element = (
       <ApprovalsTable
         dataBuffer={dataBuffer}
@@ -84,23 +67,13 @@ function App() {
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>
       {/* Sidebar Navigation */}
-      <PurchaseSidenav isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
-
-      {/* *********************************************************************************** */}
-      {/* Show login on /approvals-table if not logged in */}
-      {/* {location.pathname === "/approvals-table" && !isLoggedIn && (
-          <LoginDialog
-            open={!isLoggedIn} // Shows dialog if not logged in
-            onClose={() => {
-              // Redirecting to /purchase-request if not logged in and login dialog closed
-              navigate("/purchase-request");
-            }}
-            onLogin={(username: string, password: string) => {
-              console.log(`Username: ${username}, Password: ${password}`);
-              setIsLoggedIn(true);
-            }}
-          />
-        )} */}
+      <PurchaseSidenav
+        isOpen={sidebarOpen}
+        toggleSidebar={toggleSidebar}
+        ACCESS_GROUP={ACCESS_GROUP}
+        CUE_GROUP={CUE_GROUP}
+        IT_GROUP={IT_GROUP}
+      />
 
       {/********************************************************************* */}
       {/* MAIN SECTION */}

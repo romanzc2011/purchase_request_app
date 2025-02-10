@@ -7,37 +7,18 @@ import LoginDialog from "./components/LoginDialog.tsx";
 
 function Root() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isBypassed, setIsByPassed] = useState(false);
-  // const [loginAttempted, setLoginAttempted] = useState(false);
-  // const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Store user group perms
+  const [ACCESS_GROUP, setACCESS_GROUP] = useState(false);
+  const [CUE_GROUP, setCUE_GROUP] = useState(false);
+  const [IT_GROUP, setIT_GROUP] = useState(false);
 
-  // const handleLogin = (username: string, password: string) => {
-  //   console.log(`Username: ${username}, Password: ${password}`);
-
-  //   /* ADD AUTH LOGIC HERE */
-  //   /* Login was attempted but we dont know if they are authenticated yet */
-  //   setLoginAttempted(true);
-  //   const isAuthenticated = username !== "" && password !== "";
-  // }
-
-  /********************************************************************/
-  /* HELLO MSG - check if api is responding */
-  /********************************************************************/
-  useEffect(() => {
-    fetch("https://localhost:5004/hello")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTPS error: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        console.log("Fetched data:", data);
-      })
-      .catch((error) => {
-        console.error("Fetch error: ", error);
-      });
-  }, []); // slow to connect to the chat after every re-render, so you add the dependency array
+  const handleLoginSuccess = (access: boolean, cue: boolean, it: boolean) => {
+    setIsLoggedIn(true);
+    setACCESS_GROUP(access);
+    setCUE_GROUP(cue);
+    setIT_GROUP(it);
+  };
 
   return (
     /********************************************************************/
@@ -45,13 +26,18 @@ function Root() {
     /********************************************************************/
     <StrictMode>
       <Router>
-        {isLoggedIn || isBypassed ? (
-          <App />
+        {isLoggedIn ? (
+          <App
+            isLoggedIn={isLoggedIn}
+            ACCESS_GROUP={ACCESS_GROUP}
+            CUE_GROUP={CUE_GROUP}
+            IT_GROUP={IT_GROUP}
+          />
         ) : (
           <LoginDialog
-            open={!isLoggedIn && !isBypassed}
+            open={!isLoggedIn}
             onClose={() => console.log("Login dialog closed")}
-            onLoginSuccess={() => setIsLoggedIn(true)}
+            onLoginSuccess={handleLoginSuccess}
           />
         )}
       </Router>

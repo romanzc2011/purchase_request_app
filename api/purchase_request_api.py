@@ -86,10 +86,6 @@ Session(app)
 CORS(app, supports_credentials=True)
 jwt = JWTManager(app)
 
-@app.route('/hello', methods=['GET'])
-def hello():
-    return jsonify({"message": "Hello from Flask running on IIS..."})
-
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
 @app.route('/login', methods=['POST'])

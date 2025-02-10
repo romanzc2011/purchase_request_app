@@ -10,25 +10,22 @@ import { CircularProgress } from "@mui/material";
 
 interface LoginDialogProps {
   open: boolean;
-  isAccessGrp: boolean; // Access Group from the AD, if true no access to Approvals
-  isCUEGrp: boolean; // CUE Group from the AD, if true, they do have access to Approvals
-  isITGrp: boolean; // IT Group from the AD, if true they do have access to Approvals
   onClose: () => void;
-  onLoginSuccess: () => void;
+  onLoginSuccess: (ACCESS_GROUP: boolean, CUE_GROUP: boolean, IT_GROUP: boolean) => void;
 }
 
 export default function LoginDialog({
   open,
   onClose,
   onLoginSuccess,
-  isAccessGrp,
-  isCUEGrp,
-  isITGrp,
 }: LoginDialogProps) {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [ACCESS_GROUP, setACCESS_GROUP] = useState<boolean>(false);
+  const [CUE_GROUP, setCUE_GROUP] = useState<boolean>(false);
+  const [IT_GROUP, setIT_GROUP] = useState<boolean>(false);
 
   /***********************************************************************/
   /* VALIDATE INPUT */
@@ -65,7 +62,18 @@ export default function LoginDialog({
 
       const data = await response.json();
       console.log("Response from API: ", data);
-      onLoginSuccess();
+
+      // Extract Groups from AD_groups
+      const { ACCESS_GROUP, CUE_GROUP, IT_GROUP } = data.AD_groups;
+
+      // Set the groups to appropriate values
+      setACCESS_GROUP(ACCESS_GROUP);
+      setCUE_GROUP(CUE_GROUP);
+      setIT_GROUP(IT_GROUP);
+
+      // Pass data to PurchaseSideNav to determine if Approvals will be disabled or not
+      onLoginSuccess(ACCESS_GROUP, CUE_GROUP, IT_GROUP);
+
     } catch (error) {
       console.error("Error sending login request: ", error);
       setError("Login failed. Please check your credentials.");

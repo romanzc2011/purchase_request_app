@@ -21,6 +21,9 @@ import MenuIcon from "@mui/icons-material/Menu";
 interface PurchaseSideBarProps {
   isOpen: boolean;
   toggleSidebar: () => void;
+  ACCESS_GROUP: boolean;
+  CUE_GROUP: boolean;
+  IT_GROUP: boolean;
 }
 
 const drawerWidth = 195;
@@ -30,6 +33,9 @@ const collapseWidth = 60;
 const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
   isOpen,
   toggleSidebar,
+  ACCESS_GROUP,
+  CUE_GROUP,
+  IT_GROUP,
 }) => {
   return (
     <Box sx={{ display: "flex" }}>
@@ -156,6 +162,7 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
               <ListItemButton
                 component={Link}
                 to="/approvals-table"
+                disabled={ !IT_GROUP || !CUE_GROUP }  // Disable if the user is not part of IT or CUE group
                 sx={{ justifyContent: isOpen ? "flex-start" : "center" }}
                 aria-label="Approvals Table"
               >
