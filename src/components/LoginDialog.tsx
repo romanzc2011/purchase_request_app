@@ -46,6 +46,7 @@ export default function LoginDialog({
     if (!validateInput()) return;
 
     setLoading(true);
+
     /* Send credentials to Flask API */
     try {
       const response = await fetch("https://localhost:5004/login", {
@@ -68,11 +69,24 @@ export default function LoginDialog({
 
       // Set the groups to appropriate values
       setACCESS_GROUP(ACCESS_GROUP);
-      setCUE_GROUP(CUE_GROUP);
-      setIT_GROUP(IT_GROUP);
+      // setCUE_GROUP(CUE_GROUP);
+      // setIT_GROUP(IT_GROUP);
+
+      /*************************************************************************** */
+      /* TESTING!!!!! */
+      /*************************************************************************** */
+      // Store token in local storage
+      const accessToken = data.access_toke;
+      
+      if(accessToken) {
+        localStorage.setItem("access_token", accessToken);
+      } else {
+        console.log("Access token not found in response")
+      }
 
       // Pass data to PurchaseSideNav to determine if Approvals will be disabled or not
-      onLoginSuccess(ACCESS_GROUP, CUE_GROUP, IT_GROUP);
+      // LOGIN SUCCESS SET TO TRUE FOR TESTING ONLY
+      onLoginSuccess(ACCESS_GROUP, true, true);
 
     } catch (error) {
       console.error("Error sending login request: ", error);

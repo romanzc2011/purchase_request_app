@@ -9,12 +9,12 @@ from flask_jwt_extended import create_access_token, create_refresh_token, get_jw
 from dotenv import load_dotenv
 from waitress import serve
 from concurrent.futures import ThreadPoolExecutor
+import datetime
 import json
 import os
 import pdb
 import queue
 import threading
-import time
 
 """
 AUTHOR: Roman Campbell
@@ -83,7 +83,8 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 app.config["SESSION_TYPE"] = "filesystem"
-app.config["JWT_TOKEN_LOCATION"] = ["cookies"];
+app.config["JWT_TOKEN_LOCATION"] = ["headers"]
+app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
 app.config["JWT_COOKIE_SECURE"] = True  # Cookies will only be sent via HTTPS
 
 jwt = JWTManager(app)
@@ -101,9 +102,6 @@ def login():
     if not username or not password:
         return jsonify({"error": "Missing username or password"}), 400
     
-    if not username or not password:
-        return jsonify({"error": "Missing username or password"}), 400
-    
     # Connect to LDAPS server and attempt to bind which involves authentication    
     try:
         ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
@@ -112,7 +110,10 @@ def login():
         if connection.bound:
             AD_groups = ldap_mgr.check_user_membership(connection, username)
             session["users"] = username
-            access_token = create_access_token(username)
+            access_token = create_access_token(
+                identity=username,
+                expires_delta=datetime.timedelta(hours=1)
+            )
             
             # Create response
             response = jsonify({
@@ -154,9 +155,10 @@ def refresh_token():
 @app.route('/sendToPurchaseReq', methods=['POST'])
 @jwt_required()
 def set_purchase_request():
-    user = request.environ.get('REMOTE_USER')
-    print("REMOTE USER TEST")
-    print(f"Authenticated user: {user}")
+    # Retrieve authenticated user from JWT
+    current_user = get_jwt_identity()
+    print(f"Authenticated user: {current_user}")
+    
     data = request.json
     if not data:
         return jsonify({'error': 'Invalid data'}), 400

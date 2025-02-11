@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Buttons from "./Buttons";
 import {
   Table,
@@ -35,11 +35,14 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   /* SUBMIT DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
+    // Retrieve access to from local storage
+    const accessToken = localStorage.getItem("accessToken");
+    console.log("TOKEN: ",accessToken);
     fetch("https://localhost:5004/sendToPurchaseReq", {
       method: "POST",
-      credentials: "include",  // Ensures cookies are sent with request
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`
       },
       body: JSON.stringify({ dataBuffer }),
     })
@@ -54,7 +57,8 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
         //resetTable();
       })
       .catch((err) => console.error("Error sending data:", err));
-  };
+   };
+
 
   return (
     <TableContainer
