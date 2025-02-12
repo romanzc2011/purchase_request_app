@@ -76,7 +76,7 @@ export default function LoginDialog({
       /* TESTING!!!!! */
       /*************************************************************************** */
       // Store token in local storage
-      const accessToken = data.access_toke;
+      const accessToken = data.access_token;
       
       if(accessToken) {
         localStorage.setItem("access_token", accessToken);

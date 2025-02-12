@@ -1,15 +1,26 @@
+from constants.db_columns import purchase_cols
+from constants.db_columns import approvals_cols
+from concurrent.futures import ThreadPoolExecutor
 from database_manager import DatabaseManager
-from notification_manager import NotificationManager
-from ldap_manager import LDAPManager
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
-from ldap3.core.exceptions import LDAPBindError
+from flask_jwt_extended import (create_access_token,
+                                create_refresh_token, 
+                                get_jwt,
+                                get_jwt_identity, 
+                                jwt_required, 
+                                JWTManager, 
+                                set_access_cookies,
+                                unset_jwt_cookies)
 from flask_session import Session
-from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, JWTManager, set_access_cookies
-from dotenv import load_dotenv
+from ldap_manager import LDAPManager
+from ldap3.core.exceptions import LDAPBindError
+from notification_manager import NotificationManager
 from waitress import serve
-from concurrent.futures import ThreadPoolExecutor
-import datetime
+from datetime import (datetime,
+                      timedelta,
+                      timezone)
 import json
 import os
 import pdb
@@ -33,6 +44,19 @@ db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 executor = ThreadPoolExecutor(max_workers=5)
 
 #########################################################################
+## APP CONFIGS
+app = Flask(__name__)
+CORS(app, supports_credentials=True)
+app.config["SECRET_KEY"] = JWT_SECRET_KEY
+#app.config["SESSION_TYPE"] = "filesystem"
+app.config["JWT_TOKEN_LOCATION"] = ["headers"]
+app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
+app.config["JWT_COOKIE_SECURE"] = True  # Cookies will only be sent via HTTPS
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+
+jwt = JWTManager(app)
+
+#########################################################################
 ## EMAIL FIELDS for notifications
 to_recipient = "roman_campbell@lawb.uscourts.gov"
 from_recipient = "Purchase Request"
@@ -43,51 +67,9 @@ notifyManager = NotificationManager(msg_body=None,
                                     from_sender=from_recipient, 
                                     subject=this_subject)
 
-# Dictionary for sql column
-purchase_cols = {
-    'req_id': None,
-    'requester': None,
-    'phoneext': None,
-    'datereq': None,
-    'dateneed': None,
-    'orderType': None,
-    'fileAttachments': None,
-    'itemDescription': None,
-    'justification': None,
-    'addComments': None,
-    'learnAndDev': { 'trainNotAval': False, 'needsNotMeet': False },
-    'budgetObjCode': None,
-    'fund': None,
-    'price': None,
-    'location': None,
-    'quantity': None,
-}
-
-# Dictionary for approval data
-approvals_cols = {
-    'req_id': None,
-    'requester': None,
-    'budgetObjCode': None,
-    'fund': None,
-    'location': None,
-    'quantity': None,
-    'priceEach': None,
-    'totalPrice': None,
-    'status': None
-}
-
 ##########################################################################
 ## API FUNCTIONS
 ##########################################################################
-app = Flask(__name__)
-CORS(app, supports_credentials=True)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
-app.config["SESSION_TYPE"] = "filesystem"
-app.config["JWT_TOKEN_LOCATION"] = ["headers"]
-app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
-app.config["JWT_COOKIE_SECURE"] = True  # Cookies will only be sent via HTTPS
-
-jwt = JWTManager(app)
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
@@ -109,11 +91,8 @@ def login():
         
         if connection.bound:
             AD_groups = ldap_mgr.check_user_membership(connection, username)
-            session["users"] = username
-            access_token = create_access_token(
-                identity=username,
-                expires_delta=datetime.timedelta(hours=1)
-            )
+            access_token = create_access_token(identity=username)
+            refresh_token = create_refresh_token(identity=username)
             
             # Create response
             response = jsonify({
@@ -138,17 +117,30 @@ def login():
         return jsonify({"error": "LDAP authentication failed"}), 500
     
 ##########################################################################
-## REFRESH TOKEN
-@app.route("/refresh_token", methods=["POST"])
-@jwt_required(refresh=True)
-def refresh_token():
-    current_user = get_jwt_identity()
-    new_access_token = create_access_token(identity=current_user)
-    response = jsonify(access_token=new_access_token)
-    
-    # Set new token as cookie
-    set_access_cookies(response, new_access_token)
+## LOGOUT
+@app.route("/logout", methods=["POST"])
+def logout():
+    response = jsonify({ "msg": "logout successful" })
+    unset_jwt_cookies(response)
     return response
+    
+##########################################################################
+## REFRESH TOKEN
+## # Using an `after_request` callback, refresh any token that is within 30 minutes of expiring.
+@app.after_request
+def refresh_expiring_jwts(response):
+    try:
+        exp_timestamp = get_jwt()["exp"]
+        now = datetime.now(timezone.utc)
+        target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+        if target_timestamp > exp_timestamp:
+            print("TOKEN REFRESH")
+            access_token = create_access_token(identity=get_jwt_identity())
+            set_access_cookies(response, access_token)
+        return response
+    except (RuntimeError, KeyError):
+        # Case for an invalid JWT
+        return response
 
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit

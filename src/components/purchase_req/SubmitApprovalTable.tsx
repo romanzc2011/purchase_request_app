@@ -36,7 +36,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
     // Retrieve access to from local storage
-    const accessToken = localStorage.getItem("accessToken");
+    const accessToken = localStorage.getItem("access_token");
     console.log("TOKEN: ",accessToken);
     fetch("https://localhost:5004/sendToPurchaseReq", {
       method: "POST",
