@@ -12,20 +12,19 @@ interface LoginDialogProps {
   open: boolean;
   onClose: () => void;
   onLoginSuccess: (ACCESS_GROUP: boolean, CUE_GROUP: boolean, IT_GROUP: boolean) => void;
+  //serverIP: string;
 }
 
 export default function LoginDialog({
   open,
   onClose,
   onLoginSuccess,
+  //serverIP
 }: LoginDialogProps) {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [ACCESS_GROUP, setACCESS_GROUP] = useState<boolean>(false);
-  const [CUE_GROUP, setCUE_GROUP] = useState<boolean>(false);
-  const [IT_GROUP, setIT_GROUP] = useState<boolean>(false);
 
   /***********************************************************************/
   /* VALIDATE INPUT */
@@ -39,6 +38,9 @@ export default function LoginDialog({
     return true;
   };
 
+  //const API_BASE_URL = "https://10.:5004/api/login";
+
+
   /***********************************************************************/
   /* HANDLE LOGIN */
   /***********************************************************************/
@@ -47,50 +49,48 @@ export default function LoginDialog({
 
     setLoading(true);
 
-    /* Send credentials to Flask API */
     try {
-      const response = await fetch("https://localhost:5004/login", {
+      const response = await fetch("https://10.222.154.238:5002/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
+        
         body: JSON.stringify({ username, password }),
       });
+      console.log("Response Headers: ", response.headers);
+      console.log("URL: ",response.url)
+
 
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Response Error Body:", errorText);
+
         throw new Error(`HTTPS error, Status: ${response.status}`);
       }
 
       const data = await response.json();
       console.log("Response from API: ", data);
 
-      // Extract Groups from AD_groups
-      const { ACCESS_GROUP, CUE_GROUP, IT_GROUP } = data.AD_groups;
+      // Extract Groups from AD_groups and pass them
+      onLoginSuccess(data.AD_Groups.ACCESS_GROUP, data.AD_Groups.CUE_GROUP, data.AD_Groups.IT_GROUP);
 
-      // Set the groups to appropriate values
-      setACCESS_GROUP(ACCESS_GROUP);
-      // setCUE_GROUP(CUE_GROUP);
-      // setIT_GROUP(IT_GROUP);
-
-      /*************************************************************************** */
-      /* TESTING!!!!! */
-      /*************************************************************************** */
       // Store token in local storage
       const accessToken = data.access_token;
       
       if(accessToken) {
+
         localStorage.setItem("access_token", accessToken);
       } else {
+
         console.log("Access token not found in response")
       }
-
-      // Pass data to PurchaseSideNav to determine if Approvals will be disabled or not
-      // LOGIN SUCCESS SET TO TRUE FOR TESTING ONLY
-      onLoginSuccess(ACCESS_GROUP, true, true);
-
     } catch (error) {
+
       console.error("Error sending login request: ", error);
       setError("Login failed. Please check your credentials.");
+
     } finally {
       setLoading(false);
     }

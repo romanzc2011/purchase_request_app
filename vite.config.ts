@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'node:fs'
 
-// USE ONLY FOR TESTING -- prod will use config below, iis will handle https in prod
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -13,9 +12,8 @@ export default defineConfig({
     host: "localhost",
     port: 5173,
   },
+  build: {
+    outDir: "./dist", // ✅ Ensures no nested `dist/dist/`
+    emptyOutDir: true, // ✅ Cleans old files before building
+  }
 });
-
-// https://vite.dev/config/
-// export default defineConfig({
-//   plugins: [react()],
-// })

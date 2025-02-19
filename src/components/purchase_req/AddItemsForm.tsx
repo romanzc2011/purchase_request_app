@@ -66,7 +66,7 @@ export const AddItemsForm: React.FC<{
     console.log("Uploading file:", formData);
 
     // Submit files with fetch
-    fetch("http://127.0.0.1:5000/handleFileAttachments", {
+    fetch("http://10.234.198.113:5004/handleFileAttachments", {
       method: "POST",
       body: formData,
     })

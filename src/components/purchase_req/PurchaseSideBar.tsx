@@ -33,7 +33,6 @@ const collapseWidth = 60;
 const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
   isOpen,
   toggleSidebar,
-  ACCESS_GROUP,
   CUE_GROUP,
   IT_GROUP,
 }) => {

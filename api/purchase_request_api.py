@@ -3,8 +3,9 @@ from constants.db_columns import approvals_cols
 from concurrent.futures import ThreadPoolExecutor
 from database_manager import DatabaseManager
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, session
-from flask_cors import CORS
+
+from flask import Flask, request, jsonify, session, Response, make_response
+from flask_cors import CORS, cross_origin
 from flask_jwt_extended import (create_access_token,
                                 create_refresh_token, 
                                 get_jwt,
@@ -18,11 +19,14 @@ from ldap_manager import LDAPManager
 from ldap3.core.exceptions import LDAPBindError
 from notification_manager import NotificationManager
 from waitress import serve
+from werkzeug.middleware.proxy_fix import ProxyFix
 from datetime import (datetime,
                       timedelta,
                       timezone)
+import logging
 import json
 import os
+import psutil
 import pdb
 import queue
 import threading
@@ -34,6 +38,23 @@ NAME: PURCHASE REQUEST APP
 Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
 the UI.
 """
+
+##########################################################################
+## GET PRIVATE IP from 10.222.0.0/19 network
+def get_private_ip():
+    interfaces = psutil.net_if_addrs()
+    
+    for interface, addresses in interfaces.items():
+        if "Ethernet" in interface:
+            for addr in addresses:
+                if addr.family == 2: # ipv4 addr (AF_INET)
+                    if addr.address.startswith("10.222"):
+                        # Append port 5002 to ip addr
+                        ip_addr = addr.address
+                        return ip_addr
+    # Default fallback
+    return "127.0.0.1"
+
 load_dotenv()
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
@@ -46,15 +67,26 @@ executor = ThreadPoolExecutor(max_workers=5)
 #########################################################################
 ## APP CONFIGS
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+
+# Apply ProxyFix so Flask will know its behind a proxy
+app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=1, # Trust X-Forwarded-For (Client IP)
+    x_proto=1, # Trust X-Forwarded-Proto (https)
+    x_host=1, # Trust X-Forwarded-Host (Proxy Host)
+    x_prefix=1, # Trust X-Forwarded-Prefix 
+    x_port=1 # Trust X-Forwarded-Port
+)
+CORS(app, supports_credentials=True, origins=['https://10.222.154.238:5002'], allow_headers='*')
+
 app.config["SECRET_KEY"] = JWT_SECRET_KEY
-#app.config["SESSION_TYPE"] = "filesystem"
 app.config["JWT_TOKEN_LOCATION"] = ["headers"]
 app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
 app.config["JWT_COOKIE_SECURE"] = True  # Cookies will only be sent via HTTPS
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 
 jwt = JWTManager(app)
+
 
 #########################################################################
 ## EMAIL FIELDS for notifications
@@ -71,10 +103,36 @@ notifyManager = NotificationManager(msg_body=None,
 ## API FUNCTIONS
 ##########################################################################
 
+# @app.before_request
+def handle_options():
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response, 200  
+
+@app.after_request
+def add_header(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
-@app.route('/login', methods=['POST'])
+@app.route('/api/login', methods=['OPTIONS', 'POST'])
 def login():
+    try:
+        raw_data = request.data
+        logging.debug(f"Login attempt {raw_data}")
+        print("Raw request data:", raw_data)
+        
+        json_data = json.loads(raw_data.decode('utf-8-sig'))
+        print(f"Parsed JSON: {json_data}")
+    except Exception as e:
+        print(f"Error parsing JSON: {e}")
+        return jsonify({"error": "Invalid JSON"})
+    
     username = request.json.get("username", None)
     password = request.json.get("password", None)
     
@@ -90,20 +148,19 @@ def login():
         connection = ldap_mgr.get_connection(adu_username, password)
         
         if connection.bound:
-            AD_groups = ldap_mgr.check_user_membership(connection, username)
+            AD_Groups = ldap_mgr.check_user_membership(connection, username)
             access_token = create_access_token(identity=username)
-            refresh_token = create_refresh_token(identity=username)
             
             # Create response
             response = jsonify({
                 "message": "Login successful",
                 "access_token": access_token,
-                "AD_groups": AD_groups
+                "AD_Groups": AD_Groups
             })
             
             set_access_cookies(response, access_token)
             
-            # Set access token in secure cookie
+            response.headers['Access-Control-Allow-Origin'] = '*'
             return response
         
         else:
@@ -118,7 +175,7 @@ def login():
     
 ##########################################################################
 ## LOGOUT
-@app.route("/logout", methods=["POST"])
+@app.route("/api/logout", methods=["POST"])
 def logout():
     response = jsonify({ "msg": "logout successful" })
     unset_jwt_cookies(response)
@@ -127,24 +184,26 @@ def logout():
 ##########################################################################
 ## REFRESH TOKEN
 ## # Using an `after_request` callback, refresh any token that is within 30 minutes of expiring.
-@app.after_request
-def refresh_expiring_jwts(response):
-    try:
-        exp_timestamp = get_jwt()["exp"]
-        now = datetime.now(timezone.utc)
-        target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
-        if target_timestamp > exp_timestamp:
-            print("TOKEN REFRESH")
-            access_token = create_access_token(identity=get_jwt_identity())
-            set_access_cookies(response, access_token)
-        return response
-    except (RuntimeError, KeyError):
-        # Case for an invalid JWT
-        return response
+
+# @app.after_request
+# def refresh_expiring_jwts(response):
+#     try:
+#         exp_timestamp = get_jwt()["exp"]
+#         now = datetime.now(timezone.utc)
+#         target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+        
+#         if target_timestamp > exp_timestamp:
+#             print("TOKEN REFRESH")
+#             access_token = create_access_token(identity=get_jwt_identity())
+#             set_access_cookies(response, access_token)
+#         return response
+#     except (RuntimeError, KeyError):
+#         # Case for an invalid JWT
+#         return response
 
 ##########################################################################
 ## SEND TO APPROVALS -- being sent from the purchase req submit
-@app.route('/sendToPurchaseReq', methods=['POST'])
+@app.route('/api/sendToPurchaseReq', methods=['POST'])
 @jwt_required()
 def set_purchase_request():
     # Retrieve authenticated user from JWT
@@ -163,7 +222,7 @@ def set_purchase_request():
     
 ##########################################################################
 ## GET APPROVAL DATA
-@app.route('/getApprovalData', methods=['GET', 'OPTIONS'])
+@app.route('/api/getApprovalData', methods=['GET', 'OPTIONS'])
 def get_approval_data():
     if request.method == "OPTIONS":
         return jsonify({"status": "OK"})
@@ -178,7 +237,7 @@ def get_approval_data():
     
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params
-@app.route('/deletePurchaseReq', methods=['POST'])
+@app.route('/api/deletePurchaseReq', methods=['POST'])
 def delete_purchase_req():
     data = request.json
     if not data:
@@ -217,6 +276,7 @@ def handlle_file_upload():
 ##########################################################################
 ## PROGRAM FUNCTIONS
 ##########################################################################
+
 
 ##########################################################################
 ## PROCESS PURCHASE DATA
@@ -344,10 +404,4 @@ def purchase_bg_task(data, api_call):
 if __name__ == "__main__":
     # Create approvals and purchase req tables if not already created
     dbManager = DatabaseManager(db_path)
-    print(app.url_map)
-
-    # Run Flask
-    # 5004 only during Testing, switch back to 5000 on prod, iis takes care of redirects for https
-    app.run(debug=True, ssl_context=('../tls_certs/test_cert.pem', '../tls_certs/test_key.pem'), host="localhost", port=5004)
-    #serve(app, host="127.0.0.1", port=5000)
-    
+    serve(app, host="10.222.154.238", port=5004)

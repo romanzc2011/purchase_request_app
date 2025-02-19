@@ -31,7 +31,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   /* Fetch data from backend to populate Approvals Table */
   /************************************************************************************ */
   useEffect(() => {
-    fetch("https://localhost:5004/getApprovalData")
+    fetch("https://10.222.154.238:5004/api/getApprovalData")
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP error: ${res.status}`);
@@ -59,7 +59,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    fetch("https://localhost:5004/sendToPurchaseReq", {
+    fetch("https://10.222.154.238:5004/api/sendToPurchaseReq", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
