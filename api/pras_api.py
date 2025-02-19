@@ -1,0 +1,442 @@
+from constants.db_columns import purchase_cols
+from constants.db_columns import approvals_cols
+from concurrent.futures import ThreadPoolExecutor
+from pras_database_manager import DatabaseManager
+from dotenv import load_dotenv, set_key, find_dotenv
+from flask import Flask, request, jsonify, session, Response, g
+from flask_cors import CORS, cross_origin
+from flask_jwt_extended import (create_access_token,
+                                create_refresh_token, 
+                                get_jwt,
+                                get_jwt_identity, 
+                                jwt_required, 
+                                JWTManager, 
+                                set_access_cookies,
+                                unset_jwt_cookies)
+from flask_session import Session
+from adu_ldap_manager import LDAPManager
+from ldap3.core.exceptions import LDAPBindError
+from loguru import logger
+from notification_manager import NotificationManager
+from waitress import serve
+from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.utils import secure_filename
+from datetime import (datetime,
+                      timedelta,
+                      timezone)
+import json
+import os
+import psutil
+import pdb
+import queue
+import threading
+import time
+import uuid
+
+"""
+AUTHOR: Roman Campbell
+DATE: 01/03/2025
+NAME: PRAS - (Purchase Request Approval System)
+Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
+the UI.
+"""
+dotenv_path = find_dotenv()
+load_dotenv(dotenv_path)
+UPLOAD_FOLDER = "C:\\Users\\RomanCampbell\\repo\\react-projects\\purchase_request\\uploads\\"
+LDAP_SERVER = os.getenv("LDAP_SERVER")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+lock = threading.Lock()
+link = "https://localhost:5173/approvals-table"
+processed_data_shared = None
+db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
+executor = ThreadPoolExecutor(max_workers=5)
+
+#########################################################################
+## APP CONFIGS
+pras = Flask(__name__)
+CORS(pras)
+
+# Configure Loguru
+logger.add("/logs/pras.log", rotation="7 days")
+
+# Apply ProxyFix so Flask will know its behind a proxy
+pras.wsgi_app = ProxyFix(
+    pras.wsgi_app,
+    x_for=1, # Trust X-Forwarded-For (Client IP)
+    x_proto=1, # Trust X-Forwarded-Proto (https)
+    x_host=1, # Trust X-Forwarded-Host (Proxy Host)
+    x_prefix=1, # Trust X-Forwarded-Prefix 
+    x_port=1 # Trust X-Forwarded-Port
+)
+
+pras.config["SECRET_KEY"] = JWT_SECRET_KEY
+pras.config["JWT_TOKEN_LOCATION"] = ["headers"]
+pras.config["JWT_ACCESS_COOKIE_PATH"] = "/"
+pras.config["JWT_COOKIE_SECURE"] = True  # Cookies will only be sent via HTTPS
+pras.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+
+jwt = JWTManager(pras)
+
+#########################################################################
+## EMAIL FIELDS for notifications
+to_recipient = "roman_campbell@lawb.uscourts.gov"
+from_recipient = "Purchase Request"
+this_subject = "Purchase Request Notification"
+
+notifyManager = NotificationManager(msg_body=None, 
+                                    to_recipient=to_recipient, 
+                                    from_sender=from_recipient, 
+                                    subject=this_subject)
+
+##########################################################################
+## API FUNCTIONS
+##########################################################################
+@pras.before_request
+def handle_options():
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response, 200  
+
+##########################################################################
+## LOGIN -- auth users and return JWTs
+@pras.route('/api/login', methods=['OPTIONS', 'POST'])
+def login():
+    try:
+        raw_data = request.data
+        print("Raw request data:", raw_data)
+        
+        json_data = json.loads(raw_data.decode('utf-8-sig'))
+        print(f"Parsed JSON: {json_data}")
+    except Exception as e:
+        print(f"Error parsing JSON: {e}")
+        return jsonify({"error": "Invalid JSON"})
+    
+    username = request.json.get("username", None)
+    password = request.json.get("password", None)
+    
+    # Append ADU\ to username to match AD structure
+    adu_username = "ADU\\"+username
+    
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
+    
+    # Connect to LDAPS server and attempt to bind which involves authentication    
+    try:
+        ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
+        connection = ldap_mgr.get_connection(adu_username, password)
+        
+        if connection.bound:
+            AD_Groups = ldap_mgr.check_user_membership(connection, username)
+            access_token = create_access_token(identity=username)
+            
+            # Create response
+            response = jsonify({
+                "message": "Login successful",
+                "access_token": access_token,
+                "AD_Groups": AD_Groups
+            })
+            
+            set_access_cookies(response, access_token)
+            
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response
+        
+        else:
+            return jsonify({"error":" Invalid credentials"}), 401
+        
+    except LDAPBindError as e:
+        return jsonify({"error": "Invalid username or password"}), 401
+    
+    except Exception as e:
+        print(f"LDAP authentication error: {e}")
+        return jsonify({"error": "LDAP authentication failed"}), 500
+    
+##########################################################################
+## LOGOUT
+@pras.route("/api/logout", methods=["POST"])
+def logout():
+    response = jsonify({ "msg": "logout successful" })
+    unset_jwt_cookies(response)
+    return response
+    
+##########################################################################
+## REFRESH TOKEN
+## # Using an `after_request` callback, refresh any token that is within 30 minutes of expiring.
+@pras.after_request
+def refresh_expiring_jwts(response):
+    try:
+        exp_timestamp = get_jwt()["exp"]
+        now = datetime.now(timezone.utc)
+        target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+        
+        if target_timestamp > exp_timestamp:
+            print("TOKEN REFRESH")
+            access_token = create_access_token(identity=get_jwt_identity())
+            set_access_cookies(response, access_token)
+        return response
+    except (RuntimeError, KeyError):
+        # Case for an invalid JWT
+        return response
+
+##########################################################################
+## SEND TO APPROVALS -- being sent from the purchase req submit
+@pras.route('/api/sendToPurchaseReq', methods=['POST'])
+@jwt_required()
+def set_purchase_request():
+    # Retrieve authenticated user from JWT
+    current_user = get_jwt_identity()
+    print(f"Authenticated user: {current_user}")
+    
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Invalid data'}), 400
+    
+    # Submit the task to thread executor
+    executor.submit(purchase_bg_task, data, "sendToPurchaseReq")
+    executor.submit(purchase_bg_task, data, "insertApprovalData")
+    
+    return jsonify({"message": "Processing started in background"})
+    
+##########################################################################
+## GET APPROVAL DATA
+@pras.route('/api/getApprovalData', methods=['GET', 'OPTIONS'])
+def get_approval_data():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "OK"})
+    try:
+        query = "SELECT * FROM approvals"
+        approval_data = dbManager.fetch_rows(query)
+        return jsonify({"approval_data": approval_data})
+    
+    except Exception as e:
+        print(f"Error fetching approval data: {e}")
+        return jsonify({"error": "Failed to  fetch data"}), 500
+    
+##########################################################################
+## DELETE PURCHASE REQUEST table, condition, params
+@pras.route('/api/deletePurchaseReq', methods=['POST'])
+def delete_purchase_req():
+    data = request.json
+    if not data:
+        return jsonify({"error": "Invalid data"}), 400
+    
+    # Validate input
+    req_id = data.get("req_id")
+    if not req_id:
+        return jsonify({"error": "Missing 'req_id' in request data"}), 400
+    
+    # Define table and condition
+    table = "purchase_requests"
+    condition = "req_id = ?"
+    params = (req_id,)
+    
+    try:
+        # Delete operation
+        dbManager.delete_data(table, condition, params)
+        return jsonify({"message": f"Purchase request with req_id {req_id} deleted successfully"}), 200
+    
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    
+##########################################################################
+## HANDLE FILE UPLOAD
+@pras.route('/api/handleFileAttachments', methods=['GET', 'POST'])
+def upload_file():
+    if "file" not in request.files:
+        return jsonify({"error": "No file part"}), 400
+     
+    if request.method == 'POST':
+        uploaded_files = request.files.getlist("file")
+        saved_files = []
+        
+        for file in uploaded_files:
+            if file.filename:
+                file_path = os.path.join(UPLOAD_FOLDER, secure_filename(file.filename))
+                file.save(file_path)
+                saved_files.append(file.filename)
+                
+    return jsonify({"message": "File(s) uploaded successfully", "files": saved_files}), 200
+
+#########################################################################
+## LOGGING FUNCTION - for middleware
+@pras.after_request
+def logging_middleware(response):
+    request_id = str(uuid.uuid4())
+    
+    with logger.contextualize(request_id=request_id):
+        elapsed = time.time() - getattr(request, "start_time", time.time())
+        
+        logger.bind(
+            path=request.path,
+            method=request.method,
+            status_code=response.status_code,
+            response_size=len(response.get_data()),
+            elapsed=elapsed,
+        ).info("incoming '{method}' to '{path}'",method = request.method, path=request.path)
+        
+        response.headers["X-Request-ID"] = request_id
+        
+    return response
+
+##########################################################################
+## PROGRAM FUNCTIONS
+##########################################################################
+
+##########################################################################
+## PROCESS PURCHASE DATA
+def process_purchase_data(data):
+    with lock:
+        # Populate purchase_cols with appropriate data from api call
+        for item in data['dataBuffer']:
+            for k, v in item.items():
+                if k in purchase_cols:
+                    purchase_cols[k] = v
+                    
+        # Extract the learnAndDev element
+        if 'learnAndDev' in purchase_cols:
+            purchase_cols['trainNotAval'] = purchase_cols['learnAndDev']['trainNotAval']
+            purchase_cols['needsNotMeet'] = purchase_cols['learnAndDev']['needsNotMeet']
+            del purchase_cols['learnAndDev']
+          
+        # Calc and separate price of each and total
+        if 'price' in purchase_cols and 'quantity' in purchase_cols:
+            try:
+                purchase_cols['priceEach'] = float(purchase_cols['price'])
+                purchase_cols['quantity'] = int(purchase_cols['quantity'])
+                
+                # Validate ranges
+                if purchase_cols['priceEach'] < 0 or purchase_cols['quantity'] <= 0:
+                    raise ValueError("Price must be non-negative, and quantity must be greater than zero.")
+                
+                # Calculate totalPrice
+                purchase_cols['totalPrice'] = round(purchase_cols['priceEach'] * purchase_cols['quantity'], 2)
+                
+            except ValueError as e:
+                print("Invalid price or quantity:")
+                purchase_cols['totalPrice'] = 0
+            
+            del purchase_cols['price']
+        
+        # Show this is a new request 0=FALSE 1=TRUE
+        print("PROCESSING DATA")
+        purchase_cols['new_request'] = 1
+        purchase_cols['approved'] = 0
+        
+    return purchase_cols
+
+##########################################################################
+## PROCESS APPROVAL DATA --- send new request to approvals
+def process_approvals_data(data):
+    
+    if not isinstance(data, dict):
+        raise ValueError("Data must be a dictionary")
+    
+    approved = None
+    
+    # Is this a new request or has it been approved already
+    if purchase_cols['new_request'] == 1:
+        approvals_cols['status'] == "NEW REQUEST"
+        
+    # Not new? Was it approved or denied?
+    elif purchase_cols['new_request'] == 0:
+        approved = get_approval_status("approvals", data['req_id'])
+        if approved == 1:
+            approvals_cols['status'] = "APPROVED"
+        if approved == 0:
+            approvals_cols['status'] = "DENIED"
+    
+    # Populate approval data 
+    with lock:
+        for k, v in purchase_cols.items():
+            if k in approvals_cols:
+                approvals_cols[k] = v
+    
+    ##########################################################################
+    ## SENDING NOTIFICATION OF NEW REQUEST
+    # Create email body and send to approver
+    print("SENDING EMAIL...")
+    purchase_cols['link'] = link
+    email_template = notifyManager.load_email_template("./notification_template.html")
+    email_body = email_template.format(**purchase_cols)
+    notifyManager.send_email(email_body)
+    del purchase_cols['link']
+                    
+    return approvals_cols
+
+##########################################################################
+## GET STATUS OF APPROVALS
+def get_approval_status(table, req_id):
+    condition = f"req_id = %s"
+    columns = "approved"
+    table = "approvals"
+    params = (req_id,)
+    dbManager.fetch_single_row(table, columns, condition, params)
+
+##########################################################################
+## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
+def purchase_bg_task(data, api_call):
+    try:
+        print(f"Background task {api_call} data: {data}")
+        if api_call == "sendToPurchaseReq":
+            
+            processed_data = process_purchase_data(data)
+            table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
+            
+            # Insert data into db
+            dbManager.insert_data(processed_data, table)
+            
+            # Send to Approvals table as well
+            approval_data = process_approvals_data(processed_data)
+            if processed_data['new_request'] == 1:
+                approval_data['status'] = "NEW REQUEST"
+                processed_data['new_request'] = 0
+                
+                # Update the purchase_req table
+                updated_data = {'new_request': 0}
+                condition = f"req_id = {processed_data['req_id']}"
+                dbManager.update_data(updated_data, table, condition)
+                
+            table = "approvals"
+            dbManager.insert_data(approval_data, table)
+            
+    except Exception as e:
+        print(f"Error in background task {api_call}: {e}")
+        
+##########################################################################
+## GET PRIVATE IP from 10.222.0.0/19 or 10.223.0.0/19 network
+def get_server_ip(network):
+    interfaces = psutil.net_if_addrs()
+    
+    for interface, addresses in interfaces.items():
+        if "Ethernet" in interface:
+            for addr in addresses:
+                if addr.family == 2: # ipv4 addr (AF_INET)
+                    if addr.address.startswith(network):
+                        # prasend port 5002 to ip addr
+                        ip_addr = addr.address
+                        return ip_addr
+    # Default fallback
+    return "127.0.0.1"
+        
+##########################################################################
+## MAIN FUNCTION -- main function for primary control flow
+def main():
+    
+    server_ip = get_server_ip("10.234")
+    # Write server ip to env file
+    set_key(dotenv_path, 'SERVER_IP', server_ip)
+    
+    print(server_ip)
+    serve(pras, host=server_ip, port=5004)
+    #pras.run(host=server_ip, port=5004, debug=True)
+        
+##########################################################################
+## MAIN CONTROL FLOW
+##########################################################################
+if __name__ == "__main__":
+    dbManager = DatabaseManager(db_path)
+    main()

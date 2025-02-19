@@ -41,9 +41,6 @@ export const AddItemsForm: React.FC<{
       }),
     };
 
-    // Upload files to server
-    uploadFiles(updatedItem.fileAttachments);
-
     setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
     reset(); // Clear form
     console.log("Item Added: ", updatedItem);
@@ -57,16 +54,16 @@ export const AddItemsForm: React.FC<{
     const formData = new FormData();
 
     // Add each file to obj
-    fileAttachments.forEach((fileAttachment, index) => {
+    fileAttachments.forEach((fileAttachment) => {
       if (fileAttachment.attachment) {
-        formData.append(`fileAttachments[${index}]`, fileAttachment.attachment);
+        formData.append(`file`, fileAttachment.attachment);
       }
     });
 
     console.log("Uploading file:", formData);
 
     // Submit files with fetch
-    fetch("http://10.234.198.113:5004/handleFileAttachments", {
+    fetch(`https://${window.location.hostname}:5002/api/handleFileAttachments`, {
       method: "POST",
       body: formData,
     })
@@ -145,21 +142,13 @@ export const AddItemsForm: React.FC<{
     }
   }, [isSubmitSuccessful, reset]);
 
-  /*************************************************************************************** */
-  /* File upload input element */
-  /*************************************************************************************** */
-  const { fields, append, remove } = useFieldArray({
-    name: "fileAttachments", // This matches the field in your form state
-    control, // From useForm
-  });
-
   return (
     <Box>
       {/*************************************************************************************** */}
       {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
           once user has finished adding items and reviewed everything */}
       {/*************************************************************************************** */}
-      <form onSubmit={handleSubmit(handleAddItem, onError)} noValidate>
+      <form onSubmit={handleSubmit(handleAddItem, onError)} noValidate encType="multipart/form-data">
         {/** REQUESTER ****************************************************************** */}
         <Box className="m-2 row">
           <label htmlFor="requester" className="col-sm-1 col-form-label mt-4">

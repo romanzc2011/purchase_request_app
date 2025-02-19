@@ -31,7 +31,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   /* Fetch data from backend to populate Approvals Table */
   /************************************************************************************ */
   useEffect(() => {
-    fetch("https://10.222.154.238:5004/api/getApprovalData")
+    fetch(`https://${window.location.hostname}:5002/api/getApprovalData`)
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP error: ${res.status}`);
@@ -59,7 +59,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    fetch("https://10.222.154.238:5004/api/sendToPurchaseReq", {
+    fetch(`https://${window.location.hostname}:5002/api/sendToPurchaseReq`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -79,34 +79,6 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
       .catch((err) => console.error("Error sending data:", err));
   };
 
-  /************************************************************************************ */
-  /* SEND CRENDENTIAL DATA --- send credentials to login  */
-  /************************************************************************************ */
-  // const authenticateUser = async (username: string, password: string) => {
-  //   try {
-  //     const res = await fetch("http://localhost:5000/authenticateUser", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ username, password }),
-  //     });
-  
-  //     if (!res.ok) {
-  //       throw new Error(`HTTP error: ${res.status}`);
-  //     }
-  
-  //     const data = await res.json();
-  //     console.log("Authentication successful:", data);
-  
-  //     // Example: Handle token storage or redirect
-  //     if (data.token) {
-  //       localStorage.setItem("authToken", data.token); // Store token securely
-  //     }
-  //   } catch (err) {
-  //     console.error("Error authenticating user:", err);
-  //   }
-  // };
   /************************************************************************************ */
   /* APPROVE OR DENY */
   /************************************************************************************ */

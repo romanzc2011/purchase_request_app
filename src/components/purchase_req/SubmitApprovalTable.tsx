@@ -37,7 +37,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
     // Retrieve access to from local storage
     const accessToken = localStorage.getItem("access_token");
     console.log("TOKEN: ",accessToken);
-    fetch("https://10.234.198.113:5004/sendToPurchaseReq", {
+    fetch(`https://${window.location.hostname}:5002/api/sendToPurchaseReq`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

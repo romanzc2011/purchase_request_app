@@ -86,7 +86,7 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
                       fontSize: "1.2rem",
                     }}
                   >
-                    PURCHASE REQUEST
+                    PRAS - PURCHASE REQUEST APPROVAL SYSTEM
                   </Box>
                 </h3>
               </Box>

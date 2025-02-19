@@ -12,14 +12,12 @@ interface LoginDialogProps {
   open: boolean;
   onClose: () => void;
   onLoginSuccess: (ACCESS_GROUP: boolean, CUE_GROUP: boolean, IT_GROUP: boolean) => void;
-  //serverIP: string;
 }
 
 export default function LoginDialog({
   open,
   onClose,
   onLoginSuccess,
-  //serverIP
 }: LoginDialogProps) {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -38,9 +36,6 @@ export default function LoginDialog({
     return true;
   };
 
-  //const API_BASE_URL = "https://10.:5004/api/login";
-
-
   /***********************************************************************/
   /* HANDLE LOGIN */
   /***********************************************************************/
@@ -50,7 +45,7 @@ export default function LoginDialog({
     setLoading(true);
 
     try {
-      const response = await fetch("https://10.222.154.238:5002/api/login", {
+      const response = await fetch(`https://${window.location.hostname}:5002/api/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -59,9 +54,6 @@ export default function LoginDialog({
         
         body: JSON.stringify({ username, password }),
       });
-      console.log("Response Headers: ", response.headers);
-      console.log("URL: ",response.url)
-
 
       if (!response.ok) {
         const errorText = await response.text()
