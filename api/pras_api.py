@@ -3,8 +3,8 @@ from constants.db_columns import approvals_cols
 from concurrent.futures import ThreadPoolExecutor
 from pras_database_manager import DatabaseManager
 from dotenv import load_dotenv, set_key, find_dotenv
-from flask import Flask, request, jsonify, session, Response, g
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
+from flask import Flask, request, jsonify, session, Response, g, make_response
 from flask_jwt_extended import (create_access_token,
                                 create_refresh_token, 
                                 get_jwt,
@@ -54,20 +54,20 @@ executor = ThreadPoolExecutor(max_workers=5)
 #########################################################################
 ## APP CONFIGS
 pras = Flask(__name__)
-CORS(pras)
+#CORS(pras, supports_credentials=True)
 
 # Configure Loguru
 logger.add("/logs/pras.log", rotation="7 days")
 
 # Apply ProxyFix so Flask will know its behind a proxy
-pras.wsgi_app = ProxyFix(
-    pras.wsgi_app,
-    x_for=1, # Trust X-Forwarded-For (Client IP)
-    x_proto=1, # Trust X-Forwarded-Proto (https)
-    x_host=1, # Trust X-Forwarded-Host (Proxy Host)
-    x_prefix=1, # Trust X-Forwarded-Prefix 
-    x_port=1 # Trust X-Forwarded-Port
-)
+# pras.wsgi_app = ProxyFix(
+#     pras.wsgi_app,
+#     x_for=1, # Trust X-Forwarded-For (Client IP)
+#     x_proto=1, # Trust X-Forwarded-Proto (https)
+#     x_host=1, # Trust X-Forwarded-Host (Proxy Host)
+#     x_prefix=1, # Trust X-Forwarded-Prefix 
+#     x_port=1 # Trust X-Forwarded-Port
+# )
 
 pras.config["SECRET_KEY"] = JWT_SECRET_KEY
 pras.config["JWT_TOKEN_LOCATION"] = ["headers"]
@@ -88,22 +88,24 @@ notifyManager = NotificationManager(msg_body=None,
                                     from_sender=from_recipient, 
                                     subject=this_subject)
 
+CORS(pras, origins=["http://localhost:5002"], supports_credentials=True)
+
 ##########################################################################
 ## API FUNCTIONS
 ##########################################################################
-@pras.before_request
-def handle_options():
-    if request.method == "OPTIONS":
-        response = Response()
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        return response, 200  
+# @pras.before_request
+# def handle_options():
+#     if request.method == "OPTIONS":
+#         response = Response()
+#         response.headers["Access-Control-Allow-Origin"] = "10.234.198.113"
+#         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+#         response.headers["Access-Control-Allow-Headers"] = "*"
+#         response.headers["Access-Control-Allow-Credentials"] = "true"
+#         return response, 200  
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
-@pras.route('/api/login', methods=['OPTIONS', 'POST'])
+@pras.route('/api/login', methods=['POST'])
 def login():
     try:
         raw_data = request.data
@@ -244,7 +246,7 @@ def delete_purchase_req():
     
 ##########################################################################
 ## HANDLE FILE UPLOAD
-@pras.route('/api/handleFileAttachments', methods=['GET', 'POST'])
+@pras.route('/api/upload', methods=['GET', 'POST'])
 def upload_file():
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
@@ -426,13 +428,13 @@ def get_server_ip(network):
 ## MAIN FUNCTION -- main function for primary control flow
 def main():
     
-    server_ip = get_server_ip("10.234")
-    # Write server ip to env file
-    set_key(dotenv_path, 'SERVER_IP', server_ip)
+    # server_ip = get_server_ip("10.234")
+    # # Write server ip to env file
+    # set_key(dotenv_path, 'SERVER_IP', server_ip)
     
-    print(server_ip)
-    serve(pras, host=server_ip, port=5004)
-    #pras.run(host=server_ip, port=5004, debug=True)
+    # print(server_ip)
+    # serve(pras, host=server_ip, port=5004)
+    pras.run(host="localhost", port=5004, debug=True)
         
 ##########################################################################
 ## MAIN CONTROL FLOW

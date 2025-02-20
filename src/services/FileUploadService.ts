@@ -1,11 +1,12 @@
 import http from "../http-common";
 
-const upload = (file: File, onUploadProgress: any): Promise<any> => {
+const upload = (file: File, requisitionID: string, onUploadProgress: any): Promise<any> => {
     let formData = new FormData();
 
     formData.append("file", file);
-
-    return http.post("/upload", formData, {
+    formData.append("requistion_id", requisitionID);
+    
+    return http.post("/api/upload", formData, {
         headers: {
             "Content-Type": "multipart/form-data",
         },
@@ -14,7 +15,7 @@ const upload = (file: File, onUploadProgress: any): Promise<any> => {
 };
 
 const getFiles = () : Promise<any> => {
-    return http.get("/files");
+    return http.get("/api/getfiles");
 };
 
 const FileUploadService = {

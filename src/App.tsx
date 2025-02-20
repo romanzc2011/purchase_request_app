@@ -4,12 +4,12 @@ import "./App.css";
 import { Routes, Route } from "react-router-dom";
 import { AddItemsForm } from "./components/purchase_req/AddItemsForm";
 import SubmitApprovalTable from "./components/purchase_req/SubmitApprovalTable";
-//import LoginDialog from "./components/approvals/approvals_components/LoginDialog";
 import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
 import AlertMessage from "./components/AlertMessage";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 import ApprovalsTable from "./components/approvals/ApprovalTable";
+import { v4 as uuidv4 } from "uuid";
 
 const drawerWidth = 195;
 
@@ -18,6 +18,18 @@ interface AppProps {
   ACCESS_GROUP: boolean;
   CUE_GROUP: boolean;
   IT_GROUP: boolean;
+}
+
+/* GENERATE REQ ID - pass this along to AddItems and FileUpload, unsure which one use will do first
+    this ensures the req */
+function generateReqID(): string {
+  const uuidBuffer = new TextEncoder().encode(uuidv4());
+  let base64String = btoa(String.fromCharCode(...uuidBuffer))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+/, "");
+
+  return base64String.slice(0, 10);
 }
 
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
@@ -50,7 +62,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
       <ApprovalsTable
         dataBuffer={dataBuffer}
         onDelete={(req_id: number) =>
-          setDataBuffer(dataBuffer.filter((item) => item.req_id !== req_id))
+          setDataBuffer(dataBuffer.filter((item) => item.req_id !== req_id.toString()))
         }
         resetTable={resetTable}
       />
@@ -99,13 +111,14 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                 <AddItemsForm
                   dataBuffer={dataBuffer}
                   setDataBuffer={setDataBuffer}
+                  requistionID={generateReqID()}
                 />
                 <Box className="col-md-12" style={{ marginTop: "20px" }}>
                   <SubmitApprovalTable
                     dataBuffer={dataBuffer}
-                    onDelete={(req_id: number) =>
+                    onDelete={(req_id: string) =>
                       setDataBuffer(
-                        dataBuffer.filter((item) => item.req_id !== req_id)
+                        dataBuffer.filter((item) => item.req_id !== req_id.toString())
                       )
                     }
                     //resetTable={resetTable}

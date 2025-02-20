@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
+import { Box } from "@mui/material";
 import UploadService from "../../services/FileUploadService";
 import IFile from "../../types/File";
 
-const FileUpload: React.FC = () => {
-    const[currentFile, setCurrentFile] = useState<File>();
-    const[progress, setProgress] = useState<number>(0);
-    const[message, setMessage] = useState<string>("");
-    const[fileInfos, setFileInfos] = useState<Array<IFile>>([]);
+interface FileUploadProps {
+  reqID: string;
+}
+
+const FileUpload: React.FC<FileUploadProps> = ({ reqID }) => {
+    const [currentFile, setCurrentFile] = useState<File>();
+    const [progress, setProgress] = useState<number>(0);
+    const [message, setMessage] = useState<string>("");
+    const [fileInfos, setFileInfos] = useState<Array<IFile>>([]);
 
     const selectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
         const { files } = event.target;
@@ -19,13 +24,9 @@ const FileUpload: React.FC = () => {
         setProgress(0);
         if(!currentFile) return;
 
-        UploadService.upload(currentFile, (event: any) => {
+        UploadService.upload(currentFile, reqID, (event: any) => {
             setProgress(Math.round((100 * event.loaded) / event.total));
         })
-            .then((response) => {
-                setMessage(response.data.message);
-                return UploadService.getFiles();
-            })
             .then((files) => {
                 setFileInfos(files.data);
             })
@@ -42,35 +43,29 @@ const FileUpload: React.FC = () => {
             })
     }
 
-    useEffect(() => {
-        UploadService.getFiles().then((response) => {
-            setFileInfos(response.data);
-        })
-    })
-
     return (
-        <div>
-          <div className="row">
-            <div className="col-8">
+      <Box className="col-sm-4">
+          <Box className="row">
+            <Box className="col-8">
               <label className="btn btn-default p-0">
                 <input type="file" onChange={selectFile} />
               </label>
-            </div>
+            </Box>
     
-            <div className="col-4">
+            <Box className="col-4">
               <button
-                className="btn btn-success btn-sm"
+                className="btn btn-maroon"
                 disabled={!currentFile}
                 onClick={upload}
               >
                 Upload
               </button>
-            </div>
-          </div>
+            </Box>
+          </Box>
     
           {currentFile && (
-            <div className="progress my-3">
-              <div
+            <Box className="progress my-3">
+              <Box
                 className="progress-bar progress-bar-info"
                 role="progressbar"
                 aria-valuenow={progress}
@@ -79,18 +74,18 @@ const FileUpload: React.FC = () => {
                 style={{ width: progress + "%" }}
               >
                 {progress}%
-              </div>
-            </div>
+              </Box>
+            </Box>
           )}
     
           {message && (
-            <div className="alert alert-secondary mt-3" role="alert">
+            <Box className="alert alert-secondary mt-3" role="alert">
               {message}
-            </div>
+            </Box>
           )}
     
-          <div className="card mt-3">
-            <div className="card-header">List of Files</div>
+          <Box className="card mt-3">
+            <Box className="card-header">List of Files</Box>
             <ul className="list-group list-group-flush">
               {fileInfos &&
                 fileInfos.map((file, index) => (
@@ -99,7 +94,9 @@ const FileUpload: React.FC = () => {
                   </li>
                 ))}
             </ul>
-          </div>
-        </div>
+          </Box>
+        </Box>
       );
     };
+
+    export default FileUpload;

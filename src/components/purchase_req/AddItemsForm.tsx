@@ -1,4 +1,5 @@
-import { FieldErrors, useForm, useFieldArray } from "react-hook-form";
+import "bootstrap/dist/css/bootstrap.min.css";
+import { FieldErrors, useForm } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
 import React from "react";
 import "./LearningDev";
@@ -9,76 +10,39 @@ import { useEffect } from "react";
 import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
 import LocationPicker from "./LocationPicker";
+import FileUpload from "./FileUpload";
 import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
 
+interface AddItemsProps {
+  requistionID: string;
+  dataBuffer: FormValues[];
+  setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
+}
+
 /*************************************************************************************** */
 /* ADD ITEMS FORM */
 /*************************************************************************************** */
-export const AddItemsForm: React.FC<{
-  dataBuffer: FormValues[];
-  setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
-}> = ({ setDataBuffer }) => {
+export const AddItemsForm: React.FC<AddItemsProps> = ({ requistionID, dataBuffer, setDataBuffer }) => {
+  
   /*************************************************************************************** */
   /* HANDLE ADD ITEM function */
   /*************************************************************************************** */
   const handleAddItem = (newItem: FormValues) => {
+    /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
+  
     const updatedItem = {
       ...newItem,
-      req_id: generateRandomID(),
+      req_id: requistionID,
       price: Number(newItem.price) || 0,
       fund: newItem.fund || "",
-      budgetObjCode: newItem.budgetObjCode || "",
-      fileAttachments: newItem.fileAttachments.map((fileAttachment) => {
-        const file = fileAttachment.attachment;
-        return {
-          attachment: file,
-          name: file?.name || "",
-          size: file?.size || 0,
-          type: file?.type || "",
-        };
-      }),
+      budgetObjCode: newItem.budgetObjCode || ""
     };
 
     setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
     reset(); // Clear form
     console.log("Item Added: ", updatedItem);
-  };
-
-  /*************************************************************************************** */
-  /* UPLOAD FILES TO SERVER */
-  /*************************************************************************************** */
-  const uploadFiles = (fileAttachments: { attachment: File | null }[]) => {
-    // Create new FormData obj
-    const formData = new FormData();
-
-    // Add each file to obj
-    fileAttachments.forEach((fileAttachment) => {
-      if (fileAttachment.attachment) {
-        formData.append(`file`, fileAttachment.attachment);
-      }
-    });
-
-    console.log("Uploading file:", formData);
-
-    // Submit files with fetch
-    fetch(`https://${window.location.hostname}:5002/api/handleFileAttachments`, {
-      method: "POST",
-      body: formData,
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error("Error uploading files");
-        }
-        return res.json();
-      })
-      .then((result) => {
-        console.log("Files uploaded successfully:", result);
-      })
-      .catch((error) => {
-        console.error("File upload error: ", error);
-      });
   };
 
   /*************************************************************************************** */
@@ -88,25 +52,14 @@ export const AddItemsForm: React.FC<{
     console.log("Form errors", errors);
   };
 
-  /* RANDOM ID GENERATOR 
-  This will be for testing purposes only, in prod this will be
-  replaced with a Requistion number or something more useful
-  for finance */
-  const generateRandomID = () => {
-    const min = 1;
-    const max = 5000;
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  };
-
   const form = useForm<FormValues>({
     defaultValues: {
-      req_id: 0,
+      req_id: requistionID,
       requester: "",
       phoneext: "",
       datereq: null,
       dateneed: null,
       orderType: "",
-      fileAttachments: [{ attachment: null }],
       itemDescription: "",
       justification: "",
       addComments: "",
@@ -138,6 +91,7 @@ export const AddItemsForm: React.FC<{
   /* Reset form after successful submission */
   useEffect(() => {
     if (isSubmitSuccessful) {
+
       reset();
     }
   }, [isSubmitSuccessful, reset]);
@@ -148,7 +102,7 @@ export const AddItemsForm: React.FC<{
       {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
           once user has finished adding items and reviewed everything */}
       {/*************************************************************************************** */}
-      <form onSubmit={handleSubmit(handleAddItem, onError)} noValidate encType="multipart/form-data">
+      <form onSubmit={handleSubmit(handleAddItem, onError)}>
         {/** REQUESTER ****************************************************************** */}
         <Box className="m-2 row">
           <label htmlFor="requester" className="col-sm-1 col-form-label mt-4">
@@ -277,74 +231,18 @@ export const AddItemsForm: React.FC<{
         </Box>
 
         {/** ATTACHMENTS INCLUDED? ****************************************************************** */}
-        <Box className="m-1 align-items-center row">
-          <label
-            style={{ fontSize: "0.8rem" }}
-            htmlFor="fileAttachments"
-            className="col-sm-3 col-form-label"
-          >
-            <strong style={{ fontSize: "0.9rem" }}>
-              Attachments included?
-            </strong>{" "}
+        <Box className="m-1 align-items-center row" sx={{ display: "flex", alignItems: "center", gap: 38 }}>
+          
+          <label htmlFor="fileAttachments" style={{ fontSize: "0.9rem", maxWidth: "250px", whiteSpace: "nowrap" }}>
+            <strong style={{ fontSize: "0.9rem" }}>Attachments included?</strong>
             (training information, pictures, web pages, screen shots, etc.)
           </label>
 
-          {/********************************************************************************************* */}
-          {/** ATTACHMENTS FIELD ARRAY ****************************************************************** */}
-          {/********************************************************************************************* */}
-          <Box className="col-sm-6">
-            {fields.map((field, index) => {
-              return (
-                <Box className="mt-2 d-flex align-items-center" key={field.id}>
-                  <input
-                    type="file"
-                    className="form-control"
-                    style={{ width: "350px" }}
-                    multiple
-                    {...register(`fileAttachments.${index}.attachment`)}
-                  />
-
-                  {/* Only show REMOVE button if more than 1 file/attachment */}
-                  {index > 0 && (
-                    <Buttons
-                      className="btn btn-danger me-2"
-                      onClick={() => {
-                        const currentValues = watch();
-                        remove(index);
-                        reset({
-                          ...currentValues,
-                          fileAttachments: currentValues.fileAttachments.filter(
-                            (_, i) => i !== index
-                          ),
-                        });
-                      }}
-                      label="Remove"
-                    />
-                  )}
-                </Box>
-              );
-            })}
-
-            <Box className="d-flex align-items-center mt-3">
-              <Buttons
-                className="btn btn-maroon me-2"
-                onClick={() => {
-                  const currentValues = watch();
-                  append({ attachment: null });
-                  reset({
-                    ...currentValues,
-                    fileAttachments: [
-                      ...currentValues.fileAttachments,
-                      { attachment: null },
-                    ],
-                  });
-                }}
-                label="Add File"
-              />
-            </Box>
-          </Box>
+          <FileUpload reqID={ requistionID }/>
         </Box>
 
+
+        
         {/** ITEM DESCRIPTION ****************************************************************** */}
         <Box className="m-3 align-items-center row">
           <label

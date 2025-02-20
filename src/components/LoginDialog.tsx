@@ -44,13 +44,17 @@ export default function LoginDialog({
 
     setLoading(true);
 
+    const PROD_URL = `https://${window.location.hostname}:5002/api/login`;
+    const DEV_URL = `http://${window.location.hostname}:5004/api/login`;
+
     try {
-      const response = await fetch(`https://${window.location.hostname}:5002/api/login`, {
+      // PROD
+      const response = await fetch(DEV_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include",
+        //credentials: "include",
         
         body: JSON.stringify({ username, password }),
       });

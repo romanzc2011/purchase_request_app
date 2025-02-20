@@ -15,7 +15,7 @@ import { convertBOC } from "../../utils/bocUtils";
 /* INTERFACE */
 interface SubmitApprovalTableProps {
   dataBuffer: FormValues[];
-  onDelete: (req_id: number) => void;
+  onDelete: (req_id: string) => void;
   //resetTable: () => void;
 }
 

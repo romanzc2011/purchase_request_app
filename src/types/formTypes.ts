@@ -2,7 +2,7 @@
 /* FORM VALUES */
 /********************************************************/
 export type FormValues = {
-  req_id: number;
+  req_id: string;
   requester: string;
   phoneext: string;
   datereq: Date | null;

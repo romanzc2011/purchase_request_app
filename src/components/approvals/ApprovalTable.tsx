@@ -27,6 +27,8 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
 }) => {
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
 
+  const PROD_URL = `https://${window.location.hostname}:5002/api/login`;
+  const DEV_URL = `http://${window.location.hostname}:5004/api/login`;
   /************************************************************************************ */
   /* Fetch data from backend to populate Approvals Table */
   /************************************************************************************ */
