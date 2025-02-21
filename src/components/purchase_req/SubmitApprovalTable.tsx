@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
+import { IFile } from "../../types/File";
 
 /* INTERFACE */
 interface SubmitApprovalTableProps {

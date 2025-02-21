@@ -1,51 +1,77 @@
-import { useState, useEffect } from "react";
-import { Box } from "@mui/material";
+import { useState } from "react";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import { Box, CircularProgress } from "@mui/material";
 import UploadService from "../../services/FileUploadService";
-import IFile from "../../types/File";
+import { IFile } from "../../types/File";
 
 interface FileUploadProps {
   reqID: string;
+  setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
+const message = "";
 
-const FileUpload: React.FC<FileUploadProps> = ({ reqID }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ reqID, setFileInfos }) => {
     const [currentFile, setCurrentFile] = useState<File>();
-    const [progress, setProgress] = useState<number>(0);
-    const [message, setMessage] = useState<string>("");
-    const [fileInfos, setFileInfos] = useState<Array<IFile>>([]);
 
     const selectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
         const { files } = event.target;
-        const selectedFiles = files as FileList;
-        setCurrentFile(selectedFiles?.[0]);
-        setProgress(0);
+
+        if(files && files.length > 0) {
+          const newFile: IFile = {
+            file: files[0],
+            name: files[0].name,
+            status: "idle",
+            progress: 0
+          };
+
+          setCurrentFile(files[0]);
+
+          // Add selected files to list, start with red X before upload, check circle during, and green check on success
+          setFileInfos((prev) => [...prev, newFile]);
+        }
     }
 
     const upload = () => {
-        setProgress(0);
         if(!currentFile) return;
+
+        // Update status for the file being uploaded
+        setFileInfos((prev) =>
+          prev.map((file) =>
+            file.name === currentFile.name
+              ? { ...file, status: "uploading" }
+              : file
+          )  
+        );
 
         UploadService.upload(currentFile, reqID, (event: any) => {
             setProgress(Math.round((100 * event.loaded) / event.total));
         })
-            .then((files) => {
-              if(Array.isArray(files.data)) {
-                setFileInfos(files.data);
-              } else {
-                setFileInfos([]);
-              }
-            })
-            .catch((err) => {
-                setProgress(0);
-
-                if(err.response && err.response.data && err.response.data.message) {
-                    setMessage(err.response.data.message);
-                } else {
-                    setMessage("Could not upload the File!");
-                }
-
-                setCurrentFile(undefined);
-            })
-    }
+        /* Once uploaded get response status, if 200 then upload was successful, update the file status to 'success'  */
+        .then((response) => {
+          if (response.status === 200) {
+              setFileInfos((prev) =>
+                  prev.map((file) =>
+                      file.name === currentFile.name
+                          ? { ...file, status: "success" } // ✅ Update only the uploaded file
+                          : file
+                    )
+                );
+            } else {
+                throw new Error("Upload failed");
+            }
+        })
+        .catch(() => {
+            setFileInfos((prev) =>
+                prev.map((file) =>
+                    file.name === currentFile.name
+                      ? { ...file, status: "error" }
+                      : file
+                )
+            );
+        });
+    };
 
     return (
       <Box className="col-sm-4">
@@ -53,6 +79,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID }) => {
             <Box className="col-8">
               <label className="btn btn-default p-0">
                 <input type="file" onChange={selectFile} />
+                
               </label>
             </Box>
     
@@ -94,7 +121,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID }) => {
               {fileInfos &&
                 fileInfos.map((file, index) => (
                   <li className="list-group-item" key={index}>
-                    <a href={file.url}>{file.name}</a>
+                    {file.name}
+
+                    {/* STATUS ICONS */}
+                    {file.status === "idle" && <FiberManualRecordIcon sx={{ color: "gold", fontSize: 16, marginLeft: 1 }} />}
+                    {file.status === "uploading" && <CircularProgress size={15} color="primary" thickness={5} />}
+                    {file.status === "success" && <CheckCircleIcon sx={{ color: "green", fontSize: 16 }} />}
+                    {file.status === "error" && <CancelIcon sx={{ color: "red", fontSize: 16 }} />}
                   </li>
                 ))}
             </ul>

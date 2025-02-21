@@ -23,13 +23,8 @@ interface AppProps {
 /* GENERATE REQ ID - pass this along to AddItems and FileUpload, unsure which one use will do first
     this ensures the req */
 function generateReqID(): string {
-  const uuidBuffer = new TextEncoder().encode(uuidv4());
-  let base64String = btoa(String.fromCharCode(...uuidBuffer))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+/, "");
-
-  return base64String.slice(0, 10);
+  let myuuid = uuidv4();
+  return myuuid;
 }
 
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
