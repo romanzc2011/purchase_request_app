@@ -27,7 +27,8 @@ export const uploadFile = (
             throw new Error("Upload failed");
         }
     })
-    .catch(() => {
+    .catch((error: Error) => {
+        console.error('File upload failed:', error);
         setFileInfos((prev) =>
             prev.map((f) => (f.name === file.name ? { ...f, status: "error" } : f))
         );
