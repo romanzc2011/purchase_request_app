@@ -34,11 +34,6 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   //resetTable,
 }) => {
   const [fileInfos, setFileInfos] = useState<IFile[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-
-  const handleUpload = (file: IFile) => {
-    uploadFile(file, reqID, setFileInfos);
-  }
 
   // Check if any file is not uploaded, user may have already uploaded
   const filesPendingUpload = fileInfos.some(file => file.status !== "success");
