@@ -12,7 +12,7 @@ export const uploadFile = (
         prev.map((f) => (f.name === file.name ? { ...f, status: "uploading" } : f))
     );
 
-    UploadService.upload(file.file, reqID, (event: any) => {
+    UploadService.upload(file.file, reqID, (event: ProgressEvent) => {
         const progress = Math.round((100 * event.loaded) / event.total);
         setFileInfos((prev) =>
             prev.map((f) => (f.name === file.name ? { ...f, progress } : f))
