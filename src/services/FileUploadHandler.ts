@@ -6,8 +6,14 @@ export const uploadFile = (
     reqID: string,
     setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>
 ) => {
-    if(!file || !file.file) return;
-
+    if (!file) {
+        console.warn('No file provided to uploadFile');
+        return;
+    }
+    if (!file.file) {
+        console.warn(`File object is missing for ${file.name}`);
+        return;
+    }
     setFileInfos((prev) =>
         prev.map((f) => (f.name === file.name ? { ...f, status: "uploading" } : f))
     );
