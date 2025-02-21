@@ -12,19 +12,37 @@ import {
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/File";
+import { useState } from "react";
+import { uploadFile } from "../../services/FileUploadHandler";
+import FileUpload from "./FileUpload";
 
 /* INTERFACE */
 interface SubmitApprovalTableProps {
   dataBuffer: FormValues[];
   onDelete: (req_id: string) => void;
+  fileInfo: IFile;
+  reqID: string;
+  setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
   //resetTable: () => void;
 }
 
 const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   dataBuffer,
   onDelete,
+  fileInfo,
+  reqID
   //resetTable,
 }) => {
+  const [fileInfos, setFileInfos] = useState<IFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleUpload = (file: IFile) => {
+    uploadFile(file, reqID, setFileInfos);
+  }
+
+  // Check if any file is not uploaded, user may have already uploaded
+  const filesPendingUpload = fileInfos.some(file => file.status !== "success");
+
   // Preprocess data to calculate price
   const processedData = dataBuffer.map((item) => ({
     ...item,
@@ -35,6 +53,22 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   /* SUBMIT DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
+    // Find all file not uploaded
+    const filesToUpload = fileInfos.filter(file => file.status !== "success");
+    
+    if(filesToUpload.length > 0) {
+      console.log("Uploading remaining files");
+      setIsUploading(true);
+
+      // Upload all pending files
+      for(const file of filesToUpload) {
+          uploadFile(file, reqID, setFileInfos);
+      }
+
+      setIsUploading(false); // Uploading done
+      return;
+    }
+
     // Retrieve access to from local storage
     const accessToken = localStorage.getItem("access_token");
     console.log("TOKEN: ",accessToken);
@@ -58,7 +92,6 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
       })
       .catch((err) => console.error("Error sending data:", err));
    };
-
 
   return (
     <TableContainer
@@ -132,9 +165,20 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
             </TableRow>
           ))}
         </TableBody>
+
+        {/* FOOTER WITH FILE UPLOAD & SUBMIT BUTTON */}
         <tfoot>
           <TableRow>
             <TableCell colSpan={4}>
+              {/* Show a warning if files are pending upload */}
+              {filesPendingUpload && (
+                <p style={{ color: "red", fontWeight: "bold" }}>
+                    ⚠️ Some files are not uploaded yet. Upload them before submitting.              
+                </p>
+              )}
+
+              {/* Upload Component */}
+              <FileUpload reqID={reqID} setFileInfos={setFileInfos} />
               {/************************************************************************************ */}
               {/* BUTTONS: SUBMIT/PRINT */}
               {/************************************************************************************ */}
