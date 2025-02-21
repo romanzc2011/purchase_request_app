@@ -28,7 +28,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID }) => {
             setProgress(Math.round((100 * event.loaded) / event.total));
         })
             .then((files) => {
+              if(Array.isArray(files.data)) {
                 setFileInfos(files.data);
+              } else {
+                setFileInfos([]);
+              }
             })
             .catch((err) => {
                 setProgress(0);

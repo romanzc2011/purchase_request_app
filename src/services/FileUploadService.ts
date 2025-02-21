@@ -4,7 +4,8 @@ const upload = (file: File, requisitionID: string, onUploadProgress: any): Promi
     let formData = new FormData();
 
     formData.append("file", file);
-    formData.append("requistion_id", requisitionID);
+    formData.append("requisition_id", requisitionID);
+    console.log("reqid: ",requisitionID);
     
     return http.post("/api/upload", formData, {
         headers: {
