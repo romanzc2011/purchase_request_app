@@ -12,7 +12,7 @@ const upload = (file: File, requisitionID: string, onUploadProgress: any): Promi
             "Content-Type": "multipart/form-data",
         },
         onUploadProgress,
-    }).then(response => response);
+    });
 };
 
 const getFiles = () : Promise<any> => {

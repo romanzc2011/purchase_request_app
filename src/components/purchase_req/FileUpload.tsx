@@ -4,16 +4,16 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { uploadFile } from "../../services/FileUploadHandler"; 
-import { IFile } from "../../types/File";
+import { IFile } from "../../types/IFile";
 
 interface FileUploadProps {
   reqID: string;
+  fileInfos: IFile[];
   setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ reqID }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ reqID, fileInfos, setFileInfos }) => {
     const [currentFile, setCurrentFile] = useState<File | undefined>(); // Allow undefined
-    const [fileInfos, setFileInfos] = useState<IFile[]>([]); // Define fileInfos
 
     const selectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
         const { files } = event.target;
@@ -33,7 +33,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID }) => {
     const upload = () => {
         if (!currentFile) return; // Ensure a file is selected
 
-        const fileToUpload = fileInfos.find(file => file.file === currentFile);
+        const fileToUpload = fileInfos.find((file) => file.file === currentFile);
         if (!fileToUpload) return; // Ensure file exists in fileInfos
 
         uploadFile(fileToUpload, reqID, setFileInfos); // Upload only valid files

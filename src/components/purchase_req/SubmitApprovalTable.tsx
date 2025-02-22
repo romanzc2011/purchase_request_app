@@ -8,10 +8,12 @@ import {
   TableRow,
   Paper,
   Button,
+  Box,
 } from "@mui/material";
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
-import { IFile } from "../../types/File";
+import { IFile } from "../../types/IFile";
 import { useState } from "react";
 import { uploadFile } from "../../services/FileUploadHandler";
 import FileUpload from "./FileUpload";
@@ -19,29 +21,25 @@ import FileUpload from "./FileUpload";
 /* INTERFACE */
 interface SubmitApprovalTableProps {
   dataBuffer: FormValues[];
-  onDelete: (req_id: string) => void;
-  fileInfo: IFile;
+  onDelete: (reqID: string) => void;
+  fileInfos: IFile[];
   reqID: string;
   setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
-  //resetTable: () => void;
 }
 
 const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   dataBuffer,
   onDelete,
-  fileInfo,
-  reqID
-  //resetTable,
+  reqID,
+  fileInfos,
+  setFileInfos,
 }) => {
-  const [fileInfos, setFileInfos] = useState<IFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleUpload = (file: IFile) => {
-    uploadFile(file, reqID, setFileInfos);
-  }
-
   // Check if any file is not uploaded, user may have already uploaded
-  const filesPendingUpload = fileInfos.some(file => file.status !== "success");
+  const filesPendingUpload = fileInfos.some(
+    (file) => file.status !== "success"
+  );
 
   // Preprocess data to calculate price
   const processedData = dataBuffer.map((item) => ({
@@ -53,16 +51,16 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   /* SUBMIT DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    // Find all file not uploaded
-    const filesToUpload = fileInfos.filter(file => file.status !== "success");
-    
-    if(filesToUpload.length > 0) {
+    // Find all files not uploaded
+    const filesToUpload = fileInfos.filter((file) => file.status !== "success");
+
+    if (filesToUpload.length > 0) {
       console.log("Uploading remaining files");
       setIsUploading(true);
 
       // Upload all pending files
-      for(const file of filesToUpload) {
-          uploadFile(file, reqID, setFileInfos);
+      for (const file of filesToUpload) {
+        uploadFile(file, reqID, setFileInfos);
       }
 
       setIsUploading(false); // Uploading done
@@ -71,12 +69,12 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
 
     // Retrieve access to from local storage
     const accessToken = localStorage.getItem("access_token");
-    console.log("TOKEN: ",accessToken);
+    console.log("TOKEN: ", accessToken);
     fetch(`https://${window.location.hostname}:5002/api/sendToPurchaseReq`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessToken}`
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ dataBuffer }),
     })
@@ -91,7 +89,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
         //resetTable();
       })
       .catch((err) => console.error("Error sending data:", err));
-   };
+  };
 
   return (
     <TableContainer
@@ -137,8 +135,8 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
         </TableHead>
         <TableBody>
           {processedData.map((item) => (
-            <TableRow key={item.req_id}>
-              <TableCell sx={{ color: "white" }}>{item.req_id}</TableCell>
+            <TableRow key={item.reqID}>
+              <TableCell sx={{ color: "white" }}>{item.reqID}</TableCell>
               <TableCell sx={{ color: "white" }}>
                 {convertBOC(item.budgetObjCode)}
               </TableCell>
@@ -156,7 +154,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
                   variant="contained"
                   color="error"
                   onClick={() => {
-                    onDelete(item.req_id);
+                    onDelete(item.reqID);
                   }}
                 >
                   Delete
@@ -172,13 +170,16 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
             <TableCell colSpan={4}>
               {/* Show a warning if files are pending upload */}
               {filesPendingUpload && (
-                <p style={{ color: "red", fontWeight: "bold" }}>
-                    ⚠️ Some files are not uploaded yet. Upload them before submitting.              
-                </p>
+                <Box sx={{ display: "flex", alignItems: "center"}}>
+                  <ReportProblemIcon sx={{ color: "gold", fontSize: 16 }} />
+                  <Box 
+                    component="span"
+                    sx={{ color: "red", fontWeight: "bold", marginLeft: 1}}>
+                      Some files are not uploaded yet. Upload them before submitting.
+                    </Box>
+                </Box>
               )}
 
-              {/* Upload Component */}
-              <FileUpload reqID={reqID} setFileInfos={setFileInfos} />
               {/************************************************************************************ */}
               {/* BUTTONS: SUBMIT/PRINT */}
               {/************************************************************************************ */}
@@ -186,7 +187,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
               <Buttons
                 label="Submit Form"
                 className=" me-3 btn btn-maroon"
-                disabled={dataBuffer.length === 0}
+                disabled={dataBuffer.length === 0 || filesPendingUpload || isUploading}
                 onClick={() => {
                   handleSubmitData(dataBuffer);
                 }}

@@ -1,7 +1,7 @@
 import "bootstrap/dist/css/bootstrap.min.css";
 import { FieldErrors, useForm } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
-import React from "react";
+import React, { useState } from "react";
 import "./LearningDev";
 import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
@@ -14,30 +14,38 @@ import FileUpload from "./FileUpload";
 import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
+import { IFile } from "../../types/IFile";
 
 interface AddItemsProps {
-  requistionID: string;
+  reqID: string;
   dataBuffer: FormValues[];
   setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
+  fileInfos: IFile[];
+  setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>
 }
 
 /*************************************************************************************** */
 /* ADD ITEMS FORM */
 /*************************************************************************************** */
-export const AddItemsForm: React.FC<AddItemsProps> = ({ requistionID, dataBuffer, setDataBuffer }) => {
-  
+const AddItemsForm: React.FC<AddItemsProps> = ({
+  reqID,
+  dataBuffer,
+  setDataBuffer,
+  fileInfos,
+  setFileInfos
+}) => {
+
   /*************************************************************************************** */
   /* HANDLE ADD ITEM function */
   /*************************************************************************************** */
-  const handleAddItem = (newItem: FormValues) => {
+  const handleAddItem = async (newItem: FormValues) => {
     /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
-  
     const updatedItem = {
       ...newItem,
-      req_id: requistionID,
+      reqID: reqID,
       price: Number(newItem.price) || 0,
       fund: newItem.fund || "",
-      budgetObjCode: newItem.budgetObjCode || ""
+      budgetObjCode: newItem.budgetObjCode || "",
     };
 
     setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
@@ -54,7 +62,7 @@ export const AddItemsForm: React.FC<AddItemsProps> = ({ requistionID, dataBuffer
 
   const form = useForm<FormValues>({
     defaultValues: {
-      req_id: requistionID,
+      reqID: reqID,
       requester: "",
       phoneext: "",
       datereq: null,
@@ -91,7 +99,6 @@ export const AddItemsForm: React.FC<AddItemsProps> = ({ requistionID, dataBuffer
   /* Reset form after successful submission */
   useEffect(() => {
     if (isSubmitSuccessful) {
-
       reset();
     }
   }, [isSubmitSuccessful, reset]);
@@ -231,18 +238,31 @@ export const AddItemsForm: React.FC<AddItemsProps> = ({ requistionID, dataBuffer
         </Box>
 
         {/** ATTACHMENTS INCLUDED? ****************************************************************** */}
-        <Box className="m-1 align-items-center row" sx={{ display: "flex", alignItems: "center", gap: 38 }}>
-          
-          <label htmlFor="fileAttachments" style={{ fontSize: "0.9rem", maxWidth: "250px", whiteSpace: "nowrap" }}>
-            <strong style={{ fontSize: "0.9rem" }}>Attachments included?</strong>
+        <Box
+          className="m-1 align-items-center row"
+          sx={{ display: "flex", alignItems: "center", gap: 38 }}
+        >
+          <label
+            htmlFor="fileAttachments"
+            style={{
+              fontSize: "0.9rem",
+              maxWidth: "250px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <strong style={{ fontSize: "0.9rem" }}>
+              Attachments included?
+            </strong>
             (training information, pictures, web pages, screen shots, etc.)
           </label>
 
-          <FileUpload reqID={ requistionID }/>
+          <FileUpload
+            reqID={reqID}
+            fileInfos={fileInfos}
+            setFileInfos={setFileInfos}
+          />
         </Box>
 
-
-        
         {/** ITEM DESCRIPTION ****************************************************************** */}
         <Box className="m-3 align-items-center row">
           <label

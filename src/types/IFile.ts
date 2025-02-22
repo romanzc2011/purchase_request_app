@@ -1,5 +1,5 @@
 export interface IFile {
-    file: File;
+    file?: File;
     name: string;
     status: "idle" | "uploading" | "success" | "error";
     progress?: number;

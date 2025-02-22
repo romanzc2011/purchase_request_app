@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { Routes, Route } from "react-router-dom";
-import { AddItemsForm } from "./components/purchase_req/AddItemsForm";
+import AddItemsForm from "./components/purchase_req/AddItemsForm";
 import SubmitApprovalTable from "./components/purchase_req/SubmitApprovalTable";
 import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
 import AlertMessage from "./components/AlertMessage";
@@ -10,6 +10,7 @@ import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 import ApprovalsTable from "./components/approvals/ApprovalTable";
 import { v4 as uuidv4 } from "uuid";
+import { IFile } from "./types/IFile";
 
 const drawerWidth = 195;
 
@@ -20,18 +21,12 @@ interface AppProps {
   IT_GROUP: boolean;
 }
 
-/* GENERATE REQ ID - pass this along to AddItems and FileUpload, unsure which one use will do first
-    this ensures the req */
-function generateReqID(): string {
-  let myuuid = uuidv4();
-  return myuuid;
-}
-
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
   /* *********************************************************************************** */
   /* SHARED DATA BUFFER */
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [fileInfos, setFileInfos] = useState<IFile[]>([]);
 
   // Function to toggle the sidebar
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -40,6 +35,12 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
   // Reset the Submit Table after submission
   const resetTable = () => {
     setDataBuffer([]);
+  };
+
+  const onDelete = (reqID: string) => {
+    setDataBuffer((prevData) =>
+      prevData.filter((item) => item.reqID !== reqID)
+    );
   };
 
   /* *********************************************************************************** */
@@ -56,8 +57,10 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     element = (
       <ApprovalsTable
         dataBuffer={dataBuffer}
-        onDelete={(req_id: number) =>
-          setDataBuffer(dataBuffer.filter((item) => item.req_id !== req_id.toString()))
+        onDelete={(reqID: number) =>
+          setDataBuffer(
+            dataBuffer.filter((item) => item.reqID !== reqID.toString())
+          )
         }
         resetTable={resetTable}
       />
@@ -70,6 +73,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
       />
     );
   }
+
+  // Generate a shared uuid so all components get the same uuid
+  const reqID = uuidv4();
 
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>
@@ -106,17 +112,17 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                 <AddItemsForm
                   dataBuffer={dataBuffer}
                   setDataBuffer={setDataBuffer}
-                  requistionID={generateReqID()}
+                  reqID={reqID}
+                  fileInfos={fileInfos}
+                  setFileInfos={setFileInfos}
                 />
                 <Box className="col-md-12" style={{ marginTop: "20px" }}>
                   <SubmitApprovalTable
+                    reqID={reqID}
                     dataBuffer={dataBuffer}
-                    onDelete={(req_id: string) =>
-                      setDataBuffer(
-                        dataBuffer.filter((item) => item.req_id !== req_id.toString())
-                      )
-                    }
-                    //resetTable={resetTable}
+                    onDelete={onDelete}
+                    fileInfos={fileInfos}
+                    setFileInfos={setFileInfos} // Pass setFileInfos function
                   />
                 </Box>
               </>
