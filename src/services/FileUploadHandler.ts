@@ -2,11 +2,11 @@ import UploadService from "./FileUploadService";
 import { IFile } from "../types/IFile";
 import { AxiosProgressEvent } from "axios";
 
-export const uploadFile = (
+export const uploadFile = async (
   file: IFile,
   reqID: string,
   setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>
-) => {
+): Promise<void> => {
   if (!file) {
     console.warn("No file provided to uploadFile");
     return;

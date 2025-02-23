@@ -30,23 +30,23 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID, fileInfos, setFileInfos 
     }
   };
 
-  const upload = () => {
+  const upload = async () => {
     if (!currentFile) return;
 
     const fileToUpload = fileInfos.find((file) => file.file === currentFile);
     if (!fileToUpload) return;
 
     // Call uploadFile and handle errors by updating status to "error"
-    uploadFile(fileToUpload, reqID, setFileInfos)
-      .catch((error) => {
-        setFileInfos((prev) =>
-          prev.map((file) =>
-            file === fileToUpload
-              ? { ...file, status: "error" }
-              : file
-          )
-        );
-      });
+    try {
+        await uploadFile(fileToUpload, reqID, setFileInfos)
+
+    } catch (error) {
+      setFileInfos((prev) =>
+        prev.map((file) => 
+          file === fileToUpload ? { ...file, status: "error" } : file
+        )
+      );
+    }
   };
 
   return (
@@ -69,7 +69,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID, fileInfos, setFileInfos 
         </Box>
       </Box>
 
-      <Box className="card mt-3">
+      <Box className="mt-3">
         <Box className="card-header">List of Files</Box>
         <ul className="list-group list-group-flush">
           {fileInfos.map((file, index) => (

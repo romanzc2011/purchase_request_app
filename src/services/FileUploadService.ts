@@ -1,5 +1,16 @@
 import axios, { AxiosProgressEvent } from "axios";
 
+interface UploadResponse {
+    status: number;
+    data: {
+        message: string;
+    }
+}
+
+interface FileInfo {
+    name: string;
+}
+
 const PROD_URL = `https://${window.location.hostname}:5002`;
 const DEV_URL = `http://${window.location.hostname}:5004`;
 
@@ -18,7 +29,9 @@ const upload = (
   reqID: string,
   onUploadProgress: (progressEvent: AxiosProgressEvent) => void
 ): Promise<any> => {
+
   const formData = new FormData();
+
   formData.append("file", file);
   formData.append("reqID", reqID);
   console.log("reqID: ", reqID);
@@ -29,7 +42,7 @@ const upload = (
   });
 };
 
-const getFiles = (): Promise<any> => {
+const getFiles = (): Promise<FileInfo[]> => {
   return api.get("/api/getfiles");
 };
 
