@@ -3,8 +3,10 @@ import { Box, CircularProgress } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
-import { uploadFile } from "../../services/FileUploadHandler"; 
+import { uploadFile } from "../../services/FileUploadHandler";
 import { IFile } from "../../types/IFile";
+import DeleteIcon from "@mui/icons-material/Delete";
+import Button from "@mui/material/Button";
 
 interface FileUploadProps {
   reqID: string;
@@ -12,7 +14,11 @@ interface FileUploadProps {
   setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ reqID, fileInfos, setFileInfos }) => {
+const FileUpload: React.FC<FileUploadProps> = ({
+  reqID,
+  fileInfos,
+  setFileInfos,
+}) => {
   const [currentFile, setCurrentFile] = useState<File | undefined>();
 
   const selectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,26 +37,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID, fileInfos, setFileInfos 
   };
 
   const upload = async () => {
-    if (!currentFile) return;
-
-    const fileToUpload = fileInfos.find((file) => file.file === currentFile);
-    if (!fileToUpload) return;
-
-    // Call uploadFile and handle errors by updating status to "error"
     try {
-        await uploadFile(fileToUpload, reqID, setFileInfos)
-
+      await Promise.all(
+        // Upload idle files
+        fileInfos.map(async (fileToUpload) => {
+          if (fileToUpload.status === "idle") {
+            await uploadFile(fileToUpload, reqID, setFileInfos);
+          }
+        })
+      );
     } catch (error) {
-      setFileInfos((prev) =>
-        prev.map((file) => 
-          file === fileToUpload ? { ...file, status: "error" } : file
-        )
+      // Update file to status error if caught error
+      setFileInfos((prevFiles) =>
+        prevFiles.map((file) => ({ ...file, status: "error" }))
       );
     }
   };
 
+  const deleteFile = async () => {};
+
   return (
-    <Box className="card col-sm-4">
+    <Box className="col-sm-4">
       <Box className="row">
         <Box className="col-8">
           <label className="btn btn-default p-0">
@@ -69,15 +76,25 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID, fileInfos, setFileInfos 
         </Box>
       </Box>
 
-      <Box className="mt-3">
-        <Box className="card-header">List of Files</Box>
+      <Box
+        className="card mt-3"
+        sx={{ background: "linear-gradient(to bottom, #2c2c2c, #800000)" }}
+      >
+        <Box
+          className="card-header"
+          sx={{ color: "white", backgroundColor: "#242424" }}
+        >
+          List of Files
+        </Box>
         <ul className="list-group list-group-flush">
           {fileInfos.map((file, index) => (
             <li className="list-group-item" key={index}>
               {file.name}
               {/* STATUS ICONS */}
               {file.status === "idle" && (
-                <FiberManualRecordIcon sx={{ color: "gold", fontSize: 16, marginLeft: 1 }} />
+                <FiberManualRecordIcon
+                  sx={{ color: "gold", fontSize: 16, marginLeft: 1 }}
+                />
               )}
               {file.status === "uploading" && (
                 <CircularProgress size={15} color="primary" thickness={5} />
@@ -88,6 +105,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID, fileInfos, setFileInfos 
               {file.status === "error" && (
                 <CancelIcon sx={{ color: "red", fontSize: 16 }} />
               )}
+              <Button
+                onClick={deleteFile}
+                size="small"
+                sx={{ background: "maroon", marginLeft: "30px"}}
+                variant="contained"
+                startIcon={<DeleteIcon />}
+              >
+                Delete
+              </Button>
             </li>
           ))}
         </ul>
