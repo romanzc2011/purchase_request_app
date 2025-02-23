@@ -18,7 +18,7 @@ import { convertBOC } from "../../utils/bocUtils";
 /* INTERFACE */
 interface ApprovalTableProps {
   dataBuffer: FormValues[];
-  onDelete: (req_id: number) => void;
+  onDelete: (reqID: number) => void;
   resetTable: () => void;
 }
 
@@ -155,10 +155,10 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
           </TableHead>
           <TableBody sx={{ textAlign: "center" }}>
             {processedData.map((item) => (
-              <TableRow key={item.req_id}>
+              <TableRow key={item.reqID}>
                 {/**************************************************************************/}
                 {/* REQUISITION ID */}
-                <TableCell sx={{ color: "white" }}>{item.req_id}</TableCell>
+                <TableCell sx={{ color: "white" }}>{item.reqID}</TableCell>
 
                 {/**************************************************************************/}
                 {/* BUDGET OBJECT CODE */}
