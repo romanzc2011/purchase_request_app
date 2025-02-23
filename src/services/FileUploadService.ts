@@ -1,22 +1,36 @@
-import http from "../http-common";
+import axios, { AxiosProgressEvent } from "axios";
 
-const upload = (file: File, requisitionID: string, onUploadProgress: any): Promise<any> => {
-    let formData = new FormData();
+const PROD_URL = `https://${window.location.hostname}:5002`;
+const DEV_URL = `http://${window.location.hostname}:5004`;
 
-    formData.append("file", file);
-    formData.append("requisition_id", requisitionID);
-    console.log("reqid: ",requisitionID);
-    
-    return http.post("/api/upload", formData, {
-        headers: {
-            "Content-Type": "multipart/form-data",
-        },
-        onUploadProgress,
-    });
+// Choose which URL to use
+const baseURL = DEV_URL;
+
+const api = axios.create({
+  baseURL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+const upload = (
+  file: File,
+  reqID: string,
+  onUploadProgress: (progressEvent: AxiosProgressEvent) => void
+): Promise<any> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("reqID", reqID);
+  console.log("reqID: ", reqID);
+
+  return api.post("/api/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress,
+  });
 };
 
-const getFiles = () : Promise<any> => {
-    return http.get("/api/getfiles");
+const getFiles = (): Promise<any> => {
+  return api.get("/api/getfiles");
 };
 
 const FileUploadService = {
