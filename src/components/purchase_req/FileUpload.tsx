@@ -50,7 +50,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ reqID, fileInfos, setFileInfos 
   };
 
   return (
-    <Box className="col-sm-4">
+    <Box className="card col-sm-4">
       <Box className="row">
         <Box className="col-8">
           <label className="btn btn-default p-0">

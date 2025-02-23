@@ -251,8 +251,8 @@ def upload_file():
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
     
-    requisition_id = request.form.get("requisition_id")
-    print(f"req_id: {requisition_id}")
+    reqID = request.form.get("reqID")
+    print(f"reqID: {reqID}")
      
     if request.method == 'POST':
         uploaded_files = request.files.getlist("file")
@@ -261,7 +261,7 @@ def upload_file():
         for file in uploaded_files:
             if file.filename:
                 secure_name = secure_filename(file.filename)
-                new_filename = f"{requisition_id}_{secure_name}"
+                new_filename = f"{reqID}_{secure_name}"
                 file_path = os.path.join(UPLOAD_FOLDER, new_filename)
                 
                 file.save(file_path)
@@ -269,7 +269,7 @@ def upload_file():
                 
     return jsonify({"message": "File(s) uploaded successfully", 
                     "files": saved_files,
-                    "requisition_id": requisition_id}), 200
+                    "reqID": reqID}), 200
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
