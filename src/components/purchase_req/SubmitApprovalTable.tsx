@@ -16,7 +16,7 @@ import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
 import { useState } from "react";
 import { uploadFile } from "../../services/FileUploadHandler";
-import FileUpload from "./FileUpload";
+import { getApiURL } from "../../AppConfig";
 
 /* INTERFACE */
 interface SubmitApprovalTableProps {
@@ -25,6 +25,8 @@ interface SubmitApprovalTableProps {
   fileInfos: IFile[];
   reqID: string;
   setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
+  isSubmitted: boolean;
+  setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
@@ -33,8 +35,10 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
   reqID,
   fileInfos,
   setFileInfos,
+  setIsSubmitted
 }) => {
   const [isUploading, setIsUploading] = useState(false);
+  let API_PURCHASE_URL: string = "";
 
   // Check if any file is not uploaded, user may have already uploaded
   const filesPendingUpload = fileInfos.some(
@@ -67,6 +71,8 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
       return;
     }
 
+    // Look at the component level you're on to determine which one to set
+    API_PURCHASE_URL = getApiURL({ isLogin: false, isApproval: false, isPurchase: true });
     // Retrieve access to from local storage
     const accessToken = localStorage.getItem("access_token");
     console.log("TOKEN: ", accessToken);
@@ -190,6 +196,7 @@ const SubmitApprovalTable: React.FC<SubmitApprovalTableProps> = ({
                 disabled={dataBuffer.length === 0 || filesPendingUpload || isUploading}
                 onClick={() => {
                   handleSubmitData(dataBuffer);
+                  setIsSubmitted(true);
                 }}
               />
 

@@ -14,6 +14,7 @@ import {
 import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
+import { getApiURL } from "../../AppConfig";
 
 /* INTERFACE */
 interface ApprovalTableProps {
@@ -26,14 +27,15 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   resetTable,
 }) => {
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
+  let API_APPROVAL_URL: string = "";
 
-  const PROD_URL = `https://${window.location.hostname}:5002/api/login`;
-  const DEV_URL = `http://${window.location.hostname}:5004/api/login`;
+  API_APPROVAL_URL = getApiURL({ isLogin: false, isApproval: true, isPurchase: false });
+
   /************************************************************************************ */
   /* Fetch data from backend to populate Approvals Table */
   /************************************************************************************ */
   useEffect(() => {
-    fetch(`https://${window.location.hostname}:5002/api/getApprovalData`)
+    fetch(API_APPROVAL_URL)
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP error: ${res.status}`);

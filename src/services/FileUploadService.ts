@@ -1,21 +1,14 @@
 import axios, { AxiosProgressEvent } from "axios";
 
-interface UploadResponse {
-    status: number;
-    data: {
-        message: string;
-    }
-}
-
 interface FileInfo {
     name: string;
 }
 
 const PROD_URL = `https://${window.location.hostname}:5002`;
-const DEV_URL = `http://${window.location.hostname}:5004`;
+//const DEV_URL = `http://${window.location.hostname}:5004`;
 
 // Choose which URL to use
-const baseURL = DEV_URL;
+const baseURL = PROD_URL;
 
 const api = axios.create({
   baseURL,

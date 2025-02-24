@@ -27,6 +27,8 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [fileInfos, setFileInfos] = useState<IFile[]>([]);
+  const [isSubmitted, setIsSubmitted] = useState(false);   // Re-render once form is submitted
+  const [reqID] = useState(() => uuidv4());  // Ensures uuid 
 
   // Function to toggle the sidebar
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -74,9 +76,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     );
   }
 
-  // Generate a shared uuid so all components get the same uuid
-  const reqID = uuidv4();
-
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>
       {/* Sidebar Navigation */}
@@ -116,6 +115,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                   fileInfos={fileInfos}
                   setFileInfos={setFileInfos}
                 />
+
+                {/* isSubmitted and setIsSubmitted is what will determine to re-render the App or not, re-rendering is done
+                    to get a new reqID with each request */}
                 <Box className="col-md-12" style={{ marginTop: "20px" }}>
                   <SubmitApprovalTable
                     reqID={reqID}
@@ -123,6 +125,8 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                     onDelete={onDelete}
                     fileInfos={fileInfos}
                     setFileInfos={setFileInfos} // Pass setFileInfos function
+                    isSubmitted={isSubmitted}   
+                    setIsSubmitted={setIsSubmitted}
                   />
                 </Box>
               </>

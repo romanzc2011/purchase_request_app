@@ -1,7 +1,7 @@
 import "bootstrap/dist/css/bootstrap.min.css";
 import { FieldErrors, useForm } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
-import React, { useState } from "react";
+import React from "react";
 import "./LearningDev";
 import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
@@ -29,7 +29,6 @@ interface AddItemsProps {
 /*************************************************************************************** */
 const AddItemsForm: React.FC<AddItemsProps> = ({
   reqID,
-  dataBuffer,
   setDataBuffer,
   fileInfos,
   setFileInfos

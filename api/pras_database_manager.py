@@ -33,7 +33,7 @@ class DatabaseManager:
         print("CREATING TABLE purchase_requests")
         query = """
         CREATE TABLE IF NOT EXISTS purchase_requests (
-            req_id INTEGER PRIMARY KEY NOT NULL,
+            reqID TEXT PRIMARY KEY NOT NULL,
             requester TEXT NOT NULL,
             phoneext INTEGER NOT NULL,
             datereq TEXT,
@@ -64,7 +64,7 @@ class DatabaseManager:
         print("CREATING TABLE approvals")
         query = """
         CREATE TABLE IF NOT EXISTS approvals (
-            req_id INTEGER PRIMARY KEY NOT NULL,
+            reqID TEXT PRIMARY KEY NOT NULL,
             requester TEXT NOT NULL,
             budgetObjCode TEXT,
             fund TEXT,
@@ -73,7 +73,7 @@ class DatabaseManager:
             priceEach REAL,
             location TEXT,
             status TEXT,
-            FOREIGN KEY (req_id) REFERENCES purchase_requests(req_id)
+            FOREIGN KEY (reqID) REFERENCES purchase_requests(reqID)
                 ON UPDATE CASCADE
         )
         """

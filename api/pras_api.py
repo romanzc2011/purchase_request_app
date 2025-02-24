@@ -93,15 +93,6 @@ CORS(pras, origins=["http://localhost:5002"], supports_credentials=True)
 ##########################################################################
 ## API FUNCTIONS
 ##########################################################################
-# @pras.before_request
-# def handle_options():
-#     if request.method == "OPTIONS":
-#         response = Response()
-#         response.headers["Access-Control-Allow-Origin"] = "10.234.198.113"
-#         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-#         response.headers["Access-Control-Allow-Headers"] = "*"
-#         response.headers["Access-Control-Allow-Credentials"] = "true"
-#         return response, 200  
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
@@ -227,19 +218,19 @@ def delete_purchase_req():
         return jsonify({"error": "Invalid data"}), 400
     
     # Validate input
-    req_id = data.get("req_id")
-    if not req_id:
-        return jsonify({"error": "Missing 'req_id' in request data"}), 400
+    reqID = data.get("reqID")
+    if not reqID:
+        return jsonify({"error": "Missing 'reqID' in request data"}), 400
     
     # Define table and condition
     table = "purchase_requests"
-    condition = "req_id = ?"
-    params = (req_id,)
+    condition = "reqID = ?"
+    params = (reqID,)
     
     try:
         # Delete operation
         dbManager.delete_data(table, condition, params)
-        return jsonify({"message": f"Purchase request with req_id {req_id} deleted successfully"}), 200
+        return jsonify({"message": f"Purchase request with reqID {reqID} deleted successfully"}), 200
     
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
@@ -353,7 +344,7 @@ def process_approvals_data(data):
         
     # Not new? Was it approved or denied?
     elif purchase_cols['new_request'] == 0:
-        approved = get_approval_status("approvals", data['req_id'])
+        approved = get_approval_status("approvals", data['reqID'])
         if approved == 1:
             approvals_cols['status'] = "APPROVED"
         if approved == 0:
@@ -379,11 +370,11 @@ def process_approvals_data(data):
 
 ##########################################################################
 ## GET STATUS OF APPROVALS
-def get_approval_status(table, req_id):
-    condition = f"req_id = %s"
+def get_approval_status(table, reqID):
+    condition = f"reqID = %s"
     columns = "approved"
     table = "approvals"
-    params = (req_id,)
+    params = (reqID,)
     dbManager.fetch_single_row(table, columns, condition, params)
 
 ##########################################################################
@@ -407,7 +398,7 @@ def purchase_bg_task(data, api_call):
                 
                 # Update the purchase_req table
                 updated_data = {'new_request': 0}
-                condition = f"req_id = {processed_data['req_id']}"
+                condition = f"reqID = {processed_data['reqID']}"
                 dbManager.update_data(updated_data, table, condition)
                 
             table = "approvals"
@@ -436,13 +427,13 @@ def get_server_ip(network):
 ## MAIN FUNCTION -- main function for primary control flow
 def main():
     
-    # server_ip = get_server_ip("10.234")
+    server_ip = get_server_ip("10.234")
     # # Write server ip to env file
-    # set_key(dotenv_path, 'SERVER_IP', server_ip)
+    set_key(dotenv_path, 'SERVER_IP', server_ip)
     
     # print(server_ip)
-    # serve(pras, host=server_ip, port=5004)
-    pras.run(host="localhost", port=5004, debug=True)
+    serve(pras, host=server_ip, port=5004)
+    #pras.run(host="localhost", port=5004, debug=True)
         
 ##########################################################################
 ## MAIN CONTROL FLOW
