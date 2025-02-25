@@ -7,7 +7,9 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { CircularProgress } from "@mui/material";
-import { getApiURL } from "../AppConfig";
+
+const isHttpsEnabled: boolean = false;
+let API_URL: string = "";
 
 interface LoginDialogProps {
   open: boolean;
@@ -24,8 +26,6 @@ export default function LoginDialog({
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-
-  let API_LOGIN_URL: string = "";
 
   /***********************************************************************/
   /* VALIDATE INPUT */
@@ -46,14 +46,16 @@ export default function LoginDialog({
     if (!validateInput()) return;
 
     setLoading(true);
-    //const PROD_URL = `https://${window.location.hostname}:5002/api/login`;
-    //const DEV_URL = `http://${window.location.hostname}:5004/api/login`;
-    
-    API_LOGIN_URL = getApiURL({ isLogin: true, isApproval: false, isPurchase: false });
+
+    if(isHttpsEnabled) {
+      API_URL = `https://${window.location.hostname}:5002/api/login`; 
+    } else {
+      API_URL = `http://localhost:5004/api/login`;
+    }
     
     try {
       // PROD
-      const response = await fetch(API_LOGIN_URL, {
+      const response = await fetch(API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

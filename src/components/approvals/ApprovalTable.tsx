@@ -14,7 +14,9 @@ import {
 import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
-import { getApiURL } from "../../AppConfig";
+
+const isHttpsEnabled: boolean = false;
+let API_URL: string = "";
 
 /* INTERFACE */
 interface ApprovalTableProps {
@@ -27,15 +29,18 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   resetTable,
 }) => {
   const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
-  let API_APPROVAL_URL: string = "";
 
-  API_APPROVAL_URL = getApiURL({ isLogin: false, isApproval: true, isPurchase: false });
+  if(isHttpsEnabled) {
+    API_URL = `https://${window.location.hostname}:5002/api/sendToPurchase`; 
+  } else {
+    API_URL = `http://${window.location.hostname}:5004/api/sendToPurchase`;
+  }
 
   /************************************************************************************ */
   /* Fetch data from backend to populate Approvals Table */
   /************************************************************************************ */
   useEffect(() => {
-    fetch(API_APPROVAL_URL)
+    fetch(API_URL)
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP error: ${res.status}`);
@@ -63,7 +68,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
   /* GET REQUEST DATA --- send to backend to add to database */
   /************************************************************************************ */
   const handleSubmitData = (dataBuffer: FormValues[]) => {
-    fetch(`https://${window.location.hostname}:5002/api/sendToPurchaseReq`, {
+    fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

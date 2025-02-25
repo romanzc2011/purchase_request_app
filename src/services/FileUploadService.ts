@@ -1,14 +1,17 @@
 import axios, { AxiosProgressEvent } from "axios";
 
+const isHttpsEnabled: boolean = false;
+let baseURL: string = "";
+
 interface FileInfo {
     name: string;
 }
 
-const PROD_URL = `https://${window.location.hostname}:5002`;
-//const DEV_URL = `http://${window.location.hostname}:5004`;
-
-// Choose which URL to use
-const baseURL = PROD_URL;
+if(isHttpsEnabled) {
+  baseURL = `https://${window.location.hostname}:5002`; 
+} else {
+  baseURL = `http://${window.location.hostname}:5004`;
+}
 
 const api = axios.create({
   baseURL,

@@ -89,7 +89,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         <ul className="list-group list-group-flush">
           {fileInfos.map((file, index) => (
             <li className="list-group-item" key={index}>
-              <Typography noWrap sx={{ maxwidth: "200px", display: "inline-block", verticalAlign: "middle"}}>
+              <Typography noWrap sx={{ maxWidth: "150px", display: "inline-block", verticalAlign: "middle"}}>
               {file.name}
               </Typography>
               {/* STATUS ICONS */}

@@ -28,7 +28,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [fileInfos, setFileInfos] = useState<IFile[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);   // Re-render once form is submitted
-  const [reqID] = useState(() => uuidv4());  // Ensures uuid 
+
+  // Setting reqID like this ensures a new reqID when the state changes and re-render occurs
+  const [reqID, setReqID] = useState(() => uuidv4());
 
   // Function to toggle the sidebar
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -108,6 +110,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
             path="/purchase-request"
             element={
               <>
+                {/********************************************************************* */}
+                {/* ADD ITEMS TO FORM - component */}
+                {/********************************************************************* */}
                 <AddItemsForm
                   dataBuffer={dataBuffer}
                   setDataBuffer={setDataBuffer}
@@ -116,6 +121,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                   setFileInfos={setFileInfos}
                 />
 
+                {/********************************************************************* */}
+                {/* SUBMIT FORM TO APPROVAL TABLE - component */}
+                {/********************************************************************* */}
                 {/* isSubmitted and setIsSubmitted is what will determine to re-render the App or not, re-rendering is done
                     to get a new reqID with each request */}
                 <Box className="col-md-12" style={{ marginTop: "20px" }}>

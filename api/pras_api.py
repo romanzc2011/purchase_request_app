@@ -38,7 +38,7 @@ AUTHOR: Roman Campbell
 DATE: 01/03/2025
 NAME: PRAS - (Purchase Request Approval System)
 Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
-the UI.
+for the UI. 
 """
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
@@ -58,16 +58,6 @@ pras = Flask(__name__)
 
 # Configure Loguru
 logger.add("/logs/pras.log", rotation="7 days")
-
-# Apply ProxyFix so Flask will know its behind a proxy
-# pras.wsgi_app = ProxyFix(
-#     pras.wsgi_app,
-#     x_for=1, # Trust X-Forwarded-For (Client IP)
-#     x_proto=1, # Trust X-Forwarded-Proto (https)
-#     x_host=1, # Trust X-Forwarded-Host (Proxy Host)
-#     x_prefix=1, # Trust X-Forwarded-Prefix 
-#     x_port=1 # Trust X-Forwarded-Port
-# )
 
 pras.config["SECRET_KEY"] = JWT_SECRET_KEY
 pras.config["JWT_TOKEN_LOCATION"] = ["headers"]
@@ -91,7 +81,9 @@ notifyManager = NotificationManager(msg_body=None,
 CORS(pras, origins=["http://localhost:5002"], supports_credentials=True)
 
 ##########################################################################
+##########################################################################
 ## API FUNCTIONS
+##########################################################################
 ##########################################################################
 
 ##########################################################################
@@ -284,7 +276,9 @@ def logging_middleware(response):
     return response
 
 ##########################################################################
-## PROGRAM FUNCTIONS
+##########################################################################
+## PROGRAM FUNCTIONS -- non API
+##########################################################################
 ##########################################################################
 
 ##########################################################################
