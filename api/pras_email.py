@@ -8,7 +8,7 @@ Used to send purchase request notifications
 """
 
 request_details = {
-    'req_id': None,
+    'reqID': None,
     'requester': None,
     'date_req': None,
     'date_needed': None,

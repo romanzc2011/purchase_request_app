@@ -15,7 +15,6 @@ import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
 
-const isHttpsEnabled: boolean = false;
 let API_URL: string = "";
 
 /* INTERFACE */
@@ -23,17 +22,23 @@ interface ApprovalTableProps {
   dataBuffer: FormValues[];
   onDelete: (reqID: number) => void;
   resetTable: () => void;
+  isHttpsEnabled: boolean;
+  isOnSite: boolean;
+  setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
 }
 
-const ApprovalsTable: React.FC<ApprovalTableProps> = ({
-  resetTable,
-}) => {
-  const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
+// const ApprovalsTable: React.FC<ApprovalTableProps> = ({
+//   resetTable,
+// }) => {
+function ApprovalsTable({ dataBuffer, onDelete, resetTable, isHttpsEnabled, isOnSite}: ApprovalTableProps) {
+  //const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
 
-  if(isHttpsEnabled) {
-    API_URL = `https://${window.location.hostname}:5002/api/sendToPurchase`; 
+  if(isHttpsEnabled && isOnSite) {
+    API_URL = `https://${window.location.hostname}:5002/api/getApprovalData`; 
+  } else if(!isHttpsEnabled && isOnSite){
+    API_URL = `http://${window.location.hostname}:5004/api/getApprovalData`;
   } else {
-    API_URL = `http://${window.location.hostname}:5004/api/sendToPurchase`;
+    API_URL = "http://localhost:5004/api/getApprovalData";
   }
 
   /************************************************************************************ */
@@ -52,7 +57,7 @@ const ApprovalsTable: React.FC<ApprovalTableProps> = ({
         console.log("Fetched data:", data);
         // Extract approval_data array
         if (data.approval_data && Array.isArray(data.approval_data)) {
-          setDataBuffer(data.approval_data);
+          //setDataBuffer(dataBuffer);
         } else {
           console.error("Unexpect data format:", data);
         }

@@ -374,6 +374,8 @@ def get_approval_status(table, reqID):
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
 def purchase_bg_task(data, api_call):
+    logger.info(api_call)
+    
     try:
         print(f"Background task {api_call} data: {data}")
         if api_call == "sendToPurchaseReq":
@@ -386,17 +388,14 @@ def purchase_bg_task(data, api_call):
             
             # Send to Approvals table as well
             approval_data = process_approvals_data(processed_data)
+            
+            # These are handling new requests, no updating new_request col until either a deny or approve
             if processed_data['new_request'] == 1:
                 approval_data['status'] = "NEW REQUEST"
-                processed_data['new_request'] = 0
                 
-                # Update the purchase_req table
-                updated_data = {'new_request': 0}
-                condition = f"reqID = {processed_data['reqID']}"
-                dbManager.update_data(updated_data, table, condition)
-                
-            table = "approvals"
-            dbManager.insert_data(approval_data, table)
+                # Send to approval table (this is for viewing, may not hold all data but just so admins/users can view active requests)
+                table = "approvals"
+                dbManager.insert_data(approval_data, table)
             
     except Exception as e:
         print(f"Error in background task {api_call}: {e}")
@@ -421,13 +420,13 @@ def get_server_ip(network):
 ## MAIN FUNCTION -- main function for primary control flow
 def main():
     
-    server_ip = get_server_ip("10.234")
+    #server_ip = get_server_ip("10.234")
     # # Write server ip to env file
-    set_key(dotenv_path, 'SERVER_IP', server_ip)
+    #set_key(dotenv_path, 'SERVER_IP', server_ip)
     
     # print(server_ip)
-    serve(pras, host=server_ip, port=5004)
-    #pras.run(host="localhost", port=5004, debug=True)
+    #serve(pras, host=server_ip, port=5004)
+    pras.run(host="localhost", port=5004, debug=True)
         
 ##########################################################################
 ## MAIN CONTROL FLOW

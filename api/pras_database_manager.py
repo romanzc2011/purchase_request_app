@@ -1,3 +1,4 @@
+from loguru import logger
 import json
 import sqlite3
 import os
@@ -29,6 +30,8 @@ class DatabaseManager:
     #####################################################################################
     ## CREATE PURCHASE REQUEST TABLE
     def create_purchase_req_table(self):
+        logger.info("Creating purchase_requests table")
+        
         # Create purchase_requests if not already done so
         print("CREATING TABLE purchase_requests")
         query = """
@@ -60,8 +63,9 @@ class DatabaseManager:
     #####################################################################################
     ## CREATE APPROVALS TABLE
     def create_approvals_table(self):
+        logger.info("Creating approvals table")
+        
         # Create approvals table if not already existing
-        print("CREATING TABLE approvals")
         query = """
         CREATE TABLE IF NOT EXISTS approvals (
             reqID TEXT PRIMARY KEY NOT NULL,
@@ -82,7 +86,7 @@ class DatabaseManager:
     #####################################################################################
     ## INSERT DATA
     def insert_data(self, processed_data, table):
-        # Insert data into specified table
+        logger.info(f"Inserting data into {table}")
         
         # Ensure data is a dictionary
         if not processed_data or not isinstance(processed_data, dict):
@@ -102,6 +106,7 @@ class DatabaseManager:
     #####################################################################################
     ## UPDATE DATA
     def update_data(self, data, table, condition):
+        logger.info(f"Updating table {table}")
         # Update data in table based on where condition
         
         # Ensure data is non-empty dictionary

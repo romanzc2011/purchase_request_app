@@ -8,19 +8,24 @@ import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { CircularProgress } from "@mui/material";
 
-const isHttpsEnabled: boolean = false;
 let API_URL: string = "";
 
 interface LoginDialogProps {
   open: boolean;
   onClose: () => void;
   onLoginSuccess: (ACCESS_GROUP: boolean, CUE_GROUP: boolean, IT_GROUP: boolean) => void;
+  isHttpsEnabled: boolean;
+  isOnSite: boolean;
+  setIsOnSite: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export default function LoginDialog({
   open,
   onClose,
   onLoginSuccess,
+  isHttpsEnabled,
+  isOnSite,
+  setIsOnSite
 }: LoginDialogProps) {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -46,13 +51,14 @@ export default function LoginDialog({
     if (!validateInput()) return;
 
     setLoading(true);
+    setIsOnSite(true);
 
     if(isHttpsEnabled) {
       API_URL = `https://${window.location.hostname}:5002/api/login`; 
-    } else {
-      API_URL = `http://localhost:5004/api/login`;
-    }
-    
+    } else if(!isHttpsEnabled && isOnSite) {
+      API_URL = `http://${window.location.hostname}:5004/api/login`;
+    } 
+    console.log("api: ", API_URL);
     try {
       // PROD
       const response = await fetch(API_URL, {
