@@ -30,7 +30,7 @@ interface ApprovalTableProps {
 // const ApprovalsTable: React.FC<ApprovalTableProps> = ({
 //   resetTable,
 // }) => {
-function ApprovalsTable({ dataBuffer, onDelete, resetTable, isHttpsEnabled, isOnSite}: ApprovalTableProps) {
+function ApprovalsTable({ dataBuffer, onDelete, resetTable, isHttpsEnabled, isOnSite, setDataBuffer}: ApprovalTableProps) {
   //const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
 
   if(isHttpsEnabled && isOnSite) {
@@ -57,7 +57,7 @@ function ApprovalsTable({ dataBuffer, onDelete, resetTable, isHttpsEnabled, isOn
         console.log("Fetched data:", data);
         // Extract approval_data array
         if (data.approval_data && Array.isArray(data.approval_data)) {
-          //setDataBuffer(dataBuffer);
+            setDataBuffer(data.approval_data);
         } else {
           console.error("Unexpect data format:", data);
         }

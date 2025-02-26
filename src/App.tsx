@@ -122,10 +122,12 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP, isHttpsEnabled, is
                                 {/********************************************************************* */}
                                 <AddItemsForm
                                     dataBuffer={dataBuffer}
-                                    setDataBuffer={setDataBuffer}
                                     reqID={reqID}
                                     fileInfos={fileInfos}
+                                    setDataBuffer={setDataBuffer}
                                     setFileInfos={setFileInfos}
+                                    setIsSubmitted={setIsSubmitted}
+                                    setReqID={setReqID}
                                 />
 
                                 {/********************************************************************* */}

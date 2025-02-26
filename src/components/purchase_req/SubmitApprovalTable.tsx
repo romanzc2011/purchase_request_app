@@ -110,12 +110,6 @@ function SubmitApprovalTable({
             .then((data) => {
                 console.log("Response from POST request: ", data);
 
-                console.log("setReqID type:", typeof setReqID)
-
-                // Update submit/req states/values for re-rendering
-                setIsSubmitted(true);
-                setReqID(uuidv4());
-                //setDataBuffer([]);  // Reset form data
             })
             .catch((err) => console.error("Error sending data:", err));
     };
@@ -184,7 +178,7 @@ function SubmitApprovalTable({
                                 {item.quantity}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>
-                                {item.price.toFixed(2)}
+                                {Number(item.price).toFixed(2)}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>
                                 {item.calculatedPrice.toFixed(2)}

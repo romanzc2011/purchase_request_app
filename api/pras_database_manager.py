@@ -61,7 +61,8 @@ class DatabaseManager:
         self._execute_query(query) # Internal use method
         
     #####################################################################################
-    ## CREATE APPROVALS TABLE
+    ## CREATE APPROVALS TABLE - This table will be used for viewing current active requests, not all data
+    #                           is present but just for view
     def create_approvals_table(self):
         logger.info("Creating approvals table")
         
@@ -124,6 +125,7 @@ class DatabaseManager:
     #####################################################################################
     ## FETCH ROWS
     def fetch_rows(self, query):
+        logger.info("Fetching rows for appovals table")
         # Fetch all rows from specified table
         connection = self.get_connection()
         try:

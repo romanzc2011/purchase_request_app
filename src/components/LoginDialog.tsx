@@ -61,12 +61,12 @@ export default function LoginDialog({
     console.log("api: ", API_URL);
     try {
       // PROD
+      
       const response = await fetch(API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        //credentials: "include",
         
         body: JSON.stringify({ username, password }),
       });

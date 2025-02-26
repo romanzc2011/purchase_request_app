@@ -253,6 +253,13 @@ def upload_file():
     return jsonify({"message": "File(s) uploaded successfully", 
                     "files": saved_files,
                     "reqID": reqID}), 200
+    
+##########################################################################
+## DELETE UPLOADED FILE
+@pras.route('/api/deleteFile', methods=['OPTIONS', 'DELETE'])
+def deleteFile():
+    logger.debug(request)
+    print(request)
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -377,9 +384,8 @@ def purchase_bg_task(data, api_call):
     logger.info(api_call)
     
     try:
-        print(f"Background task {api_call} data: {data}")
         if api_call == "sendToPurchaseReq":
-            
+            logger.de
             processed_data = process_purchase_data(data)
             table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
             
@@ -398,7 +404,7 @@ def purchase_bg_task(data, api_call):
                 dbManager.insert_data(approval_data, table)
             
     except Exception as e:
-        print(f"Error in background task {api_call}: {e}")
+        logger.error(f"Error in background task for {api_call}: {e}")
         
 ##########################################################################
 ## GET PRIVATE IP from 10.222.0.0/19 or 10.223.0.0/19 network

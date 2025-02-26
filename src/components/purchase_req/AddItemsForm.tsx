@@ -15,24 +15,30 @@ import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
 import { IFile } from "../../types/IFile";
+import { v4 as uuidv4 } from "uuid";
 
 interface AddItemsProps {
   reqID: string;
   dataBuffer: FormValues[];
-  setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
   fileInfos: IFile[];
-  setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>
+  setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
+  setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
+  setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
+  setReqID: React.Dispatch<React.SetStateAction<string>>;
 }
 
 /*************************************************************************************** */
 /* ADD ITEMS FORM */
 /*************************************************************************************** */
-const AddItemsForm: React.FC<AddItemsProps> = ({
+function AddItemsForm({
   reqID,
-  setDataBuffer,
+  dataBuffer,
   fileInfos,
-  setFileInfos
-}) => {
+  setDataBuffer,
+  setFileInfos,
+  setIsSubmitted,
+  setReqID
+}: AddItemsProps) {
 
   /*************************************************************************************** */
   /* HANDLE ADD ITEM function */
@@ -48,6 +54,11 @@ const AddItemsForm: React.FC<AddItemsProps> = ({
     };
 
     setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
+
+    // Update submit/req states/values for re-rendering
+    setIsSubmitted(true);
+    setReqID(uuidv4());
+
     reset(); // Clear form
     console.log("Item Added: ", updatedItem);
   };
