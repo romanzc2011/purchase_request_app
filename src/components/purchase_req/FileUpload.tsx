@@ -61,14 +61,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
     const API_URL = "http://localhost:5004/api/deleteFile";
 
     // Delete file from backend
-    async function apiDeleteFile(reqID: string, api_url: string): Promise<number> {
+    async function apiDeleteFile(reqID: string, api_url: string, filename: string): Promise<number> {
         const response = await fetch(api_url, {
-            method: "GET",
+            method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${accessToken}`,
             },
-            body: JSON.stringify(reqID),
+            body: JSON.stringify({"reqID": reqID, "filename": filename}),
         });
         
         if(!response.ok) {
@@ -83,12 +83,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
     /***************************************************************/
     /* DELETE FILE -- delete from backend if already submitted */
     /***************************************************************/
-    function deleteFile({ file, index }: { file: any; index: any }) {
+    function deleteFile({ file, index }: { file: any; index: any; }) {
         setFileInfos((prevFiles) => prevFiles.filter((_, i) => i !== index));
 
         // Check if file has been uploaded, if so, delete it
         if (file.status === "success") {
-            apiDeleteFile(reqID, API_URL);
+            let filename: string = file.name;
+            apiDeleteFile(reqID, API_URL, filename);
         }
 
         if (fileInputRef.current) {

@@ -1,6 +1,7 @@
 from constants.db_columns import purchase_cols
 from constants.db_columns import approvals_cols
 from concurrent.futures import ThreadPoolExecutor
+from datetime import (datetime, timedelta, timezone)
 from pras_database_manager import DatabaseManager
 from dotenv import load_dotenv, set_key, find_dotenv
 from flask_cors import CORS
@@ -21,9 +22,8 @@ from notification_manager import NotificationManager
 from waitress import serve
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
-from datetime import (datetime,
-                      timedelta,
-                      timezone)
+from pathlib import Path
+
 import json
 import os
 import psutil
@@ -57,7 +57,7 @@ pras = Flask(__name__)
 #CORS(pras, supports_credentials=True)
 
 # Configure Loguru
-logger.add("/logs/pras.log", rotation="7 days")
+logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
 
 pras.config["SECRET_KEY"] = JWT_SECRET_KEY
 pras.config["JWT_TOKEN_LOCATION"] = ["headers"]
@@ -137,7 +137,7 @@ def login():
         return jsonify({"error": "Invalid username or password"}), 401
     
     except Exception as e:
-        print(f"LDAP authentication error: {e}")
+        logger.warning(f"LDAP authentication error: {e}")
         return jsonify({"error": "LDAP authentication failed"}), 500
     
 ##########################################################################
@@ -159,7 +159,7 @@ def refresh_expiring_jwts(response):
         target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
         
         if target_timestamp > exp_timestamp:
-            print("TOKEN REFRESH")
+            logger.info("TOKEN REFRESH")
             access_token = create_access_token(identity=get_jwt_identity())
             set_access_cookies(response, access_token)
         return response
@@ -203,29 +203,30 @@ def get_approval_data():
     
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params
-@pras.route('/api/deletePurchaseReq', methods=['POST'])
-def delete_purchase_req():
-    data = request.json
+@pras.route('/api/deleteFile', methods=['POST'])
+@pras.route('/api/deletePurchaseReq', methods=['GET', 'POST'])
+def delete_func():
+    if request.path == '/api/deleteFile':
+        data = request.get_json()
+
+        # Extract reqID and filename
+        reqID = data.get("reqID")
+        filename = data.get("filename")
+        upload_filename = f"{reqID}_{filename}"
+        
+        # Delete File with reqID in
+        files = os.listdir(UPLOAD_FOLDER)
+        for file in files:
+            if file == upload_filename:
+                logger.info(f"{UPLOAD_FOLDER}\\{upload_filename}")
+                os.remove(os.path.join(UPLOAD_FOLDER, file))
+    
     if not data:
+        logger.warning("Invalid data")
         return jsonify({"error": "Invalid data"}), 400
     
-    # Validate input
-    reqID = data.get("reqID")
-    if not reqID:
-        return jsonify({"error": "Missing 'reqID' in request data"}), 400
     
-    # Define table and condition
-    table = "purchase_requests"
-    condition = "reqID = ?"
-    params = (reqID,)
-    
-    try:
-        # Delete operation
-        dbManager.delete_data(table, condition, params)
-        return jsonify({"message": f"Purchase request with reqID {reqID} deleted successfully"}), 200
-    
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    return jsonify({"delete": True}), 200
     
 ##########################################################################
 ## HANDLE FILE UPLOAD
@@ -235,7 +236,6 @@ def upload_file():
         return jsonify({"error": "No file part"}), 400
     
     reqID = request.form.get("reqID")
-    print(f"reqID: {reqID}")
      
     if request.method == 'POST':
         uploaded_files = request.files.getlist("file")
@@ -253,17 +253,11 @@ def upload_file():
     return jsonify({"message": "File(s) uploaded successfully", 
                     "files": saved_files,
                     "reqID": reqID}), 200
-    
-##########################################################################
-## DELETE UPLOADED FILE
-@pras.route('/api/deleteFile', methods=['OPTIONS', 'DELETE'])
-def deleteFile():
-    logger.debug(request)
-    print(request)
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
 @pras.after_request
+@logger.catch()
 def logging_middleware(response):
     request_id = str(uuid.uuid4())
     
@@ -385,7 +379,6 @@ def purchase_bg_task(data, api_call):
     
     try:
         if api_call == "sendToPurchaseReq":
-            logger.de
             processed_data = process_purchase_data(data)
             table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
             
