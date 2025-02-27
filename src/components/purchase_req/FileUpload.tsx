@@ -58,7 +58,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
     // Retrieve access to from local storage
     const accessToken = localStorage.getItem("access_token");
-    const API_URL = "http://localhost:5004/api/deleteFile";
+    //const API_URL = "http://localhost:5004/api/deleteFile";
+    const API_URL = `https://${window.location.hostname}:5002`;
 
     // Delete file from backend
     async function apiDeleteFile(reqID: string, api_url: string, filename: string): Promise<number> {
@@ -85,11 +86,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
     /***************************************************************/
     function deleteFile({ file, index }: { file: any; index: any; }) {
         setFileInfos((prevFiles) => prevFiles.filter((_, i) => i !== index));
-
+        const delete_api: string = `${API_URL}/api/deleteFile`;
+        
         // Check if file has been uploaded, if so, delete it
         if (file.status === "success") {
             let filename: string = file.name;
-            apiDeleteFile(reqID, API_URL, filename);
+            apiDeleteFile(reqID, delete_api, filename);
         }
 
         if (fileInputRef.current) {

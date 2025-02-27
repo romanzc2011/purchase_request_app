@@ -65,6 +65,7 @@ class DatabaseManager:
     #                           is present but just for view
     def create_approvals_table(self):
         logger.info("Creating approvals table")
+        print("Creating approvals table")
         
         # Create approvals table if not already existing
         query = """
@@ -136,6 +137,7 @@ class DatabaseManager:
             # Convert to dictionary to display in table
             column_names = [desc[0] for desc in cursor.description]
             result = [dict(zip(column_names, row)) for row in rows]
+            print(result)
             return result
         
         except sqlite3.Error as e:

@@ -1,45 +1,39 @@
 import axios, { AxiosProgressEvent } from "axios";
 
-const isHttpsEnabled: boolean = false;
 let baseURL: string = "";
 
 interface FileInfo {
     name: string;
+    isSubmitted: boolean;
 }
 
-if(isHttpsEnabled) {
-  baseURL = `https://${window.location.hostname}:5002`; 
-} else {
-  baseURL = `http://${window.location.hostname}:5004`;
-}
-
+baseURL = `https://${window.location.hostname}:5002`;
 const api = axios.create({
-  baseURL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+    baseURL,
+    headers: {
+        "Content-Type": "application/json",
+    },
 });
 
 const upload = (
-  file: File,
-  reqID: string,
-  onUploadProgress: (progressEvent: AxiosProgressEvent) => void
+    file: File,
+    reqID: string,
+    onUploadProgress: (progressEvent: AxiosProgressEvent) => void
 ): Promise<any> => {
+    const formData = new FormData();
 
-  const formData = new FormData();
+    formData.append("file", file);
+    formData.append("reqID", reqID);
+    console.log("reqID: ", reqID);
 
-  formData.append("file", file);
-  formData.append("reqID", reqID);
-  console.log("reqID: ", reqID);
-
-  return api.post("/api/upload", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-    onUploadProgress,
-  });
+    return api.post("/api/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress,
+    });
 };
 
 const getFiles = (): Promise<FileInfo[]> => {
-  return api.get("/api/getfiles");
+    return api.get("/api/getfiles");
 };
 
 const FileUploadService = {

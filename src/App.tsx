@@ -19,11 +19,9 @@ interface AppProps {
     ACCESS_GROUP: boolean;
     CUE_GROUP: boolean;
     IT_GROUP: boolean;
-    isHttpsEnabled: boolean;
-    isOnSite: boolean;
 }
 
-function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP, isHttpsEnabled, isOnSite }: AppProps) {
+function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     /* *********************************************************************************** */
     /* SHARED DATA BUFFER */
     const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
@@ -70,8 +68,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP, isHttpsEnabled, is
                         )
                     )
                 }
-                isHttpsEnabled={isHttpsEnabled}
-                isOnSite={isOnSite}
                 resetTable={resetTable}
                 setDataBuffer={setDataBuffer}
             />
@@ -121,7 +117,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP, isHttpsEnabled, is
                                 {/* ADD ITEMS TO FORM - component */}
                                 {/********************************************************************* */}
                                 <AddItemsForm
-                                    dataBuffer={dataBuffer}
                                     reqID={reqID}
                                     fileInfos={fileInfos}
                                     setDataBuffer={setDataBuffer}

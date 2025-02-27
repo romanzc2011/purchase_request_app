@@ -5,9 +5,10 @@ import { FormValues } from "../../types/formTypes";
 interface JustificationProps {
   register: UseFormRegister<FormValues>;
   errors: FieldErrors<FormValues>;
+  isSubmitted: boolean;
 }
 
-const Justification: React.FC<JustificationProps> = ({ register, errors }) => {
+const Justification: React.FC<JustificationProps> = ({ register, errors, isSubmitted }) => {
   return (
     <div className='m-3 row align-items-center'>
       {/** JUSTIFICATION ****************************************************************** */}

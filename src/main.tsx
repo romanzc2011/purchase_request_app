@@ -17,9 +17,6 @@ function Root() {
   /* Using state management to 'dynamically' change which url to use, I'm finding it takes 
       significant configuration doing this manually, isOnSite refers to at LAWB office, had issues
       using localhost but Ethernet 3 IPv4 private addr always works */
-  const [isHttpsEnabled, setIsHttpsEnabled] = useState(false);
-  const [isOnSite, setIsOnSite] = useState(true);
-
   const handleLoginSuccess = (access: boolean, cue: boolean, it: boolean) => {
     setIsLoggedIn(true);
     setACCESS_GROUP(access);
@@ -28,7 +25,6 @@ function Root() {
   };
 
   return (
-
     /********************************************************************/
     /* Determine first if user is logged in then display app */
     /********************************************************************/
@@ -40,17 +36,12 @@ function Root() {
             ACCESS_GROUP={ACCESS_GROUP}
             CUE_GROUP={CUE_GROUP}
             IT_GROUP={IT_GROUP}
-            isHttpsEnabled={isHttpsEnabled}
-            isOnSite={isOnSite}
           />
         ) : (
           <LoginDialog
             open={!isLoggedIn}
             onClose={() => console.log("Login dialog closed")}
             onLoginSuccess={handleLoginSuccess}
-            isHttpsEnabled={isHttpsEnabled}
-            isOnSite={isOnSite}
-            setIsOnSite={setIsOnSite}
           />
         )}
       </Router>

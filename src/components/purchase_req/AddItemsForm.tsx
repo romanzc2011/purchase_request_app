@@ -19,7 +19,6 @@ import { v4 as uuidv4 } from "uuid";
 
 interface AddItemsProps {
   reqID: string;
-  dataBuffer: FormValues[];
   fileInfos: IFile[];
   setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
   setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
@@ -32,7 +31,6 @@ interface AddItemsProps {
 /*************************************************************************************** */
 function AddItemsForm({
   reqID,
-  dataBuffer,
   fileInfos,
   setDataBuffer,
   setFileInfos,

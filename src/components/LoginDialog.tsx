@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -8,24 +9,16 @@ import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { CircularProgress } from "@mui/material";
 
-let API_URL: string = "";
-
 interface LoginDialogProps {
   open: boolean;
   onClose: () => void;
   onLoginSuccess: (ACCESS_GROUP: boolean, CUE_GROUP: boolean, IT_GROUP: boolean) => void;
-  isHttpsEnabled: boolean;
-  isOnSite: boolean;
-  setIsOnSite: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export default function LoginDialog({
   open,
   onClose,
   onLoginSuccess,
-  isHttpsEnabled,
-  isOnSite,
-  setIsOnSite
 }: LoginDialogProps) {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -51,13 +44,8 @@ export default function LoginDialog({
     if (!validateInput()) return;
 
     setLoading(true);
-    setIsOnSite(true);
 
-    if(isHttpsEnabled) {
-      API_URL = `https://${window.location.hostname}:5002/api/login`; 
-    } else if(!isHttpsEnabled && isOnSite) {
-      API_URL = `http://${window.location.hostname}:5004/api/login`;
-    } 
+    const API_URL: string = "https://10.234.198.113:5002/api/login";
     console.log("api: ", API_URL);
     try {
       // PROD

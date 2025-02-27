@@ -16,10 +16,8 @@ import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
 import React, { useState } from "react";
 import { uploadFile } from "../../services/FileUploadHandler";
-import { v4 as uuidv4 } from "uuid";
 
-const isHttpsEnabled: boolean = false;
-let API_URL: string = "";
+let API_URL: string = `https://${window.location.hostname}:5002/api/sendToPurchaseReq`;
 
 /* INTERFACE */
 interface SubmitApprovalTableProps {
@@ -38,12 +36,9 @@ function SubmitApprovalTable({
     dataBuffer,
     onDelete,
     reqID,
-    isSubmitted,
     fileInfos,
     setFileInfos,
     setIsSubmitted,
-    setReqID,
-    setDataBuffer
 }: SubmitApprovalTableProps) {
     const [isUploading, setIsUploading] = useState(false);
 
@@ -78,15 +73,6 @@ function SubmitApprovalTable({
 
             setIsUploading(false); // Uploading done
             return;
-        }
-
-        /* Determine if https is on, this will happen on prod, when using the lovely IIS aka 
-      best dang web server in the world, your port will be 5002 as IIS reverse proxies the url
-      for SSL Offloading to enable HTTPS */
-        if (isHttpsEnabled) {
-            API_URL = `https://${window.location.hostname}:5002/api/sendToPurchaseReq`;
-        } else {
-            API_URL = `http://${window.location.hostname}:5004/api/sendToPurchaseReq`;
         }
 
         // Retrieve access to from local storage

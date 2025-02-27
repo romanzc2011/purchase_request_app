@@ -214,7 +214,7 @@ def delete_func():
         filename = data.get("filename")
         upload_filename = f"{reqID}_{filename}"
         
-        # Delete File with reqID in
+        # Delete File with reqID in 
         files = os.listdir(UPLOAD_FOLDER)
         for file in files:
             if file == upload_filename:
@@ -418,14 +418,8 @@ def get_server_ip(network):
 ##########################################################################
 ## MAIN FUNCTION -- main function for primary control flow
 def main():
-    
-    #server_ip = get_server_ip("10.234")
-    # # Write server ip to env file
-    #set_key(dotenv_path, 'SERVER_IP', server_ip)
-    
-    # print(server_ip)
-    #serve(pras, host=server_ip, port=5004)
-    pras.run(host="localhost", port=5004, debug=True)
+    serve(pras, host="10.234.198.113", port=5004)
+    #pras.run(host="localhost", port=5004, debug=True)
         
 ##########################################################################
 ## MAIN CONTROL FLOW
