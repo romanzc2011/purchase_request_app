@@ -1,0 +1,53 @@
+import UploadService from "./UploadService";
+import { IFile } from "../types/IFile";
+
+interface UploadFileProps {
+    file: IFile;
+    reqID: string;
+    setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
+}
+
+async function UploadFile({ file, reqID, setFileInfos }: UploadFileProps) {
+    if (!file || !file.file) {
+        console.warn(
+            "No file provided or file object is missing for",
+            file?.name
+        );
+        return;
+    }
+
+    // Set status to uploading
+    setFileInfos((prev) =>
+        prev.map((f) =>
+            f.name === file.name ? { ...f, status: "uploading" } : f
+        )
+    );
+
+    try {
+        const response = await UploadService.upload({
+            file: file.file,
+            reqID,
+            dataBuffer: [],
+            api_call: "/api/upload",
+        });
+
+        if (response && response.status === 200) {
+            setFileInfos((prev) =>
+                prev.map((f) =>
+                    f.name === file.name ? { ...f, status: "success" } : f
+                )
+            );
+        } else {
+            throw new Error("Upload failed");
+        }
+    } catch (error) {
+        console.error("File upload failed:", error);
+        setFileInfos((prev) =>
+            prev.map((f) =>
+                f.name === file.name ? { ...f, status: "error" } : f
+            )
+        );
+    }
+}
+
+export default UploadFile;

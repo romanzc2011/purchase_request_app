@@ -3,7 +3,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { Routes, Route } from "react-router-dom";
 import AddItemsForm from "./components/purchase_req/AddItemsForm";
-import SubmitApprovalTable from "./components/purchase_req/SubmitApprovalTable";
+import SubmitApprovalTable from "./components/purchase_req/SumbitToApproval";
 import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
 import AlertMessage from "./components/AlertMessage";
 import { Box, Toolbar } from "@mui/material";
@@ -60,7 +60,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     if (isLoggedIn) {
         element = (
             <ApprovalsTable
-                dataBuffer={dataBuffer}
+                //dataBuffer={dataBuffer}
                 onDelete={(reqID: number) =>
                     setDataBuffer(
                         dataBuffer.filter(
@@ -69,7 +69,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                     )
                 }
                 resetTable={resetTable}
-                setDataBuffer={setDataBuffer}
+                //setDataBuffer={setDataBuffer}
             />
         );
     } else {

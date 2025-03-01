@@ -14,12 +14,16 @@ import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
-import React, { useState } from "react";
-import { uploadFile } from "../../services/FileUploadHandler";
+import React, { useEffect, useState } from "react";
+import UploadFile from "../../services/UploadHandler";
 
-let API_URL: string = `https://${window.location.hostname}:5002/api/sendToPurchaseReq`;
+const baseURL = import.meta.env.VITE_API_URL;
+const API_CALL: string = "/api/sendToPurchaseReq";
+const API_URL = `${baseURL}${API_CALL}`;
 
-/* INTERFACE */
+/************************************************************************************ */
+/* INTERFACE PROPS */
+/************************************************************************************ */
 interface SubmitApprovalTableProps {
     dataBuffer: FormValues[];
     onDelete: (reqID: string) => void;
@@ -37,26 +41,48 @@ function SubmitApprovalTable({
     onDelete,
     reqID,
     fileInfos,
+    isSubmitted,
     setFileInfos,
     setIsSubmitted,
+    setDataBuffer,
 }: SubmitApprovalTableProps) {
     const [isUploading, setIsUploading] = useState(false);
+
+    /* Check if table has been submitted */
+    useEffect(() => {
+        if (isSubmitted) {
+            setDataBuffer([]);
+
+            console.log("In the if isSubmitted: dataBuffer==", dataBuffer);
+            setIsSubmitted(false);
+        }
+    }, [isSubmitted, setDataBuffer, setIsSubmitted]);
 
     // Check if any file is not uploaded, user may have already uploaded
     const filesPendingUpload = fileInfos.some(
         (file) => file.status !== "success"
     );
 
+    /************************************************************************************ */
+    /* CALCULATE PRICE -- helper function to convert price/quantity to number and do
+         calculations */
+    /************************************************************************************ */
+    function calculatePrice(item: FormValues): number {
+        const price = Number(item.price) || 0;
+        const quantity = Number(item.quantity) || 1;
+        return price * quantity;
+    }
+
     // Preprocess data to calculate price
     const processedData = dataBuffer.map((item) => ({
-        ...item,
-        calculatedPrice: (item.price || 0) * (item.quantity || 1), // Calculating based on quantity
+        ...item, // Spread operator, takes all properties from item object and puts them in new object being created with .map() callback
+        calculatedPrice: calculatePrice(item),
     }));
 
     /************************************************************************************ */
     /* SUBMIT DATA --- send to backend to add to database */
     /************************************************************************************ */
-    const handleSubmitData = (dataBuffer: FormValues[]) => {
+    const handleSubmitData = async (processedData: FormValues[]) => {
         // Find all files not uploaded
         const filesToUpload = fileInfos.filter(
             (file) => file.status !== "success"
@@ -68,7 +94,8 @@ function SubmitApprovalTable({
 
             // Upload all pending files
             for (const file of filesToUpload) {
-                uploadFile(file, reqID, setFileInfos);
+                console.log("Uploading file");
+                UploadFile({ file, reqID, setFileInfos });
             }
 
             setIsUploading(false); // Uploading done
@@ -78,26 +105,30 @@ function SubmitApprovalTable({
         // Retrieve access to from local storage
         const accessToken = localStorage.getItem("access_token");
         console.log("TOKEN: ", accessToken);
-        fetch(API_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${accessToken}`,
-            },
 
-            body: JSON.stringify({ dataBuffer }),
-        })
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error(`HTTP error: ${res.status}`);
+        // Loop over provessedData and send element separately
+        for (const item of processedData) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                    body: JSON.stringify(item),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error: ${response.status}`);
                 }
-                return res.json();
-            })
-            .then((data) => {
-                console.log("Response from POST request: ", data);
 
-            })
-            .catch((err) => console.error("Error sending data:", err));
+                const data = await response.json();
+                console.log("Response from POST request:", data);
+            } catch (error) {
+                console.error("Error sending data for item", reqID, error);
+            }
+        }
+        setIsSubmitted(true);
     };
 
     return (
@@ -164,10 +195,14 @@ function SubmitApprovalTable({
                                 {item.quantity}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>
-                                {Number(item.price).toFixed(2)}
+                                {typeof item.price === "number"
+                                    ? item.price.toFixed(2)
+                                    : "0.00"}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>
-                                {item.calculatedPrice.toFixed(2)}
+                                {typeof item.calculatedPrice === "number"
+                                    ? item.calculatedPrice.toFixed(2)
+                                    : "0.00"}
                             </TableCell>
                             <TableCell>
                                 <Button
@@ -227,7 +262,7 @@ function SubmitApprovalTable({
                                     isUploading
                                 }
                                 onClick={() => {
-                                    handleSubmitData(dataBuffer);
+                                    handleSubmitData(processedData);
                                     setIsSubmitted(true);
                                 }}
                             />

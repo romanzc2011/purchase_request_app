@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
-import { uploadFile } from "../../services/FileUploadHandler";
+import UploadFile from "../../services/UploadHandler";
 import { IFile } from "../../types/IFile";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Button from "@mui/material/Button";
@@ -11,19 +11,34 @@ import Button from "@mui/material/Button";
 interface FileUploadProps {
     reqID: string;
     fileInfos: IFile[];
+    isSubmitted: boolean;
     setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({
-    reqID,
-    fileInfos,
-    setFileInfos,
-}) => {
+/************************************************************************************ */
+/* CONFIG API URL */
+/************************************************************************************ */
+const baseURL = import.meta.env.VITE_API_URL;
+const API_CALL: string = "/api/getApprovalData";
+const API_URL = `${baseURL}${API_CALL}`;
+const accessToken = localStorage.getItem("access_token");
+
+function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadProps) {
     const [currentFile, setCurrentFile] = useState<File | undefined>();
 
-    const selectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const { files } = event.target;
-        if (files && files.length > 0) {
+    // Clear file list once form is submitted
+    useEffect(() => {
+        if(isSubmitted) {
+            setFileInfos([]);
+        }
+    }, [isSubmitted, setFileInfos]);
+
+    // For clearing the file select after delete/upload
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    function selectFile(event: React.ChangeEvent<HTMLInputElement>): void {
+        const files = event.target.files;
+        if(files && files.length > 0) {
             const newFile: IFile = {
                 file: files[0],
                 name: files[0].name,
@@ -33,17 +48,17 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
             setCurrentFile(files[0]);
             setFileInfos((prev) => [...prev, newFile]);
-        }
-    };
+        };
+    }
 
     // Uploading file
-    const upload = async () => {
+    async function upload() {
         try {
             await Promise.all(
                 // Upload idle files
                 fileInfos.map(async (fileToUpload) => {
                     if (fileToUpload.status === "idle") {
-                        await uploadFile(fileToUpload, reqID, setFileInfos);
+                        await UploadFile({ file: fileToUpload, reqID, setFileInfos });
                         setCurrentFile(undefined);
                     }
                 })
@@ -56,10 +71,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         }
     };
 
-    // Retrieve access to from local storage
-    const accessToken = localStorage.getItem("access_token");
-    //const API_URL = "http://localhost:5004/api/deleteFile";
-    const API_URL = `https://${window.location.hostname}:5002`;
+    
 
     // Delete file from backend
     async function apiDeleteFile(reqID: string, api_url: string, filename: string): Promise<number> {
@@ -74,12 +86,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
         
         if(!response.ok) {
           throw new Error(`HTTP error: ${response.status}`);
-        }
+        } 
 
         return response.status;
     }
-    // For clearing the file select after delete/upload
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    
 
     /***************************************************************/
     /* DELETE FILE -- delete from backend if already submitted */

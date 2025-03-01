@@ -1,4 +1,3 @@
-import React from "react";
 import Justification from "./Justification";
 import AddComments from "./AddComments";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
@@ -9,7 +8,7 @@ interface LearningDevProps {
   errors: FieldErrors<FormValues>;
 }
 
-const LearningDev: React.FC<LearningDevProps> = ({ register, errors }) => {
+function LearningDev({ register, errors }: LearningDevProps) {
   return (
     <div className="row">
       <div className="col-sm-5">

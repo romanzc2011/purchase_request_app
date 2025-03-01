@@ -25,6 +25,9 @@ export default function LoginDialog({
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
+  const baseURL = import.meta.env.VITE_API_URL;
+  const API_CALL = "/api/login";
+  const API_URL = `${baseURL}${API_CALL}`
   /***********************************************************************/
   /* VALIDATE INPUT */
   /***********************************************************************/
@@ -45,7 +48,7 @@ export default function LoginDialog({
 
     setLoading(true);
 
-    const API_URL: string = "https://10.234.198.113:5002/api/login";
+    
     console.log("api: ", API_URL);
     try {
       // PROD

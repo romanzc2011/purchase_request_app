@@ -1,4 +1,3 @@
-import React from 'react';
 import { UseFormRegister, FieldErrors } from 'react-hook-form';
 import { FormValues } from "../../types/formTypes";
 
@@ -7,7 +6,7 @@ interface AddCommentsProps {
   errors: FieldErrors<FormValues>;
 }
 
-const AddComments: React.FC<AddCommentsProps> = ({ register, errors }) => {
+function AddComments({ register, errors }: AddCommentsProps) {
   return (
     <div className='m-3 row align-items-center'>
       {/** ADDITIONAL COMMENTS ****************************************************************** */}

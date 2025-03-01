@@ -285,12 +285,12 @@ def logging_middleware(response):
 ##########################################################################
 ## PROCESS PURCHASE DATA
 def process_purchase_data(data):
+    print(f"DATA: {data}")
     with lock:
         # Populate purchase_cols with appropriate data from api call
-        for item in data['dataBuffer']:
-            for k, v in item.items():
-                if k in purchase_cols:
-                    purchase_cols[k] = v
+        for k, v in data.items():
+            if k in purchase_cols:
+                purchase_cols[k] = v
                     
         # Extract the learnAndDev element
         if 'learnAndDev' in purchase_cols:
@@ -382,6 +382,7 @@ def purchase_bg_task(data, api_call):
             processed_data = process_purchase_data(data)
             table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
             
+            print(f"PROCESSED DATA: {processed_data}")
             # Insert data into db
             dbManager.insert_data(processed_data, table)
             
@@ -418,8 +419,8 @@ def get_server_ip(network):
 ##########################################################################
 ## MAIN FUNCTION -- main function for primary control flow
 def main():
-    serve(pras, host="10.234.198.113", port=5004)
-    #pras.run(host="localhost", port=5004, debug=True)
+    #serve(pras, host="10.234.198.113", port=5004)
+    pras.run(host="localhost", port=5004, debug=True)
         
 ##########################################################################
 ## MAIN CONTROL FLOW

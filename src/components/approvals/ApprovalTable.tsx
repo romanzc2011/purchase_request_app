@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Buttons from "../purchase_req/Buttons";
 import {
     Table,
@@ -14,21 +14,27 @@ import {
 import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
-let API_URL: string = "https://10.234.198.113:5002/api/getApprovalData";
 
+/************************************************************************************ */
+/* CONFIG API URL */
+/************************************************************************************ */
+const baseURL = import.meta.env.VITE_API_URL;
+const API_CALL: string = "/api/getApprovalData";
+const API_URL = `${baseURL}${API_CALL}`;
 /* INTERFACE */
 interface ApprovalTableProps {
-    dataBuffer: FormValues[];
+    //dataBuffer: FormValues[];
     onDelete: (reqID: number) => void;
     resetTable: () => void;
-    setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
+    //setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
 }
 
 function ApprovalsTable({
-    dataBuffer,
+    //dataBuffer,
     resetTable,
-    setDataBuffer,
+    //setDataBuffer,
 }: ApprovalTableProps) {
+    const [approvalData, setApprovalData] = useState<FormValues[]>([]);
 
     console.log("API: ", API_URL);
     /************************************************************************************ */
@@ -47,7 +53,7 @@ function ApprovalsTable({
                 console.log("Fetched data:", data);
                 // Extract approval_data array
                 if (data.approval_data && Array.isArray(data.approval_data)) {
-                    setDataBuffer(data.approval_data);
+                    setApprovalData(data.approval_data);
                 } else {
                     console.error("Unexpect data format:", data);
                 }
@@ -55,33 +61,9 @@ function ApprovalsTable({
             .catch((err) => console.error("Error fetching data: ", err));
     }, []); // Empty dependency arr ensure this runs once
 
-    const processedData = dataBuffer.map((item) => ({
+    const processedData = approvalData.map((item) => ({
         ...item,
     }));
-
-    /************************************************************************************ */
-    /* GET REQUEST DATA --- send to backend to add to database */
-    /************************************************************************************ */
-    const handleSubmitData = (dataBuffer: FormValues[]) => {
-        fetch(API_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ dataBuffer }),
-        })
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error(`HTTP error: ${res.status}`);
-                }
-                return res.json();
-            })
-            .then((data) => {
-                console.log("Response from POST request: ", data);
-                resetTable();
-            })
-            .catch((err) => console.error("Error sending data:", err));
-    };
 
     /************************************************************************************ */
     /* APPROVE OR DENY */
@@ -280,24 +262,7 @@ function ApprovalsTable({
                     <tfoot>
                         <TableRow>
                             <TableCell colSpan={4}>
-                                {/************************************************************************************ */}
-                                {/* BUTTONS: SUBMIT/PRINT */}
-                                {/************************************************************************************ */}
-                                {/* Submit data to proper destination, email to supervisor or notify sup that there's a request for them to approve */}
-                                <Buttons
-                                    label="Submit Form"
-                                    className=" me-3 btn btn-maroon"
-                                    disabled={dataBuffer.length === 0}
-                                    onClick={() => {
-                                        handleSubmitData(dataBuffer);
-                                    }}
-                                />
-
-                                {/* This button will print out item Request */}
-                                <Buttons
-                                    label="Print Form"
-                                    className="btn btn-maroon"
-                                />
+                           
                             </TableCell>
 
                             <TableCell

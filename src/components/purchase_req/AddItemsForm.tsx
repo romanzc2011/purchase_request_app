@@ -52,9 +52,6 @@ function AddItemsForm({
     };
 
     setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
-
-    // Update submit/req states/values for re-rendering
-    setIsSubmitted(true);
     setReqID(uuidv4());
 
     reset(); // Clear form
@@ -88,11 +85,11 @@ function AddItemsForm({
       price: 0,
       location: "",
     },
-    mode: "onSubmit",
+    mode: "onChange",
   });
 
   const { register, control, handleSubmit, formState, watch, reset } = form;
-  const { errors, isDirty, isValid, isSubmitSuccessful } = formState;
+  const { errors, isValid, isSubmitted } = formState;
 
   /*************************************************************************************** */
   /* Form submission function */
@@ -106,10 +103,10 @@ function AddItemsForm({
 
   /* Reset form after successful submission */
   useEffect(() => {
-    if (isSubmitSuccessful) {
+    if (isSubmitted) {
       reset();
     }
-  }, [isSubmitSuccessful, reset]);
+  }, [isSubmitted, reset]);
 
   return (
     <Box>
@@ -268,6 +265,7 @@ function AddItemsForm({
             reqID={reqID}
             fileInfos={fileInfos}
             setFileInfos={setFileInfos}
+            isSubmitted={isSubmitted}
           />
         </Box>
 
@@ -374,7 +372,7 @@ function AddItemsForm({
               SUBMIT button will handle gathering and sending the data to proper supervisors */}
           <Buttons
             className="me-3 btn btn-maroon"
-            disabled={!isDirty || !isValid}
+            disabled={!isValid}
             label="Add Item"
             onClick={handleSubmit(handleAddItem)}
           />
