@@ -1,32 +1,49 @@
-import { UseFormRegister, FieldErrors } from 'react-hook-form';
+import React from "react";
+import { UseFormRegister, FieldErrors } from "react-hook-form";
 import { FormValues } from "../../types/formTypes";
+import Grid from "@mui/material/Grid2";
+import { TextField, Typography } from "@mui/material";
 
 interface AddCommentsProps {
-  register: UseFormRegister<FormValues>;
-  errors: FieldErrors<FormValues>;
+    register: UseFormRegister<FormValues>;
+    errors: FieldErrors<FormValues>;
 }
 
-function AddComments({ register, errors }: AddCommentsProps) {
-  return (
-    <div className='m-3 row align-items-center'>
-      {/** ADDITIONAL COMMENTS ****************************************************************** */}
-      <div className="m-1 row">
-        <label htmlFor="addComments" className="col-sm-2 col-form-label" style={{ fontSize: "1rem" }}>
-          <strong>Additional Comments/Special Instructions</strong>
-        </label>
-        <div className="col-sm-5">
-          <textarea
-            style={{ fontSize: "0.8rem" }}
-            id="addComments"
-            rows={7}
-            className="form-control"
-            {...register("addComments")}
-          />
-          <p>{errors.addComments?.message}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
+const Justification: React.FC<AddCommentsProps> = ({ register, errors }) => {
+    return (
+        <Grid container spacing={1} mt={4}>
+            <Grid size={{ xs: 3 }}>
+                <Typography
+                    variant="button"
+                    component="label"
+                    htmlFor="addComments"
+                >
+                    <strong style={{ fontSize: "0.9rem" }}>
+                        Addition Comments/Instructions:
+                    </strong>{" "}
+                  
+                </Typography>
+            </Grid>
+            <Grid size={{ xs: 4 }}>
+                <TextField
+                    id="addComments"
+                    multiline
+                    rows={4}
+                    fullWidth
+                    className="form-control"
+                    variant="outlined"
+                    size="small"
+                    {...register("addComments")}
+                    error={!!errors.addComments}
+                    helperText={errors.addComments?.message}
+                    sx={{
+                        ml: 2,
+                        fontSize: "0.8rem",
+                    }}
+                />
+            </Grid>
+        </Grid>
+    );
+};
 
-export default AddComments
+export default Justification;

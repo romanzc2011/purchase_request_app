@@ -87,7 +87,7 @@ function SubmitApprovalTable({
         const filesToUpload = fileInfos.filter(
             (file) => file.status !== "success"
         );
-
+        console.log("Files to upload:", filesToUpload.length);
         if (filesToUpload.length > 0) {
             console.log("Uploading remaining files");
             setIsUploading(true);
@@ -106,7 +106,7 @@ function SubmitApprovalTable({
         const accessToken = localStorage.getItem("access_token");
         console.log("TOKEN: ", accessToken);
 
-        // Loop over provessedData and send element separately
+        // Loop over provessedData and send each request separately
         for (const item of processedData) {
             try {
                 const response = await fetch(API_URL, {
@@ -256,11 +256,7 @@ function SubmitApprovalTable({
                             <Buttons
                                 label="Submit Form"
                                 className=" me-3 btn btn-maroon"
-                                disabled={
-                                    dataBuffer.length === 0 ||
-                                    filesPendingUpload ||
-                                    isUploading
-                                }
+                                disabled={dataBuffer.length === 0}
                                 onClick={() => {
                                     handleSubmitData(processedData);
                                     setIsSubmitted(true);

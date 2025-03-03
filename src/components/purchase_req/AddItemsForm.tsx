@@ -8,7 +8,8 @@ import Buttons from "./Buttons";
 import BudgetCodePicker from "./BudgetCodePicker";
 import { useEffect } from "react";
 import { FormValues } from "../../types/formTypes";
-import { Box } from "@mui/material";
+import { TextField, Typography } from "@mui/material";
+import Grid from "@mui/material/Grid2";
 import LocationPicker from "./LocationPicker";
 import FileUpload from "./FileUpload";
 import FundPicker from "./FundPicker";
@@ -16,384 +17,498 @@ import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
 import { IFile } from "../../types/IFile";
 import { v4 as uuidv4 } from "uuid";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import InfoIcon from "@mui/icons-material/Info";
+import Tooltip from "@mui/material/Tooltip";
+import Justification from "./Justification";
+import AddComments from "./AddComments";
 
+/*************************************************************************************** */
+/* INTERFACE PROPS */
+/*************************************************************************************** */
 interface AddItemsProps {
-  reqID: string;
-  fileInfos: IFile[];
-  setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
-  setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
-  setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
-  setReqID: React.Dispatch<React.SetStateAction<string>>;
+    reqID: string;
+    fileInfos: IFile[];
+    setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
+    setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
+    setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
+    setReqID: React.Dispatch<React.SetStateAction<string>>;
 }
 
 /*************************************************************************************** */
 /* ADD ITEMS FORM */
 /*************************************************************************************** */
 function AddItemsForm({
-  reqID,
-  fileInfos,
-  setDataBuffer,
-  setFileInfos,
-  setIsSubmitted,
-  setReqID
+    reqID,
+    fileInfos,
+    setDataBuffer,
+    setFileInfos,
+    setReqID,
 }: AddItemsProps) {
 
-  /*************************************************************************************** */
-  /* HANDLE ADD ITEM function */
-  /*************************************************************************************** */
-  const handleAddItem = async (newItem: FormValues) => {
-    /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
-    const updatedItem = {
-      ...newItem,
-      reqID: reqID,
-      price: Number(newItem.price) || 0,
-      fund: newItem.fund || "",
-      budgetObjCode: newItem.budgetObjCode || "",
+    /*************************************************************************************** */
+    /* HANDLE ADD ITEM function */
+    /*************************************************************************************** */
+    const handleAddItem = async (newItem: FormValues) => {
+        /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
+        const updatedItem = {
+            ...newItem,
+            reqID: reqID,
+            price: Number(newItem.price) || 0,
+            fund: newItem.fund || "",
+            budgetObjCode: newItem.budgetObjCode || "",
+        };
+
+        setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
+        setReqID(uuidv4());
+
+        reset(); // Clear form
+        console.log("Item Added: ", updatedItem);
     };
 
-    setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
-    setReqID(uuidv4());
+    /*************************************************************************************** */
+    /* HANDLE ADD ITEM ERRORS function */
+    /*************************************************************************************** */
+    const onError = (errors: FieldErrors<FormValues>) => {
+        console.log("Form errors", errors);
+    };
 
-    reset(); // Clear form
-    console.log("Item Added: ", updatedItem);
-  };
-
-  /*************************************************************************************** */
-  /* HANDLE ADD ITEM ERRORS function */
-  /*************************************************************************************** */
-  const onError = (errors: FieldErrors<FormValues>) => {
-    console.log("Form errors", errors);
-  };
-
-  const form = useForm<FormValues>({
-    defaultValues: {
-      reqID: reqID,
-      requester: "",
-      phoneext: "",
-      datereq: null,
-      dateneed: null,
-      orderType: "",
-      itemDescription: "",
-      justification: "",
-      addComments: "",
-      learnAndDev: {
-        trainNotAval: "",
-        needsNotMeet: "",
-      },
-      budgetObjCode: "",
-      fund: "",
-      price: 0,
-      location: "",
-    },
-    mode: "onChange",
-  });
-
-  const { register, control, handleSubmit, formState, watch, reset } = form;
-  const { errors, isValid, isSubmitted } = formState;
-
-  /*************************************************************************************** */
-  /* Form submission function */
-  /*************************************************************************************** */
-  useEffect(() => {
-    const subscription = watch((value) => {
-      console.log(value);
+    const form = useForm<FormValues>({
+        defaultValues: {
+            reqID: reqID,
+            requester: "",
+            phoneext: "",
+            datereq: null,
+            dateneed: null,
+            orderType: "",
+            itemDescription: "",
+            justification: "",
+            addComments: "",
+            learnAndDev: {
+                trainNotAval: "",
+                needsNotMeet: "",
+            },
+            budgetObjCode: "",
+            fund: "",
+            price: 0,
+            location: "",
+        },
+        mode: "onChange",
     });
-    return () => subscription.unsubscribe();
-  }, [watch]);
 
-  /* Reset form after successful submission */
-  useEffect(() => {
-    if (isSubmitted) {
-      reset();
-    }
-  }, [isSubmitted, reset]);
+    const { register, control, handleSubmit, formState, watch, reset } = form;
+    const { errors, isValid, isSubmitted } = formState;
 
-  return (
-    <Box>
-      {/*************************************************************************************** */}
-      {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
-          once user has finished adding items and reviewed everything */}
-      {/*************************************************************************************** */}
-      <form onSubmit={handleSubmit(handleAddItem, onError)}>
-        {/** REQUESTER ****************************************************************** */}
-        <Box className="m-2 row">
-          <label htmlFor="requester" className="col-sm-1 col-form-label mt-4">
-            <strong>Requester</strong>
-          </label>
-          <Box className="col-sm-3">
-            <input
-              id="requester"
-              type="text"
-              className="form-control mt-4"
-              {...register("requester", {
-                required: {
-                  value: true,
-                  message: "Name of requester is required",
-                },
-              })}
-            />
-            <p className="error">{errors.requester?.message}</p>
-          </Box>
-        </Box>
+    /*************************************************************************************** */
+    /* Form submission function */
+    /*************************************************************************************** */
+    useEffect(() => {
+        const subscription = watch((value) => {
+            console.log(value);
+        });
+        return () => subscription.unsubscribe();
+    }, [watch]);
 
-        {/** PHONE EXT ****************************************************************** */}
-        <Box className="m-2 row">
-          <label htmlFor="phoneext" className="col-sm-1 col-form-label">
-            <strong>Phone Extension</strong>
-          </label>
-          <Box className="col-sm-2">
-            <input
-              id="phoneext"
-              type="text"
-              style={{ width: "150px" }}
-              className="form-control"
-              {...register("phoneext", {
-                required: {
-                  value: true,
-                  message: "Phone extension is required",
-                },
-              })}
-            ></input>
-            <p className="error">{errors.phoneext?.message}</p>
-          </Box>
-        </Box>
+    /* Reset form after successful submission */
+    useEffect(() => {
+        if (isSubmitted) {
+            reset();
+        }
+    }, [isSubmitted, reset]);
 
-        {/*************************************************************************************** */}
-        {/** DATE OF REQ ************************************************************************ */}
-        {/*************************************************************************************** */}
-        <Box className="m-2 row align-items-center">
-          <label htmlFor="datereq" className="col-sm-1 col-form-label">
-            <strong>Date of Request</strong>
-          </label>
-          <Box className="col-sm-1">
-            <input
-              id="datereq"
-              type="date"
-              style={{ width: "150px" }}
-              className="form-control"
-              {...register("datereq", {
-                required: {
-                  value: true,
-                  message: "Date requested is required.",
-                },
-              })}
-            ></input>
-            <p className="error">{errors.datereq?.message}</p>
-          </Box>
-        </Box>
+    return (
+        <Grid>
+            {/*************************************************************************************** */}
+            {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
+              once user has finished adding items and reviewed everything */}
+            {/*************************************************************************************** */}
+            <form onSubmit={handleSubmit(handleAddItem, onError)}>
+                {/******************************************************************************************* */}
+                {/** REQUESTER ****************************************************************************** */}
+                {/******************************************************************************************* */}
+                <Grid container spacing={1} alignItems="center" sx={{ mt: 4 }}>
+                    <Grid size={{ xs: 2 }}>
+                        <Typography
+                            variant="button"
+                            component="label"
+                            htmlFor="requester"
+                        >
+                            <strong>Requester</strong>
+                        </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                            id="requester"
+                            className="form-control"
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            {...register("requester", {
+                                required: "Name of requester is required",
+                            })}
+                            error={!!errors.requester}
+                            helperText={errors.requester?.message}
+                        />
+                    </Grid>
+                </Grid>
 
-        {/*************************************************************************************** */}
-        {/** DATE ITEMS NEEDED ****************************************************************** */}
-        {/*************************************************************************************** */}
-        <Box className="m-2 row align-items-center">
-          <label htmlFor="dateneed" className="col-sm-1 col-form-label">
-            <strong>Date Item(s) Needed</strong>
-          </label>
-          <Box className="col-sm-2">
-            <Box style={{ display: "flex", alignItems: "center", gap: "30px" }}>
-              <input
-                id="dateneed"
-                type="date"
-                style={{ width: "150px" }}
-                className="form-control"
-                {...register("dateneed", {
-                  validate: (value, { orderType }) => {
-                    if (!value && !orderType) {
-                      return "'Date Item(s) Needed' OR an option must be selected.";
-                    }
-                    return true;
-                  },
-                })}
-              />
-              <strong>OR</strong>
-              <Box>
-                <label
-                  htmlFor="quarterlyOrder"
-                  style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
-                >
-                  <input
-                    id="quarterlyOrder"
-                    type="radio"
-                    value="quarterlyOrder"
-                    {...register("orderType")}
-                    style={{ marginRight: "3px" }}
-                  />
-                  Inclusion w/quarterly office supply order
-                </label>
-              </Box>
-              <strong>OR</strong>
-              <label
-                htmlFor="noRush"
-                style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
-              >
-                <input
-                  id="noRush"
-                  type="radio"
-                  value="noRush"
-                  {...register("orderType")}
-                  style={{ marginRight: "5px" }}
+                {/******************************************************************************************* */}
+                {/** PHONE EXT ****************************************************************************** */}
+                {/******************************************************************************************* */}
+                <Grid container spacing={1} alignItems="center" sx={{ mt: 4 }}>
+                    <Grid size={{ xs: 2 }}>
+                        <Typography
+                            variant="button"
+                            component="label"
+                            htmlFor="phoneext"
+                        >
+                            <strong>Phone Extension</strong>
+                        </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                            id="phoneext"
+                            className="form-control"
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            {...register("phoneext", {
+                                required: "Phone extention is required",
+                            })}
+                            error={!!errors.requester}
+                            helperText={errors.requester?.message}
+                        />
+                    </Grid>
+                </Grid>
+
+                {/*************************************************************************************** */}
+                {/** DATE OF REQ ************************************************************************ */}
+                {/*************************************************************************************** */}
+                <Grid container spacing={1} sx={{ mt: 4 }}>
+                    <Grid size={{ xs: 2 }}>
+                        <Typography
+                            variant="button"
+                            component="label"
+                            htmlFor="datereq"
+                            sx={{ whiteSpace: "nowrap" }}
+                        >
+                            <strong>Date of Request</strong>
+                        </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}>
+                        <input
+                            id="datereq"
+                            type="date"
+                            style={{ width: "150px" }}
+                            className="form-control"
+                            {...register("datereq", {
+                                required: {
+                                    value: true,
+                                    message: "Date requested is required.",
+                                },
+                            })}
+                        ></input>
+                        <p className="error">{errors.datereq?.message}</p>
+                    </Grid>
+                </Grid>
+
+                {/*************************************************************************************** */}
+                {/** DATE ITEMS NEEDED ****************************************************************** */}
+                {/*************************************************************************************** */}
+                <Grid container spacing={1} className="row" sx={{ mt: 2 }}>
+                    {/* Label: Date Items Needed */}
+                    <Grid size={{ xs: 2 }}>
+                        <Typography
+                            variant="button"
+                            component="label"
+                            htmlFor="dateneed"
+                            sx={{ whiteSpace: "nowrap" }}
+                        >
+                            <strong>Date Item(s) Needed</strong>
+                        </Typography>
+                    </Grid>
+
+                    {/* Date Picker Input */}
+                    <Grid size={{ xs: "auto" }} mr={4}>
+                        <input
+                            id="dateneed"
+                            type="date"
+                            style={{ width: "150px" }}
+                            className="form-control"
+                            {...register("dateneed", {
+                                validate: (value, { orderType }) => {
+                                    if (!value && !orderType) {
+                                        return "'Date Item(s) Needed' OR an option must be selected.";
+                                    }
+                                    return true;
+                                },
+                            })}
+                        />
+                    </Grid>
+
+                    {/* OR Label */}
+                    <Grid size={{ xs: "auto" }}>
+                        <strong>OR</strong>
+                    </Grid>
+
+                    {/* Quarterly Order Option */}
+                    <Grid size={{ xs: "auto" }} mr={4}>
+                        <label
+                            htmlFor="quarterlyOrder"
+                            style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
+                        >
+                            <input
+                                id="quarterlyOrder"
+                                type="radio"
+                                value="quarterlyOrder"
+                                {...register("orderType")}
+                                style={{ marginRight: "5px" }}
+                            />
+                            Inclusion w/quarterly office supply order
+                        </label>
+                    </Grid>
+
+                    {/* OR Label */}
+                    <Grid size={{ xs: "auto" }}>
+                        <strong>OR</strong>
+                    </Grid>
+
+                    {/* No Rush Option */}
+                    <Grid size={{ xs: 3 }}>
+                        <label
+                            htmlFor="noRush"
+                            style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
+                        >
+                            <input
+                                id="noRush"
+                                type="radio"
+                                value="noRush"
+                                {...register("orderType")}
+                                style={{ marginRight: "5px" }}
+                            />
+                            No Rush
+                        </label>
+                    </Grid>
+                </Grid>
+
+                {/* Error message for Date Needed validation */}
+                <Grid size={{ xs: 12 }}>
+                    <p className="error">{errors.dateneed?.message}</p>
+                </Grid>
+                <hr />
+
+                {/******************************************************************************************* */}
+                {/** FILE ATTACHMENTS *********************************************************************** */}
+                {/******************************************************************************************* */}
+                <Grid container sx={{ mt: 4 }}>
+                    {/* Left Side - Label and Description */}
+                    <Grid size={{ xs: 3 }}>
+                        <Typography
+                            variant="button"
+                            component="label"
+                            htmlFor="fileAttachments"
+                        >
+                            <strong>Attachments included?</strong>
+                        </Typography>
+                        <Typography
+                            variant="button"
+                            component="label"
+                            htmlFor="fileAttachments"
+                            sx={{ fontSize: "12px", mt: 0.5 }}
+                        ></Typography>
+                        <Tooltip
+                            title="Training information, pictures, web pages, screen shots, etc."
+                            arrow
+                        >
+                            <InfoIcon
+                                sx={{
+                                    fontSize: "16px",
+                                    ml: 1,
+                                    verticalAlign: "middle",
+                                }}
+                            />
+                        </Tooltip>
+                    </Grid>
+
+                    {/* Right Side - File Upload Component */}
+                    <Grid size={{ xs: "auto" }} sx={{ ml: 2 }}>
+                        <FileUpload
+                            reqID={reqID}
+                            fileInfos={fileInfos}
+                            setFileInfos={setFileInfos}
+                            isSubmitted={isSubmitted}
+                        />
+                    </Grid>
+                </Grid>
+
+                {/******************************************************************************************* */}
+                {/** ITEM DESCRIPTION *********************************************************************** */}
+                {/******************************************************************************************* */}
+                <Grid container spacing={1} mt={4}>
+                    <Grid size={{ xs: 3 }}>
+                        <Typography
+                            variant="button"
+                            component="label"
+                            htmlFor="itemDescription"
+                        >
+                            <strong style={{ fontSize: "0.9rem" }}>
+                                Description of Item/Project:
+                            </strong>{" "}
+                            <Tooltip
+                                title="Include details such as qty, color, size, intended recipient, etc. NOTE: If request is for office supplies needed before the next quarterly order, please state the justification."
+                                arrow
+                            >
+                                <InfoIcon
+                                    sx={{
+                                        fontSize: "16px",
+                                        ml: 1,
+                                        verticalAlign: "middle",
+                                    }}
+                                />
+                            </Tooltip>
+                        </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 4 }}>
+                        <TextField
+                            id="itemDescription"
+                            multiline
+                            rows={4}
+                            fullWidth
+                            className="form-control"
+                            variant="outlined"
+                            size="small"
+                            {...register("itemDescription", {
+                                required: {
+                                    value: true,
+                                    message: "Item description required.",
+                                },
+                            })}
+                            error={!!errors.itemDescription}
+                            helperText={errors.itemDescription?.message}
+                            sx={{
+                                ml: 2,
+                                fontSize: "0.8rem",
+                            }}
+                        />
+                    </Grid>
+                </Grid>
+
+                {/******************************************************************************************* */}
+                {/** JUSTIFICATION/ADD COMMENTS ************************************************************* */}
+                {/******************************************************************************************* */}
+                <Justification register={register} errors={errors} />
+                <AddComments register={register} errors={errors} />
+                
+                {/** FOR LEARNING OR DEV? ****************************************************************** */}
+                <Grid container>
+                    <LearningDev register={register} errors={errors} />
+                </Grid>
+                
+                <hr />
+                <Grid sx={{ my: 2 }}>
+                    <Grid
+                        sx={{
+                            display: "flex",
+                            gap: 2,
+                            alignItems: "center",
+                            flexWrap: "nowrap",
+                        }}
+                    >
+                        {/************************************************************************************ */}
+                        {/* BUDGET OBJECT CODE */}
+                        <BudgetCodePicker
+                            onSelectBudgetCode={(budgetObjCode) =>
+                                console.log(budgetObjCode)
+                            }
+                            control={control}
+                            register={register("budgetObjCode")}
+                            errors={errors}
+                        />
+
+                        {/************************************************************************************ */}
+                        {/* FUND SELECT */}
+                        <FundPicker
+                            onSelectFund={(fund: string) => console.log(fund)}
+                            register={register("fund")}
+                            errors={errors}
+                        />
+
+                        {/************************************************************************************ */}
+                        {/* LOCATION */}
+                        <LocationPicker
+                            onSelectLocation={(location: string) =>
+                                console.log(location)
+                            }
+                            register={register("location")}
+                            errors={errors}
+                        />
+                    </Grid>
+
+                    <Grid
+                        sx={{
+                            display: "flex",
+                            gap: 5,
+                            alignItems: "center",
+                            mt: 5,
+                        }}
+                    >
+                        {/************************************************************************************ */}
+                        {/* PRICE */}
+                        <PriceInput
+                            register={register("price", {
+                                required: "Price is required.",
+                                validate: (value) =>
+                                    value >= 0 ||
+                                    "Price cannot be less than $0.",
+                            })}
+                            errors={errors}
+                        />
+
+                        {/************************************************************************************ */}
+                        {/* QUANTITY */}
+                        <QuantityInput
+                            register={register("quantity", {
+                                required: "Quantity is required.",
+                                validate: (value) =>
+                                    value > 0 ||
+                                    "Quantity must be greater than 0.",
+                            })}
+                            errors={errors}
+                        />
+                    </Grid>
+                </Grid>
+
+                {/************************************************************************************ */}
+                {/* BUTTONS: ADD ITEM, Clear */}
+                {/************************************************************************************ */}
+                <Grid sx={{ display: "flex", justifyContent: "flex-start" }}>
+                    {/* Capture all data pertaining to the request temporarily to allow for addition of additional items
+                      SUBMIT button will handle gathering and sending the data to proper supervisors */}
+                    <Buttons
+                        className="me-3 btn btn-maroon"
+                        disabled={!isValid}
+                        label="Add Item"
+                        onClick={handleSubmit(handleAddItem)}
+                    />
+                    <Buttons
+                        label="Reset Form"
+                        className="btn btn-maroon"
+                        onClick={() => reset()}
+                    />
+                </Grid>
+                <hr
+                    style={{
+                        backgroundColor: "white",
+                        height: "2px",
+                        border: "none",
+                        margin: "20px 0",
+                    }}
                 />
-                No Rush
-              </label>
-            </Box>
-            <p className="error">{errors.dateneed?.message}</p>
-
-            {/************************************************************************************ */}
-          </Box>
-        </Box>
-
-        {/** ATTACHMENTS INCLUDED? ****************************************************************** */}
-        <Box
-          className="m-1 align-items-center row"
-          sx={{ display: "flex", alignItems: "center", gap: 38 }}
-        >
-          <label
-            htmlFor="fileAttachments"
-            style={{
-              fontSize: "0.9rem",
-              maxWidth: "250px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <strong style={{ fontSize: "0.9rem" }}>
-              Attachments included?
-            </strong>
-            (training information, pictures, web pages, screen shots, etc.)
-          </label>
-
-          <FileUpload
-            reqID={reqID}
-            fileInfos={fileInfos}
-            setFileInfos={setFileInfos}
-            isSubmitted={isSubmitted}
-          />
-        </Box>
-
-        {/** ITEM DESCRIPTION ****************************************************************** */}
-        <Box className="m-3 align-items-center row">
-          <label
-            style={{ fontSize: "0.8rem" }}
-            htmlFor="itemDescription"
-            className="col-sm-4 col-form-label"
-          >
-            <strong style={{ fontSize: "0.9rem" }}>
-              Description of Item/Project:
-            </strong>{" "}
-            (Include details such as qty, color, size, intended recipient, etc.)
-            <br /> NOTE: If request is for office supplies needed before the
-            next quarterly order, please state the justification.
-          </label>
-          <Box className="col-sm-4">
-            <textarea
-              style={{ fontSize: "0.8rem" }}
-              id="itemDescription"
-              rows={6}
-              className="form-control"
-              {...register("itemDescription", {
-                required: {
-                  value: true,
-                  message: "Item description required.",
-                },
-              })}
-            />
-            <p className="error">{errors.itemDescription?.message}</p>
-          </Box>
-        </Box>
-
-        {/** FOR LEARNING OR DEV? ****************************************************************** */}
-        <Box>
-          <LearningDev register={register} errors={errors} />
-        </Box>
-
-        <Box sx={{ my: 2 }}>
-          <Box
-            sx={{
-              display: "flex",
-              gap: 2,
-              alignItems: "center",
-              flexWrap: "nowrap",
-            }}
-          >
-            {/************************************************************************************ */}
-            {/* BUDGET OBJECT CODE */}
-            <BudgetCodePicker
-              onSelectBudgetCode={(budgetObjCode) => console.log(budgetObjCode)}
-              register={register("budgetObjCode")}
-              errors={errors}
-            />
-
-            {/************************************************************************************ */}
-            {/* FUND SELECT */}
-            <FundPicker
-              onSelectFund={(fund: string) => console.log(fund)}
-              register={register("fund")}
-              errors={errors}
-            />
-
-            {/************************************************************************************ */}
-            {/* LOCATION */}
-            <LocationPicker
-              onSelectLocation={(location: string) => console.log(location)}
-              register={register("location")}
-              errors={errors}
-            />
-          </Box>
-
-          <Box sx={{ display: "flex", gap: 5, alignItems: "center", mt: 5 }}>
-            {/************************************************************************************ */}
-            {/* PRICE */}
-            <PriceInput
-              register={register("price", {
-                required: "Price is required.",
-                validate: (value) =>
-                  value >= 0 || "Price cannot be less than $0.",
-              })}
-              errors={errors}
-            />
-
-            {/************************************************************************************ */}
-            {/* QUANTITY */}
-            <QuantityInput
-              register={register("quantity", {
-                required: "Quantity is required.",
-                validate: (value) =>
-                  value > 0 || "Quantity must be greater than 0.",
-              })}
-              errors={errors}
-            />
-          </Box>
-        </Box>
-
-        {/************************************************************************************ */}
-        {/* BUTTONS: ADD ITEM, Clear */}
-        {/************************************************************************************ */}
-        <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
-          {/* Capture all data pertaining to the request temporarily to allow for addition of additional items
-              SUBMIT button will handle gathering and sending the data to proper supervisors */}
-          <Buttons
-            className="me-3 btn btn-maroon"
-            disabled={!isValid}
-            label="Add Item"
-            onClick={handleSubmit(handleAddItem)}
-          />
-          <Buttons
-            label="Reset Form"
-            className="btn btn-maroon"
-            onClick={() => reset()}
-          />
-        </Box>
-        <hr
-          style={{
-            backgroundColor: "white",
-            height: "2px",
-            border: "none",
-            margin: "20px 0",
-          }}
-        />
-      </form>
-      <DevTool control={control} />
-    </Box>
-  );
-};
+            </form>
+            <DevTool control={control} />
+        </Grid>
+    );
+}
 
 export default AddItemsForm;

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import Grid from "@mui/material/Grid2";
 import CancelIcon from "@mui/icons-material/Cancel";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import UploadFile from "../../services/UploadHandler";
@@ -25,7 +26,7 @@ const accessToken = localStorage.getItem("access_token");
 
 function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadProps) {
     const [currentFile, setCurrentFile] = useState<File | undefined>();
-
+    console.log("isSubmitted:", isSubmitted);
     // Clear file list once form is submitted
     useEffect(() => {
         if(isSubmitted) {
@@ -111,7 +112,7 @@ function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadP
     }
 
     return (
-        <Box className="col-sm-4">
+        <Grid>
             <Box className="row">
                 <Box className="col-8">
                     <label className="btn btn-default p-0">
@@ -202,7 +203,7 @@ function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadP
                     ))}
                 </ul>
             </Box>
-        </Box>
+        </Grid>
     );
 };
 

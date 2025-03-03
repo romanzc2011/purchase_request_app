@@ -14,6 +14,7 @@ import {
 import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
+import Grid from "@mui/material/Grid2";
 
 /************************************************************************************ */
 /* CONFIG API URL */
@@ -73,19 +74,18 @@ function ApprovalsTable({
     const handleDeny = () => {};
 
     return (
-        <Box sx={{ marginTop: "40px" }}>
+        <Box sx={{ overflowX: "auto", width: "100%" }}>
             <TableContainer
                 component={Paper}
                 sx={{
                     background: " #2c2c2c",
                     color: "white", // Ensure text contrast
                     borderRadius: "10px",
-                    overflow: "hidden", // Ensure rounded corners
                     width: "100%",
                     marginTop: "20px",
                 }}
             >
-                <Table sx={{ width: "100%", tableLayout: "auto" }}>
+                <Table sx={{ minWidth: 800, tableLayout: "auto" }}>
                     <TableHead
                         sx={{
                             background:
@@ -300,7 +300,7 @@ function ApprovalsTable({
                     </tfoot>
                 </Table>
             </TableContainer>
-        </Box>
+            </Box>
     );
 }
 

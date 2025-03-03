@@ -19,7 +19,7 @@ export type FormValues = {
   addComments: string;
   learnAndDev: {
     trainNotAval: string;
-    needsNotMeet: string;
+    needsNotMeet: string
   };
   quantity: number;
   price: number;
