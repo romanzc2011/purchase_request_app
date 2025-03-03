@@ -1,4 +1,3 @@
-import React from "react";
 import { UseFormRegister, FieldErrors, Controller } from "react-hook-form";
 import { FormValues } from "../../types/formTypes";
 import {
@@ -19,17 +18,14 @@ interface BudgetPickerProps {
 
 const BudgetCodePicker = ({
     onSelectBudgetCode,
-    register,
-    errors,
     control,
 }: BudgetPickerProps) => {
     return (
         <Box
             sx={{
-                display: "flex",
                 alignItems: "center",
                 gap: 2,
-                width: "400px", // reduced width
+                width: "300px", // reduced width
             }}
         >
             <Controller
@@ -42,20 +38,31 @@ const BudgetCodePicker = ({
                         variant="outlined"
                         size="small"
                         error={!!fieldState.error}
-                        sx={{ backgroundColor: "white" }}
+                        sx={{
+                            backgroundColor: "white",
+                            fontWeight: "bold",
+                            color: "blue",
+                            "&.Mui-focused": {
+                                color: "blue",
+                            },
+                            "&.MuiInputLabel-shrink": {
+                                color: "blue",
+                                fontWeight: "bold",
+                            },
+                        }}
                     >
                         <InputLabel
                             id="budgetObjCode-label"
-                            sx={{ 
-                              fontWeight: "bold", 
-                              color: "maroon",
-                              "&.Mui-focused": {
-                                color: "maroon",
-                              },
-                              "&.MuiInputLabel-shrink" : {
-                                color: "maroon",
+                            sx={{
                                 fontWeight: "bold",
-                              }
+                                color: "blue",
+                                "&.Mui-focused": {
+                                    color: "blue",
+                                },
+                                "&.MuiInputLabel-shrink": {
+                                    color: "blue",
+                                    fontWeight: "bold",
+                                },
                             }}
                         >
                             Budget Object Code (BOC)

@@ -46,7 +46,6 @@ function AddItemsForm({
     setFileInfos,
     setReqID,
 }: AddItemsProps) {
-
     /*************************************************************************************** */
     /* HANDLE ADD ITEM function */
     /*************************************************************************************** */
@@ -399,90 +398,89 @@ function AddItemsForm({
                 {/******************************************************************************************* */}
                 <Justification register={register} errors={errors} />
                 <AddComments register={register} errors={errors} />
-                
+
                 {/** FOR LEARNING OR DEV? ****************************************************************** */}
                 <Grid container>
                     <LearningDev register={register} errors={errors} />
                 </Grid>
-                
+
                 <hr />
-                <Grid sx={{ my: 2 }}>
+                <Grid container spacing={2}>
+                    {/* Column for the Select Pickers */}
                     <Grid
-                        sx={{
-                            display: "flex",
-                            gap: 2,
-                            alignItems: "center",
-                            flexWrap: "nowrap",
-                        }}
+                        size={{ xs: 12, sm: 6 }}
+                        container
+                        direction="column"
+                        spacing={2}
                     >
-                        {/************************************************************************************ */}
-                        {/* BUDGET OBJECT CODE */}
-                        <BudgetCodePicker
-                            onSelectBudgetCode={(budgetObjCode) =>
-                                console.log(budgetObjCode)
-                            }
-                            control={control}
-                            register={register("budgetObjCode")}
-                            errors={errors}
-                        />
-
-                        {/************************************************************************************ */}
-                        {/* FUND SELECT */}
-                        <FundPicker
-                            onSelectFund={(fund: string) => console.log(fund)}
-                            register={register("fund")}
-                            errors={errors}
-                        />
-
-                        {/************************************************************************************ */}
-                        {/* LOCATION */}
-                        <LocationPicker
-                            onSelectLocation={(location: string) =>
-                                console.log(location)
-                            }
-                            register={register("location")}
-                            errors={errors}
-                        />
+                        <Grid>
+                            <BudgetCodePicker
+                                onSelectBudgetCode={(budgetObjCode) =>
+                                    console.log(budgetObjCode)
+                                }
+                                control={control}
+                                register={register("budgetObjCode")}
+                                errors={errors}
+                            />
+                        </Grid>
+                        <Grid>
+                            <FundPicker
+                                onSelectFund={(fund: string) =>
+                                    console.log(fund)
+                                }
+                                control={control}
+                                register={register("fund")}
+                                errors={errors}
+                            />
+                        </Grid>
+                        <Grid>
+                            <LocationPicker
+                                onSelectLocation={(location: string) =>
+                                    console.log(location)
+                                }
+                                control={control}
+                                register={register("location")}
+                                errors={errors}
+                            />
+                        </Grid>
                     </Grid>
 
+                    {/* Column for Price and Quantity */}
                     <Grid
-                        sx={{
-                            display: "flex",
-                            gap: 5,
-                            alignItems: "center",
-                            mt: 5,
-                        }}
+                        size={{ xs: 12, sm: 6 }}
+                        container
+                        direction="column"
+                        spacing={2}
                     >
-                        {/************************************************************************************ */}
-                        {/* PRICE */}
-                        <PriceInput
-                            register={register("price", {
-                                required: "Price is required.",
-                                validate: (value) =>
-                                    value >= 0 ||
-                                    "Price cannot be less than $0.",
-                            })}
-                            errors={errors}
-                        />
-
-                        {/************************************************************************************ */}
-                        {/* QUANTITY */}
-                        <QuantityInput
-                            register={register("quantity", {
-                                required: "Quantity is required.",
-                                validate: (value) =>
-                                    value > 0 ||
-                                    "Quantity must be greater than 0.",
-                            })}
-                            errors={errors}
-                        />
+                        <Grid>
+                            <PriceInput
+                                register={register("price", {
+                                    required: "Price is required.",
+                                    validate: (value) =>
+                                        value >= 0 ||
+                                        "Price cannot be less than $0.",
+                                })}
+                                errors={errors}
+                            />
+                        </Grid>
+                        <Grid>
+                            <QuantityInput
+                                register={register("quantity", {
+                                    required: "Quantity is required.",
+                                    validate: (value) =>
+                                        value > 0 ||
+                                        "Quantity must be greater than 0.",
+                                })}
+                                errors={errors}
+                            />
+                        </Grid>
                     </Grid>
                 </Grid>
 
                 {/************************************************************************************ */}
                 {/* BUTTONS: ADD ITEM, Clear */}
                 {/************************************************************************************ */}
-                <Grid sx={{ display: "flex", justifyContent: "flex-start" }}>
+                <Grid sx={{ display: "flex", justifyContent: "flex-start", mt: 4 }}>
                     {/* Capture all data pertaining to the request temporarily to allow for addition of additional items
                       SUBMIT button will handle gathering and sending the data to proper supervisors */}
                     <Buttons

@@ -1,40 +1,71 @@
-import { UseFormRegister, FieldErrors } from "react-hook-form";
+import { UseFormRegister, FieldErrors, Controller } from "react-hook-form";
 import { FormValues } from "../../types/formTypes";
-import { Box } from "@mui/material";
+import {
+    Box,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    FormHelperText,
+} from "@mui/material";
 
 interface FundPickerProps {
-  onSelectFund: (fund: string) => void;
-  register: ReturnType<UseFormRegister<FormValues>>;
-  errors: FieldErrors<FormValues>;
+    onSelectFund: (fund: string) => void;
+    register: ReturnType<UseFormRegister<FormValues>>;
+    errors: FieldErrors<FormValues>;
+    control: any;
 }
 
-const FundPicker = ({ onSelectFund, register, errors }: FundPickerProps) => {
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-      <label
-        htmlFor="fund"
-        style={{
-          display: "block",
-          width: "100px",
-          whiteSpace: "nowrap",
-          textAlign: "right",
-          marginRight: "5px",
-        }}
-      >
-        <strong>Fund:</strong>
-      </label>
-      <select
-        className="form-select"
-        {...register}
-        onChange={(e) => onSelectFund(e.target.value)}
-      >
-        <option value={"092000"}>092000</option>
-        <option value={"51140E"}>51140E</option>
-        <option value={"51140X"}>51140X</option>
-      </select>
-      {errors.fund && <p className="error">{errors.fund.message}</p>}
-    </Box>
-  );
+const FundPicker = ({
+    onSelectFund,
+    control,
+}: FundPickerProps) => {
+    return (
+        <Box sx={{
+          alignItems: "center",
+          gap: 2,
+          width: "300px", // reduced width
+      }}>
+            <Controller
+                name="fund"
+                control={control}
+                render={({ field, fieldState }) => (
+                    <FormControl
+                        variant="outlined"
+                        fullWidth
+                        size="small"
+                        error={!!fieldState.error}
+                        sx={{ backgroundColor: "white" }}
+                    >
+                        <InputLabel
+                            id="fund-label"
+                            sx={{ fontWeight: "bold", color: "blue" }}
+                        >
+                            Fund
+                        </InputLabel>
+                        <Select
+                            labelId="fund-label"
+                            label="Fund"
+                            {...field}
+                            onChange={(e) => {
+                                field.onChange(e);
+                                onSelectFund(e.target.value as string);
+                            }}
+                        >
+                            <MenuItem value={"51140X"}>51140X</MenuItem>
+                            <MenuItem value={"51140E"}>51140E</MenuItem>
+                            <MenuItem value={"092000"}>092000</MenuItem>
+                        </Select>
+                        {fieldState.error && (
+                            <FormHelperText>
+                                {fieldState.error.message}
+                            </FormHelperText>
+                        )}
+                    </FormControl>
+                )}
+            />
+        </Box>
+    );
 };
 
 export default FundPicker;

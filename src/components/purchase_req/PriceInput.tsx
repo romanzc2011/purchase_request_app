@@ -1,31 +1,42 @@
 import { UseFormRegister, FieldErrors } from "react-hook-form";
 import { FormValues } from "../../types/formTypes";
-import { Box } from "@mui/material";
+import { Box, TextField, Typography } from "@mui/material";
+import Grid from "@mui/material/Grid2";
 
 interface PriceInputProps {
-  register: ReturnType<UseFormRegister<FormValues>>;
-  errors: FieldErrors<FormValues>;
+    register: ReturnType<UseFormRegister<FormValues>>;
+    errors: FieldErrors<FormValues>;
 }
 
 const PriceInput = ({ register, errors }: PriceInputProps) => {
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "358px" }}>
-      <label
-        htmlFor="price"
-        style={{ display: "block", width: "100px", whiteSpace: "nowrap" }}
-      >
-        <strong>Price:</strong>
-      </label>
-      <input
-        id="price"
-        type="number"
-        className="form-control"
-        placeholder="Enter Price"
-        {...register}
-      />
-      {errors.price && <p className="error">{errors.price.message}</p>}
-    </Box>
-  );
+    return (
+        <Grid container spacing={1} alignItems="center">
+            <Grid size={{ xs: 2 }}>
+                <Typography
+                    variant="button"
+                    component="label"
+                    htmlFor="price"
+                    sx={{ mr: 8, fontWeight: "bold" }}
+                >
+                    Price:
+                </Typography>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+                <TextField
+                    id="price"
+                    className="form-control"
+                    size="small"
+                    type="number"
+                    variant="outlined"
+                    placeholder="Enter Price"
+                    error={!!errors.price}
+                    helperText={errors.price?.message}
+                    sx={{ backgroundColor: "white" }}
+                    {...register}
+                />
+            </Grid>
+        </Grid>
+    );
 };
 
 export default PriceInput;
