@@ -1,4 +1,4 @@
-import os
+from loguru import logger
 import pythoncom
 import win32com.client as win32
 
@@ -25,29 +25,36 @@ class NotificationManager:
         self.msg_body = msg_body
         
         # Send email using outlook
-        print("SENDING EMAIL...")
-        pythoncom.CoInitialize()
-        outlook = win32.Dispatch("Outlook.Application")
-        mail = outlook.CreateItem(0)
-        
-        if not self.to_recipient:
-            raise ValueError("Receipient email is not set")
-        
-        if not self.subject:
-            raise ValueError("Email subject is not set")
-        
-        if not self.msg_body:
-            raise ValueError("Message body is not set")
-        
-        mail.Subject = self.subject
-        mail.HTMLBody = self.msg_body
-        mail.To = self.to_recipient
-        
-        # Include the CC if present
-        if self.cc_persons:
-            mail.CC = "; ".join(self.cc_persons)
-        mail.Send()
-        print("Email sent successfully...")
+        try:
+            pythoncom.CoInitialize()
+            outlook = win32.Dispatch("Outlook.Application")
+            mail = outlook.CreateItem(0)
+            
+            if not self.to_recipient:
+                logger.warn("Recipient email is not set")
+                raise ValueError("Receipient email is not set")
+            
+            if not self.subject:
+                logger.warn("Email subject is not set")
+                raise ValueError("Email subject is not set")
+            
+            if not self.msg_body:
+                logger.warn("Message body is not set")
+                raise ValueError("Message body is not set")
+            
+            mail.Subject = self.subject
+            mail.HTMLBody = self.msg_body
+            mail.To = self.to_recipient
+            
+            # Include the CC if present
+            if self.cc_persons:
+                mail.CC = "; ".join(self.cc_persons)
+            mail.Send()
+            logger.info("Email sent successfully.")
+        except Exception as e:
+            logger.error(f"Error sending email: {e}")
+        finally:
+            pythoncom.CoUninitialize()
         
     ##################################################################
     ## LOAD TEMPLATE

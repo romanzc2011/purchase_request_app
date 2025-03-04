@@ -24,6 +24,7 @@ class DatabaseManager:
         # Establish and return connection to database
         connection = sqlite3.connect(self.db_path)
         connection.execute("PRAGMA foreign_key = ON;")
+        connection.execute("PRAGMA journal_mode=WAL;")
         connection.row_factory = sqlite3.Row
         return connection
     
@@ -32,8 +33,6 @@ class DatabaseManager:
     def create_purchase_req_table(self):
         logger.info("Creating purchase_requests table")
         
-        # Create purchase_requests if not already done so
-        print("CREATING TABLE purchase_requests")
         query = """
         CREATE TABLE IF NOT EXISTS purchase_requests (
             reqID TEXT PRIMARY KEY NOT NULL,
@@ -65,7 +64,6 @@ class DatabaseManager:
     #                           is present but just for view
     def create_approvals_table(self):
         logger.info("Creating approvals table")
-        print("Creating approvals table")
         
         # Create approvals table if not already existing
         query = """
@@ -79,6 +77,7 @@ class DatabaseManager:
             priceEach REAL,
             location TEXT,
             status TEXT,
+            new_request TEXT,
             FOREIGN KEY (reqID) REFERENCES purchase_requests(reqID)
                 ON UPDATE CASCADE
         )
@@ -88,7 +87,7 @@ class DatabaseManager:
     #####################################################################################
     ## INSERT DATA
     def insert_data(self, processed_data, table):
-        logger.info(f"Inserting data into {table}")
+        logger.info(f"Inserting data into {table}, data: {processed_data}")
         
         # Ensure data is a dictionary
         if not processed_data or not isinstance(processed_data, dict):
@@ -102,6 +101,9 @@ class DatabaseManager:
         columns = ", ".join(processed_data.keys())
         placeholders = ", ".join(["?"] * len(processed_data))
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+        
+        
+        logger.info(query)
         
         self._execute_query(query, list(processed_data.values()))
         
@@ -184,10 +186,10 @@ class DatabaseManager:
         
         try:
             self._execute_query(query, params)
-            print("Delete operation successful")
+            logger.warn("Delete operation successful")
         
         except sqlite3.Error as e:
-            print(f"Error during delete operation: {e}")
+            logger.error(f"Error during delete operation: {e}")
                         
             
     #####################################################################################
@@ -204,7 +206,7 @@ class DatabaseManager:
                     cursor.execute(query)
         
         except sqlite3.Error as e:
-            print(f"Database error: {e}")
+            logger.warning(f"Database error in _execute_query: {e} | Query: {query} | Params: {params}")
         
         finally:
             connection.close()

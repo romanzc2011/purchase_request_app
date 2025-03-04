@@ -17,8 +17,6 @@ import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
 import { IFile } from "../../types/IFile";
 import { v4 as uuidv4 } from "uuid";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
 import InfoIcon from "@mui/icons-material/Info";
 import Tooltip from "@mui/material/Tooltip";
 import Justification from "./Justification";
@@ -92,6 +90,7 @@ function AddItemsForm({
             fund: "",
             price: 0,
             location: "",
+            quantity: 0
         },
         mode: "onChange",
     });

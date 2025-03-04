@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from flask import jsonify
 from ldap3 import Server, Connection, Tls, ALL, SUBTREE
 from ldap3.core.exceptions import LDAPExceptionError, LDAPBindError
+from loguru import logger
 from requests_ntlm import HttpNtlmAuth
 from dataclasses import dataclass, field
 import ssl
@@ -53,19 +54,19 @@ class LDAPManager:
         try:
             conn = Connection(server,user=username, password=password, authentication="NTLM", auto_bind=True)
             if conn.bound:
-                print("\n#####################################")
+                print("\n#####################################################################")
                 print(f"\n✅ --- Successfully authenticated to {self.server_name}")
                 print(f"\n# ---- Authenticated as: {username}")
-                print("\n#####################################")
+                print("\n#####################################################################")
                 
             return conn
         
         except LDAPExceptionError as e:
-            print("❌ LDAP Server Returned an Error:", str(e))
+            logger.error("❌ LDAP Server Returned an Error:", str(e))
             # Raised when the server returns an explicit error (e.g., invalid credentials, insufficient permissions)
 
         except Exception as e:
-            print("❌ Unexpected Error:", str(e))
+            logger.error("❌ Unexpected Error:", str(e))
 
     #####################################################################################
     ## TLS CONFIG
@@ -78,7 +79,6 @@ class LDAPManager:
     def check_user_membership(self, conn, username):
         
         try:
-            
             # Iterate thru the DNS Groups and determine what user is member of
             for group in group_dns:
                 
@@ -138,4 +138,4 @@ class LDAPManager:
             return user_groups
 
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"ERROR: {e}")

@@ -28,5 +28,6 @@ approvals_cols = {
     'quantity': None,
     'priceEach': None,
     'totalPrice': None,
+    'new_request': None,
     'status': None
 }

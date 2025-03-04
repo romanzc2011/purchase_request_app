@@ -1,6 +1,7 @@
+from adu_ldap_manager import LDAPManager
 from constants.db_columns import purchase_cols
 from constants.db_columns import approvals_cols
-from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from datetime import (datetime, timedelta, timezone)
 from pras_database_manager import DatabaseManager
 from dotenv import load_dotenv, set_key, find_dotenv
@@ -15,20 +16,17 @@ from flask_jwt_extended import (create_access_token,
                                 set_access_cookies,
                                 unset_jwt_cookies)
 from flask_session import Session
-from adu_ldap_manager import LDAPManager
 from ldap3.core.exceptions import LDAPBindError
 from loguru import logger
+from multiprocessing.dummy import Pool as ThreadPool
 from notification_manager import NotificationManager
 from waitress import serve
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
-from pathlib import Path
 
 import json
 import os
 import psutil
-import pdb
-import queue
 import threading
 import time
 import uuid
@@ -40,16 +38,16 @@ NAME: PRAS - (Purchase Request Approval System)
 Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
 for the UI. 
 """
+
+
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 UPLOAD_FOLDER = "C:\\Users\\RomanCampbell\\repo\\react-projects\\purchase_request\\uploads\\"
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 lock = threading.Lock()
-link = "https://localhost:5173/approvals-table"
 processed_data_shared = None
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
-executor = ThreadPoolExecutor(max_workers=5)
 
 #########################################################################
 ## APP CONFIGS
@@ -92,12 +90,10 @@ CORS(pras, origins=["http://localhost:5002"], supports_credentials=True)
 def login():
     try:
         raw_data = request.data
-        print("Raw request data:", raw_data)
-        
         json_data = json.loads(raw_data.decode('utf-8-sig'))
         print(f"Parsed JSON: {json_data}")
     except Exception as e:
-        print(f"Error parsing JSON: {e}")
+        logger.error(f"Error parsing JSON: {e}")
         return jsonify({"error": "Invalid JSON"})
     
     username = request.json.get("username", None)
@@ -174,16 +170,25 @@ def refresh_expiring_jwts(response):
 def set_purchase_request():
     # Retrieve authenticated user from JWT
     current_user = get_jwt_identity()
-    print(f"Authenticated user: {current_user}")
+    logger.info(f"Authenticated user: {current_user}")
     
     data = request.json
     if not data:
+        logger.error("Invalid data")
         return jsonify({'error': 'Invalid data'}), 400
     
-    # Submit the task to thread executor
-    executor.submit(purchase_bg_task, data, "sendToPurchaseReq")
-    executor.submit(purchase_bg_task, data, "insertApprovalData")
+    # Process purchase data
+    pool = ThreadPool()
+    processed_data = pool.map(process_purchase_data, [data])
     
+    logger.info("PROCESSED_DATA", processed_data)
+    
+    copied_data = deepcopy(processed_data[0])
+    
+    pool.map(purchase_req_commit, [copied_data])
+    pool.close()
+    pool.join()
+        
     return jsonify({"message": "Processing started in background"})
     
 ##########################################################################
@@ -198,7 +203,7 @@ def get_approval_data():
         return jsonify({"approval_data": approval_data})
     
     except Exception as e:
-        print(f"Error fetching approval data: {e}")
+        logger.error(f"Error fetching approval data: {e}")
         return jsonify({"error": "Failed to  fetch data"}), 500
     
 ##########################################################################
@@ -285,81 +290,81 @@ def logging_middleware(response):
 ##########################################################################
 ## PROCESS PURCHASE DATA
 def process_purchase_data(data):
-    print(f"DATA: {data}")
     with lock:
-        # Populate purchase_cols with appropriate data from api call
-        for k, v in data.items():
-            if k in purchase_cols:
-                purchase_cols[k] = v
-                    
-        # Extract the learnAndDev element
-        if 'learnAndDev' in purchase_cols:
-            purchase_cols['trainNotAval'] = purchase_cols['learnAndDev']['trainNotAval']
-            purchase_cols['needsNotMeet'] = purchase_cols['learnAndDev']['needsNotMeet']
-            del purchase_cols['learnAndDev']
-          
-        # Calc and separate price of each and total
-        if 'price' in purchase_cols and 'quantity' in purchase_cols:
-            try:
-                purchase_cols['priceEach'] = float(purchase_cols['price'])
-                purchase_cols['quantity'] = int(purchase_cols['quantity'])
+        local_purchase_cols = purchase_cols.copy()
+        logger.info(f"Processing data: {data}")
                 
-                # Validate ranges
-                if purchase_cols['priceEach'] < 0 or purchase_cols['quantity'] <= 0:
-                    raise ValueError("Price must be non-negative, and quantity must be greater than zero.")
-                
-                # Calculate totalPrice
-                purchase_cols['totalPrice'] = round(purchase_cols['priceEach'] * purchase_cols['quantity'], 2)
-                
-            except ValueError as e:
-                print("Invalid price or quantity:")
-                purchase_cols['totalPrice'] = 0
+        try:
+            # Populate local_purchase_cols with appropriate data from api call
+            for k, v in data.items():
+                if k in local_purchase_cols:
+                    local_purchase_cols[k] = v
+                        
+            # Extract the learnAndDev element
+            if 'learnAndDev' in local_purchase_cols:
+                local_purchase_cols['trainNotAval'] = local_purchase_cols['learnAndDev'].get('trainNotAval', False)
+                local_purchase_cols['needsNotMeet'] = local_purchase_cols['learnAndDev'].get('needsNotMeet', False)
+                del local_purchase_cols['learnAndDev']
             
-            del purchase_cols['price']
+            # Calc and separate price of each and total
+            if 'price' in local_purchase_cols and 'quantity' in local_purchase_cols:
+                try:
+                    local_purchase_cols['priceEach'] = float(local_purchase_cols['price'])
+                    local_purchase_cols['quantity'] = int(local_purchase_cols['quantity'])
+                    
+                    # Validate ranges
+                    if local_purchase_cols['priceEach'] < 0 or local_purchase_cols['quantity'] <= 0:
+                        raise ValueError("Price must be non-negative, and quantity must be greater than zero.")
+                    
+                    # Calculate totalPrice
+                    local_purchase_cols['totalPrice'] = round(local_purchase_cols['priceEach'] * local_purchase_cols['quantity'], 2)
+                    
+                except ValueError as e:
+                    logger.error("Invalid price or quantity:")
+                    local_purchase_cols['totalPrice'] = 0
+                del local_purchase_cols['price']
         
-        # Show this is a new request 0=FALSE 1=TRUE
-        print("PROCESSING DATA")
-        purchase_cols['new_request'] = 1
-        purchase_cols['approved'] = 0
+            # Show this is a new request 0=FALSE 1=TRUE
+            local_purchase_cols['new_request'] = 1
+            local_purchase_cols['approved'] = 0
+            
+        except Exception as e:
+            logger.error(f"Error in process_purchase_data: {e}")
         
-    return purchase_cols
+    return local_purchase_cols
 
 ##########################################################################
 ## PROCESS APPROVAL DATA --- send new request to approvals
-def process_approvals_data(data):
+def process_approvals_data(processed_data):
+    logger.info(f'LINE 340 - process_approvals_data: {processed_data}')
     
-    if not isinstance(data, dict):
+    if not isinstance(processed_data, dict):
         raise ValueError("Data must be a dictionary")
     
-    approved = None
-    
     # Is this a new request or has it been approved already
-    if purchase_cols['new_request'] == 1:
-        approvals_cols['status'] == "NEW REQUEST"
+    if processed_data['new_request'] == 1:
+        approvals_cols['status'] = "NEW REQUEST"
         
     # Not new? Was it approved or denied?
     elif purchase_cols['new_request'] == 0:
-        approved = get_approval_status("approvals", data['reqID'])
+        approved = get_approval_status("approvals", processed_data['reqID'])
         if approved == 1:
             approvals_cols['status'] = "APPROVED"
         if approved == 0:
             approvals_cols['status'] = "DENIED"
     
     # Populate approval data 
-    with lock:
-        for k, v in purchase_cols.items():
-            if k in approvals_cols:
-                approvals_cols[k] = v
-    
+    for k, v in processed_data.items():
+        if k in approvals_cols:
+            approvals_cols[k] = v
+            
     ##########################################################################
     ## SENDING NOTIFICATION OF NEW REQUEST
     # Create email body and send to approver
-    print("SENDING EMAIL...")
-    purchase_cols['link'] = link
+    logger.info("SENDING EMAIL to approver...")
     email_template = notifyManager.load_email_template("./notification_template.html")
-    email_body = email_template.format(**purchase_cols)
+    email_body = email_template.format(**processed_data)
     notifyManager.send_email(email_body)
-    del purchase_cols['link']
                     
     return approvals_cols
 
@@ -374,31 +379,26 @@ def get_approval_status(table, reqID):
 
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
-def purchase_bg_task(data, api_call):
-    logger.info(api_call)
-    
-    try:
-        if api_call == "sendToPurchaseReq":
-            processed_data = process_purchase_data(data)
-            table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
-            
-            print(f"PROCESSED DATA: {processed_data}")
+def purchase_req_commit(processed_data):
+    with lock:
+        
+        try:
             # Insert data into db
+            table = "purchase_requests" # Data first needs to be entered into purchase_req before sent to approvals
             dbManager.insert_data(processed_data, table)
             
             # Send to Approvals table as well
             approval_data = process_approvals_data(processed_data)
             
             # These are handling new requests, no updating new_request col until either a deny or approve
+            logger.info(f"new_request: {processed_data['new_request']}")
             if processed_data['new_request'] == 1:
                 approval_data['status'] = "NEW REQUEST"
-                
-                # Send to approval table (this is for viewing, may not hold all data but just so admins/users can view active requests)
                 table = "approvals"
                 dbManager.insert_data(approval_data, table)
-            
-    except Exception as e:
-        logger.error(f"Error in background task for {api_call}: {e}")
+                
+        except Exception as e:
+            logger.error(f"Exception occurred: {e}")
         
 ##########################################################################
 ## GET PRIVATE IP from 10.222.0.0/19 or 10.223.0.0/19 network
@@ -419,7 +419,7 @@ def get_server_ip(network):
 ##########################################################################
 ## MAIN FUNCTION -- main function for primary control flow
 def main():
-    #serve(pras, host="10.234.198.113", port=5004)
+    #serve(pras, host="localhost", port=5004)
     pras.run(host="localhost", port=5004, debug=True)
         
 ##########################################################################
