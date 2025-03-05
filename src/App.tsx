@@ -26,8 +26,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     /* SHARED DATA BUFFER */
     const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [fileInfos, setFileInfos] = useState<IFile[]>([]);
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
+    const [finalSubmit, setFinalSubmit] = useState(false); // Clear out fileInfo once submitted
+    const [fileInfo, setFileInfo] = useState<IFile[]>([]);
 
     // Setting reqID like this ensures a new reqID when the state changes and re-render occurs
     const [reqID, setReqID] = useState(() => uuidv4());
@@ -118,11 +119,11 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                                 {/********************************************************************* */}
                                 <AddItemsForm
                                     reqID={reqID}
-                                    fileInfos={fileInfos}
+                                    fileInfo={fileInfo}
                                     setDataBuffer={setDataBuffer}
-                                    setFileInfos={setFileInfos}
                                     setIsSubmitted={setIsSubmitted}
                                     setReqID={setReqID}
+                                    setFileInfo={setFileInfo}
                                 />
 
                                 {/********************************************************************* */}
@@ -138,12 +139,12 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                                         reqID={reqID}
                                         dataBuffer={dataBuffer}
                                         onDelete={onDelete}
-                                        fileInfos={fileInfos}
-                                        setFileInfos={setFileInfos} // Pass setFileInfos function
+                                        fileInfo={fileInfo}
                                         isSubmitted={isSubmitted}
                                         setIsSubmitted={setIsSubmitted}
                                         setReqID={setReqID}
                                         setDataBuffer={setDataBuffer}
+                                        setFileInfo={setFileInfo}
                                     />
                                 </Box>
                             </>

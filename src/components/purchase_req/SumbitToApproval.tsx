@@ -8,9 +8,7 @@ import {
     TableRow,
     Paper,
     Button,
-    Box,
 } from "@mui/material";
-import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
@@ -27,24 +25,24 @@ const API_URL = `${baseURL}${API_CALL}`;
 interface SubmitApprovalTableProps {
     dataBuffer: FormValues[];
     onDelete: (reqID: string) => void;
-    fileInfos: IFile[];
     reqID: string;
+    fileInfo: IFile[];
     isSubmitted: boolean;
-    setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
     setReqID: React.Dispatch<React.SetStateAction<string>>;
     setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
+    setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
 function SubmitApprovalTable({
     dataBuffer,
     onDelete,
     reqID,
-    fileInfos,
+    fileInfo,
     isSubmitted,
-    setFileInfos,
     setIsSubmitted,
     setDataBuffer,
+    setFileInfo
 }: SubmitApprovalTableProps) {
     const [isUploading, setIsUploading] = useState(false);
 
@@ -57,11 +55,6 @@ function SubmitApprovalTable({
             setIsSubmitted(false);
         }
     }, [isSubmitted, setDataBuffer, setIsSubmitted]);
-
-    // Check if any file is not uploaded, user may have already uploaded
-    const filesPendingUpload = fileInfos.some(
-        (file) => file.status !== "success"
-    );
 
     /************************************************************************************ */
     /* CALCULATE PRICE -- helper function to convert price/quantity to number and do
@@ -83,23 +76,16 @@ function SubmitApprovalTable({
     /* SUBMIT DATA --- send to backend to add to database */
     /************************************************************************************ */
     const handleSubmitData = async (processedData: FormValues[]) => {
+
+        /* UploadFile is function in UploadHandler that is making the call to the service to
+            handle the upload */
         // Find all files not uploaded
-        const filesToUpload = fileInfos.filter(
-            (file) => file.status !== "success"
-        );
-        console.log("Files to upload:", filesToUpload.length);
-        if (filesToUpload.length > 0) {
-            console.log("Uploading remaining files");
-            setIsUploading(true);
+        const filesToUpload = fileInfo.filter(file => file.status !== "success");
 
-            // Upload all pending files
-            for (const file of filesToUpload) {
-                console.log("Uploading file");
-                UploadFile({ file, reqID, setFileInfos });
+        if(filesToUpload.length > 0) {
+            for(const file of filesToUpload) {
+                await UploadFile({ file, reqID, setFileInfo });
             }
-
-            setIsUploading(false); // Uploading done
-            return;
         }
 
         // Retrieve access to from local storage
@@ -223,32 +209,6 @@ function SubmitApprovalTable({
                 <tfoot>
                     <TableRow>
                         <TableCell colSpan={4}>
-                            {/* Show a warning if files are pending upload */}
-                            {filesPendingUpload && (
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        mb: 2,
-                                    }}
-                                >
-                                    <ReportProblemIcon
-                                        sx={{ color: "gold", fontSize: 16 }}
-                                    />
-                                    <Box
-                                        component="span"
-                                        sx={{
-                                            color: "red",
-                                            fontWeight: "bold",
-                                            marginLeft: 1,
-                                        }}
-                                    >
-                                        Some files are not uploaded yet. Upload
-                                        them before submitting.
-                                    </Box>
-                                </Box>
-                            )}
-
                             {/************************************************************************************ */}
                             {/* BUTTONS: SUBMIT/PRINT */}
                             {/************************************************************************************ */}
@@ -260,6 +220,7 @@ function SubmitApprovalTable({
                                 onClick={() => {
                                     handleSubmitData(processedData);
                                     setIsSubmitted(true);
+                                    setFileInfo([]);
                                 }}
                             />
 

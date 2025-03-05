@@ -27,11 +27,11 @@ import AddComments from "./AddComments";
 /*************************************************************************************** */
 interface AddItemsProps {
     reqID: string;
-    fileInfos: IFile[];
+    fileInfo: IFile[];
     setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
-    setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
     setReqID: React.Dispatch<React.SetStateAction<string>>;
+    setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
 /*************************************************************************************** */
@@ -39,26 +39,27 @@ interface AddItemsProps {
 /*************************************************************************************** */
 function AddItemsForm({
     reqID,
-    fileInfos,
     setDataBuffer,
-    setFileInfos,
     setReqID,
+    fileInfo,
+    setFileInfo,
 }: AddItemsProps) {
     /*************************************************************************************** */
     /* HANDLE ADD ITEM function */
     /*************************************************************************************** */
     const handleAddItem = async (newItem: FormValues) => {
         /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
+        const newReqID = uuidv4();
         const updatedItem = {
             ...newItem,
-            reqID: reqID,
+            reqID: newReqID,
             price: Number(newItem.price) || 0,
             fund: newItem.fund || "",
             budgetObjCode: newItem.budgetObjCode || "",
         };
 
         setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
-        setReqID(uuidv4());
+        setReqID(newReqID);
 
         reset(); // Clear form
         console.log("Item Added: ", updatedItem);
@@ -90,7 +91,7 @@ function AddItemsForm({
             fund: "",
             price: 0,
             location: "",
-            quantity: 0
+            quantity: 0,
         },
         mode: "onChange",
     });
@@ -107,13 +108,6 @@ function AddItemsForm({
         });
         return () => subscription.unsubscribe();
     }, [watch]);
-
-    /* Reset form after successful submission */
-    useEffect(() => {
-        if (isSubmitted) {
-            reset();
-        }
-    }, [isSubmitted, reset]);
 
     return (
         <Grid>
@@ -315,6 +309,7 @@ function AddItemsForm({
                             htmlFor="fileAttachments"
                             sx={{ fontSize: "12px", mt: 0.5 }}
                         ></Typography>
+
                         <Tooltip
                             title="Training information, pictures, web pages, screen shots, etc."
                             arrow
@@ -333,9 +328,9 @@ function AddItemsForm({
                     <Grid size={{ xs: "auto" }} sx={{ ml: 2 }}>
                         <FileUpload
                             reqID={reqID}
-                            fileInfos={fileInfos}
-                            setFileInfos={setFileInfos}
                             isSubmitted={isSubmitted}
+                            fileInfo={fileInfo}
+                            setFileInfo={setFileInfo}
                         />
                     </Grid>
                 </Grid>
@@ -479,7 +474,13 @@ function AddItemsForm({
                 {/************************************************************************************ */}
                 {/* BUTTONS: ADD ITEM, Clear */}
                 {/************************************************************************************ */}
-                <Grid sx={{ display: "flex", justifyContent: "flex-start", mt: 4 }}>
+                <Grid
+                    sx={{
+                        display: "flex",
+                        justifyContent: "flex-start",
+                        mt: 4,
+                    }}
+                >
                     {/* Capture all data pertaining to the request temporarily to allow for addition of additional items
                       SUBMIT button will handle gathering and sending the data to proper supervisors */}
                     <Buttons

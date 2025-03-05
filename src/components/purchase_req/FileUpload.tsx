@@ -1,45 +1,32 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import Grid from "@mui/material/Grid2";
 import CancelIcon from "@mui/icons-material/Cancel";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
-import UploadFile from "../../services/UploadHandler";
 import { IFile } from "../../types/IFile";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Button from "@mui/material/Button";
 
 interface FileUploadProps {
     reqID: string;
-    fileInfos: IFile[];
     isSubmitted: boolean;
-    setFileInfos: React.Dispatch<React.SetStateAction<IFile[]>>;
+    fileInfo: IFile[];
+    setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
 /************************************************************************************ */
-/* CONFIG API URL */
+/* FILE UPLOAD */
 /************************************************************************************ */
-const baseURL = import.meta.env.VITE_API_URL;
-const API_CALL: string = "/api/getApprovalData";
-const API_URL = `${baseURL}${API_CALL}`;
-const accessToken = localStorage.getItem("access_token");
-
-function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadProps) {
-    const [currentFile, setCurrentFile] = useState<File | undefined>();
-    console.log("isSubmitted:", isSubmitted);
-    // Clear file list once form is submitted
-    useEffect(() => {
-        if(isSubmitted) {
-            setFileInfos([]);
-        }
-    }, [isSubmitted, setFileInfos]);
-
-    // For clearing the file select after delete/upload
+function FileUpload({ reqID, fileInfo, setFileInfo }: FileUploadProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    /************************************************************************************ */
+    /* SELECT FILE */
+    /************************************************************************************ */
     function selectFile(event: React.ChangeEvent<HTMLInputElement>): void {
         const files = event.target.files;
-        if(files && files.length > 0) {
+        if (files && files.length > 0) {
             const newFile: IFile = {
                 file: files[0],
                 name: files[0].name,
@@ -47,63 +34,43 @@ function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadP
                 progress: 0,
             };
 
-            setCurrentFile(files[0]);
-            setFileInfos((prev) => [...prev, newFile]);
-        };
+            setFileInfo((prev) => [...prev, newFile]);
+        }
     }
 
-    // Uploading file
-    async function upload() {
-        try {
-            await Promise.all(
-                // Upload idle files
-                fileInfos.map(async (fileToUpload) => {
-                    if (fileToUpload.status === "idle") {
-                        await UploadFile({ file: fileToUpload, reqID, setFileInfos });
-                        setCurrentFile(undefined);
-                    }
-                })
-            );
-        } catch (error) {
-            // Update file to status error if caught error
-            setFileInfos((prevFiles) =>
-                prevFiles.map((file) => ({ ...file, status: "error" }))
-            );
-        }
-    };
-
-    
-
     // Delete file from backend
-    async function apiDeleteFile(reqID: string, api_url: string, filename: string): Promise<number> {
-        const response = await fetch(api_url, {
+    async function apiDeleteFile(
+        reqID: string,
+        filename: string
+    ): Promise<number> {
+        const API_URL = `${import.meta.env.VITE_API_URL}/api/deleteFile`;
+        const accessToken = localStorage.getItem("access_token");
+        const response = await fetch(API_URL, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${accessToken}`,
+                Authorization: `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({"reqID": reqID, "filename": filename}),
+            body: JSON.stringify({ reqID: reqID, filename: filename }),
         });
-        
-        if(!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`);
-        } 
 
+        if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+        }
         return response.status;
     }
-    
 
     /***************************************************************/
-    /* DELETE FILE -- delete from backend if already submitted */
+    /* DELETE FILE -- (only deletes files in frontend list) */
     /***************************************************************/
-    function deleteFile({ file, index }: { file: any; index: any; }) {
-        setFileInfos((prevFiles) => prevFiles.filter((_, i) => i !== index));
-        const delete_api: string = `${API_URL}/api/deleteFile`;
-        
-        // Check if file has been uploaded, if so, delete it
+    function deleteFile({ file, index }: { file: IFile; index: number }) {
+        setFileInfo((prevFiles) => prevFiles.filter((_, i) => i !== index));
+
+        // Check if file has been uploaded, if so, delete it, this is if user changes their mind
         if (file.status === "success") {
-            let filename: string = file.name;
-            apiDeleteFile(reqID, delete_api, filename);
+            apiDeleteFile(reqID, file.name).catch((error) =>
+                console.error("Error deleting file: ", error)
+            );
         }
 
         if (fileInputRef.current) {
@@ -123,16 +90,6 @@ function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadP
                         />
                     </label>
                 </Box>
-                <Box className="col-4">
-                    <button
-                        type="button"
-                        className="btn btn-maroon"
-                        disabled={!currentFile}
-                        onClick={upload}
-                    >
-                        Upload
-                    </button>
-                </Box>
             </Box>
 
             <Box
@@ -148,7 +105,7 @@ function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadP
                     List of Files
                 </Box>
                 <ul className="list-group list-group-flush">
-                    {fileInfos.map((file, index) => (
+                    {fileInfo.map((file, index) => (
                         <li className="list-group-item" key={index}>
                             <Typography
                                 noWrap
@@ -205,6 +162,6 @@ function FileUpload({ reqID, fileInfos, isSubmitted, setFileInfos }: FileUploadP
             </Box>
         </Grid>
     );
-};
+}
 
 export default FileUpload;
