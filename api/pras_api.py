@@ -6,7 +6,7 @@ from datetime import (datetime, timedelta, timezone)
 from pras_database_manager import DatabaseManager
 from dotenv import load_dotenv, set_key, find_dotenv
 from flask_cors import CORS
-from flask import Flask, request, jsonify, session, Response, g, make_response
+from flask import Flask, request, jsonify, Response, g, make_response
 from flask_jwt_extended import (create_access_token,
                                 create_refresh_token, 
                                 get_jwt,
@@ -15,7 +15,6 @@ from flask_jwt_extended import (create_access_token,
                                 JWTManager, 
                                 set_access_cookies,
                                 unset_jwt_cookies)
-from flask_session import Session
 from ldap3.core.exceptions import LDAPBindError
 from loguru import logger
 from multiprocessing.dummy import Pool as ThreadPool
@@ -52,7 +51,7 @@ db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
 #########################################################################
 ## APP CONFIGS
 pras = Flask(__name__)
-#CORS(pras, supports_credentials=True)
+CORS(pras, origins='*', supports_credentials=True)
 
 # Configure Loguru
 logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
@@ -60,7 +59,7 @@ logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
 pras.config["SECRET_KEY"] = JWT_SECRET_KEY
 pras.config["JWT_TOKEN_LOCATION"] = ["headers"]
 pras.config["JWT_ACCESS_COOKIE_PATH"] = "/"
-pras.config["JWT_COOKIE_SECURE"] = True  # Cookies will only be sent via HTTPS
+#pras.config["JWT_COOKIE_SECURE"] = True  # Cookies will only be sent via HTTPS
 pras.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 
 jwt = JWTManager(pras)
@@ -76,8 +75,6 @@ notifyManager = NotificationManager(msg_body=None,
                                     from_sender=from_recipient, 
                                     subject=this_subject)
 
-CORS(pras, origins=["http://localhost:5002"], supports_credentials=True)
-
 ##########################################################################
 ##########################################################################
 ## API FUNCTIONS
@@ -89,6 +86,7 @@ CORS(pras, origins=["http://localhost:5002"], supports_credentials=True)
 @pras.route('/api/login', methods=['POST'])
 def login():
     try:
+        print("HELLO LOGIN API\n")
         raw_data = request.data
         json_data = json.loads(raw_data.decode('utf-8-sig'))
         print(f"Parsed JSON: {json_data}")
@@ -107,6 +105,7 @@ def login():
     
     # Connect to LDAPS server and attempt to bind which involves authentication    
     try:
+        print("HELLO LOGIN")
         ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
         connection = ldap_mgr.get_connection(adu_username, password)
         
@@ -194,6 +193,7 @@ def set_purchase_request():
 ##########################################################################
 ## GET APPROVAL DATA
 @pras.route('/api/getApprovalData', methods=['GET', 'OPTIONS'])
+@jwt_required()
 def get_approval_data():
     if request.method == "OPTIONS":
         return jsonify({"status": "OK"})
@@ -210,6 +210,7 @@ def get_approval_data():
 ## DELETE PURCHASE REQUEST table, condition, params
 @pras.route('/api/deleteFile', methods=['POST'])
 @pras.route('/api/deletePurchaseReq', methods=['GET', 'POST'])
+@jwt_required()
 def delete_func():
     if request.path == '/api/deleteFile':
         data = request.get_json()
@@ -236,6 +237,7 @@ def delete_func():
 ##########################################################################
 ## HANDLE FILE UPLOAD
 @pras.route('/api/upload', methods=['GET', 'POST'])
+@jwt_required()
 def upload_file():
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
@@ -419,7 +421,7 @@ def get_server_ip(network):
 ##########################################################################
 ## MAIN FUNCTION -- main function for primary control flow
 def main():
-    #serve(pras, host="localhost", port=5004)
+    #serve(pras, host="10.234.198.113", port=5004)
     pras.run(host="localhost", port=5004, debug=True)
         
 ##########################################################################

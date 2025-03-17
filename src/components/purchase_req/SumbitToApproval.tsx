@@ -12,7 +12,7 @@ import {
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import UploadFile from "../../services/UploadHandler";
 
 const baseURL = import.meta.env.VITE_API_URL;
@@ -44,7 +44,6 @@ function SubmitApprovalTable({
     setDataBuffer,
     setFileInfo
 }: SubmitApprovalTableProps) {
-    const [isUploading, setIsUploading] = useState(false);
 
     /* Check if table has been submitted */
     useEffect(() => {

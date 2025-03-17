@@ -25,7 +25,7 @@ export default function LoginDialog({
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
-  const baseURL = import.meta.env.VITE_API_URL;
+  const baseURL = "http://localhost:5004"
   const API_CALL = "/api/login";
   const API_URL = `${baseURL}${API_CALL}`
   /***********************************************************************/
@@ -48,7 +48,6 @@ export default function LoginDialog({
 
     setLoading(true);
 
-    
     console.log("api: ", API_URL);
     try {
       // PROD

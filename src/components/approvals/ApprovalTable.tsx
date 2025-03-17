@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import Buttons from "../purchase_req/Buttons";
+import { useEffect, useState } from "react";
 import {
     Table,
     TableBody,
@@ -14,7 +13,6 @@ import {
 import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
-import Grid from "@mui/material/Grid2";
 
 /************************************************************************************ */
 /* CONFIG API URL */
@@ -24,16 +22,11 @@ const API_CALL: string = "/api/getApprovalData";
 const API_URL = `${baseURL}${API_CALL}`;
 /* INTERFACE */
 interface ApprovalTableProps {
-    //dataBuffer: FormValues[];
     onDelete: (reqID: number) => void;
     resetTable: () => void;
-    //setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
 }
 
 function ApprovalsTable({
-    //dataBuffer,
-    resetTable,
-    //setDataBuffer,
 }: ApprovalTableProps) {
     const [approvalData, setApprovalData] = useState<FormValues[]>([]);
 

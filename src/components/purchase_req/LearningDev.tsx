@@ -1,16 +1,13 @@
-import Justification from "./Justification";
-import AddComments from "./AddComments";
-import { UseFormRegister, FieldErrors } from "react-hook-form";
+import { UseFormRegister } from "react-hook-form";
 import { FormValues } from "../../types/formTypes";
 import Grid from "@mui/material/Grid2";
 import { Typography, Checkbox, FormControlLabel } from "@mui/material";
 
 interface LearningDevProps {
     register: UseFormRegister<FormValues>;
-    errors: FieldErrors<FormValues>;
 }
 
-function LearningDev({ register, errors }: LearningDevProps) {
+function LearningDev({ register }: LearningDevProps) {
     return (
         <Grid container spacing={2} mt={4}>
             {/* First Column: Learning & Development Option */}

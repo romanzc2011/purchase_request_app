@@ -1,7 +1,5 @@
 import UploadService from "./UploadService";
 import { IFile } from "../types/IFile";
-import { useState } from "react";
-import FileUpload from "../components/purchase_req/FileUpload";
 
 interface UploadFileProps {
     file: IFile;

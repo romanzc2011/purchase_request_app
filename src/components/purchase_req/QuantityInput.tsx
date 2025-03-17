@@ -1,6 +1,6 @@
 import { UseFormRegister, FieldErrors } from "react-hook-form";
 import { FormValues } from "../../types/formTypes";
-import { Box, TextField, Typography } from "@mui/material";
+import { TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 
 interface QuantityInputProps {

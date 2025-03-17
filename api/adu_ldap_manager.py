@@ -1,3 +1,4 @@
+
 from dotenv import load_dotenv
 from flask import jsonify
 from ldap3 import Server, Connection, Tls, ALL, SUBTREE
@@ -52,7 +53,7 @@ class LDAPManager:
         server = Server(self.server_name, port=self.port, use_ssl=self.using_tls, tls=tls, get_info=ALL)
         
         try:
-            conn = Connection(server,user=username, password=password, authentication="NTLM", auto_bind=True)
+            conn = Connection(server,user=username, password=password, auto_bind=True)
             if conn.bound:
                 print("\n#####################################################################")
                 print(f"\n✅ --- Successfully authenticated to {self.server_name}")
@@ -71,7 +72,7 @@ class LDAPManager:
     #####################################################################################
     ## TLS CONFIG
     def tls_config(self):
-        tls_configure = Tls(validate=ssl.CERT_REQUIRED, version=ssl.PROTOCOL_TLSv1_2)
+        tls_configure = Tls(validate=ssl.CERT_NONE, version=ssl.PROTOCOL_TLSv1_2)
         return tls_configure
   
     #####################################################################################

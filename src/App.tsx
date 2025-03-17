@@ -27,7 +27,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
-    const [finalSubmit, setFinalSubmit] = useState(false); // Clear out fileInfo once submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
 
     // Setting reqID like this ensures a new reqID when the state changes and re-render occurs
