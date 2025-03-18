@@ -16,7 +16,7 @@ import { Box } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
 
 /************************************************************************************ */
-/* CONFIG API URL */
+/* CONFIG API URL- */
 /************************************************************************************ */
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/getApprovalData";
