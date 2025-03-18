@@ -195,11 +195,15 @@ def set_purchase_request():
 @pras.route('/api/getApprovalData', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_approval_data():
+    print("GET APPROVAL FUNCTION")
     if request.method == "OPTIONS":
+        logger.info(f"{request.method}")
         return jsonify({"status": "OK"})
     try:
         query = "SELECT * FROM approvals"
         approval_data = dbManager.fetch_rows(query)
+        
+        logger.info(f"APPROVAL DATA: {approval_data}")
         return jsonify({"approval_data": approval_data})
     
     except Exception as e:

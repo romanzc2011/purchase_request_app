@@ -1,5 +1,6 @@
 //import { useEffect } from "react";
 import { StrictMode, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
     Navigate,
     Route,
@@ -11,6 +12,8 @@ import "./index.css";
 import App from "./App.tsx";
 import LoginDialog from "./components/LoginDialog.tsx";
 import ProtectedRoute from "./components/authentication/ProtectedRoute.tsx";
+
+const queryClient = new QueryClient();
 
 function Root() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -31,47 +34,49 @@ function Root() {
     };
 
     return (
-        <StrictMode>
-            <Router>
-                <Routes>
-                    {/*************************************************************/}
-                    {/* LOGIN ROUTE */}
-                    {/*************************************************************/}
-                    <Route
-                        path="/login"
-                        element={
-                            isLoggedIn ? (
-                                <Navigate to="/" replace />
-                            ) : (
-                                <LoginDialog
-                                    open={!isLoggedIn}
-                                    onClose={() =>
-                                        console.log("Login dialog closed.")
-                                    }
-                                    onLoginSuccess={handleLoginSuccess}
-                                />
-                            )
-                        }
-                    />
-                    {/*************************************************************/}
-                    {/* PROTECTED ROUTES */}
-                    {/*************************************************************/}
-                    <Route
-                        path="*"
-                        element={
-                            <ProtectedRoute isLoggedIn={isLoggedIn}>
-                                <App
-                                    isLoggedIn={isLoggedIn}
-                                    ACCESS_GROUP={ACCESS_GROUP}
-                                    CUE_GROUP={CUE_GROUP}
-                                    IT_GROUP={IT_GROUP}
-                                />
-                            </ProtectedRoute>
-                        }
-                    />
-                </Routes>
-            </Router>
-        </StrictMode>
+        <QueryClientProvider client={queryClient}>
+            <StrictMode>
+                <Router>
+                    <Routes>
+                        {/*************************************************************/}
+                        {/* LOGIN ROUTE */}
+                        {/*************************************************************/}
+                        <Route
+                            path="/login"
+                            element={
+                                isLoggedIn ? (
+                                    <Navigate to="/" replace />
+                                ) : (
+                                    <LoginDialog
+                                        open={!isLoggedIn}
+                                        onClose={() =>
+                                            console.log("Login dialog closed.")
+                                        }
+                                        onLoginSuccess={handleLoginSuccess}
+                                    />
+                                )
+                            }
+                        />
+                        {/*************************************************************/}
+                        {/* PROTECTED ROUTES */}
+                        {/*************************************************************/}
+                        <Route
+                            path="*"
+                            element={
+                                <ProtectedRoute isLoggedIn={isLoggedIn}>
+                                    <App
+                                        isLoggedIn={isLoggedIn}
+                                        ACCESS_GROUP={ACCESS_GROUP}
+                                        CUE_GROUP={CUE_GROUP}
+                                        IT_GROUP={IT_GROUP}
+                                    />
+                                </ProtectedRoute>
+                            }
+                        />
+                    </Routes>
+                </Router>
+            </StrictMode>
+        </QueryClientProvider>
     );
 }
 

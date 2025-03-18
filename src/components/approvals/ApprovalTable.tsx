@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from '@tanstack/react-query';
 import {
     Table,
     TableBody,
@@ -26,38 +27,27 @@ interface ApprovalTableProps {
     resetTable: () => void;
 }
 
+/* FETCHING APPROVAL DATA FUNCTION for useQuery */
+const fetchAApprovalData = async () => {
+    const response = await fetch(API_URL, {
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+    });
+    if(!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+    }
+    return response.json();
+}
+
 function ApprovalsTable({
 }: ApprovalTableProps) {
-    const [approvalData, setApprovalData] = useState<FormValues[]>([]);
+    const {isPending, isError, data, error} = useQuery({
+        queryKey: ['approval_data'],
+        queryFn: fetchAApprovalData,
+    });
 
-    console.log("API: ", API_URL);
-    /************************************************************************************ */
-    /* Fetch data from backend to populate Approvals Table */
-    /************************************************************************************ */
-    useEffect(() => {
-        fetch(API_URL)
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error(`HTTP error: ${res.status}`);
-                }
-
-                return res.json();
-            })
-            .then((data) => {
-                console.log("Fetched data:", data);
-                // Extract approval_data array
-                if (data.approval_data && Array.isArray(data.approval_data)) {
-                    setApprovalData(data.approval_data);
-                } else {
-                    console.error("Unexpect data format:", data);
-                }
-            })
-            .catch((err) => console.error("Error fetching data: ", err));
-    }, []); // Empty dependency arr ensure this runs once
-
-    const processedData = approvalData.map((item) => ({
-        ...item,
-    }));
+    const retval = data?.approval_data || [];
 
     /************************************************************************************ */
     /* APPROVE OR DENY */
@@ -170,30 +160,30 @@ function ApprovalsTable({
                         </TableRow>
                     </TableHead>
                     <TableBody sx={{ textAlign: "center" }}>
-                        {processedData.map((item) => (
-                            <TableRow key={item.reqID}>
+                        {retval.map((approval_data: FormValues) => (
+                            <TableRow key={approval_data.reqID}>
                                 {/**************************************************************************/}
                                 {/* REQUISITION ID */}
                                 <TableCell sx={{ color: "white" }}>
-                                    {item.reqID}
+                                    {approval_data.reqID}
                                 </TableCell>
 
                                 {/**************************************************************************/}
                                 {/* BUDGET OBJECT CODE */}
                                 <TableCell sx={{ color: "white" }}>
-                                    {convertBOC(item.budgetObjCode)}
+                                    {convertBOC(approval_data.budgetObjCode)}
                                 </TableCell>
 
                                 {/**************************************************************************/}
                                 {/* FUND */}
                                 <TableCell sx={{ color: "white" }}>
-                                    {item.fund}
+                                    {approval_data.fund}
                                 </TableCell>
 
                                 {/**************************************************************************/}
                                 {/* LOCATION */}
                                 <TableCell sx={{ color: "white" }}>
-                                    {item.location}
+                                    {approval_data.location}
                                 </TableCell>
 
                                 {/**************************************************************************/}
@@ -201,7 +191,7 @@ function ApprovalsTable({
                                 <TableCell
                                     sx={{ color: "white", textAlign: "center" }}
                                 >
-                                    {item.quantity}
+                                    {approval_data.quantity}
                                 </TableCell>
 
                                 {/**************************************************************************/}
@@ -209,8 +199,8 @@ function ApprovalsTable({
                                 <TableCell
                                     sx={{ color: "white", textAlign: "center" }}
                                 >
-                                    {typeof item.priceEach === "number"
-                                        ? item.priceEach.toFixed(2)
+                                    {typeof approval_data.priceEach === "number"
+                                        ? approval_data.priceEach.toFixed(2)
                                         : "0.00"}
                                 </TableCell>
 
@@ -219,14 +209,14 @@ function ApprovalsTable({
                                 <TableCell
                                     sx={{ color: "white", textAlign: "center" }}
                                 >
-                                    {typeof item.totalPrice === "number"
-                                        ? item.totalPrice.toFixed(2)
+                                    {typeof approval_data.totalPrice === "number"
+                                        ? approval_data.totalPrice.toFixed(2)
                                         : "0.00"}
                                 </TableCell>
                                 {/**************************************************************************/}
                                 {/* STATUS */}
                                 <TableCell sx={{ color: "white" }}>
-                                    {item.status}
+                                    {approval_data.status}
                                 </TableCell>
 
                                 {/**************************************************************************/}
@@ -280,11 +270,11 @@ function ApprovalsTable({
                                 }}
                             >
                                 Total: $
-                                {processedData
+                                {retval
                                     .reduce(
-                                        (acc, item) =>
+                                        (acc: number, approval_data: FormValues) =>
                                             acc +
-                                            (Number(item.totalPrice) || 0),
+                                            (Number(approval_data.totalPrice) || 0),
                                         0
                                     )
                                     .toFixed(2)}
