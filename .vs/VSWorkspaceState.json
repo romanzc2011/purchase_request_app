@@ -5,8 +5,9 @@
     "\\src",
     "\\src\\components",
     "\\src\\components\\approvals",
+    "\\src\\components\\purchase_req",
     "\\tls_certs"
   ],
-  "SelectedNode": "\\api\\adu_ldap_manager.py",
+  "SelectedNode": "\\src\\components\\approvals\\SearchBar.tsx",
   "PreviewInSolutionExplorer": false
 }

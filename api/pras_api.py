@@ -1,4 +1,6 @@
+from re import search
 from adu_ldap_manager import LDAPManager
+from search_service import SearchService
 from constants.db_columns import purchase_cols
 from constants.db_columns import approvals_cols
 from copy import deepcopy
@@ -22,6 +24,7 @@ from notification_manager import NotificationManager
 from waitress import serve
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
+from search_service import SearchService
 
 import json
 import os
@@ -47,6 +50,7 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 lock = threading.Lock()
 processed_data_shared = None
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
+search_service = SearchService()
 
 #########################################################################
 ## APP CONFIGS
@@ -207,6 +211,17 @@ def get_approval_data():
     except Exception as e:
         logger.error(f"Error fetching approval data: {e}")
         return jsonify({"error": "Failed to  fetch data"}), 500
+
+##########################################################################
+## GET SEARCH DATA
+@pras.route('/api/getSearchData', methods=['GET', 'OPTIONS'])
+@jwt_required()
+def get_search_data():
+    print(request)
+    query = request.args.get('query', '')
+    retval = search_service.get_search_results(query)
+    print(retval)
+    return jsonify(retval)
     
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params

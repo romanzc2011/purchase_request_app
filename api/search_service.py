@@ -1,5 +1,5 @@
-###################################################################
-# Name: REQUISTION AND SEARCH SERVICE
+######################################################################################
+# Name: SEARCH SERVICE
 # Author: ROMAN CAMPBELL
 # Date: 03/20/2025
 # Description:
@@ -13,12 +13,15 @@ database.
 User will be able to search for orders based on any number of the sections of
 req ID, functionality will also be added to search for requests based on status.
 """
-###################################################################
+######################################################################################
+from loguru import logger
 
-###################################################################
-# MAIN
-def main():
-    print("hello")
+class SearchService:
+    def __init__(self):
+        pass
 
-if __name__ == '__main__':
-    main()
+    def get_search_results(self, query: str):
+        logger.info("Data received from search")
+        results = []
+        results.append(query)
+        return results
