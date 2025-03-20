@@ -1,6 +1,7 @@
 # Dictionary for sql column
 purchase_cols = {
     'reqID': None,
+    'recipient': None,
     'requester': None,
     'phoneext': None,
     'datereq': None,
@@ -22,6 +23,7 @@ purchase_cols = {
 approvals_cols = {
     'reqID': None,
     'requester': None,
+    'recipient': None,
     'budgetObjCode': None,
     'fund': None,
     'location': None,

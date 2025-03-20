@@ -37,6 +37,7 @@ class DatabaseManager:
         CREATE TABLE IF NOT EXISTS purchase_requests (
             reqID TEXT PRIMARY KEY NOT NULL,
             requester TEXT NOT NULL,
+            recipient TEXT NOT NULL,
             phoneext INTEGER NOT NULL,
             datereq TEXT,
             dateneed TEXT,
@@ -70,6 +71,8 @@ class DatabaseManager:
         CREATE TABLE IF NOT EXISTS approvals (
             reqID TEXT PRIMARY KEY NOT NULL,
             requester TEXT NOT NULL,
+            recipient TEXT NOT NULL,
+            recipient TEXT NOT NULL,
             budgetObjCode TEXT,
             fund TEXT,
             quantity INTEGER,
@@ -101,7 +104,6 @@ class DatabaseManager:
         columns = ", ".join(processed_data.keys())
         placeholders = ", ".join(["?"] * len(processed_data))
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
-        
         
         logger.info(query)
         

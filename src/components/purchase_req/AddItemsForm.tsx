@@ -76,6 +76,7 @@ function AddItemsForm({
         defaultValues: {
             reqID: reqID,
             requester: "",
+            recipient: "",
             phoneext: "",
             datereq: null,
             dateneed: null,
@@ -141,6 +142,34 @@ function AddItemsForm({
                             })}
                             error={!!errors.requester}
                             helperText={errors.requester?.message}
+                        />
+                    </Grid>
+                </Grid>
+                {/******************************************************************************************* */}
+                {/** RECIPIENT ****************************************************************************** */}
+                {/******************************************************************************************* */}
+                <Grid container spacing={1} alignItems="center" sx={{ mt: 4 }}>
+                    <Grid size={{ xs: 2 }}>
+                        <Typography
+                            variant="button"
+                            component="label"
+                            htmlFor="recipient"
+                        >
+                            <strong>Recipient</strong>
+                        </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}>
+                        <TextField
+                            id="recipient"
+                            className="form-control"
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            {...register("recipient", {
+                                required: "Name of recipient is required",
+                            })}
+                            error={!!errors.recipient}
+                            helperText={errors.recipient?.message}
                         />
                     </Grid>
                 </Grid>
