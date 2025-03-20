@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React from "react";
 import { TextField, Typography, Box, IconButton } from "@mui/material";
 import { useQuery } from '@tanstack/react-query';
