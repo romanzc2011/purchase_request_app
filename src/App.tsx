@@ -29,8 +29,8 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
 
-    // Setting reqID like this ensures a new reqID when the state changes and re-render occurs
-    const [reqID, setReqID] = useState(() => uuidv4());
+    // Setting ID like this ensures a new ID when the state changes and re-render occurs
+    const [ID, setID] = useState(() => uuidv4());
 
     // Function to toggle the sidebar
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -41,9 +41,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
         setDataBuffer([]);
     };
 
-    const onDelete = (reqID: string) => {
+    const onDelete = (ID: string) => {
         setDataBuffer((prevData) =>
-            prevData.filter((item) => item.reqID !== reqID)
+            prevData.filter((item) => item.ID !== ID)
         );
     };
 
@@ -61,10 +61,10 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
         element = (
             <ApprovalsTable
                 //dataBuffer={dataBuffer}
-                onDelete={(reqID: number) =>
+                onDelete={(ID: number) =>
                     setDataBuffer(
                         dataBuffer.filter(
-                            (item) => item.reqID !== reqID.toString()
+                            (item) => item.ID !== ID.toString()
                         )
                     )
                 }
@@ -117,11 +117,11 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                                 {/* ADD ITEMS TO FORM - component */}
                                 {/********************************************************************* */}
                                 <AddItemsForm
-                                    reqID={reqID}
+                                    ID={ID}
                                     fileInfo={fileInfo}
                                     setDataBuffer={setDataBuffer}
                                     setIsSubmitted={setIsSubmitted}
-                                    setReqID={setReqID}
+                                    setID={setID}
                                     setFileInfo={setFileInfo}
                                 />
 
@@ -129,19 +129,19 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                                 {/* SUBMIT FORM TO APPROVAL TABLE - component */}
                                 {/********************************************************************* */}
                                 {/* isSubmitted and setIsSubmitted is what will determine to re-render the App or not, re-rendering is done
-                    to get a new reqID with each request */}
+                    to get a new ID with each request */}
                                 <Box
                                     className="col-md-12"
                                     style={{ marginTop: "20px" }}
                                 >
                                     <SubmitApprovalTable
-                                        reqID={reqID}
+                                        ID={ID}
                                         dataBuffer={dataBuffer}
                                         onDelete={onDelete}
                                         fileInfo={fileInfo}
                                         isSubmitted={isSubmitted}
                                         setIsSubmitted={setIsSubmitted}
-                                        setReqID={setReqID}
+                                        setID={setID}
                                         setDataBuffer={setDataBuffer}
                                         setFileInfo={setFileInfo}
                                     />

@@ -1,3 +1,4 @@
+from multiprocessing import process
 from re import search
 from adu_ldap_manager import LDAPManager
 from search_service import SearchService
@@ -232,12 +233,12 @@ def delete_func():
     if request.path == '/api/deleteFile':
         data = request.get_json()
 
-        # Extract reqID and filename
-        reqID = data.get("reqID")
+        # Extract ID and filename
+        ID = data.get("ID")
         filename = data.get("filename")
-        upload_filename = f"{reqID}_{filename}"
+        upload_filename = f"{ID}_{filename}"
         
-        # Delete File with reqID in 
+        # Delete File with ID in 
         files = os.listdir(UPLOAD_FOLDER)
         for file in files:
             if file == upload_filename:
@@ -259,7 +260,7 @@ def upload_file():
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
     
-    reqID = request.form.get("reqID")
+    ID = request.form.get("ID")
      
     if request.method == 'POST':
         uploaded_files = request.files.getlist("file")
@@ -268,7 +269,7 @@ def upload_file():
         for file in uploaded_files:
             if file.filename:
                 secure_name = secure_filename(file.filename)
-                new_filename = f"{reqID}_{secure_name}"
+                new_filename = f"{ID}_{secure_name}"
                 file_path = os.path.join(UPLOAD_FOLDER, new_filename)
                 
                 file.save(file_path)
@@ -276,7 +277,7 @@ def upload_file():
                 
     return jsonify({"message": "File(s) uploaded successfully", 
                     "files": saved_files,
-                    "reqID": reqID}), 200
+                    "ID": ID}), 200
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -346,11 +347,24 @@ def process_purchase_data(data):
             # Show this is a new request 0=FALSE 1=TRUE
             local_purchase_cols['new_request'] = 1
             local_purchase_cols['approved'] = 0
+
+            # Add the reqID to outgoing data
+            local_purchase_cols['reqID'] = generate_reqID(data)
             
         except Exception as e:
             logger.error(f"Error in process_purchase_data: {e}")
         
     return local_purchase_cols
+
+##########################################################################
+## GENERATE REQUISITION ID
+def generate_reqID(processed_data):
+    requester_part = processed_data.get('requester', '')[:4]
+    boc_part = processed_data.get('budgetObjCode', '').split("-")[0][:4]
+    fund_part = processed_data.get('fund', '')[:4]
+    location_part = processed_data.get('location', '')[:4]
+    id_part = processed_data.get('ID', '')[9:13]
+    return f"{requester_part}{"-"}{boc_part}{"-"}{fund_part}{"-"}{location_part}{"-"}{id_part}"
 
 ##########################################################################
 ## PROCESS APPROVAL DATA --- send new request to approvals
@@ -366,7 +380,7 @@ def process_approvals_data(processed_data):
         
     # Not new? Was it approved or denied?
     elif purchase_cols['new_request'] == 0:
-        approved = get_approval_status("approvals", processed_data['reqID'])
+        approved = get_approval_status("approvals", processed_data['ID'])
         if approved == 1:
             approvals_cols['status'] = "APPROVED"
         if approved == 0:
@@ -389,11 +403,11 @@ def process_approvals_data(processed_data):
 
 ##########################################################################
 ## GET STATUS OF APPROVALS
-def get_approval_status(table, reqID):
-    condition = f"reqID = %s"
+def get_approval_status(table, ID):
+    condition = f"ID = %s"
     columns = "approved"
     table = "approvals"
-    params = (reqID,)
+    params = (ID,)
     dbManager.fetch_single_row(table, columns, condition, params)
 
 ##########################################################################

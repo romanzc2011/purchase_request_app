@@ -25,12 +25,12 @@ const API_CALL: string = "/api/getApprovalData";
 const API_URL = `${baseURL}${API_CALL}`;
 /* INTERFACE */
 interface ApprovalTableProps {
-    onDelete: (reqID: number) => void;
+    onDelete: (ID: number) => void;
     resetTable: () => void;
 }
 
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */
-const fetchAApprovalData = async () => {
+const fetchApprovalData = async () => {
     const response = await fetch(API_URL, {
         headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -46,7 +46,7 @@ function ApprovalsTable({
 }: ApprovalTableProps) {
     const {isPending, isError, data, error} = useQuery({
         queryKey: ['approval_data'],
-        queryFn: fetchAApprovalData,
+        queryFn: fetchApprovalData,
     });
 
     const retval = data?.approval_data || [];
@@ -202,11 +202,11 @@ function ApprovalsTable({
                     </TableHead>
                     <TableBody sx={{ textAlign: "center" }}>
                         {retval.map((approval_data: FormValues) => (
-                            <TableRow key={approval_data.reqID}>
+                            <TableRow key={approval_data.ID}>
                                 {/**************************************************************************/}
                                 {/* REQUISITION ID */}
                                 <TableCell sx={{ color: "white" }}>
-                                    {approval_data.reqID}
+                                    {approval_data.ID}
                                 </TableCell>
 
                                 {/**************************************************************************/}

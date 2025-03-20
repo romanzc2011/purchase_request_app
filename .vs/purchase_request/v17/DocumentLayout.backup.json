@@ -3,20 +3,24 @@
   "WorkspaceRootPath": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\pras_api.py||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:api\\pras_api.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\approvals\\SearchBar.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\components\\approvals\\SearchBar.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\search_service.py||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:api\\search_service.py||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\pras_api.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:api\\pras_api.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\notification_manager.py||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:api\\notification_manager.py||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\approvals\\SearchBar.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\components\\approvals\\SearchBar.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\main.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\main.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\approvals\\ApprovalTable.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
@@ -35,10 +39,6 @@
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:api\\adu_ldap_manager.py||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\main.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\main.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\romancampbell\\source\\repos\\purchase_request\\.gitignore||{3B902123-F8A7-4915-9F01-361F908088D0}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:.gitignore||{3B902123-F8A7-4915-9F01-361F908088D0}"
     }
@@ -50,12 +50,8 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 10,
+          "SelectedChildIndex": 5,
           "Children": [
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
-            },
             {
               "$type": "Document",
               "DocumentIndex": 1,
@@ -64,27 +60,27 @@
               "RelativeDocumentMoniker": "api\\search_service.py",
               "ToolTip": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\search_service.py",
               "RelativeToolTip": "api\\search_service.py",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAAAXAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAAWAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
               "WhenOpened": "2025-03-20T19:25:21.427Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "notification_manager.py",
               "DocumentMoniker": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\notification_manager.py",
               "RelativeDocumentMoniker": "api\\notification_manager.py",
               "ToolTip": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\notification_manager.py",
               "RelativeToolTip": "api\\notification_manager.py",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
               "WhenOpened": "2025-03-20T19:21:14.885Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "AddItemsForm.tsx",
               "DocumentMoniker": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\purchase_req\\AddItemsForm.tsx",
               "RelativeDocumentMoniker": "src\\components\\purchase_req\\AddItemsForm.tsx",
@@ -92,44 +88,43 @@
               "RelativeToolTip": "src\\components\\purchase_req\\AddItemsForm.tsx",
               "ViewState": "AgIAAFQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
-              "WhenOpened": "2025-03-20T18:27:59.563Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-20T18:27:59.563Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "ApprovalTable.tsx",
               "DocumentMoniker": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\approvals\\ApprovalTable.tsx",
               "RelativeDocumentMoniker": "src\\components\\approvals\\ApprovalTable.tsx",
               "ToolTip": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\approvals\\ApprovalTable.tsx",
               "RelativeToolTip": "src\\components\\approvals\\ApprovalTable.tsx",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAAPAAAAAAAAAA==",
+              "ViewState": "AgIAACcAAAAAAAAAAAAAABkAAAAPAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
               "WhenOpened": "2025-03-20T16:27:20.582Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 4,
               "Title": "main.tsx",
               "DocumentMoniker": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\main.tsx",
               "RelativeDocumentMoniker": "src\\main.tsx",
               "ToolTip": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\main.tsx",
               "RelativeToolTip": "src\\main.tsx",
-              "ViewState": "AgIAADgAAAAAAAAAAAAQwAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAD4AAAAAAAAAAAAQwFAAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
               "WhenOpened": "2025-03-20T16:25:59.446Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 0,
               "Title": "SearchBar.tsx",
               "DocumentMoniker": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\approvals\\SearchBar.tsx",
               "RelativeDocumentMoniker": "src\\components\\approvals\\SearchBar.tsx",
               "ToolTip": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\approvals\\SearchBar.tsx",
               "RelativeToolTip": "src\\components\\approvals\\SearchBar.tsx",
-              "ViewState": "AgIAAAkAAAAAAAAAAAAAAAwAAAAsAAAAAAAAAA==",
+              "ViewState": "AgIAAA0AAAAAAAAAAAAAABAAAAAYAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
               "WhenOpened": "2025-03-20T16:12:09.049Z",
               "EditorCaption": ""
@@ -144,12 +139,11 @@
               "RelativeToolTip": ".gitignore",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
-              "WhenOpened": "2025-03-17T20:02:10.435Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-17T20:02:10.435Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "adu_ldap_manager.py",
               "DocumentMoniker": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\adu_ldap_manager.py",
               "RelativeDocumentMoniker": "api\\adu_ldap_manager.py",
@@ -157,12 +151,11 @@
               "RelativeToolTip": "api\\adu_ldap_manager.py",
               "ViewState": "AgIAACQAAAAAAAAAAAAAADYAAAACAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
-              "WhenOpened": "2025-03-17T19:45:30.67Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-17T19:45:30.67Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "LoginDialog.tsx",
               "DocumentMoniker": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\src\\components\\LoginDialog.tsx",
               "RelativeDocumentMoniker": "src\\components\\LoginDialog.tsx",
@@ -170,18 +163,17 @@
               "RelativeToolTip": "src\\components\\LoginDialog.tsx",
               "ViewState": "AgIAAFEAAAAAAAAAAAAAAL8AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
-              "WhenOpened": "2025-03-17T19:41:55.337Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-17T19:41:55.337Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "pras_api.py",
               "DocumentMoniker": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\pras_api.py",
               "RelativeDocumentMoniker": "api\\pras_api.py",
               "ToolTip": "C:\\Users\\romancampbell\\source\\repos\\purchase_request\\api\\pras_api.py",
               "RelativeToolTip": "api\\pras_api.py",
-              "ViewState": "AgIAAMQAAAAAAAAAAAAAANUAAAASAAAAAAAAAA==",
+              "ViewState": "AgIAAMMAAAAAAAAAAAAQwNcAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.002457|",
               "WhenOpened": "2025-03-17T18:13:51.595Z",
               "EditorCaption": ""

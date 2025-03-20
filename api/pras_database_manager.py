@@ -35,7 +35,8 @@ class DatabaseManager:
         
         query = """
         CREATE TABLE IF NOT EXISTS purchase_requests (
-            reqID TEXT PRIMARY KEY NOT NULL,
+            ID TEXT PRIMARY KEY NOT NULL,
+            reqID TEXT NOT NULL,
             requester TEXT NOT NULL,
             recipient TEXT NOT NULL,
             phoneext INTEGER NOT NULL,
@@ -69,7 +70,8 @@ class DatabaseManager:
         # Create approvals table if not already existing
         query = """
         CREATE TABLE IF NOT EXISTS approvals (
-            reqID TEXT PRIMARY KEY NOT NULL,
+            ID TEXT PRIMARY KEY NOT NULL,
+            reqID TEXT NOT NULL,
             requester TEXT NOT NULL,
             recipient TEXT NOT NULL,
             budgetObjCode TEXT,
@@ -80,7 +82,7 @@ class DatabaseManager:
             location TEXT,
             status TEXT,
             new_request TEXT,
-            FOREIGN KEY (reqID) REFERENCES purchase_requests(reqID)
+            FOREIGN KEY (ID) REFERENCES purchase_requests(ID)
                 ON UPDATE CASCADE
         )
         """
@@ -137,6 +139,7 @@ class DatabaseManager:
             cursor.execute(query)
             rows = cursor.fetchall()
             
+            logger.info(f"DATA: {rows}")
             # Convert to dictionary to display in table
             column_names = [desc[0] for desc in cursor.description]
             result = [dict(zip(column_names, row)) for row in rows]

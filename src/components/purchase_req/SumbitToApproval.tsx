@@ -24,12 +24,12 @@ const API_URL = `${baseURL}${API_CALL}`;
 /************************************************************************************ */
 interface SubmitApprovalTableProps {
     dataBuffer: FormValues[];
-    onDelete: (reqID: string) => void;
-    reqID: string;
+    onDelete: (ID: string) => void;
+    ID: string;
     fileInfo: IFile[];
     isSubmitted: boolean;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
-    setReqID: React.Dispatch<React.SetStateAction<string>>;
+    setID: React.Dispatch<React.SetStateAction<string>>;
     setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
@@ -37,7 +37,7 @@ interface SubmitApprovalTableProps {
 function SubmitApprovalTable({
     dataBuffer,
     onDelete,
-    reqID,
+    ID,
     fileInfo,
     isSubmitted,
     setIsSubmitted,
@@ -83,7 +83,7 @@ function SubmitApprovalTable({
 
         if(filesToUpload.length > 0) {
             for(const file of filesToUpload) {
-                await UploadFile({ file, reqID, setFileInfo });
+                await UploadFile({ file, ID, setFileInfo });
             }
         }
 
@@ -110,7 +110,7 @@ function SubmitApprovalTable({
                 const data = await response.json();
                 console.log("Response from POST request:", data);
             } catch (error) {
-                console.error("Error sending data for item", reqID, error);
+                console.error("Error sending data for item", ID, error);
             }
         }
         setIsSubmitted(true);
@@ -163,9 +163,9 @@ function SubmitApprovalTable({
                 </TableHead>
                 <TableBody>
                     {processedData.map((item) => (
-                        <TableRow key={item.reqID}>
+                        <TableRow key={item.ID}>
                             <TableCell sx={{ color: "white" }}>
-                                {item.reqID}
+                                {item.ID}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>
                                 {convertBOC(item.budgetObjCode)}
@@ -194,7 +194,7 @@ function SubmitApprovalTable({
                                     variant="contained"
                                     color="error"
                                     onClick={() => {
-                                        onDelete(item.reqID);
+                                        onDelete(item.ID);
                                     }}
                                 >
                                     Delete

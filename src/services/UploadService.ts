@@ -7,7 +7,7 @@ interface FileInfo {
 
 interface UploadParamsProps {
     file: File;
-    reqID: string;
+    ID: string;
     dataBuffer: FormValues[];
     api_call: string;
 }
@@ -22,11 +22,11 @@ const api = axios.create({
 });
 
 
-function upload({ file, reqID, dataBuffer, api_call }: UploadParamsProps) {
+function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
     const formData = new FormData();
 
     formData.append("file", file);
-    formData.append("reqID", reqID);
+    formData.append("ID", ID);
 
     if(api_call == "/api/upload") {
         return api.post("/api/upload", formData, {

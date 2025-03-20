@@ -3,11 +3,11 @@ import { IFile } from "../types/IFile";
 
 interface UploadFileProps {
     file: IFile;
-    reqID: string;
+    ID: string;
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
-async function UploadFile({ file, reqID, setFileInfo }: UploadFileProps) {
+async function UploadFile({ file, ID, setFileInfo }: UploadFileProps) {
     if (!file || !file.file) {
         console.warn(
             "No file provided or file object is missing for",
@@ -27,7 +27,7 @@ async function UploadFile({ file, reqID, setFileInfo }: UploadFileProps) {
         console.log("UploadHandler.ts");
         const response = await UploadService.upload({
             file: file.file,
-            reqID,
+            ID,
             dataBuffer: [],
             api_call: "/api/upload",
         });

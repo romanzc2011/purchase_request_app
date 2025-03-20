@@ -9,7 +9,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import Button from "@mui/material/Button";
 
 interface FileUploadProps {
-    reqID: string;
+    ID: string;
     isSubmitted: boolean;
     fileInfo: IFile[];
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
@@ -18,7 +18,7 @@ interface FileUploadProps {
 /************************************************************************************ */
 /* FILE UPLOAD */
 /************************************************************************************ */
-function FileUpload({ reqID, fileInfo, setFileInfo }: FileUploadProps) {
+function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     /************************************************************************************ */
@@ -40,7 +40,7 @@ function FileUpload({ reqID, fileInfo, setFileInfo }: FileUploadProps) {
 
     // Delete file from backend
     async function apiDeleteFile(
-        reqID: string,
+        ID: string,
         filename: string
     ): Promise<number> {
         const API_URL = `${import.meta.env.VITE_API_URL}/api/deleteFile`;
@@ -51,7 +51,7 @@ function FileUpload({ reqID, fileInfo, setFileInfo }: FileUploadProps) {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({ reqID: reqID, filename: filename }),
+            body: JSON.stringify({ ID: ID, filename: filename }),
         });
 
         if (!response.ok) {
@@ -68,7 +68,7 @@ function FileUpload({ reqID, fileInfo, setFileInfo }: FileUploadProps) {
 
         // Check if file has been uploaded, if so, delete it, this is if user changes their mind
         if (file.status === "success") {
-            apiDeleteFile(reqID, file.name).catch((error) =>
+            apiDeleteFile(ID, file.name).catch((error) =>
                 console.error("Error deleting file: ", error)
             );
         }

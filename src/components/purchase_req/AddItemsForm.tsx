@@ -26,11 +26,12 @@ import AddComments from "./AddComments";
 /* INTERFACE PROPS */
 /*************************************************************************************** */
 interface AddItemsProps {
+    ID: string;
     reqID: string;
     fileInfo: IFile[];
     setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
-    setReqID: React.Dispatch<React.SetStateAction<string>>;
+    setID: React.Dispatch<React.SetStateAction<string>>;
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
@@ -38,9 +39,10 @@ interface AddItemsProps {
 /* ADD ITEMS FORM */
 /*************************************************************************************** */
 function AddItemsForm({
+    ID,
     reqID,
     setDataBuffer,
-    setReqID,
+    setID,
     fileInfo,
     setFileInfo,
 }: AddItemsProps) {
@@ -49,17 +51,18 @@ function AddItemsForm({
     /*************************************************************************************** */
     const handleAddItem = async (newItem: FormValues) => {
         /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
-        const newReqID = uuidv4();
+        const newID = uuidv4();
+        //const newReqID = "send to create reqid service";
         const updatedItem = {
             ...newItem,
-            reqID: newReqID,
+            ID: newID,
             price: Number(newItem.price) || 0,
             fund: newItem.fund || "",
             budgetObjCode: newItem.budgetObjCode || "",
         };
 
         setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
-        setReqID(newReqID);
+        setID(newID);
 
         reset(); // Clear form
         console.log("Item Added: ", updatedItem);
@@ -74,7 +77,8 @@ function AddItemsForm({
 
     const form = useForm<FormValues>({
         defaultValues: {
-            reqID: reqID,
+            ID: ID,
+            reqID: "reqID",
             requester: "",
             recipient: "",
             phoneext: "",
@@ -356,7 +360,7 @@ function AddItemsForm({
                     {/* Right Side - File Upload Component */}
                     <Grid size={{ xs: "auto" }} sx={{ ml: 2 }}>
                         <FileUpload
-                            reqID={reqID}
+                            ID={ID}
                             isSubmitted={isSubmitted}
                             fileInfo={fileInfo}
                             setFileInfo={setFileInfo}

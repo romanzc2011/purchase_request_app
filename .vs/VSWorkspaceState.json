@@ -2,12 +2,15 @@
   "ExpandedNodes": [
     "",
     "\\api",
+    "\\api\\constants",
+    "\\api\\db",
     "\\src",
     "\\src\\components",
-    "\\src\\components\\approvals",
     "\\src\\components\\purchase_req",
+    "\\src\\services",
+    "\\src\\types",
     "\\tls_certs"
   ],
-  "SelectedNode": "\\src\\components\\approvals\\SearchBar.tsx",
+  "SelectedNode": "\\api\\pras_api.py",
   "PreviewInSolutionExplorer": false
 }
