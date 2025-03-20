@@ -86,7 +86,6 @@ notifyManager = NotificationManager(msg_body=None,
 @pras.route('/api/login', methods=['POST'])
 def login():
     try:
-        print("HELLO LOGIN API\n")
         raw_data = request.data
         json_data = json.loads(raw_data.decode('utf-8-sig'))
         print(f"Parsed JSON: {json_data}")
@@ -105,7 +104,6 @@ def login():
     
     # Connect to LDAPS server and attempt to bind which involves authentication    
     try:
-        print("HELLO LOGIN")
         ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
         connection = ldap_mgr.get_connection(adu_username, password)
         
@@ -195,7 +193,7 @@ def set_purchase_request():
 @pras.route('/api/getApprovalData', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_approval_data():
-    print("GET APPROVAL FUNCTION")
+
     if request.method == "OPTIONS":
         logger.info(f"{request.method}")
         return jsonify({"status": "OK"})

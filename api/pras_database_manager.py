@@ -72,7 +72,6 @@ class DatabaseManager:
             reqID TEXT PRIMARY KEY NOT NULL,
             requester TEXT NOT NULL,
             recipient TEXT NOT NULL,
-            recipient TEXT NOT NULL,
             budgetObjCode TEXT,
             fund TEXT,
             quantity INTEGER,

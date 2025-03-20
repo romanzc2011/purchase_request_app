@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useState } from "react";
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -13,6 +14,7 @@ import {
 } from "@mui/material";
 import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
+import SearchBar from "./SearchBar";
 import { convertBOC } from "../../utils/bocUtils";
 
 /************************************************************************************ */
@@ -58,6 +60,7 @@ function ApprovalsTable({
 
     return (
         <Box sx={{ overflowX: "auto", width: "100%" }}>
+            <SearchBar />
             <TableContainer
                 component={Paper}
                 sx={{
@@ -76,6 +79,8 @@ function ApprovalsTable({
                         }}
                     >
                         <TableRow>
+                            {/**************************************************************************/}
+                                {/* REQUISITION ID */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -85,6 +90,8 @@ function ApprovalsTable({
                             >
                                 REQUISITION ID
                             </TableCell>
+                            {/**************************************************************************/}
+                                {/* RECIPIENT */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -92,8 +99,23 @@ function ApprovalsTable({
                                     textAlign: "center",
                                 }}
                             >
+                                
+                                RECIPIENT
+                            </TableCell>
+                            {/**************************************************************************/}
+                                {/* BUDGET OBJECT CODE */}
+                            <TableCell
+                                sx={{
+                                    color: "white",
+                                    fontWeight: "bold",
+                                    textAlign: "center",
+                                }}
+                            >
+                                
                                 BUDGET OBJECT CODE
                             </TableCell>
+                            {/**************************************************************************/}
+                                {/* FUND */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -101,8 +123,11 @@ function ApprovalsTable({
                                     textAlign: "center",
                                 }}
                             >
+                                
                                 FUND
                             </TableCell>
+                            {/**************************************************************************/}
+                                {/* LOCATION */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -110,8 +135,11 @@ function ApprovalsTable({
                                     textAlign: "center",
                                 }}
                             >
+                                
                                 LOCATION
                             </TableCell>
+                            {/**************************************************************************/}
+                                {/* QUANTITY */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -119,8 +147,11 @@ function ApprovalsTable({
                                     textAlign: "center",
                                 }}
                             >
+                                
                                 QUANTITY
                             </TableCell>
+                            {/**************************************************************************/}
+                                {/* PRICE EACH */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -128,8 +159,11 @@ function ApprovalsTable({
                                     textAlign: "center",
                                 }}
                             >
+                                
                                 PRICE EACH
                             </TableCell>
+                            {/**************************************************************************/}
+                                {/* ESTIMATED PRICE */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -137,8 +171,11 @@ function ApprovalsTable({
                                     textAlign: "center",
                                 }}
                             >
+                                
                                 ESTIMATED PRICE
                             </TableCell>
+                            {/**************************************************************************/}
+                                {/* STATUS */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -146,8 +183,11 @@ function ApprovalsTable({
                                     textAlign: "center",
                                 }}
                             >
+                                
                                 STATUS
                             </TableCell>
+                            {/**************************************************************************/}
+                                {/* ACTIONS */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -155,6 +195,7 @@ function ApprovalsTable({
                                     textAlign: "center",
                                 }}
                             >
+                                
                                 ACTIONS
                             </TableCell>
                         </TableRow>
@@ -166,6 +207,12 @@ function ApprovalsTable({
                                 {/* REQUISITION ID */}
                                 <TableCell sx={{ color: "white" }}>
                                     {approval_data.reqID}
+                                </TableCell>
+
+                                {/**************************************************************************/}
+                                {/* RECIPIENT */}
+                                <TableCell sx={{ color: "white" }}>
+                                    {approval_data.recipient}
                                 </TableCell>
 
                                 {/**************************************************************************/}

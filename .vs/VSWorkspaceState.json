@@ -2,7 +2,9 @@
   "ExpandedNodes": [
     "",
     "\\api",
-    "\\api\\PRAS_API",
+    "\\src",
+    "\\src\\components",
+    "\\src\\components\\approvals",
     "\\tls_certs"
   ],
   "SelectedNode": "\\api\\adu_ldap_manager.py",
