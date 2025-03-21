@@ -1,8 +1,8 @@
-import "bootstrap/dist/css/bootstrap.min.css";
 import { FieldErrors, useForm } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
 import React from "react";
 import "./LearningDev";
+import { Box } from "@mui/material";
 import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
 import BudgetCodePicker from "./BudgetCodePicker";
@@ -27,7 +27,6 @@ import AddComments from "./AddComments";
 /*************************************************************************************** */
 interface AddItemsProps {
     ID: string;
-    reqID: string;
     fileInfo: IFile[];
     setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
@@ -40,7 +39,6 @@ interface AddItemsProps {
 /*************************************************************************************** */
 function AddItemsForm({
     ID,
-    reqID,
     setDataBuffer,
     setID,
     fileInfo,
@@ -115,7 +113,7 @@ function AddItemsForm({
     }, [watch]);
 
     return (
-        <Grid>
+        <Box sx={{ display: 'flex' }}>
             {/*************************************************************************************** */}
             {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
               once user has finished adding items and reviewed everything */}
@@ -538,7 +536,7 @@ function AddItemsForm({
                 />
             </form>
             <DevTool control={control} />
-        </Grid>
+        </Box>
     );
 }
 

@@ -82,7 +82,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     }
 
     return (
-        <Box sx={{ display: "flex", height: "100vh" }}>
+        <Box sx={{ display: "flex" }}>
             {/* Sidebar Navigation */}
             <PurchaseSidenav
                 isOpen={sidebarOpen}
@@ -101,7 +101,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                     padding: 3,
                     marginLeft: sidebarOpen ? `${drawerWidth}px` : "60px", // Adjust dynamically
                     transition: "margin 0.3s ease", // Smooth transition
-                    overflow: "auto", // Enable scrolling if content overflows
                 }}
             >
                 <Toolbar /> {/* Space to offset AppBar */}

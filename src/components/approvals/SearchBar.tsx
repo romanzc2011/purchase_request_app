@@ -47,7 +47,7 @@ function SearchBar() {
     return (
         <Box display="flex" justifyContent="space-between" p={2}>
             {/* SEARCH BAR */}
-            <Box sx={{ display: 'flex', backgroundColor: '#363B3F', borderRadius: '3px' }}>
+            <Box sx={{ display: 'flex', width: '25%', backgroundColor: '#363B3F', borderRadius: '3px' }}>
                 <Input
                     sx={{ ml: 2, 
                         color: "white", 

@@ -59,7 +59,7 @@ function ApprovalsTable({
     const handleDeny = () => {};
 
     return (
-        <Box sx={{ overflowX: "auto", width: "100%" }}>
+        <Box sx={{ overflowX: "auto", height: '100vh', width: "100%" }}>
             <SearchBar />
             <TableContainer
                 component={Paper}
