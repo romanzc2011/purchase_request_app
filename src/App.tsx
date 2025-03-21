@@ -60,7 +60,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     if (isLoggedIn) {
         element = (
             <ApprovalsTable
-                //dataBuffer={dataBuffer}
                 onDelete={(ID: number) =>
                     setDataBuffer(
                         dataBuffer.filter(

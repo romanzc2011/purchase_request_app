@@ -1,6 +1,7 @@
 import { FieldErrors, useForm } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
 import React from "react";
+import { useMutation } from "@tanstack/react-query";
 import "./LearningDev";
 import { Box } from "@mui/material";
 import LearningDev from "./LearningDev";
@@ -22,6 +23,13 @@ import Tooltip from "@mui/material/Tooltip";
 import Justification from "./Justification";
 import AddComments from "./AddComments";
 
+/************************************************************************************ */
+/* CONFIG API URL- */
+/************************************************************************************ */
+const baseURL = import.meta.env.VITE_API_URL;
+const API_CALL: string = "/api/getReqID";
+const API_URL = `${baseURL}${API_CALL}`;
+
 /*************************************************************************************** */
 /* INTERFACE PROPS */
 /*************************************************************************************** */
@@ -35,6 +43,24 @@ interface AddItemsProps {
 }
 
 /*************************************************************************************** */
+/* GENERATE REQUISITION ID */
+/*************************************************************************************** */
+async function generateReqID(requestData: FormValues): Promise<{ reqID: string }>  {
+    const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+    }
+    return response.json();
+}
+
+/*************************************************************************************** */
 /* ADD ITEMS FORM */
 /*************************************************************************************** */
 function AddItemsForm({
@@ -44,6 +70,10 @@ function AddItemsForm({
     fileInfo,
     setFileInfo,
 }: AddItemsProps) {
+    const { mutate: generateReqIDMutation } = useMutation<{ reqID: string }, Error, FormValues>({
+        mutationFn: generateReqID,
+    });
+
     /*************************************************************************************** */
     /* HANDLE ADD ITEM function */
     /*************************************************************************************** */
@@ -59,11 +89,22 @@ function AddItemsForm({
             budgetObjCode: newItem.budgetObjCode || "",
         };
 
-        setDataBuffer((prev) => [...prev, updatedItem]); // Add to buffer
-        setID(newID);
-
-        reset(); // Clear form
-        console.log("Item Added: ", updatedItem);
+        // Trigger the mutation to generate a reqID
+        generateReqIDMutation(updatedItem, {
+            onSuccess: (data: { reqID: string }) => {
+                // Update the item with the generated reqID
+                updatedItem.reqID = data.reqID;
+                console.log("Received reqID: ", data.reqID);
+                // Now update the buffer and state
+                setDataBuffer((prev) => [...prev, updatedItem]);
+                setID(newID);
+                reset();
+                console.log("Item Added: ", updatedItem);
+            },
+            onError: (err) => {
+                console.error("Error generating reqID", err);
+            },
+        });
     };
 
     /*************************************************************************************** */

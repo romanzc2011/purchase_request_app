@@ -30,7 +30,10 @@ function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
 
     if(api_call == "/api/upload") {
         return api.post("/api/upload", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
+            headers: { 
+                "Content-Type": "multipart/form-data",
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
         });
     }
 

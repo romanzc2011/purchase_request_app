@@ -8,7 +8,7 @@ from copy import deepcopy
 from datetime import (datetime, timedelta, timezone)
 from pras_database_manager import DatabaseManager
 from dotenv import load_dotenv, set_key, find_dotenv
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask import Flask, request, jsonify, Response, g, make_response
 from flask_jwt_extended import (create_access_token,
                                 create_refresh_token, 
@@ -45,7 +45,7 @@ for the UI.
 
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
-UPLOAD_FOLDER = "C:\\Users\\RomanCampbell\\repo\\react-projects\\purchase_request\\uploads\\"
+UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 lock = threading.Lock()
@@ -56,11 +56,12 @@ search_service = SearchService()
 #########################################################################
 ## APP CONFIGS
 pras = Flask(__name__)
-CORS(pras, origins='*', supports_credentials=True)
+CORS(pras, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configure Loguru
 logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
 
+pras.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024   # 16MB
 pras.config["SECRET_KEY"] = JWT_SECRET_KEY
 pras.config["JWT_TOKEN_LOCATION"] = ["headers"]
 pras.config["JWT_ACCESS_COOKIE_PATH"] = "/"
@@ -183,8 +184,6 @@ def set_purchase_request():
     pool = ThreadPool()
     processed_data = pool.map(process_purchase_data, [data])
     
-    logger.info("PROCESSED_DATA", processed_data)
-    
     copied_data = deepcopy(processed_data[0])
     
     pool.map(purchase_req_commit, [copied_data])
@@ -254,30 +253,38 @@ def delete_func():
     
 ##########################################################################
 ## HANDLE FILE UPLOAD
-@pras.route('/api/upload', methods=['GET', 'POST'])
+@pras.route('/api/upload', methods=['POST', 'OPTIONS'])
 @jwt_required()
 def upload_file():
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
     
     ID = request.form.get("ID")
-     
-    if request.method == 'POST':
+    saved_files = []
+
+    # Ensure the upload directory exists
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+    try:
         uploaded_files = request.files.getlist("file")
-        saved_files = []
-        
         for file in uploaded_files:
             if file.filename:
                 secure_name = secure_filename(file.filename)
                 new_filename = f"{ID}_{secure_name}"
                 file_path = os.path.join(UPLOAD_FOLDER, new_filename)
-                
                 file.save(file_path)
                 saved_files.append(file.filename)
-                
-    return jsonify({"message": "File(s) uploaded successfully", 
-                    "files": saved_files,
-                    "ID": ID}), 200
+
+                logger.info(f"UPLOAD_FOLDER resolved to: {UPLOAD_FOLDER}")
+    except Exception as e:
+        logger.error(f"Error during file upload: {e}")
+        return jsonify({"error": "File upload failed", "details": str(e)}), 500
+    
+    return jsonify({"message": "File(s) uploaded successfully", "files": saved_files, "ID": ID}), 200
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -300,6 +307,16 @@ def logging_middleware(response):
         response.headers["X-Request-ID"] = request_id
         
     return response
+
+#########################################################################
+## GET REQ ID -- send back to caller
+@pras.route('/api/getReqID', methods=['POST'])
+@jwt_required()
+def get_req_id():
+    data = request.get_json() or {}
+    req_id = create_req_id(data)
+    logger.success('Requisition id created.')
+    return jsonify({'reqID': req_id})
 
 ##########################################################################
 ##########################################################################
@@ -348,8 +365,10 @@ def process_purchase_data(data):
             local_purchase_cols['new_request'] = 1
             local_purchase_cols['approved'] = 0
 
+            logger.info(f"Heres reqID: {local_purchase_cols['reqID']}")
+
+
             # Add the reqID to outgoing data
-            local_purchase_cols['reqID'] = generate_reqID(data)
             
         except Exception as e:
             logger.error(f"Error in process_purchase_data: {e}")
@@ -358,13 +377,13 @@ def process_purchase_data(data):
 
 ##########################################################################
 ## GENERATE REQUISITION ID
-def generate_reqID(processed_data):
+def create_req_id(processed_data):
     requester_part = processed_data.get('requester', '')[:4]
     boc_part = processed_data.get('budgetObjCode', '').split("-")[0][:4]
     fund_part = processed_data.get('fund', '')[:4]
     location_part = processed_data.get('location', '')[:4]
     id_part = processed_data.get('ID', '')[9:13]
-    return f"{requester_part}{"-"}{boc_part}{"-"}{fund_part}{"-"}{location_part}{"-"}{id_part}"
+    return f"{requester_part}-{boc_part}-{fund_part}-{location_part}-{id_part}"
 
 ##########################################################################
 ## PROCESS APPROVAL DATA --- send new request to approvals

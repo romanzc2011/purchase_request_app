@@ -154,7 +154,7 @@ function SubmitApprovalTable({
                             Price Each
                         </TableCell>
                         <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                            Estimated Price
+                            Line Total
                         </TableCell>
                         <TableCell sx={{ color: "white", fontWeight: "bold" }}>
                             Actions
@@ -165,7 +165,7 @@ function SubmitApprovalTable({
                     {processedData.map((item) => (
                         <TableRow key={item.ID}>
                             <TableCell sx={{ color: "white" }}>
-                                {item.ID}
+                                {item.reqID}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>
                                 {convertBOC(item.budgetObjCode)}

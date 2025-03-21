@@ -38,6 +38,7 @@ function Root() {
             <StrictMode>
                 <Router>
                     <Routes>
+                        <Route path="/" element={<Navigate to="/purchase-request" />} />
                         {/*************************************************************/}
                         {/* LOGIN ROUTE */}
                         {/*************************************************************/}
