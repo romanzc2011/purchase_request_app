@@ -130,24 +130,26 @@ class DatabaseManager:
     
     #####################################################################################
     ## FETCH ROWS
-    def fetch_rows(self, query):
+    def fetch_rows(self, query, params=None):
         logger.info("Fetching rows for appovals table")
         # Fetch all rows from specified table
         connection = self.get_connection()
         try:
             cursor = connection.cursor()
-            cursor.execute(query)
+            if params is not None:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
             rows = cursor.fetchall()
             
             logger.info(f"DATA: {rows}")
             # Convert to dictionary to display in table
             column_names = [desc[0] for desc in cursor.description]
             result = [dict(zip(column_names, row)) for row in rows]
-            print(result)
             return result
         
         except sqlite3.Error as e:
-            print(f"Error fetching rows: {e}")
+            logger.error(f"Error fetching rows: {e}")
             return []
         
         finally:

@@ -90,16 +90,12 @@ notifyManager = NotificationManager(msg_body=None,
 ## LOGIN -- auth users and return JWTs
 @pras.route('/api/login', methods=['POST'])
 def login():
+    
     try:
-        raw_data = request.data
-        json_data = json.loads(raw_data.decode('utf-8-sig'))
-        print(f"Parsed JSON: {json_data}")
+        username = request.json.get("username", None)
+        password = request.json.get("password", None)
     except Exception as e:
         logger.error(f"Error parsing JSON: {e}")
-        return jsonify({"error": "Invalid JSON"})
-    
-    username = request.json.get("username", None)
-    password = request.json.get("password", None)
     
     # Append ADU\ to username to match AD structure
     adu_username = "ADU\\"+username
@@ -218,7 +214,6 @@ def get_approval_data():
 def get_search_data():
     query = request.args.get('query', '')
     retval = search_service.get_search_results(query)
-    print(retval)
     return jsonify(retval)
     
 ##########################################################################

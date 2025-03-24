@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useState } from "react";
-import { useQuery } from '@tanstack/react-query';
+import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Table,
     TableBody,
@@ -14,7 +14,6 @@ import {
 } from "@mui/material";
 import { FormValues } from "../../types/formTypes";
 import { Box } from "@mui/material";
-import SearchBar from "./SearchBar";
 import { convertBOC } from "../../utils/bocUtils";
 
 /************************************************************************************ */
@@ -24,10 +23,12 @@ const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/getApprovalData";
 const API_URL = `${baseURL}${API_CALL}`;
 
+
 /* INTERFACE */
 interface ApprovalTableProps {
     onDelete: (ID: number) => void;
     resetTable: () => void;
+    searchQuery: string;
 }
 
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */
@@ -43,14 +44,19 @@ const fetchApprovalData = async () => {
     return response.json();
 }
 
-function ApprovalsTable({
-}: ApprovalTableProps) {
+function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     const {isPending, isError, data, error} = useQuery({
-        queryKey: ['approval_data'],
+        queryKey: ['approval_data', searchQuery],
         queryFn: fetchApprovalData,
     });
+    
+    const queryClient = useQueryClient();
+    const cachedSearchData = searchQuery && queryClient.getQueryData<FormValues[]>(['search-str', searchQuery]);
 
-    const retval = data?.approval_data || [];
+    // If searchQuery exists and cachedData found, display that
+    const retval = searchQuery
+        ? cachedSearchData || []
+        : data?.approval_data || [];
 
     /************************************************************************************ */
     /* APPROVE OR DENY */
@@ -61,7 +67,6 @@ function ApprovalsTable({
 
     return (
         <Box sx={{ overflowX: "auto", height: '100vh', width: "100%" }}>
-            <SearchBar />
             <TableContainer
                 component={Paper}
                 sx={{

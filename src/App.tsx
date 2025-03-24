@@ -11,6 +11,7 @@ import { FormValues } from "./types/formTypes";
 import ApprovalsTable from "./components/approvals/ApprovalTable";
 import { v4 as uuidv4 } from "uuid";
 import { IFile } from "./types/IFile";
+import ApprovalPageMain from "./components/approvals/ApprovalPageMain";
 
 const drawerWidth = 195;
 
@@ -59,7 +60,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     let element;
     if (isLoggedIn) {
         element = (
-            <ApprovalsTable
+            <ApprovalPageMain
                 onDelete={(ID: number) =>
                     setDataBuffer(
                         dataBuffer.filter(
@@ -68,7 +69,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                     )
                 }
                 resetTable={resetTable}
-                //setDataBuffer={setDataBuffer}
             />
         );
     } else {

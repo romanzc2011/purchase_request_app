@@ -40,10 +40,18 @@ class SearchService:
 
         # Build the SQL query
         if query_column:
-            sql = f"SELECT * FROM approvals WHERE {query_column} LIKE ?"
-            params = [f"{query}%"]
-            print(params)
-            print(sql)
+
+            try:
+                sql = f"SELECT * FROM approvals WHERE {query_column} LIKE ?"
+                params = [f"{query}%"]
+                print(sql)
+                print(params)
+            except Exception as e:
+                logger.error(f"{e}")
+
+            results = dbManager.fetch_rows(sql, params)
+            return results
+
         else:
             sql = """
                 SELECT * FROM approvals
@@ -54,6 +62,7 @@ class SearchService:
                 OR mid_uuid LIKE ?
                 """
             params = [f"{query}%"]
-            print(sql)
             print(params)
             results = dbManager.fetch_rows(sql, params)
+            
+            return results

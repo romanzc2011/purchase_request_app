@@ -1,11 +1,16 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React from "react";
+import React, { useEffect } from "react";
 import { useState } from "react";
 import { useDebounce } from 'use-debounce';
 import { Box, IconButton, debounce } from "@mui/material";
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, keepPreviousData, useQueryClient, QueryClient } from '@tanstack/react-query';
 import Input from '@mui/material/Input';
 import SearchIcon from "@mui/icons-material/Search";
+import { FormValues } from "../../types/formTypes";
+
+interface SearchBarProps {
+    setSearchQuery: (query: string) => void;
+}
 
 // @todo: 
 // Add functionality where the search bar appends a '-' after 4 chars
@@ -15,7 +20,8 @@ import SearchIcon from "@mui/icons-material/Search";
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/getSearchData";
 const API_URL = `${baseURL}${API_CALL}`;
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 100;
+
 
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */
 const fetchSearchData = async (query: string, queryColumn?: string) => {
@@ -32,14 +38,20 @@ const fetchSearchData = async (query: string, queryColumn?: string) => {
     if(!response.ok) {
         throw new Error(`HTTP error: ${response.status}`);
     }
+
     return response.json();
 }
 
 /* SEARCH BAR */
 /* Using debouncing, which waits so many ms to get continuous data */
-function SearchBar() {
+function SearchBar({ setSearchQuery }: SearchBarProps) {
     const [query, setQuery] = useState('');
     const [debouncedQuery] = useDebounce(query, DEBOUNCE_MS);
+
+    useEffect(() => {
+        setSearchQuery(debouncedQuery);
+    }, [debouncedQuery, setSearchQuery]);
+
     const queryResult = useQuery({
         queryKey: ['search-str', debouncedQuery],
         queryFn: async () => {
@@ -49,6 +61,7 @@ function SearchBar() {
             const searchTerm: string = debouncedQuery.trim();
             let queryColumn: string | undefined;
 
+            // Searching for fund and boc
             if(/^\d+$/.test(searchTerm)) {
                 // Test the first character to determine if it's BOC or Fund
                 const firstChar: string = searchTerm[0];
@@ -58,6 +71,8 @@ function SearchBar() {
                     queryColumn = "budgetObjCode";
                 }
             }
+            console.log("QUERY_RESULT: ", queryResult.data);
+            setSearchQuery(debouncedQuery);
 
             return fetchSearchData(debouncedQuery, queryColumn);
         },
