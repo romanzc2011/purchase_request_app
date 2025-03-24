@@ -59,7 +59,7 @@ class SearchService:
                 OR budgetObjCode LIKE ?
                 OR fund LIKE ?
                 OR location LIKE ?
-                OR mid_uuid LIKE ?
+                OR 
                 """
             params = [f"{query}%"]
             print(params)

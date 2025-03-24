@@ -117,7 +117,7 @@ function AddItemsForm({
     const form = useForm<FormValues>({
         defaultValues: {
             ID: ID,
-            reqID: "reqID",
+            reqID: "",
             requester: "",
             recipient: "",
             phoneext: "",

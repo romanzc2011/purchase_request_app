@@ -360,9 +360,6 @@ def process_purchase_data(data):
 
             logger.info(f"Heres reqID: {local_purchase_cols['reqID']}")
 
-
-            # Add the reqID to outgoing data
-            
         except Exception as e:
             logger.error(f"Error in process_purchase_data: {e}")
         
@@ -375,7 +372,8 @@ def create_req_id(processed_data):
     boc_part = processed_data.get('budgetObjCode', '').split("-")[0][:4]
     fund_part = processed_data.get('fund', '')[:4]
     location_part = processed_data.get('location', '')[:4]
-    id_part = processed_data.get('ID', '')[9:13]
+    id_part = processed_data.get('ID', '')[9:13]  # first 4 char length of uuid
+
     return f"{requester_part}-{boc_part}-{fund_part}-{location_part}-{id_part}"
 
 ##########################################################################
