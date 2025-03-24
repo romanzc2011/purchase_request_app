@@ -42,7 +42,6 @@ Will be used to keep track of purchase requests digitally through a central UI. 
 for the UI. 
 """
 
-
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
@@ -217,7 +216,6 @@ def get_approval_data():
 @pras.route('/api/getSearchData', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_search_data():
-    print(request)
     query = request.args.get('query', '')
     retval = search_service.get_search_results(query)
     print(retval)

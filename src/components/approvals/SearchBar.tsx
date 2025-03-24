@@ -7,19 +7,24 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import Input from '@mui/material/Input';
 import SearchIcon from "@mui/icons-material/Search";
 
+// @todo: 
+// Add functionality where the search bar appends a '-' after 4 chars
 /************************************************************************************ */
 /* CONFIG API URL- */
 /************************************************************************************ */
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/getSearchData";
 const API_URL = `${baseURL}${API_CALL}`;
-
 const DEBOUNCE_MS = 300;
 
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */
-const fetchSearchData = async (query: string) => {
-    const URL = `${API_URL}?query=${encodeURIComponent(query)}`
-    const response = await fetch(URL, {
+const fetchSearchData = async (query: string, queryColumn?: string) => {
+    let url = `${API_URL}?query=${encodeURIComponent(query)}`;
+    if(queryColumn) {
+        url += `&queryColumn=${encodeURIComponent(queryColumn)}`;
+    }
+
+    const response = await fetch(url, {
         headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
@@ -31,6 +36,7 @@ const fetchSearchData = async (query: string) => {
 }
 
 /* SEARCH BAR */
+/* Using debouncing, which waits so many ms to get continuous data */
 function SearchBar() {
     const [query, setQuery] = useState('');
     const [debouncedQuery] = useDebounce(query, DEBOUNCE_MS);
@@ -38,7 +44,22 @@ function SearchBar() {
         queryKey: ['search-str', debouncedQuery],
         queryFn: async () => {
             if (!debouncedQuery) return [];
-            return fetchSearchData(debouncedQuery);
+
+            // Heuristic to determine the queryColumn based on the search term
+            const searchTerm: string = debouncedQuery.trim();
+            let queryColumn: string | undefined;
+
+            if(/^\d+$/.test(searchTerm)) {
+                // Test the first character to determine if it's BOC or Fund
+                const firstChar: string = searchTerm[0];
+                if(firstChar === '5' || firstChar === '0') {
+                    queryColumn = "fund";
+                } else if(firstChar === '3') {
+                    queryColumn = "budgetObjCode";
+                }
+            }
+
+            return fetchSearchData(debouncedQuery, queryColumn);
         },
         staleTime: DEBOUNCE_MS,
         placeholderData: keepPreviousData,

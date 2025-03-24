@@ -23,6 +23,7 @@ import { convertBOC } from "../../utils/bocUtils";
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/getApprovalData";
 const API_URL = `${baseURL}${API_CALL}`;
+
 /* INTERFACE */
 interface ApprovalTableProps {
     onDelete: (ID: number) => void;
@@ -172,7 +173,7 @@ function ApprovalsTable({
                                 }}
                             >
                                 
-                                ESTIMATED PRICE
+                                LINE TOTAL
                             </TableCell>
                             {/**************************************************************************/}
                                 {/* STATUS */}
@@ -206,7 +207,7 @@ function ApprovalsTable({
                                 {/**************************************************************************/}
                                 {/* REQUISITION ID */}
                                 <TableCell sx={{ color: "white" }}>
-                                    {approval_data.ID}
+                                    {approval_data.reqID}
                                 </TableCell>
 
                                 {/**************************************************************************/}
