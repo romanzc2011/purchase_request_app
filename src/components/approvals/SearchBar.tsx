@@ -58,19 +58,19 @@ function SearchBar({ setSearchQuery }: SearchBarProps) {
             if (!debouncedQuery) return [];
 
             // Heuristic to determine the queryColumn based on the search term
-            const searchTerm: string = debouncedQuery.trim();
+            // const searchTerm: string = debouncedQuery.trim();
             let queryColumn: string | undefined;
 
-            // Searching for fund and boc
-            if(/^\d+$/.test(searchTerm)) {
-                // Test the first character to determine if it's BOC or Fund
-                const firstChar: string = searchTerm[0];
-                if(firstChar === '5' || firstChar === '0') {
-                    queryColumn = "fund";
-                } else if(firstChar === '3') {
-                    queryColumn = "budgetObjCode";
-                }
-            }
+            // // Searching for fund and boc
+            // if(/^\d+$/.test(searchTerm)) {
+            //     // Test the first character to determine if it's BOC or Fund
+            //     const firstChar: string = searchTerm[0];
+            //     if(firstChar === '5' || firstChar === '0') {
+            //         queryColumn = "fund";
+            //     } else if(firstChar === '3') {
+            //         queryColumn = "budgetObjCode";
+            //     }
+            // }
             console.log("QUERY_RESULT: ", queryResult.data);
             setSearchQuery(debouncedQuery);
 

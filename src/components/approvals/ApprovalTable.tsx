@@ -23,7 +23,6 @@ const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/getApprovalData";
 const API_URL = `${baseURL}${API_CALL}`;
 
-
 /* INTERFACE */
 interface ApprovalTableProps {
     onDelete: (ID: number) => void;
@@ -53,6 +52,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     const queryClient = useQueryClient();
     const cachedSearchData = searchQuery && queryClient.getQueryData<FormValues[]>(['search-str', searchQuery]);
 
+    console.log(data?.approval_data);
     // If searchQuery exists and cachedData found, display that
     const retval = searchQuery
         ? cachedSearchData || []
