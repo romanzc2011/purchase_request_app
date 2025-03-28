@@ -16,53 +16,41 @@ req ID, functionality will also be added to search for requests based on status.
 ######################################################################################
 from loguru import logger
 from flask import request, jsonify
-from pras_database_manager import DatabaseManager
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from pydantic_schemas import AppovalSchema
+from typing import Optional, List
+import db_alchemy_service as dbas
+from db_alchemy_service import Approval
 
-dbManager = DatabaseManager("./db/purchase_requests.db")
 class SearchService:
     def __init__(self):
         pass
-
-    def get_search_results(self, query: str):
-        logger.info("Data received from search")
-        ALLOWED_COLUMNS = {'requester', 'budgetObjCode', 'fund', 'location', 'mid_uuid'}
-
-        results = []
-        results.append(query)
+    
+    def get_search_results(
+        self,
+        query: str,
+        db: Session,
+        query_column: Optional[str] = None
+    ) -> List[AppovalSchema]:
+        ALLOWED_COLUMNS = {'requester', 'budgetObjCode', 'fund', 'location'}
         
-        # Column based search for records
-        query = request.args.get('query', '')
-        query_column = request.args.get('queryColumn', '')
-
-        # Build query with only allowed columns
+        # Validate query_column
         if query_column not in ALLOWED_COLUMNS:
             query_column = None
-
-        # Build the SQL query
-        if query_column:
-
-            try:
-                sql = f"SELECT * FROM approvals WHERE {query_column} LIKE ?"
-                params = [f"{query}%"]
-                print(sql)
-                print(params)
-            except Exception as e:
-                logger.error(f"{e}")
-
-            results = dbManager.fetch_rows(sql, params)
-            return results
-
-        else:
-            sql = """
-                SELECT * FROM approvals
-                WHERE requester LIKE ?
-                OR budgetObjCode LIKE ?
-                OR fund LIKE ?
-                OR location LIKE ?
-                OR 
-                """
-            params = [f"{query}%"]
-            print(params)
-            results = dbManager.fetch_rows(sql, params)
             
-            return results
+        if query_column:
+            filter_expr = getattr(Approval, query_column).ilike(f"{query}%")
+            results = db.query(Approval).filter(filter_expr).all()
+        else:
+            results = db.query(Approval).filter(
+                or_(
+                    Approval.requester.ilike(f"{query}%"),
+                    Approval.budgetObjCode.ilike(f"{query}%"),
+                    Approval.fund.ilike(f"{query}%"),
+                    Approval.location.ilike(f"{query}%")
+                )
+            ).all()
+            
+        # Convert SQLAlchemy objects to Pyndantic models
+        return [AppovalSchema.model_validate(approval) for approval in results]

@@ -4,7 +4,8 @@ from typing import List, Optional
 ########################################################
 ## PYDANTIC SCHEMA -- structures data into pydantic, a style that easily converts to json with fastapi
 ########################################################
-
+# pending_approval means the last person to approve request has not done so.
+# For Approval: Matt: approves first -> Final approver
 # purchase_request schema
 class PurchaseRequestSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -17,12 +18,12 @@ class PurchaseRequestSchema(BaseModel):
     datereq: str
     dateneed: str
     orderType: str
-    fileAttachments: bytes
+    fileAttachments: Optional[bytes] = None
     itemDescription: str
     justification: str
     addComments: Optional[str] = None
-    trainNotAval: str
-    needsNotMeet: str
+    trainNotAval: Optional[str] = None
+    needsNotMeet: Optional[str] = None
     budgetObjCode: str
     fund: str
     priceEach: float
@@ -30,8 +31,8 @@ class PurchaseRequestSchema(BaseModel):
     location: str
     quantity: int
     new_request: bool
+    pending_approval: bool
     approved: bool
-
 
 # approval schema
 class AppovalSchema(BaseModel):
@@ -48,7 +49,6 @@ class AppovalSchema(BaseModel):
     priceEach: float
     location: str
     status: str
-    new_request: str
-    
-    
-    
+    new_request: bool
+    pending_approval: bool
+    approved: bool

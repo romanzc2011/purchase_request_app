@@ -40,7 +40,9 @@ const fetchApprovalData = async () => {
     if(!response.ok) {
         throw new Error(`HTTP error: ${response.status}`);
     }
-    return response.json();
+    const jsonData = await response.json();
+    console.log(jsonData);
+    return jsonData;
 }
 
 function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
@@ -48,15 +50,12 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
         queryKey: ['approval_data', searchQuery],
         queryFn: fetchApprovalData,
     });
-    
+    console.log("Fetch data:", data);
     const queryClient = useQueryClient();
     const cachedSearchData = searchQuery && queryClient.getQueryData<FormValues[]>(['search-str', searchQuery]);
 
-    console.log(data?.approval_data);
     // If searchQuery exists and cachedData found, display that
-    const retval = searchQuery
-        ? cachedSearchData || []
-        : data?.approval_data || [];
+    const retval = searchQuery ? cachedSearchData || [] : data || [];
 
     /************************************************************************************ */
     /* APPROVE OR DENY */

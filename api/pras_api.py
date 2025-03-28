@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends, HTTPException, status, UploadFile, File, Form, APIRouter
+from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException, status, UploadFile, File, Form, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -10,11 +10,9 @@ from loguru import logger
 from dotenv import load_dotenv, find_dotenv
 from ldap3.core.exceptions import LDAPBindError
 from multiprocessing.dummy import Pool as ThreadPool
-from adu_ldap_manager import LDAPManager
-from pras_database_manager import DatabaseManager
+from adu_ldap_service import LDAPManager
 from search_service import SearchService
 from notification_manager import NotificationManager
-from constants.db_columns import purchase_cols, approvals_cols
 from sqlalchemy.orm import Session
 from werkzeug.utils import secure_filename
 import db_alchemy_service as dbas
@@ -37,7 +35,7 @@ load_dotenv(dotenv_path)
 UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_requests.db")
+db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_request.db")
 
 #########################################################################
 ## APP CONFIGS
@@ -57,7 +55,6 @@ logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
 
 ##########################################################################
 # Initialize services and shared objects
-dbManager = DatabaseManager(db_path)
 search_service = SearchService()
 notifyManager = NotificationManager(
     msg_body=None, 
@@ -104,9 +101,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 ##########################################################################
 ##########################################################################
 
+api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
+
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
-@app.post("/api/login")
+@api_router.post("/login")
 async def login(credentials: dict):
     # Expecting JSON with username/password
     username = credentials.get("username")
@@ -143,36 +142,37 @@ async def login(credentials: dict):
     
 ##########################################################################
 ## LOGOUT
-@app.post("/api/logout")
+@api_router.post("/logout")
 async def logout():
     # In FastAPI, logging out is usually handled on the client side by discarding the token.
     return JSONResponse(content={"msg": "Logout successful"})
 
 ##########################################################################
 ## GET APPROVAL DATA
-@app.get("/api/getApprovalData", response_model=List[ps.AppovalSchema])
+@api_router.get("/getApprovalData", response_model=List[ps.AppovalSchema])
 async def get_approval_data(
     current_user: str = Depends(get_current_user), 
     db: Session = Depends(dbas.get_db_session)
 ):
-    approvals = dbas.get_all_approvals(db)
+    approval = dbas.get_all_approval(db)
     
     # Convert each approval instance to Pydantic instance in foreach
-    approvals_data = [ps.AppovalSchema.model_validate(approval) for approval in approvals]
-    print(approvals_data)
-    return approvals_data
+    approval_data = [ps.AppovalSchema.model_validate(approval) for approval in approval]
+    print(approval_data)
+    return approval_data
 
 ##########################################################################
 ## GET SEARCH DATA
-@app.get("/api/getSearchData")
+@api_router.get("/getSearchData")
 async def get_search_data(query: str = "", current_user: str = Depends(get_current_user)):
     results = search_service.get_search_results(query)
     return JSONResponse(content=results)
 
 ##########################################################################
-## SEND TO APPROVALS -- being sent from the purchase req submit
-@app.post("/api/sendToPurchaseReq")
+## SEND TO approval -- being sent from the purchase req submit
+@api_router.post("/sendToPurchaseReq")
 async def set_purchase_request(data: dict, current_user: str = Depends(get_current_user)):
+    print(data)
     logger.info(f"Authenticated user: {current_user}")
     if not data:
         raise HTTPException(status_code=400, detail="Invalid data")
@@ -189,7 +189,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params
-@app.post("/api/deleteFile")
+@api_router.post("/deleteFile")
 async def delete_file(data: dict, current_user: str = Depends(get_current_user)):
     """
     Deletes a file given its ID and filename.
@@ -222,7 +222,7 @@ async def delete_file(data: dict, current_user: str = Depends(get_current_user))
     
 ##########################################################################
 ## HANDLE FILE UPLOAD
-@app.post("/api/upload")
+@api_router.post("/upload")
 async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
     # Ensure the upload directory exists
     if not os.path.exists(UPLOAD_FOLDER):
@@ -260,7 +260,7 @@ async def log_requests(request: Request, call_next):
 
 #########################################################################
 ## GET REQ ID -- send back to caller
-@app.post("/api/getReqID")
+@api_router.post("/getReqID")
 async def get_req_id(data: dict = None, current_user: str = Depends(get_current_user)):
     if data is None:
         data = {}
@@ -274,20 +274,24 @@ async def get_req_id(data: dict = None, current_user: str = Depends(get_current_
 ##########################################################################
 ##########################################################################
 
+app.include_router(api_router)
+
 ##########################################################################
 ## PROCESS PURCHASE DATA
 def process_purchase_data(data):
     with lock:
-        local_purchase_cols = purchase_cols.copy()
+        local_purchase_cols = {col.name: None for col in dbas.PurchaseRequest.__table__.columns}
         logger.info(f"Processing data: {data}")
         try:
             for k, v in data.items():
                 if k in local_purchase_cols:
                     local_purchase_cols[k] = v
+                    
             if 'learnAndDev' in local_purchase_cols:
                 local_purchase_cols['trainNotAval'] = local_purchase_cols['learnAndDev'].get('trainNotAval', False)
                 local_purchase_cols['needsNotMeet'] = local_purchase_cols['learnAndDev'].get('needsNotMeet', False)
                 del local_purchase_cols['learnAndDev']
+                
             if 'price' in local_purchase_cols and 'quantity' in local_purchase_cols:
                 try:
                     local_purchase_cols['priceEach'] = float(local_purchase_cols['price'])
@@ -299,9 +303,9 @@ def process_purchase_data(data):
                     logger.error("Invalid price or quantity:")
                     local_purchase_cols['totalPrice'] = 0
                 del local_purchase_cols['price']
-            local_purchase_cols['new_request'] = 1
-            local_purchase_cols['approved'] = 0
-            logger.info(f"Here is reqID: {local_purchase_cols.get('reqID')}")
+            local_purchase_cols['new_request'] = True
+            local_purchase_cols['pending_approval'] = False
+            local_purchase_cols['approved'] = False
         except Exception as e:
             logger.error(f"Error in process_purchase_data: {e}")
     return local_purchase_cols
@@ -317,59 +321,77 @@ def create_req_id(processed_data):
     return f"{requester_part}-{boc_part}-{fund_part}-{location_part}-{id_part}"
 
 ##########################################################################
-## PROCESS APPROVAL DATA --- send new request to approvals
-def process_approvals_data(processed_data):
-    logger.info(f"Processing approvals data: {processed_data}")
+## PROCESS APPROVAL DATA --- send new request to approval
+def process_approval_data(processed_data):
+    logger.info(f"Processing approval data: {processed_data}")
+    
+    pending_approval = False
+    approval_data = {}
+    
     if not isinstance(processed_data, dict):
         raise ValueError("Data must be a dictionary")
-    if processed_data['new_request'] == 1:
-        approvals_cols['status'] = "NEW REQUEST"
-    elif processed_data.get('new_request') == 0:
-        approved = get_approval_status("approvals", processed_data['ID'])
-        if approved == 1:
-            approvals_cols['status'] = "APPROVED"
-        elif approved == 0:
-            approvals_cols['status'] = "DENIED"
-    for k, v in processed_data.items():
-        if k in approvals_cols:
-            approvals_cols[k] = v
-    logger.info("Sending notification email to approver...")
+    
+    # Determine approval status via status
+    if processed_data.get('new_request'):
+        approval_data['status'] = "NEW REQUEST"
+        
+    elif processed_data.get('pending_approval'):
+        approval_data['status'] = "PENDING"
+        
+    elif (not processed_data.get('new_request') and
+          not processed_data.get('pending_approval') and
+          not processed_data.get('approved')):
+        approval_data['status'] = "DENIED"
+        
+    else:
+        approval_data["status"] = "UNKNOWN"
+    
+    # Define allowed keys that correspond to the Approval model's columns.
+    allowed_keys = [
+        'ID', 'reqID', 'requester', 'recipient', 'budgetObjCode', 
+        'fund', 'quantity', 'totalPrice', 'priceEach', 'location', 
+        'new_request', 'pending_approval', 'approved'
+    ]
+    
+    # Populate approval_data from processed_data
+    for key, value in processed_data.items():
+        if key in allowed_keys:
+            approval_data[key] = value
+    
     email_template = notifyManager.load_email_template("./notification_template.html")
     email_body = email_template.format(**processed_data)
     notifyManager.send_email(email_body)
-    return approvals_cols
             
     ##########################################################################
     ## SENDING NOTIFICATION OF NEW REQUEST
     # Create email body and send to approver
-    logger.info("SENDING EMAIL to approver...")
+    logger.info("Sending notification email to approver...")
     email_template = notifyManager.load_email_template("./notification_template.html")
     email_body = email_template.format(**processed_data)
     notifyManager.send_email(email_body)
                     
-    return approvals_cols
+    return approval_data
 
 ##########################################################################
-## GET STATUS OF APPROVALS
-def get_approval_status(table, ID):
-    condition = "ID = %s"
-    columns = "approved"
-    params = (ID,)
-    return dbManager.fetch_single_row(table, columns, condition, params)
+## GET STATUS OF approval
+def get_approval_status(ID):
+    condition = dbas.Approval.ID == ID
+    columns = [dbas.Approval.approved]
 
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
 def purchase_req_commit(processed_data):
     with lock:
         try:
-            table = "purchase_requests"
-            dbManager.insert_data(processed_data, table)
-            approval_data = process_approvals_data(processed_data)
+            table = "purchase_request"
+            dbas.insert_data(processed_data, table)
+            approval_data = process_approval_data(processed_data)
             logger.info(f"new_request: {processed_data.get('new_request')}")
+            
             if processed_data.get('new_request') == 1:
                 approval_data['status'] = "NEW REQUEST"
-                table = "approvals"
-                dbManager.insert_data(approval_data, table)
+                table = "approval"
+                dbas.insert_data(approval_data, table)
         except Exception as e:
             logger.error(f"Exception occurred: {e}")
 
