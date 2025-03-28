@@ -172,7 +172,7 @@ async def get_search_data(query: str = "", current_user: str = Depends(get_curre
 ## SEND TO approval -- being sent from the purchase req submit
 @api_router.post("/sendToPurchaseReq")
 async def set_purchase_request(data: dict, current_user: str = Depends(get_current_user)):
-    print(data)
+    print("set_purchase_request:", data)
     logger.info(f"Authenticated user: {current_user}")
     if not data:
         raise HTTPException(status_code=400, detail="Invalid data")
@@ -280,8 +280,8 @@ app.include_router(api_router)
 ## PROCESS PURCHASE DATA
 def process_purchase_data(data):
     with lock:
+        logger.success(f"priceEach {data['priceEach']}")
         local_purchase_cols = {col.name: None for col in dbas.PurchaseRequest.__table__.columns}
-        logger.info(f"Processing data: {data}")
         try:
             for k, v in data.items():
                 if k in local_purchase_cols:
@@ -292,22 +292,28 @@ def process_purchase_data(data):
                 local_purchase_cols['needsNotMeet'] = local_purchase_cols['learnAndDev'].get('needsNotMeet', False)
                 del local_purchase_cols['learnAndDev']
                 
-            if 'price' in local_purchase_cols and 'quantity' in local_purchase_cols:
+            if 'priceEach' in local_purchase_cols and 'quantity' in local_purchase_cols:
+                
                 try:
-                    local_purchase_cols['priceEach'] = float(local_purchase_cols['price'])
+                    print(local_purchase_cols['priceEach'])
+                    local_purchase_cols['priceEach'] = float(local_purchase_cols['priceEach'])
                     local_purchase_cols['quantity'] = int(local_purchase_cols['quantity'])
                     if local_purchase_cols['priceEach'] < 0 or local_purchase_cols['quantity'] <= 0:
                         raise ValueError("Invalid values")
                     local_purchase_cols['totalPrice'] = round(local_purchase_cols['priceEach'] * local_purchase_cols['quantity'], 2)
+                    logger.success(f"TOTAL: {local_purchase_cols['totalPrice']}")
+                    
                 except ValueError as e:
                     logger.error("Invalid price or quantity:")
                     local_purchase_cols['totalPrice'] = 0
-                del local_purchase_cols['price']
+                    
             local_purchase_cols['new_request'] = True
             local_purchase_cols['pending_approval'] = False
             local_purchase_cols['approved'] = False
+            
         except Exception as e:
             logger.error(f"Error in process_purchase_data: {e}")
+            
     return local_purchase_cols
 
 ##########################################################################
@@ -323,6 +329,7 @@ def create_req_id(processed_data):
 ##########################################################################
 ## PROCESS APPROVAL DATA --- send new request to approval
 def process_approval_data(processed_data):
+    print("PROCESSED: ", processed_data)
     logger.info(f"Processing approval data: {processed_data}")
     
     pending_approval = False
@@ -357,10 +364,6 @@ def process_approval_data(processed_data):
     for key, value in processed_data.items():
         if key in allowed_keys:
             approval_data[key] = value
-    
-    email_template = notifyManager.load_email_template("./notification_template.html")
-    email_body = email_template.format(**processed_data)
-    notifyManager.send_email(email_body)
             
     ##########################################################################
     ## SENDING NOTIFICATION OF NEW REQUEST

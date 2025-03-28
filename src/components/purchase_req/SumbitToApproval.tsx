@@ -60,7 +60,7 @@ function SubmitApprovalTable({
          calculations */
     /************************************************************************************ */
     function calculatePrice(item: FormValues): number {
-        const price = Number(item.price) || 0;
+        const price = Number(item.priceEach) || 0;
         const quantity = Number(item.quantity) || 1;
         return price * quantity;
     }
@@ -180,8 +180,8 @@ function SubmitApprovalTable({
                                 {item.quantity}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>
-                                {typeof item.price === "number"
-                                    ? item.price.toFixed(2)
+                                {typeof item.priceEach === "number"
+                                    ? item.priceEach.toFixed(2)
                                     : "0.00"}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>

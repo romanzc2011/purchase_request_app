@@ -84,7 +84,7 @@ function AddItemsForm({
         const updatedItem = {
             ...newItem,
             ID: newID,
-            price: Number(newItem.price) || 0,
+            price: Number(newItem.priceEach) || 0,
             fund: newItem.fund || "",
             budgetObjCode: newItem.budgetObjCode || "",
         };
@@ -133,7 +133,7 @@ function AddItemsForm({
             },
             budgetObjCode: "",
             fund: "",
-            price: 0,
+            priceEach: 0,
             location: "",
             quantity: 0,
         },
@@ -176,8 +176,8 @@ function AddItemsForm({
                     <Grid size={{ xs: 6, sm: 3 }}>
                         <TextField
                             id="requester"
-                            className="form-control"
                             fullWidth
+                            className="form-control"
                             variant="outlined"
                             size="small"
                             {...register("requester", {
@@ -240,8 +240,8 @@ function AddItemsForm({
                             {...register("phoneext", {
                                 required: "Phone extention is required",
                             })}
-                            error={!!errors.requester}
-                            helperText={errors.requester?.message}
+                            error={!!errors.phoneext}
+                            helperText={errors.phoneext?.message}
                         />
                     </Grid>
                 </Grid>
@@ -520,7 +520,7 @@ function AddItemsForm({
                     >
                         <Grid>
                             <PriceInput
-                                register={register("price", {
+                                register={register("priceEach", {
                                     required: "Price is required.",
                                     validate: (value) =>
                                         value >= 0 ||
