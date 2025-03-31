@@ -51,7 +51,6 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
         queryKey: ['approval_data', searchQuery],
         queryFn: fetchApprovalData,
     });
-    console.log("Fetch data:", data);
     const queryClient = useQueryClient();
     const cachedSearchData = searchQuery && queryClient.getQueryData<FormValues[]>(['search-str', searchQuery]);
 

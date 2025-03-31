@@ -15,6 +15,8 @@ from whoosh.filedb.filestore import FileStorage
 from whoosh.fields import Schema, TEXT, ID, NUMERIC, BOOLEAN
 from whoosh.index import create_in
 from whoosh.writing import AsyncWriter
+from whoosh.analysis import StemmingAnalyzer
+from whoosh.qparser import MultifieldParser
 import whoosh.index as index
 import os
 
@@ -58,10 +60,21 @@ class SearchService:
         status=TEXT(stored=True)  
     )
     
+    searchable_fields = ['ID', 'reqID', 'requester', 'recipient', 'budgetObjCode','fund', 
+                      'quantity', 'totalPrice', 'priceEach', 'location', 'new_request', 
+                      'approved', 'pending_approval', 'status']
+    
     storage = FileStorage("indexdir")
     
     def __init__(self):
-        pass
+        # Create index dir if it doesnt already exist
+        if not os.path.exists("indexdir"):
+            os.mkdir("indexdir")
+            self.ix = create_in("indexdir", schema=self.approval_schema, indexname="approvals")
+        else:
+            # Open existing index
+            self.ix = index.open_dir("indexdir", indexname="approvals")
+            logger.success("Index opened successfully...")
     
     ## SEARCH RESULTS
     def search_results(db: Session, query: str, query_column: Optional[str] = None):
@@ -128,51 +141,39 @@ class SearchService:
         them to the index.
         """
         
+        writer = AsyncWriter(self.ix)
         session = next(dbas.get_db_session())
         
-        # Create index directory if not already created
-        if not os.path.exists("indexdir"):
-            os.mkdir("indexdir")
+        # Query approval table
+        approvals = dbas.get_all_approval(session)
+        
+        for approval in approvals:
+            writer.update_document(
+                ID=str(approval.ID),
+                reqID=str(approval.reqID),
+                requester=approval.requester,
+                recipient=approval.recipient,
+                budgetObjCode=approval.budgetObjCode,
+                fund=approval.fund,
+                quantity=approval.quantity,
+                totalPrice=approval.totalPrice,
+                priceEach=approval.priceEach,
+                location=approval.location,
+                new_request=approval.new_request,
+                pending_approval=approval.pending_approval,
+                approved=approval.approved,
+                status=approval.status
+            )
             
-             # Create whoosh index from schema
-            ix = create_in("indexdir", schema=self.approval_schema, indexname="approvals")
-
-            # Query approval table
-            approvals = dbas.get_all_approval(session)
-
-            # Open whoosh writer to add docs to index
-            writer = AsyncWriter(ix)
-            
-            for approval in approvals:
-                writer.add_document(
-                    ID=str(approval.ID),
-                    reqID=str(approval.reqID),
-                    requester=approval.requester,
-                    recipient=approval.recipient,
-                    budgetObjCode=approval.budgetObjCode,
-                    fund=approval.fund,
-                    quantity=approval.quantity,
-                    totalPrice=approval.totalPrice,
-                    priceEach=approval.priceEach,
-                    location=approval.location,
-                    new_request=approval.new_request,
-                    pending_approval=approval.pending_approval,
-                    approved=approval.approved,
-                    status=approval.status
-                )
-            
-            writer.commit()
-            logger.success("Whoosh Index created successfully")
-        else:
-            # Open existing index
-            ix = index.open_dir("indexdir", indexname="approvals")
-            writer = AsyncWriter(ix)
-            logger.success("Writer ready for usage")
+        writer.commit()
+        logger.success("Whoosh Index created successfully")
+       
             
     ############################################################
     ## ADD APPROVAL DOC
-    def add_approval_doc(writer, record):
-        writer.add_document(
+    def add_approval_doc(self, record):
+        writer = AsyncWriter(self.ix)
+        writer.update_document(
             ID=record["ID"],
             reqID=record["reqID"],
             requester=record["requester"],
@@ -193,7 +194,8 @@ class SearchService:
         
     ############################################################
     ## UPDATE DOCUMENT
-    def update_approval_doc(writer, id, record):
+    def update_approval_doc(self, id, record):
+        writer = AsyncWriter(self.ix)
         writer.update_document(
             ID=str(id),
             reqID=str(record["reqID"]),
@@ -212,3 +214,13 @@ class SearchService:
         )
         writer.commit()
         logger.success("Approval doc has been updated")
+    
+    ############################################################
+    ## EXECUTE SEARCH
+    def execute_search(self, query):
+        with self.ix.searcher() as searcher:
+            parser = MultifieldParser(self.searchable_fields, schema=self.approval_schema)
+            query_obj = parser.parse(query)
+            results = searcher.search(query_obj)
+            # Convert results to list of dictionaries
+            return [dict(hit) for hit in results]

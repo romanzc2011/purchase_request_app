@@ -33,6 +33,7 @@ for the UI.
 uvicorn pras_api:app --port 5004
 """
 # Load environment variables
+searchService = SearchService()
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
@@ -72,6 +73,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 # Instantiate search service
 searchService = SearchService()
 searchService.create_whoosh_index()
+
 
 ##########################################################################
 ## JWT UTILITY FUNCTIONS
@@ -164,7 +166,6 @@ async def get_approval_data(
     
     # Convert each approval instance to Pydantic instance in foreach
     approval_data = [ps.AppovalSchema.model_validate(approval) for approval in approval]
-    print(approval_data)
     return approval_data
 
 ##########################################################################
@@ -177,7 +178,7 @@ async def get_search_data(
     db: Session = Depends(dbas.get_db_session)
 ):
     logger.info(f"Search for query: {query}")
-    results = search_service.get_search_results(query, db)
+    results = searchService.execute_search(query)
     return JSONResponse(content=jsonable_encoder(results))
 
 ##########################################################################

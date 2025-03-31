@@ -23,27 +23,19 @@ const API_URL = `${baseURL}${API_CALL}`;
 const DEBOUNCE_MS = 100;
 
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */
-const fetchSearchData = async (code: string, queryColumn?: string) => {
-    
-    const params = new URLSearchParams();
-    params.append("code", code);
-    if(queryColumn) {
-        params.append("column", queryColumn);
-    }
-    const searchURL = `${API_URL}/search?${params.toString()}`;
-    console.log("searchURL: ", searchURL);
-
-    const response = await fetch(searchURL, {
+async function fetchSearchData(query: string, queryColumn?: string) {
+    const url = `${API_URL}/search?query=${encodeURIComponent(query)}${queryColumn ? `&column=${queryColumn}` : ''}`;
+    const response = await fetch(url, {
         headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
     });
-
     if(!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
+        throw new Error('Response was not ok');
     }
-    console.log("JSON: ", response.json());
-    return response.json();
+
+    const data = await response.json();
+    return data;
 }
 
 /* SEARCH BAR */
@@ -56,28 +48,12 @@ function SearchBar({ setSearchQuery }: SearchBarProps) {
         setSearchQuery(debouncedQuery);
     }, [debouncedQuery, setSearchQuery]);
 
-    const queryResult = useQuery({
+    useQuery({
         queryKey: ['search-str', debouncedQuery],
         queryFn: async () => {
             if (!debouncedQuery) return [];
-
-            // Heuristic to determine the queryColumn based on the search term
-            const searchTerm: string = debouncedQuery.trim();
             let queryColumn: string | undefined;
-
-            // Searching for fund and boc
-            if(/^\d+$/.test(searchTerm)) {
-                // Test the first character to determine if it's BOC or Fund
-                const firstChar: string = searchTerm[0];
-                if(firstChar === '5' || firstChar === '0') {
-                    queryColumn = "fund";
-                } else if(firstChar === '3') {
-                    queryColumn = "budgetObjCode";
-                }
-            }
-            console.log("QUERY_RESULT: ", queryColumn);
             setSearchQuery(debouncedQuery);
-
             return fetchSearchData(debouncedQuery, queryColumn);
         },
         staleTime: DEBOUNCE_MS,
