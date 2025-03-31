@@ -6,17 +6,13 @@
 
 ######################################################################################
 from loguru import logger
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
 import db_alchemy_service as dbas
-from typing import Optional
-from db_alchemy_service import Approval
 from whoosh.filedb.filestore import FileStorage
+from whoosh.analysis import RegexTokenizer, LowercaseFilter, StopFilter
 from whoosh.fields import Schema, TEXT, ID, NUMERIC, BOOLEAN
 from whoosh.index import create_in
 from whoosh.writing import AsyncWriter
-from whoosh.analysis import StemmingAnalyzer
-from whoosh.qparser import MultifieldParser
+from whoosh.qparser import MultifieldParser, AndGroup
 import whoosh.index as index
 import os
 
@@ -25,7 +21,7 @@ import os
 ## CLASS SEARCH SERVICE
 ############################################################
 
-class SearchService:
+class SearchService():
     """
     Requistion ID and Search Service for the search bar on the Approvals Table.
     Put these two services together as they will both be dealing with the reqID.
@@ -75,60 +71,8 @@ class SearchService:
             # Open existing index
             self.ix = index.open_dir("indexdir", indexname="approvals")
             logger.success("Index opened successfully...")
-    
-    ## SEARCH RESULTS
-    def search_results(db: Session, query: str, query_column: Optional[str] = None):
-        """
-        Search for approval records based on a text query and an optional specific column.
-
-        If query_column is provided and valid, the search will be restricted to that column.
-        Otherwise, the search will be performed across all allowed columns.
-
-        Allowed columns:
-          - requester
-          - budgetObjCode
-          - fund
-          - location
-          - reqID
-          - status
-
-        :param db: Database session.
-        :param query: The search term.
-        :param query_column: Optional specific column to search.
-        :return: List of matching Approval records.
-        """
         
-        # Define allowed columns
-        allowed_columns = {
-            'requester': Approval.requester,
-            'budgetObjCode': Approval.budgetObjCode,
-            'fund': Approval.fund,
-            'location': Approval.location,
-            'reqID': Approval.reqID,
-            'status': Approval.status,
-        }
-        
-        if not query:
-            return db.query(Approval).all()
-        
-        # if a valid column is specified search by that column
-        if query_column in allowed_columns:
-            filter_expr = allowed_columns[query_column].ilike(f"%{query}%")
-            results = db.query(Approval).filter(filter_expr).all()
-        else:
-            # Otherwise search all allowed
-            results = db.query(Approval).filter(
-                or_(
-                    Approval.requester.ilike(f"%{query}%"),
-                    Approval.budgetObjCode.ilike(f"%{query}%"),
-                    Approval.fund.ilike(f"%{query}%"),
-                    Approval.location.ilike(f"%{query}%"),
-                    Approval.reqID.ilike(f"%{query}%"),
-                    Approval.status.ilike(f"%{query}%")
-                )
-            ).all()
-            
-        return results
+        self.analyzer = RegexTokenizer() | LowercaseFilter() | StopFilter()
 
     ############################################################
     ## CREATE WHOOSH INDEX
@@ -173,7 +117,7 @@ class SearchService:
     ## ADD APPROVAL DOC
     def add_approval_doc(self, record):
         writer = AsyncWriter(self.ix)
-        writer.update_document(
+        writer.updatee_document(
             ID=record["ID"],
             reqID=record["reqID"],
             requester=record["requester"],
@@ -214,13 +158,13 @@ class SearchService:
         )
         writer.commit()
         logger.success("Approval doc has been updated")
-    
+        
     ############################################################
     ## EXECUTE SEARCH
     def execute_search(self, query):
         with self.ix.searcher() as searcher:
-            parser = MultifieldParser(self.searchable_fields, schema=self.approval_schema)
+            parser = MultifieldParser(self.searchable_fields, schema=self.ix.schema, group=AndGroup)
             query_obj = parser.parse(query)
-            results = searcher.search(query_obj)
-            # Convert results to list of dictionaries
+            results = searcher.search(query_obj, limit=2)
+            # Convert results to a list of dictionaries
             return [dict(hit) for hit in results]

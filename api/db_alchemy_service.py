@@ -77,6 +77,8 @@ class Approval(Base):
     pending_approval: Mapped[bool] = mapped_column(Boolean)
     approved: Mapped[bool] = mapped_column(Boolean)
     status: Mapped[str] = mapped_column(String)
+    
+    
 
     # Link back to PurchaseRequest without cascade here.
     purchase_request = relationship(

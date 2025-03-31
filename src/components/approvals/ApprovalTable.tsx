@@ -9,12 +9,12 @@ import {
     TableHead,
     TableRow,
     Paper,
-    Button,
     Typography,
 } from "@mui/material";
 import { FormValues } from "../../types/formTypes";
-import { Box } from "@mui/material";
+import { Box, Button } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 
 /************************************************************************************ */
 /* CONFIG API URL- */
@@ -37,8 +37,8 @@ const fetchApprovalData = async () => {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
     });
-    
-    if(!response.ok) {
+
+    if (!response.ok) {
         throw new Error(`HTTP error: ${response.status}`);
     }
     const jsonData = await response.json();
@@ -47,7 +47,7 @@ const fetchApprovalData = async () => {
 }
 
 function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
-    const {isPending, isError, data, error} = useQuery({
+    const { isPending, isError, data, error } = useQuery({
         queryKey: ['approval_data', searchQuery],
         queryFn: fetchApprovalData,
     });
@@ -60,9 +60,9 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     /************************************************************************************ */
     /* APPROVE OR DENY */
     /************************************************************************************ */
-    const handleApprove = () => {};
+    const handleApprove = () => { };
 
-    const handleDeny = () => {};
+    const handleDeny = () => { };
 
     return (
         <Box sx={{ overflowX: "auto", height: '100vh', width: "100%" }}>
@@ -85,7 +85,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                     >
                         <TableRow>
                             {/**************************************************************************/}
-                                {/* REQUISITION ID */}
+                            {/* REQUISITION ID */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -96,7 +96,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 REQUISITION ID
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* RECIPIENT */}
+                            {/* RECIPIENT */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -104,11 +104,11 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
                                 RECIPIENT
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* BUDGET OBJECT CODE */}
+                            {/* BUDGET OBJECT CODE */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -116,11 +116,11 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
                                 BUDGET OBJECT CODE
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* FUND */}
+                            {/* FUND */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -128,11 +128,11 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
                                 FUND
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* LOCATION */}
+                            {/* LOCATION */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -140,11 +140,11 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
                                 LOCATION
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* QUANTITY */}
+                            {/* QUANTITY */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -152,11 +152,11 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
                                 QUANTITY
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* PRICE EACH */}
+                            {/* PRICE EACH */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -164,11 +164,11 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
                                 PRICE EACH
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* ESTIMATED PRICE */}
+                            {/* ESTIMATED PRICE */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -176,11 +176,11 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
                                 LINE TOTAL
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* STATUS */}
+                            {/* ITEM DESCRIPTION */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -188,11 +188,36 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
+                                ITEM DESCRIPTION
+                            </TableCell>
+
+                            {/**************************************************************************/}
+                            {/* JUSTIFICATION */}
+                            <TableCell
+                                sx={{
+                                    color: "white",
+                                    fontWeight: "bold",
+                                    textAlign: "center",
+                                }}
+                            >
+
+                                JUSTIFICATION
+                            </TableCell>
+                            {/**************************************************************************/}
+                            {/* STATUS */}
+                            <TableCell
+                                sx={{
+                                    color: "white",
+                                    fontWeight: "bold",
+                                    textAlign: "center",
+                                }}
+                            >
+
                                 STATUS
                             </TableCell>
                             {/**************************************************************************/}
-                                {/* ACTIONS */}
+                            {/* ACTIONS */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -200,7 +225,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                
+
                                 ACTIONS
                             </TableCell>
                         </TableRow>
@@ -266,6 +291,16 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                         : "0.00"}
                                 </TableCell>
                                 {/**************************************************************************/}
+                                {/* ITEM DESCRIPTION */}
+                                <TableCell sx={{ color: "white" }}>
+                                </TableCell>
+
+                                {/**************************************************************************/}
+                                {/* JUSTIFICATION */}
+                                <TableCell sx={{ color: "white" }}>
+                                </TableCell>
+
+                                {/**************************************************************************/}
                                 {/* STATUS */}
                                 <TableCell sx={{ color: "white" }}>
                                     {approval_data.status}
@@ -289,6 +324,13 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                         >
                                             Deny
                                         </Button>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            onClick={handleDeny}
+                                        >
+                                            <DownloadOutlinedIcon />
+                                        </Button>
                                     </Box>
                                 </TableCell>
                             </TableRow>
@@ -296,8 +338,8 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                     </TableBody>
                     <tfoot>
                         <TableRow>
-                            <TableCell colSpan={4}>
-                           
+                            <TableCell colSpan={6}>
+
                             </TableCell>
 
                             <TableCell
@@ -335,7 +377,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                     </tfoot>
                 </Table>
             </TableContainer>
-            </Box>
+        </Box>
     );
 }
 
