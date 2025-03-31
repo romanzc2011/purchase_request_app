@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import Optional
 
 ########################################################
 ## PYDANTIC SCHEMA -- structures data into pydantic, a style that easily converts to json with fastapi

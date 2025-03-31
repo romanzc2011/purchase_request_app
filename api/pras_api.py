@@ -12,7 +12,7 @@ from dotenv import load_dotenv, find_dotenv
 from ldap3.core.exceptions import LDAPBindError
 from multiprocessing.dummy import Pool as ThreadPool
 from adu_ldap_service import LDAPManager
-from search_service import create_whoosh_index
+from search_service import SearchService
 from notification_manager import NotificationManager
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -21,6 +21,7 @@ import db_alchemy_service as dbas
 import psutil
 import pydantic_schemas as ps
 import jwt  # PyJWT
+import search_service
 
 """
 AUTHOR: Roman Campbell
@@ -68,7 +69,9 @@ lock = threading.Lock()
 # OAuth2 scheme placeholder (used to extract JWT token from Authorization header)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
-create_whoosh_index()
+# Instantiate search service
+searchService = SearchService()
+searchService.create_whoosh_index()
 
 ##########################################################################
 ## JWT UTILITY FUNCTIONS
