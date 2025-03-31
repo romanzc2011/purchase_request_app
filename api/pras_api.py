@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException, status, UploadFile, File, Form, APIRouter
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 import uvicorn
@@ -11,9 +12,10 @@ from dotenv import load_dotenv, find_dotenv
 from ldap3.core.exceptions import LDAPBindError
 from multiprocessing.dummy import Pool as ThreadPool
 from adu_ldap_service import LDAPManager
-from search_service import SearchService
+from search_service import create_whoosh_index
 from notification_manager import NotificationManager
 from sqlalchemy.orm import Session
+from typing import Optional, List
 from werkzeug.utils import secure_filename
 import db_alchemy_service as dbas
 import psutil
@@ -55,7 +57,6 @@ logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
 
 ##########################################################################
 # Initialize services and shared objects
-search_service = SearchService()
 notifyManager = NotificationManager(
     msg_body=None, 
     to_recipient="roman_campbell@lawb.uscourts.gov", 
@@ -66,6 +67,8 @@ lock = threading.Lock()
 
 # OAuth2 scheme placeholder (used to extract JWT token from Authorization header)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+
+create_whoosh_index()
 
 ##########################################################################
 ## JWT UTILITY FUNCTIONS
@@ -163,10 +166,16 @@ async def get_approval_data(
 
 ##########################################################################
 ## GET SEARCH DATA
-@api_router.get("/getSearchData")
-async def get_search_data(query: str = "", current_user: str = Depends(get_current_user)):
-    results = search_service.get_search_results(query)
-    return JSONResponse(content=results)
+@api_router.get("/getSearchData/search", response_model=List[ps.AppovalSchema])
+async def get_search_data(
+    query: str = "", 
+    column: Optional[str] = None,
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(dbas.get_db_session)
+):
+    logger.info(f"Search for query: {query}")
+    results = search_service.get_search_results(query, db)
+    return JSONResponse(content=jsonable_encoder(results))
 
 ##########################################################################
 ## SEND TO approval -- being sent from the purchase req submit

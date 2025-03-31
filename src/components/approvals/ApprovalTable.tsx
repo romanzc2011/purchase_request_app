@@ -37,6 +37,7 @@ const fetchApprovalData = async () => {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
     });
+    
     if(!response.ok) {
         throw new Error(`HTTP error: ${response.status}`);
     }

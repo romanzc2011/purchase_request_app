@@ -111,7 +111,8 @@ def search_results(query: str):
             or_(
                 Approval.requester.ilike(f"%{query}%"),
                 Approval.recipient.ilike(f"%{query}%"),
-                Approval.fund.ilike(f"%{query}%")
+                Approval.fund.ilike(f"%{query}%"),
+                Approval.budgetObjCode.ilike({f"%{query}%"})
             )
         ).all()
         return results
