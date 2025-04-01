@@ -6,6 +6,7 @@
 
 ######################################################################################
 from loguru import logger
+from six import text_type
 import db_alchemy_service as dbas
 from sqlalchemy import event
 from sqlalchemy.orm.session import Session
@@ -71,7 +72,9 @@ class SearchService():
     
     ###################################################################################################
     ### INIT
-    def __init__(self):
+    def __init__(self, session=None):
+        self.session = session
+        self.primary_key = "ID"
         # Create index dir if it doesnt already exist
         if not os.path.exists("indexdir"):
             os.mkdir("indexdir")
@@ -97,8 +100,7 @@ class SearchService():
         using the predefined schema, retrieves all approval records from the database, and adds
         them to the index.
         """
-        
-        writer = AsyncWriter(self.ix)
+        writer = self.ix.writer()
         session = next(dbas.get_db_session())
         
         # Query approval table
@@ -120,8 +122,8 @@ class SearchService():
         logger.success("Whoosh Index created successfully")
         
     ############################################################
-    ## DIRTY APPROVAL -- dirty mean new or altered but not deleted, like Sessions
-    def dirty_approval_doc(self, id, record):
+    ## DIRTY APPROVAL -- altered but not deleted
+    def alter_approval_doc(self, id, record):
         writer = AsyncWriter(self.ix)
         record['ID'] = str(id)
         writer.update_document(**record)
@@ -129,8 +131,18 @@ class SearchService():
         logger.success("Approval doc has been updated")
         
     ############################################################
+    ## GET INDEX FOR MODEL CLASS
+    # Gets the whoosh index for this model, creating one if it does not exist.
+    def index_for_model_class(self, model_class):
+        index = self.indexes.get(model_class.__name__)
+        if index is None:
+            self.create_whoosh_index()
+        return index
+        
+    ############################################################
     ## EXECUTE SEARCH
     def execute_search(self, query):
+        
         with self.ix.searcher() as searcher:
             parser = MultifieldParser(self.searchable_fields, schema=self.ix.schema, group=AndGroup)
             query_obj = parser.parse(query)
@@ -142,14 +154,70 @@ class SearchService():
     ## BEFORE COMMIT
     def before_commit(self, session):
         self.to_update = {}
-        
+        logger.info("before_commit execution")
         for model in session.new:
             model_class = model.__class__
             if hasattr(model_class, 'searchable_fields'):
                 self.to_update.setdefault(model_class.__name__, []).append(
                     ("new", model))
         
+        for model in session.deleted:
+            model_class = model.__class__
+            if hasattr(model_class, 'searchable_fields'):
+                self.to_update.setdefault(model_class.__name__, []).append(
+                    ("deleted", model))
+                
+        for model in session.dirty:
+            model_class = model.__class__
+            if hasattr(model_class, 'searchable_fields'):
+                self.to_update.setdefault(model_class.__name__, []).append(
+                    ("changed", model))
+        
 
     ############################################################
     ## AFTER COMMIT
+    def after_commit(self, session):
+        """
+        Any db updates go through here. We check if any of these models have
+        ``__searchable__`` fields, indicating they need to be indexed. With these
+        we update the whoosh index for the model. If no index exists, it will be
+        created here; this could impose a penalty on the initial commit of a model.
+        """
+        logger.info("after_commit execution")
+        for typ, values in self.to_update.items():
+            model_class = values[0][1].__class__
+            index = self.index_for_model_class(model_class)
+            with index.writer() as writer:
+                searchable = model_class.__searchable__
+                
+                for change_type, model in values:
+                    writer.delete_by_term(
+                        self.primary_key, text_type(getattr(model, self.primary_key)))
+                    
+                    if change_type in ("new", "change"):
+                        attrs = {key: getattr(model, key) for key in searchable}
+                        attrs[self.primary_key] = text_type(
+                            getattr(model, self.primary_key))
+    
+    # class Searcher(object):
         
+    #     def __init__(self, model_class, primary, index, session=None):
+    #         self.model_class = model_class
+    #         self.primary = primary
+    #         self.index = index
+    #         self.session = session
+    #         self.searcher = index.searcher()
+    #         fields = set(index.schema._fields.keys()) - set([self.primary])
+    #         self.parser = MultifieldParser(list(fields), index.schema)
+            
+    #     def __call__(self, query, limit=None):
+    #         session = self.session
+    #         if not session:
+    #             session = dbas.get_db_session()
+
+    #         results = self.index.searcher().search(
+    #             self.parser.parse(query), limit=limit)
+    #         keys = [x[self.primary] for x in results]
+    #         primary_column = getattr(self.model_class, self.primary)
+    #         # Execute the query to return a list of results
+    #         return session.query(self.model_class).filter(primary_column.in_(keys)).all()

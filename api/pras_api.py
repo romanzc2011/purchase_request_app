@@ -33,7 +33,6 @@ for the UI.
 uvicorn pras_api:app --port 5004
 """
 # Load environment variables
-searchService = SearchService()
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
@@ -178,6 +177,7 @@ async def get_search_data(
     db: Session = Depends(dbas.get_db_session)
 ):
     logger.info(f"Search for query: {query}")
+    
     results = searchService.execute_search(query)
     return JSONResponse(content=jsonable_encoder(results))
 
