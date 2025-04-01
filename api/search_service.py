@@ -8,6 +8,7 @@
 from loguru import logger
 import db_alchemy_service as dbas
 from sqlalchemy import event
+from sqlalchemy.orm.session import Session
 from whoosh.filedb.filestore import FileStorage
 from whoosh.analysis import RegexTokenizer, LowercaseFilter, StopFilter
 from whoosh.fields import Schema, TEXT, ID, NUMERIC, BOOLEAN, DATETIME
@@ -81,6 +82,10 @@ class SearchService():
             logger.success("Index opened successfully...")
         
         self.analyzer = RegexTokenizer() | LowercaseFilter() | StopFilter()
+        
+        # Add event listeners
+        event.listen(Session, "before_commit", self.before_commit)
+        event.listen(Session, "after_commit", self.after_commit)
 
     ############################################################
     ## CREATE WHOOSH INDEX
@@ -99,53 +104,27 @@ class SearchService():
         # Query approval table
         approvals = dbas.get_all_approval(session)
         
+        # Define the list of fields to index
+        fields = ['ID', 'reqID', 'requester', 'recipient', 'budgetObjCode',
+                'fund', 'quantity', 'totalPrice', 'priceEach', 'location',
+                'newRequest', 'pendingApproval', 'approved', 'status',
+                'createdTime', 'approvedTime', 'deniedTime']
+        
         for approval in approvals:
-            writer.update_document(
-                ID=str(approval.ID),
-                reqID=str(approval.reqID),
-                requester=approval.requester,
-                recipient=approval.recipient,
-                budgetObjCode=approval.budgetObjCode,
-                fund=approval.fund,
-                quantity=approval.quantity,
-                totalPrice=approval.totalPrice,
-                priceEach=approval.priceEach,
-                location=approval.location,
-                newRequest=approval.newRequest,
-                pendingApproval=approval.pendingApproval,
-                approved=approval.approved,
-                status=approval.status,
-                createdTime=approval.createdTime,
-                approvedTime=approval.approvedTime,
-                deniedTime=approval.deniedTime
-            )
+            # Build dictionary dynamically via getattr
+            doc = {field: getattr(approval, field) for field in fields}
+            doc['ID'] = str(doc['ID'])
+            writer.update_document(**doc)
             
         writer.commit()
         logger.success("Whoosh Index created successfully")
         
     ############################################################
-    ## UPDATE DOCUMENT
-    def alter_approval_doc(self, id, record):
+    ## DIRTY APPROVAL -- dirty mean new or altered but not deleted, like Sessions
+    def dirty_approval_doc(self, id, record):
         writer = AsyncWriter(self.ix)
-        writer.update_document(
-            ID=str(id),
-            reqID=str(record["reqID"]),
-            requester=record["requester"],
-            recipient=record["recipient"],
-            budgetObjCode=record["budgetObjCode"],
-            fund=record["fund"],
-            quantity=record["quantity"],
-            totalPrice=record["totalPrice"],
-            priceEach=record["priceEach"],
-            location=record["location"],
-            newRequest=record["newRequest"],
-            pendingApproval=record["pendingApproval"],
-            approved=record["approved"],
-            status=record["status"],
-            createdTime=record["createdTime"],
-            approvedTime=record["approvedTime"],
-            deniedTime=record["deniedTime"]
-        )
+        record['ID'] = str(id)
+        writer.update_document(**record)
         writer.commit()
         logger.success("Approval doc has been updated")
         
@@ -158,3 +137,19 @@ class SearchService():
             results = searcher.search(query_obj, limit=2)
             # Convert results to a list of dictionaries
             return [dict(hit) for hit in results]
+        
+    ############################################################
+    ## BEFORE COMMIT
+    def before_commit(self, session):
+        self.to_update = {}
+        
+        for model in session.new:
+            model_class = model.__class__
+            if hasattr(model_class, 'searchable_fields'):
+                self.to_update.setdefault(model_class.__name__, []).append(
+                    ("new", model))
+        
+
+    ############################################################
+    ## AFTER COMMIT
+        
