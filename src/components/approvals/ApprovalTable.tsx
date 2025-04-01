@@ -10,11 +10,14 @@ import {
     TableRow,
     Paper,
     Typography,
+    Icon,
 } from "@mui/material";
 import { FormValues } from "../../types/formTypes";
 import { Box, Button } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
+import MoreDataButton from "./MoreDataButton";
+
 
 /************************************************************************************ */
 /* CONFIG API URL- */
@@ -30,7 +33,9 @@ interface ApprovalTableProps {
     searchQuery: string;
 }
 
+/************************************************************************************ */
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */
+/************************************************************************************ */
 const fetchApprovalData = async () => {
     const response = await fetch(API_URL, {
         headers: {
@@ -46,6 +51,9 @@ const fetchApprovalData = async () => {
     return jsonData;
 }
 
+/************************************************************************************ */
+/* APPROVALS TABLE */
+/************************************************************************************ */
 function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     const { isPending, isError, data, error } = useQuery({
         queryKey: ['approval_data', searchQuery],
@@ -292,17 +300,19 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 </TableCell>
                                 {/**************************************************************************/}
                                 {/* ITEM DESCRIPTION */}
-                                <TableCell sx={{ color: "white" }}>
+                                <TableCell sx={{ color: "white", textAlign: "center"}}>
+                                    <MoreDataButton />
                                 </TableCell>
 
                                 {/**************************************************************************/}
                                 {/* JUSTIFICATION */}
-                                <TableCell sx={{ color: "white" }}>
+                                <TableCell sx={{ color: "white", textAlign: "center" }}>
+                                    <MoreDataButton />
                                 </TableCell>
 
                                 {/**************************************************************************/}
                                 {/* STATUS */}
-                                <TableCell sx={{ color: "white" }}>
+                                <TableCell sx={{ color: "white", textAlign: "center" }}>
                                     {approval_data.status}
                                 </TableCell>
 

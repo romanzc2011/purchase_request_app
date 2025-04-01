@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
+from datetime import datetime
 
 ########################################################
 ## PYDANTIC SCHEMA -- structures data into pydantic, a style that easily converts to json with fastapi
@@ -30,9 +31,10 @@ class PurchaseRequestSchema(BaseModel):
     totalPrice: float
     location: str
     quantity: int
-    new_request: bool
-    pending_approval: bool
+    newRequest: bool
+    pendingApproval: bool
     approved: bool
+    createdTime: datetime
 
 # approval schema
 class AppovalSchema(BaseModel):
@@ -49,6 +51,9 @@ class AppovalSchema(BaseModel):
     priceEach: float
     location: str
     status: str
-    new_request: bool
-    pending_approval: bool
+    newRequest: bool
+    pendingApproval: bool
     approved: bool
+    createdTime: datetime
+    approvedTime: Optional[datetime] = None 
+    deniedTime: Optional[datetime] = None

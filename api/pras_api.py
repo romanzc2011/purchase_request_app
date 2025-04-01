@@ -320,8 +320,8 @@ def process_purchase_data(data):
                     logger.error("Invalid price or quantity:")
                     local_purchase_cols['totalPrice'] = 0
                     
-            local_purchase_cols['new_request'] = True
-            local_purchase_cols['pending_approval'] = False
+            local_purchase_cols['newRequest'] = True
+            local_purchase_cols['pendingApproval'] = False
             local_purchase_cols['approved'] = False
             
         except Exception as e:
@@ -345,21 +345,21 @@ def process_approval_data(processed_data):
     print("PROCESSED: ", processed_data)
     logger.info(f"Processing approval data: {processed_data}")
     
-    pending_approval = False
+    pendingApproval = False
     approval_data = {}
     
     if not isinstance(processed_data, dict):
         raise ValueError("Data must be a dictionary")
     
     # Determine approval status via status
-    if processed_data.get('new_request'):
+    if processed_data.get('newRequest'):
         approval_data['status'] = "NEW REQUEST"
         
-    elif processed_data.get('pending_approval'):
+    elif processed_data.get('pendingApproval'):
         approval_data['status'] = "PENDING"
         
-    elif (not processed_data.get('new_request') and
-          not processed_data.get('pending_approval') and
+    elif (not processed_data.get('newRequest') and
+          not processed_data.get('pendingApproval') and
           not processed_data.get('approved')):
         approval_data['status'] = "DENIED"
         
@@ -370,7 +370,7 @@ def process_approval_data(processed_data):
     allowed_keys = [
         'ID', 'reqID', 'requester', 'recipient', 'budgetObjCode', 
         'fund', 'quantity', 'totalPrice', 'priceEach', 'location', 
-        'new_request', 'pending_approval', 'approved'
+        'newRequest', 'pendingApproval', 'approved'
     ]
     
     # Populate approval_data from processed_data
@@ -402,9 +402,9 @@ def purchase_req_commit(processed_data):
             table = "purchase_request"
             dbas.insert_data(processed_data, table)
             approval_data = process_approval_data(processed_data)
-            logger.info(f"new_request: {processed_data.get('new_request')}")
+            logger.info(f"newRequest: {processed_data.get('newRequest')}")
             
-            if processed_data.get('new_request') == 1:
+            if processed_data.get('newRequest') == 1:
                 approval_data['status'] = "NEW REQUEST"
                 table = "approval"
                 dbas.insert_data(approval_data, table)

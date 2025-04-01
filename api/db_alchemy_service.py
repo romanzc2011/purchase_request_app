@@ -1,7 +1,7 @@
-
+from datetime import datetime, timezone
 from loguru import logger
 from sqlalchemy import (create_engine, or_, Column, String, Integer,
-                         Float, Boolean, Text, LargeBinary, ForeignKey)
+                         Float, Boolean, Text, LargeBinary, ForeignKey, DateTime)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.orm import Mapped, mapped_column
@@ -16,7 +16,7 @@ Base = declarative_base()
 # Define your session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-########################################################
+###################################################################################################
 ## PURCHASE REQUEST
 class PurchaseRequest(Base):
     __tablename__ = "purchase_request"
@@ -41,9 +41,10 @@ class PurchaseRequest(Base):
     totalPrice: Mapped[float] = mapped_column(Float)
     location: Mapped[str] = mapped_column(String)
     quantity: Mapped[int] = mapped_column(Integer)
-    new_request: Mapped[bool] = mapped_column(Boolean)
-    pending_approval: Mapped[bool] = mapped_column(Boolean)
+    newRequest: Mapped[bool] = mapped_column(Boolean)
+    pendingApproval: Mapped[bool] = mapped_column(Boolean)
     approved: Mapped[bool] = mapped_column(Boolean)
+    createdTime: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
      # Set up a one-to-one relationship with Approval on the parent side
     approval = relationship(
@@ -57,7 +58,7 @@ class PurchaseRequest(Base):
     def __repr__(self):
         return f"<PurchaseRequest(reqID='{self.reqID}', requester='{self.requester}', recipient='{self.recipient}')>"
 
-########################################################
+###################################################################################################
 ## approval TABLE
 class Approval(Base):
     __tablename__ =  "approval"
@@ -73,13 +74,14 @@ class Approval(Base):
     totalPrice: Mapped[float] = mapped_column(Float)
     priceEach: Mapped[float] = mapped_column(Float)
     location: Mapped[str] = mapped_column(String)
-    new_request: Mapped[bool] = mapped_column(Boolean)
-    pending_approval: Mapped[bool] = mapped_column(Boolean)
+    newRequest: Mapped[bool] = mapped_column(Boolean)
+    pendingApproval: Mapped[bool] = mapped_column(Boolean)
     approved: Mapped[bool] = mapped_column(Boolean)
     status: Mapped[str] = mapped_column(String)
+    createdTime: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    approvedTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    deniedTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
-    
-
     # Link back to PurchaseRequest without cascade here.
     purchase_request = relationship(
         "PurchaseRequest",
@@ -97,6 +99,7 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
+###################################################################################################
  ## Create session for functions/queries
 def get_db_session():
     db = SessionLocal()
@@ -104,8 +107,9 @@ def get_db_session():
         yield db
     finally:
         db.close()
- 
- ## Search for data
+
+###################################################################################################
+## Search for data
 def search_results(query: str):
     session = SessionLocal()
     try:
@@ -120,12 +124,14 @@ def search_results(query: str):
         return results
     finally:
         session.close()
-        
+
+###################################################################################################   
 ## Get all data from Approval
 def get_all_approval(db_session: Session):
     results = db_session.query(Approval).all()
     return results
 
+###################################################################################################
 # Insert data
 def insert_data(processed_data, table):
     logger.info(f"Inserting data into {table}, data: {processed_data}")
@@ -149,6 +155,7 @@ def insert_data(processed_data, table):
         db.commit()
         logger.info(f"Successfully inserted data into {table}")
 
+###################################################################################################
 # Retrieve data from single line
 def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     """

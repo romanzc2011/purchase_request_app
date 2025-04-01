@@ -7,12 +7,14 @@
 ######################################################################################
 from loguru import logger
 import db_alchemy_service as dbas
+from sqlalchemy import event
 from whoosh.filedb.filestore import FileStorage
 from whoosh.analysis import RegexTokenizer, LowercaseFilter, StopFilter
-from whoosh.fields import Schema, TEXT, ID, NUMERIC, BOOLEAN
+from whoosh.fields import Schema, TEXT, ID, NUMERIC, BOOLEAN, DATETIME
 from whoosh.index import create_in
 from whoosh.writing import AsyncWriter
 from whoosh.qparser import MultifieldParser, AndGroup
+from whoosh.qparser.dateparse import DateParserPlugin
 import whoosh.index as index
 import os
 
@@ -50,18 +52,24 @@ class SearchService():
         totalPrice=NUMERIC(stored=True, numtype=float),
         priceEach=NUMERIC(stored=True, numtype=float),
         location=TEXT(stored=True),         
-        new_request=BOOLEAN(stored=True),  
-        pending_approval=BOOLEAN(stored=True),
+        newRequest=BOOLEAN(stored=True),  
+        pendingApproval=BOOLEAN(stored=True),
         approved=BOOLEAN(stored=True),      
-        status=TEXT(stored=True)  
+        status=TEXT(stored=True),
+        createdTime=DATETIME(stored=True),
+        approvedTime=DATETIME(stored=True),
+        deniedTime=DATETIME(stored=True)
+        
     )
     
     searchable_fields = ['ID', 'reqID', 'requester', 'recipient', 'budgetObjCode','fund', 
-                      'quantity', 'totalPrice', 'priceEach', 'location', 'new_request', 
-                      'approved', 'pending_approval', 'status']
+                      'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
+                      'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
     
     storage = FileStorage("indexdir")
     
+    ###################################################################################################
+    ### INIT
     def __init__(self):
         # Create index dir if it doesnt already exist
         if not os.path.exists("indexdir"):
@@ -103,42 +111,21 @@ class SearchService():
                 totalPrice=approval.totalPrice,
                 priceEach=approval.priceEach,
                 location=approval.location,
-                new_request=approval.new_request,
-                pending_approval=approval.pending_approval,
+                newRequest=approval.newRequest,
+                pendingApproval=approval.pendingApproval,
                 approved=approval.approved,
-                status=approval.status
+                status=approval.status,
+                createdTime=approval.createdTime,
+                approvedTime=approval.approvedTime,
+                deniedTime=approval.deniedTime
             )
             
         writer.commit()
         logger.success("Whoosh Index created successfully")
-       
-            
-    ############################################################
-    ## ADD APPROVAL DOC
-    def add_approval_doc(self, record):
-        writer = AsyncWriter(self.ix)
-        writer.updatee_document(
-            ID=record["ID"],
-            reqID=record["reqID"],
-            requester=record["requester"],
-            recipient=record["recipient"],
-            budgetObjCode=record["budgetObjCode"],
-            fund=record["fund"],
-            quantity=record["quantity"],
-            totalPrice=record["totalPrice"],
-            priceEach=record["priceEach"],
-            location=record["location"],
-            new_request=record["new_request"],
-            pending_approval=record["pending_approval"],
-            approved=record["approved"],
-            status=record["status"]
-        )
-        writer.commit()
-        logger.success("Approval doc has been committed")
         
     ############################################################
     ## UPDATE DOCUMENT
-    def update_approval_doc(self, id, record):
+    def alter_approval_doc(self, id, record):
         writer = AsyncWriter(self.ix)
         writer.update_document(
             ID=str(id),
@@ -151,10 +138,13 @@ class SearchService():
             totalPrice=record["totalPrice"],
             priceEach=record["priceEach"],
             location=record["location"],
-            new_request=record["new_request"],
-            pending_approval=record["pending_approval"],
+            newRequest=record["newRequest"],
+            pendingApproval=record["pendingApproval"],
             approved=record["approved"],
-            status=record["status"]
+            status=record["status"],
+            createdTime=record["createdTime"],
+            approvedTime=record["approvedTime"],
+            deniedTime=record["deniedTime"]
         )
         writer.commit()
         logger.success("Approval doc has been updated")
