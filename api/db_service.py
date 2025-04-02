@@ -3,7 +3,7 @@ from loguru import logger
 from sqlalchemy import (create_engine, or_, Column, String, Integer,
                          Float, Boolean, Text, LargeBinary, ForeignKey, DateTime)
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 from pydantic_schemas import PurchaseRequestSchema, AppovalSchema
@@ -12,9 +12,7 @@ import json
 # Create engine and base
 engine = create_engine('sqlite:///db/purchase_request.db', echo=True)
 Base = declarative_base()
-
-# Define your session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+my_session = sessionmaker(engine)
 
 ###################################################################################################
 ## PURCHASE REQUEST
@@ -95,41 +93,25 @@ class Approval(Base):
             f"status='{self.status}')>")
     
 Base.metadata.create_all(engine)
-
-Session = sessionmaker(bind=engine)
-session = Session()
+my_session = sessionmaker(bind=engine)
 
 ###################################################################################################
  ## Create session for functions/queries
 def get_db_session():
-    db = SessionLocal()
+    db = my_session()
     try:
         yield db
     finally:
         db.close()
-
-###################################################################################################
-## Search for data
-def search_results(query: str):
-    session = SessionLocal()
-    try:
-        results = session.query(Approval).filter(
-            or_(
-                Approval.requester.ilike(f"%{query}%"),
-                Approval.recipient.ilike(f"%{query}%"),
-                Approval.fund.ilike(f"%{query}%"),
-                Approval.budgetObjCode.ilike({f"%{query}%"})
-            )
-        ).all()
-        return results
-    finally:
-        session.close()
 
 ###################################################################################################   
 ## Get all data from Approval
 def get_all_approval(db_session: Session):
     results = db_session.query(Approval).all()
     return results
+
+def send_message(queue):
+    queue.put("refresh_index")
 
 ###################################################################################################
 # Insert data

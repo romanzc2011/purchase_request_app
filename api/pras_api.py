@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
+from multiprocessing import Process, Queue
 import uvicorn
 from datetime import datetime, timedelta, timezone
 from typing import List
@@ -11,13 +12,15 @@ from loguru import logger
 from dotenv import load_dotenv, find_dotenv
 from ldap3.core.exceptions import LDAPBindError
 from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing import Queue, Process
 from adu_ldap_service import LDAPManager
 from search_service import SearchService
 from notification_manager import NotificationManager
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from werkzeug.utils import secure_filename
-import db_alchemy_service as dbas
+import db_service as dbas
+import ipc_service as ipc
 import psutil
 import pydantic_schemas as ps
 import jwt  # PyJWT
@@ -39,6 +42,8 @@ UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_request.db")
+ipc = ipc.IPC_Service()
+searchService = SearchService()
 
 #########################################################################
 ## APP CONFIGS
@@ -70,9 +75,6 @@ lock = threading.Lock()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 # Instantiate search service
-searchService = SearchService()
-searchService.create_whoosh_index()
-
 
 ##########################################################################
 ## JWT UTILITY FUNCTIONS
@@ -177,7 +179,8 @@ async def get_search_data(
     db: Session = Depends(dbas.get_db_session)
 ):
     logger.info(f"Search for query: {query}")
-    
+    ipc.send_to_shm()
+    #searchService.create_whoosh_index()
     results = searchService.execute_search(query)
     return JSONResponse(content=jsonable_encoder(results))
 

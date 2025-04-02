@@ -35,6 +35,7 @@ async function fetchSearchData(query: string, queryColumn?: string) {
     }
 
     const data = await response.json();
+    console.log(data)
     return data;
 }
 

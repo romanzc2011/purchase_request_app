@@ -7,7 +7,7 @@
 ######################################################################################
 from loguru import logger
 from six import text_type
-import db_alchemy_service as dbas
+import db_service as dbas
 from sqlalchemy import event
 from sqlalchemy.orm.session import Session
 from whoosh.filedb.filestore import FileStorage
@@ -18,8 +18,8 @@ from whoosh.writing import AsyncWriter
 from whoosh.qparser import MultifieldParser, AndGroup
 from whoosh.qparser.dateparse import DateParserPlugin
 import whoosh.index as index
+import ipc_service as ipc
 import os
-
 
 ############################################################
 ## CLASS SEARCH SERVICE
@@ -75,6 +75,7 @@ class SearchService():
     def __init__(self, session=None):
         self.session = session
         self.primary_key = "ID"
+        
         # Create index dir if it doesnt already exist
         if not os.path.exists("indexdir"):
             os.mkdir("indexdir")
@@ -89,10 +90,12 @@ class SearchService():
         # Add event listeners
         event.listen(Session, "before_commit", self.before_commit)
         event.listen(Session, "after_commit", self.after_commit)
-
+        
     ############################################################
     ## CREATE WHOOSH INDEX
     def create_whoosh_index(self):
+        shm_data = ipc.ipc_instance.receive_from_shm()
+        logger.success(f"{shm_data}")
         """
         Create a Whoosh index for approval records.
 
@@ -100,6 +103,7 @@ class SearchService():
         using the predefined schema, retrieves all approval records from the database, and adds
         them to the index.
         """
+        
         writer = self.ix.writer()
         session = next(dbas.get_db_session())
         
@@ -147,6 +151,7 @@ class SearchService():
             parser = MultifieldParser(self.searchable_fields, schema=self.ix.schema, group=AndGroup)
             query_obj = parser.parse(query)
             results = searcher.search(query_obj, limit=2)
+            
             # Convert results to a list of dictionaries
             return [dict(hit) for hit in results]
         
@@ -196,28 +201,8 @@ class SearchService():
                     
                     if change_type in ("new", "change"):
                         attrs = {key: getattr(model, key) for key in searchable}
-                        attrs[self.primary_key] = text_type(
-                            getattr(model, self.primary_key))
-    
-    # class Searcher(object):
-        
-    #     def __init__(self, model_class, primary, index, session=None):
-    #         self.model_class = model_class
-    #         self.primary = primary
-    #         self.index = index
-    #         self.session = session
-    #         self.searcher = index.searcher()
-    #         fields = set(index.schema._fields.keys()) - set([self.primary])
-    #         self.parser = MultifieldParser(list(fields), index.schema)
-            
-    #     def __call__(self, query, limit=None):
-    #         session = self.session
-    #         if not session:
-    #             session = dbas.get_db_session()
+                        attrs[self.primary_key] = text_type(getattr(model, self.primary_key))
+                        writer.add_document(**attrs)
 
-    #         results = self.index.searcher().search(
-    #             self.parser.parse(query), limit=limit)
-    #         keys = [x[self.primary] for x in results]
-    #         primary_column = getattr(self.model_class, self.primary)
-    #         # Execute the query to return a list of results
-    #         return session.query(self.model_class).filter(primary_column.in_(keys)).all()
+    ###################################################################################################
+    ## MESSAGE QUEUE -- for receiving message from db_service to update index
