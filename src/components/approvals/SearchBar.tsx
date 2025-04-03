@@ -23,7 +23,7 @@ const API_URL = `${baseURL}${API_CALL}`;
 const DEBOUNCE_MS = 100;
 
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */
-async function fetchSearchData(query: string, queryColumn?: string) {
+export async function fetchSearchData(query: string, queryColumn?: string) {
     const url = `${API_URL}/search?query=${encodeURIComponent(query)}${queryColumn ? `&column=${queryColumn}` : ''}`;
     const response = await fetch(url, {
         headers: {
@@ -35,7 +35,7 @@ async function fetchSearchData(query: string, queryColumn?: string) {
     }
 
     const data = await response.json();
-    console.log(data)
+    console.log("DATA:", data)
     return data;
 }
 

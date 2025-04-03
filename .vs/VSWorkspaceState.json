@@ -2,15 +2,15 @@
   "ExpandedNodes": [
     "",
     "\\api",
-    "\\api\\constants",
     "\\api\\db",
     "\\src",
     "\\src\\components",
+    "\\src\\components\\approvals",
     "\\src\\components\\purchase_req",
     "\\src\\services",
     "\\src\\types",
     "\\tls_certs"
   ],
-  "SelectedNode": "\\api\\pras_api.py",
+  "SelectedNode": "\\api\\search_service.py",
   "PreviewInSolutionExplorer": false
 }

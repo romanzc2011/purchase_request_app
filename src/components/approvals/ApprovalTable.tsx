@@ -17,6 +17,7 @@ import { Box, Button } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import MoreDataButton from "./MoreDataButton";
+import { fetchSearchData } from "./SearchBar";
 
 
 /************************************************************************************ */
@@ -55,15 +56,30 @@ const fetchApprovalData = async () => {
 /* APPROVALS TABLE */
 /************************************************************************************ */
 function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
-    const { isPending, isError, data, error } = useQuery({
-        queryKey: ['approval_data', searchQuery],
-        queryFn: fetchApprovalData,
+    const {
+        data: searchData,
+        isPending,
+        isError,
+        error,
+    } = useQuery({
+        queryKey: ['search-data', searchQuery],
+        queryFn: () => fetchSearchData(searchQuery),
+        enabled: !!searchQuery,  // only run when searchQuery exists
     });
-    const queryClient = useQueryClient();
-    const cachedSearchData = searchQuery && queryClient.getQueryData<FormValues[]>(['search-str', searchQuery]);
 
-    // If searchQuery exists and cachedData found, display that
-    const retval = searchQuery ? cachedSearchData || [] : data || [];
+    const { data: approvalData } = useQuery({
+        queryKey: ['approval_data'],
+        queryFn: fetchApprovalData,
+        enabled: !searchQuery,
+    });
+
+    // if searchQuery exists use searchData otherwise use approvalData
+    let retval;
+    if (searchQuery) {
+        retval = searchData ? searchData : []
+    } else {
+        retval = approvalData ? approvalData : [];
+    }
 
     /************************************************************************************ */
     /* APPROVE OR DENY */

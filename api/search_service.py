@@ -11,12 +11,13 @@ import db_service as dbas
 from sqlalchemy import event
 from sqlalchemy.orm.session import Session
 from whoosh.filedb.filestore import FileStorage
-from whoosh.analysis import RegexTokenizer, LowercaseFilter, StopFilter
+from whoosh.analysis import RegexTokenizer, LowercaseFilter, StopFilter, StemmingAnalyzer
 from whoosh.fields import Schema, TEXT, ID, NUMERIC, BOOLEAN, DATETIME
 from whoosh.index import create_in
 from whoosh.writing import AsyncWriter
 from whoosh.qparser import MultifieldParser, AndGroup
 from whoosh.qparser.dateparse import DateParserPlugin
+from whoosh.query import Term
 import whoosh.index as index
 import ipc_service as ipc
 import os
@@ -75,6 +76,7 @@ class SearchService():
     def __init__(self, session=None):
         self.session = session
         self.primary_key = "ID"
+        self.indexes = {}
         
         # Create index dir if it doesnt already exist
         if not os.path.exists("indexdir"):
@@ -84,13 +86,35 @@ class SearchService():
             # Open existing index
             self.ix = index.open_dir("indexdir", indexname="approvals")
             logger.success("Index opened successfully...")
-        
+            
+        self.create_whoosh_index()
         self.analyzer = RegexTokenizer() | LowercaseFilter() | StopFilter()
         
         # Add event listeners
         event.listen(Session, "before_commit", self.before_commit)
         event.listen(Session, "after_commit", self.after_commit)
         
+    def register_class(self, model_class):
+        """
+        Registers a model class, by creating the necessary Whoosh index if needed.
+        """
+        schema, primary = self._get_schema_and_primary(model_class)
+        self.indexes[model_class.__name__] = self.ix
+
+    def _get_schema_and_primary(self, model_class):
+        schema = {}
+        primary = None
+        for field in model_class.__table__.columns:
+            if field.primary_key:
+                schema[field.name] = whoosh.fields.ID(stored=True, unique=True)
+                primary = field.name
+            if field.name in model_class.__searchable__:
+                if type(field.type) in (sqlalchemy.types.Text,
+                                        sqlalchemy.types.UnicodeText):
+                    schema[field.name] = whoosh.fields.TEXT(
+                        analyzer=StemmingAnalyzer())
+        return Schema(**schema), primary
+            
     ############################################################
     ## CREATE WHOOSH INDEX
     def create_whoosh_index(self):
@@ -109,12 +133,7 @@ class SearchService():
         
         # Query approval table
         approvals = dbas.get_all_approval(session)
-        
-        # Define the list of fields to index
-        fields = ['ID', 'reqID', 'requester', 'recipient', 'budgetObjCode',
-                'fund', 'quantity', 'totalPrice', 'priceEach', 'location',
-                'newRequest', 'pendingApproval', 'approved', 'status',
-                'createdTime', 'approvedTime', 'deniedTime']
+        fields = dbas.Approval.__searchable__
         
         for approval in approvals:
             # Build dictionary dynamically via getattr
@@ -138,19 +157,37 @@ class SearchService():
     ## GET INDEX FOR MODEL CLASS
     # Gets the whoosh index for this model, creating one if it does not exist.
     def index_for_model_class(self, model_class):
-        index = self.indexes.get(model_class.__name__)
-        if index is None:
+        idx = self.indexes.get(model_class.__name__)
+        if idx is None:
             self.create_whoosh_index()
-        return index
+            idx = self.ix
+            self.indexes[model_class.__name__] = idx
+        return idx
+    
+    ############################################################################################
+    # EXACT SINGLETON SEARCH
+    def _exact_singleton_search(self, term, query, db: Session):
+        with self.ix.searcher() as searcher:
+            column_term = Term(term, query)
+            column_result = searcher.search(column_term, limit=1)
+
+            if column_result:
+                session = self.session if self.session is not None else db
+                return session.query(dbas.Approval).filter(getattr(dbas.Approval, term) == query).all()
         
     ############################################################
     ## EXECUTE SEARCH
-    def execute_search(self, query):
+    def execute_search(self, query, db: Session, limit=10):
         
         with self.ix.searcher() as searcher:
             parser = MultifieldParser(self.searchable_fields, schema=self.ix.schema, group=AndGroup)
             query_obj = parser.parse(query)
-            results = searcher.search(query_obj, limit=2)
+            results = searcher.search(query_obj, limit=6)
+            
+            # reqID -- display only this if exact match
+            singleton_query = self._exact_singleton_search("reqID", query, db)
+            if singleton_query:
+                return singleton_query
             
             # Convert results to a list of dictionaries
             return [dict(hit) for hit in results]
@@ -162,19 +199,21 @@ class SearchService():
         logger.info("before_commit execution")
         for model in session.new:
             model_class = model.__class__
-            if hasattr(model_class, 'searchable_fields'):
+            logger.success(f"{model_class}")
+            if hasattr(model_class, '__searchable__'):
+                logger.warning("BEFORE COMMIT")
                 self.to_update.setdefault(model_class.__name__, []).append(
                     ("new", model))
         
         for model in session.deleted:
             model_class = model.__class__
-            if hasattr(model_class, 'searchable_fields'):
+            if hasattr(model_class, '__searchable__'):
                 self.to_update.setdefault(model_class.__name__, []).append(
                     ("deleted", model))
                 
         for model in session.dirty:
             model_class = model.__class__
-            if hasattr(model_class, 'searchable_fields'):
+            if hasattr(model_class, '__searchable__'):
                 self.to_update.setdefault(model_class.__name__, []).append(
                     ("changed", model))
         
@@ -203,6 +242,3 @@ class SearchService():
                         attrs = {key: getattr(model, key) for key in searchable}
                         attrs[self.primary_key] = text_type(getattr(model, self.primary_key))
                         writer.add_document(**attrs)
-
-    ###################################################################################################
-    ## MESSAGE QUEUE -- for receiving message from db_service to update index

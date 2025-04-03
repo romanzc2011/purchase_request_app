@@ -181,7 +181,8 @@ async def get_search_data(
     logger.info(f"Search for query: {query}")
     ipc.send_to_shm()
     #searchService.create_whoosh_index()
-    results = searchService.execute_search(query)
+    results = searchService.execute_search(query, db)
+    logger.success(f"RESULT: {results}")
     return JSONResponse(content=jsonable_encoder(results))
 
 ##########################################################################
