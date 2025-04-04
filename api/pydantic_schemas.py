@@ -46,6 +46,8 @@ class AppovalSchema(BaseModel):
     recipient: str
     budgetObjCode: str
     fund: str
+    itemDescription: str
+    justification: str
     quantity: int
     totalPrice: float
     priceEach: float

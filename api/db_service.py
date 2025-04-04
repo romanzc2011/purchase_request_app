@@ -62,7 +62,7 @@ class Approval(Base):
     __tablename__ =  "approval"
     __searchable__ = ['ID', 'reqID', 'requester', 'recipient', 'budgetObjCode','fund', 
                       'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
-                      'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
+                      'approved', 'pendingApproval', 'createdTime', 'approvedTime', 'deniedTime']
 
     #  Use the same ID as purchase_request, creating a one-to-one relationship
     ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_request.ID"), primary_key=True, nullable=False)
@@ -72,6 +72,8 @@ class Approval(Base):
     budgetObjCode: Mapped[str] = mapped_column(String)
     fund: Mapped[str] = mapped_column(String)
     quantity: Mapped[int] = mapped_column(Integer)
+    itemDescription: Mapped[str] = mapped_column(Text)
+    justification: Mapped[str] = mapped_column(Text)
     totalPrice: Mapped[float] = mapped_column(Float)
     priceEach: Mapped[float] = mapped_column(Float)
     location: Mapped[str] = mapped_column(String)

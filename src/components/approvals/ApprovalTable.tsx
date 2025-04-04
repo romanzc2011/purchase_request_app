@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useState } from "react";
-import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
     Table,
     TableBody,
@@ -84,7 +83,9 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     /************************************************************************************ */
     /* APPROVE OR DENY */
     /************************************************************************************ */
-    const handleApprove = () => { };
+    async function handleApprove() {
+
+    }
 
     const handleDeny = () => { };
 
@@ -317,13 +318,13 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 {/**************************************************************************/}
                                 {/* ITEM DESCRIPTION */}
                                 <TableCell sx={{ color: "white", textAlign: "center"}}>
-                                    <MoreDataButton />
+                                    <MoreDataButton name="Item Description" data={approval_data.itemDescription} />
                                 </TableCell>
 
                                 {/**************************************************************************/}
                                 {/* JUSTIFICATION */}
                                 <TableCell sx={{ color: "white", textAlign: "center" }}>
-                                    <MoreDataButton />
+                                    <MoreDataButton name="Justification" data={approval_data.justification} />
                                 </TableCell>
 
                                 {/**************************************************************************/}

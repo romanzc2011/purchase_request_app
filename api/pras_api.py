@@ -372,8 +372,8 @@ def process_approval_data(processed_data):
     
     # Define allowed keys that correspond to the Approval model's columns.
     allowed_keys = [
-        'ID', 'reqID', 'requester', 'recipient', 'budgetObjCode', 
-        'fund', 'quantity', 'totalPrice', 'priceEach', 'location', 
+        'ID', 'reqID', 'requester', 'recipient', 'budgetObjCode',  'fund', 
+        'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location', 
         'newRequest', 'pendingApproval', 'approved'
     ]
     
