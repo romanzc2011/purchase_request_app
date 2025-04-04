@@ -21,9 +21,10 @@ class NotificationManager:
         self.cc_persons = cc_persons or [] # optional
     
     # Send notification email to recipients
-    def send_email(self, msg_body):
-        self.msg_body = msg_body
-        
+    def send_email(self, msg_body=None):
+        if msg_body is not None:
+            self.msg_body = msg_body
+
         # Send email using outlook
         try:
             pythoncom.CoInitialize()
@@ -31,15 +32,15 @@ class NotificationManager:
             mail = outlook.CreateItem(0)
             
             if not self.to_recipient:
-                logger.warn("Recipient email is not set")
+                logger.warning("Recipient email is not set")
                 raise ValueError("Receipient email is not set")
             
             if not self.subject:
-                logger.warn("Email subject is not set")
+                logger.warning("Email subject is not set")
                 raise ValueError("Email subject is not set")
             
             if not self.msg_body:
-                logger.warn("Message body is not set")
+                logger.warning("Message body is not set")
                 raise ValueError("Message body is not set")
             
             mail.Subject = self.subject
@@ -62,51 +63,49 @@ class NotificationManager:
         with open(template_path, "r") as file:
             template = file.read()
         return template
-        
+
     ##################################################################
-    ## GENE
-    ##################################################################
-    ## SETTERS
+    # SETTERS
     def set_msg_body(self, value):
-        self._msg_body = value
-        
+        self.msg_body = value
+
     def set_to_recipient(self, value):
         self._to_recipient = value
-        
+
     def set_from_sender(self, value):
         self._from_sender = value
-    
+
     def set_subject(self, value):
         self._subject = value
-    
+
     def set_cc_persons(self, value):
         self._cc_persons = value
-        
+
     def set_msg_data(self, value):
         self._msg_data = value
-        
+
     def set_link(self, value):
         self._link = value
-        
+
     ##################################################################
-    ## GETTERS
+    # GETTERS
     def get_msg_body(self):
         return self._msg_body
-        
+
     def get_to_recipient(self):
         return self._to_recipient
-        
+
     def get_from_sender(self):
         return self._from_sender
-    
-    def set_subject(self):
+
+    def get_subject(self): 
         return self._subject
-    
-    def set_cc_persons(self):
+
+    def get_cc_persons(self):
         return self._cc_persons
-        
-    def set_msg_data(self):
+
+    def get_msg_data(self): 
         return self._msg_data
-        
-    def set_link(self):
+
+    def get_link(self):
         return self._link

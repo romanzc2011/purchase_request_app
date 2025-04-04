@@ -9,7 +9,6 @@ import {
     TableRow,
     Paper,
     Typography,
-    Icon,
 } from "@mui/material";
 import { FormValues } from "../../types/formTypes";
 import { Box, Button } from "@mui/material";
@@ -18,13 +17,14 @@ import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import MoreDataButton from "./MoreDataButton";
 import { fetchSearchData } from "./SearchBar";
 
-
 /************************************************************************************ */
 /* CONFIG API URL- */
 /************************************************************************************ */
 const baseURL = import.meta.env.VITE_API_URL;
-const API_CALL: string = "/api/getApprovalData";
-const API_URL = `${baseURL}${API_CALL}`;
+const API_CALL1: string = "/api/getApprovalData";
+const API_CALL2: string = "/api/approveDenyRequest";
+const API_URL2 = `${baseURL}${API_CALL2}`;
+const API_URL1 = `${baseURL}${API_CALL1}`;
 
 /* INTERFACE */
 interface ApprovalTableProps {
@@ -37,7 +37,7 @@ interface ApprovalTableProps {
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */
 /************************************************************************************ */
 const fetchApprovalData = async () => {
-    const response = await fetch(API_URL, {
+    const response = await fetch(API_URL1, {
         headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
@@ -83,11 +83,39 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     /************************************************************************************ */
     /* APPROVE OR DENY */
     /************************************************************************************ */
-    async function handleApprove() {
-
+    async function handleApproveDeny(id: string, status: string) {
+        try {
+            const response = await fetch(API_URL2, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                },
+                body: JSON.stringify({
+                    ID: id,
+                    status: status,
+                })
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log("FetchService.ts", data);
+            return data;
+        }
+        catch (error) {
+            console.error("FetchService.ts", error);
+            throw error;
+        }
     }
-
-    const handleDeny = () => { };
+    
+    async function handleDownload() {
+        // Handle download action here      
+        console.log("Download clicked");
+        // Add your logic to download the item
+    }
+     /************************************************************************************ */
+     /* APPROVAL TABLE */
 
     return (
         <Box sx={{ overflowX: "auto", height: '100vh', width: "100%" }}>
@@ -340,21 +368,21 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                         <Button
                                             variant="contained"
                                             color="success"
-                                            onClick={handleApprove}
+                                            onClick={() => handleApproveDeny(approval_data.ID, 'approve')}
                                         >
                                             Approve
                                         </Button>
                                         <Button
                                             variant="contained"
                                             color="error"
-                                            onClick={handleDeny}
+                                            onClick={() => handleApproveDeny(approval_data.ID, 'deny')}
                                         >
                                             Deny
                                         </Button>
                                         <Button
                                             variant="contained"
                                             color="primary"
-                                            onClick={handleDeny}
+                                            onClick={() => handleDownload}
                                         >
                                             <DownloadOutlinedIcon />
                                         </Button>

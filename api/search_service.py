@@ -19,7 +19,6 @@ from whoosh.qparser import MultifieldParser, AndGroup
 from whoosh.qparser.dateparse import DateParserPlugin
 from whoosh.query import Term
 import whoosh.index as index
-import ipc_service as ipc
 import os
 
 ############################################################
@@ -118,8 +117,6 @@ class SearchService():
     ############################################################
     ## CREATE WHOOSH INDEX
     def create_whoosh_index(self):
-        shm_data = ipc.ipc_instance.receive_from_shm()
-        logger.success(f"{shm_data}")
         """
         Create a Whoosh index for approval records.
 

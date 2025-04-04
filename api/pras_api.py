@@ -20,11 +20,9 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from werkzeug.utils import secure_filename
 import db_service as dbas
-import ipc_service as ipc
 import psutil
 import pydantic_schemas as ps
 import jwt  # PyJWT
-import search_service
 
 """
 AUTHOR: Roman Campbell
@@ -42,8 +40,7 @@ UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_request.db")
-ipc = ipc.IPC_Service()
-searchService = SearchService()
+search_service = SearchService()
 
 #########################################################################
 ## APP CONFIGS
@@ -63,7 +60,7 @@ logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
 
 ##########################################################################
 # Initialize services and shared objects
-notifyManager = NotificationManager(
+notify_manager = NotificationManager(
     msg_body=None, 
     to_recipient="roman_campbell@lawb.uscourts.gov", 
     from_sender="Purchase Request", 
@@ -73,8 +70,6 @@ lock = threading.Lock()
 
 # OAuth2 scheme placeholder (used to extract JWT token from Authorization header)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
-
-# Instantiate search service
 
 ##########################################################################
 ## JWT UTILITY FUNCTIONS
@@ -179,9 +174,7 @@ async def get_search_data(
     db: Session = Depends(dbas.get_db_session)
 ):
     logger.info(f"Search for query: {query}")
-    ipc.send_to_shm()
-    #searchService.create_whoosh_index()
-    results = searchService.execute_search(query, db)
+    results = search_service.execute_search(query, db)
     logger.success(f"RESULT: {results}")
     return JSONResponse(content=jsonable_encoder(results))
 
@@ -286,6 +279,53 @@ async def get_req_id(data: dict = None, current_user: str = Depends(get_current_
     return JSONResponse(content={"reqID": req_id})
 
 ##########################################################################
+## APPROVE/DENY PURCHASE REQUEST
+@api_router.post("/approveDenyRequest")
+async def approve_deny_request(data: dict, current_user: str = Depends(get_current_user)):
+    if not data:
+        raise HTTPException(status_code=400, detail="Invalid data")
+    
+    ## Setup email
+    notify_manager.set_from_sender("Purchase Request")
+    notify_manager.set_subject("Purchase Request Final Approval Notification")
+    notify_manager.set_to_recipient("roman_campbell@lawb.uscourts.gov")   # in production, this should be the final approver
+    
+    logger.info("approve_deny_request:")
+    logger.info(data)
+    
+    ## Get ID and status from data
+    ID = data.get("ID")
+    status = data.get("status")
+    
+    if not ID or not status:
+        raise HTTPException(status_code=400, detail="Missing ID or status")
+    
+    logger.info(f"ID: {ID}, Status: {status}")
+    
+    ## Request has been approved or denied
+    if status == "approve":
+        notify_manager.set_msg_body("Request approved")
+        notify_manager.set_msg_data(data)
+        
+        #dbas.update_approval_status(ID, approved=True, pendingApproval=False)
+        
+        logger.success(f"Request {ID} approved")
+    
+    ## Request has been denied
+    elif status == "deny":
+        notify_manager.set_msg_body("Request denied")
+        notify_manager.set_msg_data(data)
+        #dbas.update_approval_status(ID, approved=False, pendingApproval=False)
+        logger.error(f"Request {ID} denied")
+    
+    ## Prepare email and send to final approver, the first approver (Matt) sets it to pending_approval = true
+    ## Peter, Edmund, Ted make up final approvers, sets it to approved = true
+    notify_manager.send_email()
+    
+    
+    return {"message": "Request approved/denied successfully"} 
+
+##########################################################################
 ##########################################################################
 ## PROGRAM FUNCTIONS -- non API
 ##########################################################################
@@ -386,9 +426,9 @@ def process_approval_data(processed_data):
     ## SENDING NOTIFICATION OF NEW REQUEST
     # Create email body and send to approver
     logger.info("Sending notification email to approver...")
-    email_template = notifyManager.load_email_template("./notification_template.html")
+    email_template = notify_manager.load_email_template("./notification_template.html")
     email_body = email_template.format(**processed_data)
-    notifyManager.send_email(email_body)
+    notify_manager.send_email(email_body)
                     
     return approval_data
 

@@ -5,7 +5,10 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Modal from '@mui/material/Modal';
-
+/*************************************************************************************/
+/* MoreDataButton simply the MORE icons in ApprovalTable for itemDescription and
+   justification. Not enough room in table so this way they can see all the data */
+/*************************************************************************************/
 interface MoreDataButtonProps {
     name: string;
     data: string;
