@@ -4,6 +4,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from multiprocessing import Process, Queue
+from sqlalchemy import select
 import uvicorn
 from datetime import datetime, timedelta, timezone
 from typing import List
@@ -297,32 +298,48 @@ async def approve_deny_request(data: dict, current_user: str = Depends(get_curre
     ID = data.get("ID")
     status = data.get("status")
     
-    if not ID or not status:
-        raise HTTPException(status_code=400, detail="Missing ID or status")
+    with next(dbas.get_db_session()) as db:
+        # Check if ID exists in the database
+        condition = dbas.Approval.ID == data.get("ID")
+        columns = [dbas.Approval.ID, dbas.Approval.approved, dbas.Approval.pendingApproval, 
+                   dbas.Approval.status, dbas.Approval.newRequest]
+        
+        # Fetch the record
+        result = db.query(*columns).filter(condition).params({"ID": ID}).first()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="ID not found in database")
+        
+        if not ID or not status:
+            raise HTTPException(status_code=400, detail="Missing ID or status")
+        
+        current_approved = result[1] if result else None
+        current_pendingApproval = result[2] if result else None
+        current_status = result[3] if result else None
+        current_newRequest = result[4] if result else None
     
-    logger.info(f"ID: {ID}, Status: {status}")
+    # This is a new request, so we need to set the status to "PENDING" and update the database
+    # status is either "approve" or "deny"
+    if status == "approve" and current_newRequest and current_status == "NEW REQUEST" and not current_pendingApproval and not current_approved:
+
+        # Update the status to "PENDING" in the database
+        dbas.update_data(ID, 'approval', approved=False, pendingApproval=True, status="PENDING", newRequest=False)
     
-    ## Request has been approved or denied
-    if status == "approve":
-        notify_manager.set_msg_body("Request approved")
+        notify_manager.set_msg_body("Request pending approval")
         notify_manager.set_msg_data(data)
-        
-        #dbas.update_approval_status(ID, approved=True, pendingApproval=False)
-        
-        logger.success(f"Request {ID} approved")
     
     ## Request has been denied
     elif status == "deny":
+        dbas.update_data(ID, 'approval', approved=False, pendingApproval=False, status="DENIED", newRequest=False)
+        
         notify_manager.set_msg_body("Request denied")
         notify_manager.set_msg_data(data)
-        #dbas.update_approval_status(ID, approved=False, pendingApproval=False)
+        
         logger.error(f"Request {ID} denied")
     
     ## Prepare email and send to final approver, the first approver (Matt) sets it to pending_approval = true
     ## Peter, Edmund, Ted make up final approvers, sets it to approved = true
     notify_manager.send_email()
-    
-    
     return {"message": "Request approved/denied successfully"} 
 
 ##########################################################################

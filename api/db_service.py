@@ -143,6 +143,35 @@ def insert_data(processed_data, table):
         logger.info(f"Successfully inserted data into {table}")
 
 ###################################################################################################
+# Update data
+def update_data(ID, table, **kwargs):
+    logger.info(f"Updating {table} with ID {ID}, data: {kwargs}")
+    
+    if not kwargs or not isinstance(kwargs, dict):
+        raise ValueError("Update data must be a non-empty dictionary")
+    
+    with next(get_db_session()) as db:
+        if table == "purchase_request":
+            obj = db.query(PurchaseRequest).filter(PurchaseRequest.ID == ID).first()
+        elif table == "approval":
+            obj = db.query(Approval).filter(Approval.ID == ID).first()
+        else:
+            raise ValueError(f"Unsupported table: {table}")
+        
+        if obj:
+            for key, value in kwargs.items():
+                if hasattr(obj, key):
+                    setattr(obj, key, value)
+                else:
+                    raise ValueError(f"Invalid field: {key}")
+            
+            db.commit()
+            logger.info(f"Successfully updated {table} with ID {ID}")
+        else:
+            logger.error(f"Object with ID {ID} not found in {table}")
+            raise ValueError(f"Object with ID {ID} not found in {table}")
+        
+###################################################################################################
 # Retrieve data from single line
 def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     """

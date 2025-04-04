@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Table,
     TableBody,
@@ -55,11 +55,9 @@ const fetchApprovalData = async () => {
 /* APPROVALS TABLE */
 /************************************************************************************ */
 function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
+    const queryClient = useQueryClient();
     const {
         data: searchData,
-        isPending,
-        isError,
-        error,
     } = useQuery({
         queryKey: ['search-data', searchQuery],
         queryFn: () => fetchSearchData(searchQuery),
@@ -80,9 +78,11 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
         retval = approvalData ? approvalData : [];
     }
 
+    // Check if the data is empty and display a message if it is
     /************************************************************************************ */
     /* APPROVE OR DENY */
     /************************************************************************************ */
+    // Get the current state of newRequest, approved, and pendingApproval
     async function handleApproveDeny(id: string, status: string) {
         try {
             const response = await fetch(API_URL2, {
@@ -100,7 +100,9 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                 throw new Error(`HTTP error: ${response.status}`);
             }
             const data = await response.json();
-            console.log("FetchService.ts", data);
+
+            // Invalidate the query to to trigger a refetch
+            queryClient.invalidateQueries({ queryKey: ['approval_data'] });
             return data;
         }
         catch (error) {
@@ -108,14 +110,14 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
             throw error;
         }
     }
-    
+
     async function handleDownload() {
         // Handle download action here      
         console.log("Download clicked");
         // Add your logic to download the item
     }
-     /************************************************************************************ */
-     /* APPROVAL TABLE */
+    /************************************************************************************ */
+    /* APPROVAL TABLE */
 
     return (
         <Box sx={{ overflowX: "auto", height: '100vh', width: "100%" }}>
@@ -345,7 +347,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 </TableCell>
                                 {/**************************************************************************/}
                                 {/* ITEM DESCRIPTION */}
-                                <TableCell sx={{ color: "white", textAlign: "center"}}>
+                                <TableCell sx={{ color: "white", textAlign: "center" }}>
                                     <MoreDataButton name="Item Description" data={approval_data.itemDescription} />
                                 </TableCell>
 
