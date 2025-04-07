@@ -1,5 +1,6 @@
 from loguru import logger
 from adu_ldap_service import LDAPManager
+from ipc_service import IPC_Service
 import pythoncom
 import win32com.client as win32
 import os
@@ -60,22 +61,36 @@ class EmailService:
             ## Create dynamic message body
             ################################################################
             ## FIRST APPROVER
-            if self.get_first_approver() is not None:
+            NEW_REQUEST = False
+            PENDING = False
+            
+            stats = IPC_Service().receive_from_shm()
+            if stats == b"NEW_REQUEST":
+                NEW_REQUEST = True
+            elif stats == b"PENDING":
+                PENDING = True
+                
+            if self.get_first_approver() is not None and NEW_REQUEST:
                 mail.Subject = "Purchase Request Notification - First Approver"
                 mail.HTMLBody = "<p>Dear {first_approver},</p><p>You have a new purchase request to review.</p>"
                 self.msg_body = self.msg_body.replace("{first_approver}", self.get_first_approver())
+                mail.To = self.get_first_approver()
+                
                 
             ## FINAL APPROVER
-            if self.get_final_approver() is not None:
+            if self.get_final_approver() is not None and PENDING:
                 mail.Subject = "Purchase Request Notification - Final Approver"
                 mail.HTMLBody = "<p>Dear {final_approver},</p><p>You have a new purchase request to review.</p>"
                 self.msg_body = self.msg_body.replace("{final_approver}", self.get_final_approver())
+                mail.To(self.get_final_approver())
+                mail.Recipients.Add(self.get_first_approver())
             
             ## REQUESTER
-            if self.get_requester() is not None:
+            if self.get_requester() is not None and NEW_REQUEST:
                 mail.Subject = "Purchase Request Notification - Requester"
                 mail.HTMLBody = "<p>Dear {requester},</p><p>Your purchase request has been submitted.</p>"
                 self.msg_body = self.msg_body.replace("{requester}", self.get_requester())
+                mail.Recipients.Add(self.get_requester())
             
             mail.Subject = self.subject
             mail.HTMLBody = self.msg_body
@@ -133,7 +148,7 @@ class EmailService:
     ##################################################################
     # GETTERS
     def get_msg_body(self):
-        return self._msg_body
+        return self.msg_body
     
     def get_requester(self):
         return self.requester
@@ -142,19 +157,19 @@ class EmailService:
         return self.first_approver
     
     def get_final_approver(self):
-        return self._final_approver
+        return self.final_approver
 
     def get_from_sender(self):
-        return self._from_sender
+        return self.from_sender
 
     def get_subject(self): 
-        return self._subject
+        return self.subject
 
     def get_cc_persons(self):
-        return self._cc_persons
+        return self.cc_persons
 
     def get_msg_data(self): 
-        return self._msg_data
+        return self.msg_data
 
     def get_link(self):
-        return self._link
+        return self.link

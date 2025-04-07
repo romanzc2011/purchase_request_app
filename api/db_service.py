@@ -143,6 +143,23 @@ def insert_data(processed_data, table):
         logger.info(f"Successfully inserted data into {table}")
 
 ###################################################################################################
+# Get status of request from Approval table
+def get_status_by_id(db_session: Session, ID: str):
+    logger.info(f"Fetching status for ID: {ID}")
+    
+    if not ID:
+        raise ValueError("ID must be a non-empty string")
+    
+    result = db_session.query(Approval).filter(Approval.ID == ID).first()
+    
+    if result:
+        return result.status
+    else:
+        logger.error(f"Object with ID {ID} not found in Approval table")
+        raise ValueError(f"Object with ID {ID} not found in Approval table")
+
+
+###################################################################################################
 # Update data
 def update_data(ID, table, **kwargs):
     logger.info(f"Updating {table} with ID {ID}, data: {kwargs}")

@@ -18,6 +18,7 @@ from adu_ldap_service import LDAPManager
 from search_service import SearchService
 from email_service import EmailService
 from sqlalchemy.orm import Session
+from ipc_service import IPC_Service
 from typing import Optional, List
 from werkzeug.utils import secure_filename
 import db_service as dbas
@@ -316,6 +317,21 @@ async def approve_deny_request(data: dict, current_user: str = Depends(get_curre
         condition = dbas.Approval.ID == data.get("ID")
         columns = [dbas.Approval.ID, dbas.Approval.approved, dbas.Approval.pendingApproval, 
                    dbas.Approval.status, dbas.Approval.newRequest]
+        
+        # Get ID and check current status, NEW send email to first approver and requester
+        # PENDING send email to final approver
+        # DENIED send email to requester
+        current_status = dbas.get_status_by_id(db, ID)
+        
+        if current_status == "NEW REQUEST":
+            # Send email to first approver and requester
+            IPC_Service().send_to_shm("NEW_REQUEST")
+            logger.info(f"ID {ID} is a new request")
+            
+        elif current_status == "PENDING":
+            # Send email to final approver
+            IPC_Service().send_to_shm("PENDING_APPROVAL")
+            logger.info(f"ID {ID} is pending approval")
         
         # Fetch the record
         result = db.query(*columns).filter(condition).params({"ID": ID}).first()
