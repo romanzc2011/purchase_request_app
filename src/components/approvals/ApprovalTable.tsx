@@ -348,7 +348,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 {/**************************************************************************/}
                                 {/* ITEM DESCRIPTION */}
                                 <TableCell sx={{ color: "white", textAlign: "center" }}>
-                                    <MoreDataButton name="Item Description" data={approval_data.itemDescription} />
+                                        {approval_data.itemDescription}
                                 </TableCell>
 
                                 {/**************************************************************************/}

@@ -42,6 +42,8 @@ class LDAPManager:
     it_group_dns: bool = False
     cue_group_dns: bool = False
     access_group_dns: bool = False
+    is_authenticated: bool = False
+    conn: Connection = field(default=None, init=False)
     
     #####################################################################################
     ## GET CONNECTION of ldaps
@@ -54,11 +56,14 @@ class LDAPManager:
         
         try:
             conn = Connection(server,user=username, password=password, auto_bind=True)
+            
             if conn.bound:
                 print("\n#####################################################################")
                 print(f"\n✅ --- Successfully authenticated to {self.server_name}")
                 print(f"\n# ---- Authenticated as: {username}")
                 print("\n#####################################################################")
+                self.set_is_authenticated(True)
+                self.set_conn(conn)
                 
             return conn
         
@@ -92,6 +97,7 @@ class LDAPManager:
                 )
                 
                 if conn.entries:
+                    print(f"entries: {conn.entries}")
                     # Extract full DN of all members
                     group_entry = conn.entries[0]
                     members_dn_list = group_entry.member.values
@@ -102,6 +108,7 @@ class LDAPManager:
                     match = re.search(r'CN=LAWB_([^,]+)', group)
                     group_name = match.group(1) if match else "Uknown"
                     
+                    
                     matched_user = None
                     for member_dn in members_dn_list:
                         # Query LDAP for each DN to get their sAMAccountName (username)
@@ -109,8 +116,15 @@ class LDAPManager:
                             search_base=member_dn,
                             search_filter="(objectClass=person)",  # search for user object
                             search_scope=SUBTREE,
-                            attributes=['sAMAccountName']
+                            attributes=['sAMAccountName', 'mail']
                         )
+                        
+                        if conn.entries:
+                            entry = conn.entries[0]
+                            print(f"DN: {entry.entry_dn}")
+                            for attribute, values in entry.entry_attributes_as_dict.items():
+                                print(f"{attribute}: {values}")
+                            print("-----------------------------\n")
                         
                         if conn.entries:
                             member_username = conn.entries[0].sAMAccountName.value
@@ -131,12 +145,54 @@ class LDAPManager:
                                     self.access_group_dns = True
                                     user_groups["ACCESS_GROUP"] = self.access_group_dns
                                     continue
-                                    
-            print(f"\n{self.it_group_dns}")
-            print(f"{self.cue_group_dns}")
-            print(f"{self.access_group_dns}")
             
             return user_groups
 
         except Exception as e:
             logger.error(f"ERROR: {e}")
+
+    #####################################################################################
+    ## EMAIL ADDRESS LOOKUP
+    def get_email_address(self, conn, username):
+        try:
+            conn.search(
+                search_base='DC=ADU,DC=DCN',
+                search_filter=f'(sAMAccountName={username})',
+                search_scope=SUBTREE,
+                attributes=['mail']
+            )
+            
+            if conn.entries:
+                email_address = conn.entries[0].mail.value
+                return email_address
+            else:
+                logger.error(f"User {username} not found in LDAP.")
+                return None
+        except Exception as e:
+            logger.error(f"Error retrieving email address: {e}")
+            return None
+        
+    #####################################################################################
+    ## GET/SET CONNECTION   
+    def set_is_authenticated(self, value):
+        self.is_authenticated = value
+        
+    def get_is_authenticated(self):
+        return self.is_authenticated
+    
+    def set_conn(self, conn):
+        self.conn = conn
+        
+    def get_conn(self):
+        return self.conn
+    
+    def set_username(self, username):
+        self.username = username
+    
+    def get_username(self):
+        return self.username
+
+    #####################################################################################
+    ## EMAIL ADDRESS LOOKUP
+    
+            

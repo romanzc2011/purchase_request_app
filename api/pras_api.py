@@ -16,7 +16,7 @@ from multiprocessing.dummy import Pool as ThreadPool
 from multiprocessing import Queue, Process
 from adu_ldap_service import LDAPManager
 from search_service import SearchService
-from notification_manager import NotificationManager
+from email_service import NotificationManager
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from werkzeug.utils import secure_filename
@@ -30,8 +30,9 @@ AUTHOR: Roman Campbell
 DATE: 01/03/2025
 NAME: PRAS - (Purchase Request Approval System)
 Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
-for the UI. 
+for the UI. When making a purchase request, user will use the their AD username for requestor/recipient.
 
+TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
 # Load environment variables
@@ -42,6 +43,7 @@ LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_request.db")
 search_service = SearchService()
+ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
 
 #########################################################################
 ## APP CONFIGS
@@ -95,7 +97,6 @@ def verify_jwt_token(token: str):
 ## GET CURRENT USER
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     user = verify_jwt_token(token)
-    print(user)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return user
@@ -120,13 +121,16 @@ async def login(credentials: dict):
     
     # Append ADU\ to username to match AD structure
     adu_username = "ADU\\"+username
-    
+    ldap_mgr.set_username(username)
     # Connect to LDAPS server and attempt to bind which involves authentication    
     try:
-        ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
         connection = ldap_mgr.get_connection(adu_username, password)
         
         if connection.bound:
+            emailaddr = ldap_mgr.get_email_address(ldap_mgr.get_conn(), ldap_mgr.get_username())
+            logger.success(f"EMAIL ADDRESS: {emailaddr}")
+            
+            # Check user membership in AD groups
             AD_Groups = ldap_mgr.check_user_membership(connection, username)
             access_token = create_access_token(identity=username)
             
@@ -144,6 +148,9 @@ async def login(credentials: dict):
     except Exception as e:
         logger.warning(f"LDAP authentication error: {e}")
         raise HTTPException(status_code=500, detail="LDAP authentication failed")
+    
+    
+  
     
 ##########################################################################
 ## LOGOUT
