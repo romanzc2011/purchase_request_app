@@ -1,13 +1,15 @@
 /********************************************************/
 /* FORM VALUES */
 /********************************************************/
+
+
 export type FormValues = {
   ID: string;
   reqID: string;
   requester: string;
   recipient: string;
   phoneext: string;
-  datereq: Date | null;
+  datereq: string;
   dateneed: Date | null;
   orderType: string;
   fileAttachments: {
@@ -44,13 +46,13 @@ export type UserCredentials = {
 /* Budget object code */
 /********************************************************/
 export const BOCMenuItems = [
-  "3101 - General Office Equipment",
-  "3107 - Audio Recording Equipment",
-  "3111 - Furniture and Fixtures",
-  "3113 - Mailing Equipment",
-  "3121 - Legal Resources - New Print and Digital Purchases",
-  "3122 - Legal Resources - Print and Digital Continuations",
-  "3130 - Law Enforcement Equipment"
+  "3101",
+  "3107",
+  "3111",
+  "3113",
+  "3121",
+  "3122",
+  "3130"
 ];
 
 /********************************************************/

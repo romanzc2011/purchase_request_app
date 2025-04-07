@@ -16,7 +16,7 @@ from multiprocessing.dummy import Pool as ThreadPool
 from multiprocessing import Queue, Process
 from adu_ldap_service import LDAPManager
 from search_service import SearchService
-from email_service import NotificationManager
+from email_service import EmailService
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from werkzeug.utils import secure_filename
@@ -63,9 +63,10 @@ logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
 
 ##########################################################################
 # Initialize services and shared objects
-notify_manager = NotificationManager(
+email_service = EmailService(
     msg_body=None, 
-    to_recipient="roman_campbell@lawb.uscourts.gov", 
+    first_approver="roman_campbell@lawb.uscourts.gov", # in production, this should be the first approver
+    final_approver="roman_campbell@lawb.uscourts.gov", # in production, this should be the final approver
     from_sender="Purchase Request", 
     subject="Purchase Request Notification"
 )
@@ -127,9 +128,6 @@ async def login(credentials: dict):
         connection = ldap_mgr.get_connection(adu_username, password)
         
         if connection.bound:
-            emailaddr = ldap_mgr.get_email_address(ldap_mgr.get_conn(), ldap_mgr.get_username())
-            logger.success(f"EMAIL ADDRESS: {emailaddr}")
-            
             # Check user membership in AD groups
             AD_Groups = ldap_mgr.check_user_membership(connection, username)
             access_token = create_access_token(identity=username)
@@ -148,9 +146,6 @@ async def login(credentials: dict):
     except Exception as e:
         logger.warning(f"LDAP authentication error: {e}")
         raise HTTPException(status_code=500, detail="LDAP authentication failed")
-    
-    
-  
     
 ##########################################################################
 ## LOGOUT
@@ -190,13 +185,24 @@ async def get_search_data(
 ## SEND TO approval -- being sent from the purchase req submit
 @api_router.post("/sendToPurchaseReq")
 async def set_purchase_request(data: dict, current_user: str = Depends(get_current_user)):
-    print("set_purchase_request:", data)
     logger.info(f"Authenticated user: {current_user}")
     if not data:
         raise HTTPException(status_code=400, detail="Invalid data")
     
     from multiprocessing.dummy import Pool as ThreadPool
     pool = ThreadPool()
+    
+    # Extract requester 
+    requester = data.get("requester")
+    
+    logger.info(f"Requester: {requester}")
+    
+    # Get emails from AD
+    requester_email = ldap_mgr.get_email_address(ldap_mgr.get_conn(), requester) 
+    
+    logger.info(f"Requester email: {requester_email}")
+    email_service.set_requester(requester_email)
+    
     processed_data = pool.map(process_purchase_data, [data])
     copied_data = processed_data[0].copy()  # or use deepcopy if needed
     pool.map(purchase_req_commit, [copied_data])
@@ -294,9 +300,9 @@ async def approve_deny_request(data: dict, current_user: str = Depends(get_curre
         raise HTTPException(status_code=400, detail="Invalid data")
     
     ## Setup email
-    notify_manager.set_from_sender("Purchase Request")
-    notify_manager.set_subject("Purchase Request Final Approval Notification")
-    notify_manager.set_to_recipient("roman_campbell@lawb.uscourts.gov")   # in production, this should be the final approver
+    email_service.set_from_sender("Purchase Request")
+    email_service.set_subject("Purchase Request Final Approval Notification")
+    email_service.set_to_recipient("roman_campbell@lawb.uscourts.gov")   # in production, this should be the final approver
     
     logger.info("approve_deny_request:")
     logger.info(data)
@@ -332,21 +338,21 @@ async def approve_deny_request(data: dict, current_user: str = Depends(get_curre
         # Update the status to "PENDING" in the database
         dbas.update_data(ID, 'approval', approved=False, pendingApproval=True, status="PENDING", newRequest=False)
     
-        notify_manager.set_msg_body("Request pending approval")
-        notify_manager.set_msg_data(data)
+        email_service.set_msg_body("Request pending approval")
+        email_service.set_msg_data(data)
     
     ## Request has been denied
     elif status == "deny":
         dbas.update_data(ID, 'approval', approved=False, pendingApproval=False, status="DENIED", newRequest=False)
         
-        notify_manager.set_msg_body("Request denied")
-        notify_manager.set_msg_data(data)
+        email_service.set_msg_body("Request denied")
+        email_service.set_msg_data(data)
         
         logger.error(f"Request {ID} denied")
     
     ## Prepare email and send to final approver, the first approver (Matt) sets it to pending_approval = true
     ## Peter, Edmund, Ted make up final approvers, sets it to approved = true
-    notify_manager.send_email()
+    email_service.send_email()
     return {"message": "Request approved/denied successfully"} 
 
 ##########################################################################
@@ -450,9 +456,9 @@ def process_approval_data(processed_data):
     ## SENDING NOTIFICATION OF NEW REQUEST
     # Create email body and send to approver
     logger.info("Sending notification email to approver...")
-    email_template = notify_manager.load_email_template("./notification_template.html")
+    email_template = email_service.load_email_template("./email_template.html")
     email_body = email_template.format(**processed_data)
-    notify_manager.send_email(email_body)
+    email_service.send_email(email_body)
                     
     return approval_data
 

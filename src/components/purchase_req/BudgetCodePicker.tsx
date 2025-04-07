@@ -76,23 +76,23 @@ const BudgetCodePicker = ({
                                 onSelectBudgetCode(e.target.value as string);
                             }}
                         >
-                            <MenuItem value={"3101 - General Office Equipment"}>
+                            <MenuItem value={"3101"}>
                                 3101 - General Office Equipment
                             </MenuItem>
                             <MenuItem
-                                value={"3107 - Audio Recording Equipment"}
+                                value={"3107"}
                             >
                                 3107 - Audio Recording Equipment
                             </MenuItem>
-                            <MenuItem value={"3111 - Furniture and Fixtures"}>
+                            <MenuItem value={"3111"}>
                                 3111 - Furniture and Fixtures
                             </MenuItem>
-                            <MenuItem value={"3113 - Mailing Equipment"}>
+                            <MenuItem value={"3113"}>
                                 3113 - Mailing Equipment
                             </MenuItem>
                             <MenuItem
                                 value={
-                                    "3121 - Legal Resources - New Print and Digital Purchases"
+                                    "3121"
                                 }
                             >
                                 3121 - Legal Resources - New Print and Digital
@@ -100,14 +100,14 @@ const BudgetCodePicker = ({
                             </MenuItem>
                             <MenuItem
                                 value={
-                                    "3122 - Legal Resources - Print and Digital Continuations"
+                                    "3122"
                                 }
                             >
                                 3122 - Legal Resources - Print and Digital
                                 Continuations
                             </MenuItem>
                             <MenuItem
-                                value={"3130 - Law Enforcement Equipment"}
+                                value={"3130"}
                             >
                                 3130 - Law Enforcement Equipment
                             </MenuItem>

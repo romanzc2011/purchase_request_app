@@ -83,7 +83,6 @@ class LDAPManager:
     #####################################################################################
     ## SEARCH FOR GROUP MEMBERSHIP
     def check_user_membership(self, conn, username):
-        
         try:
             # Iterate thru the DNS Groups and determine what user is member of
             for group in group_dns:
@@ -107,9 +106,6 @@ class LDAPManager:
                     
                     match = re.search(r'CN=LAWB_([^,]+)', group)
                     group_name = match.group(1) if match else "Uknown"
-                    
-                    
-                    matched_user = None
                     for member_dn in members_dn_list:
                         # Query LDAP for each DN to get their sAMAccountName (username)
                         conn.search(
@@ -118,14 +114,7 @@ class LDAPManager:
                             search_scope=SUBTREE,
                             attributes=['sAMAccountName', 'mail']
                         )
-                        
-                        if conn.entries:
-                            entry = conn.entries[0]
-                            print(f"DN: {entry.entry_dn}")
-                            for attribute, values in entry.entry_attributes_as_dict.items():
-                                print(f"{attribute}: {values}")
-                            print("-----------------------------\n")
-                        
+            
                         if conn.entries:
                             member_username = conn.entries[0].sAMAccountName.value
                             if member_username.lower() == username.lower():
@@ -191,8 +180,3 @@ class LDAPManager:
     
     def get_username(self):
         return self.username
-
-    #####################################################################################
-    ## EMAIL ADDRESS LOOKUP
-    
-            

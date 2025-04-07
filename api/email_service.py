@@ -1,21 +1,31 @@
 from loguru import logger
+from adu_ldap_service import LDAPManager
 import pythoncom
 import win32com.client as win32
+import os
 
 """
 AUTHOR: Roman Campbell
 DATE: 01/07/2025
-Used to send purchase request notifications
+Used to send purchase request notifications.
+Method of execution, you have NEW REQUESTS, PENDING REQUESTS, and APPROVED REQUESTS.
+For NEW REQUESTS, you will send an email to the first approver and the requester.
+For PENDING REQUESTS, you will send an email to the final approver. This means that we wont send an email
+to final approver until the status is set to PENDING. Will need to grab the status from the database using
+request ID.
 """
+ldap_mgr = LDAPManager(server_name=os.getenv("LDAP_SERVER"), port=636, using_tls=True)
 
-class NotificationManager:
+class EmailService:
     """
     A class to manage email notification operations
     """
-    def __init__(self, msg_body, to_recipient, from_sender, subject, cc_persons=None):
-        # Init NotificationManager class
+    def __init__(self, msg_body, first_approver, final_approver, from_sender, subject, cc_persons=None):
+        # Init EmailService class
         self.msg_body = msg_body
-        self.to_recipient = to_recipient
+        self.first_approver = first_approver
+        self.final_approver = final_approver
+        self.requester = None
         self.from_sender = from_sender
         self.subject = subject
         self.cc_persons = cc_persons or [] # optional
@@ -31,9 +41,9 @@ class NotificationManager:
             outlook = win32.Dispatch("Outlook.Application")
             mail = outlook.CreateItem(0)
             
-            if not self.to_recipient:
-                logger.warning("Recipient email is not set")
-                raise ValueError("Receipient email is not set")
+            if not self.requester:
+                logger.warning("Requester email is not set")
+                raise ValueError("Requester email is not set")
             
             if not self.subject:
                 logger.warning("Email subject is not set")
@@ -43,9 +53,34 @@ class NotificationManager:
                 logger.warning("Message body is not set")
                 raise ValueError("Message body is not set")
             
+            if not self.first_approver:
+                logger.warning("First approver email is not set")
+                raise ValueError("First approver email is not set") 
+            
+            ## Create dynamic message body
+            ################################################################
+            ## FIRST APPROVER
+            if self.get_first_approver() is not None:
+                mail.Subject = "Purchase Request Notification - First Approver"
+                mail.HTMLBody = "<p>Dear {first_approver},</p><p>You have a new purchase request to review.</p>"
+                self.msg_body = self.msg_body.replace("{first_approver}", self.get_first_approver())
+                
+            ## FINAL APPROVER
+            if self.get_final_approver() is not None:
+                mail.Subject = "Purchase Request Notification - Final Approver"
+                mail.HTMLBody = "<p>Dear {final_approver},</p><p>You have a new purchase request to review.</p>"
+                self.msg_body = self.msg_body.replace("{final_approver}", self.get_final_approver())
+            
+            ## REQUESTER
+            if self.get_requester() is not None:
+                mail.Subject = "Purchase Request Notification - Requester"
+                mail.HTMLBody = "<p>Dear {requester},</p><p>Your purchase request has been submitted.</p>"
+                self.msg_body = self.msg_body.replace("{requester}", self.get_requester())
+            
             mail.Subject = self.subject
             mail.HTMLBody = self.msg_body
-            mail.To = self.to_recipient
+            mail.To = self.get_requester()
+            mail.Recipients.Add(self.get_first_approver())
             
             # Include the CC if present
             if self.cc_persons:
@@ -68,32 +103,46 @@ class NotificationManager:
     # SETTERS
     def set_msg_body(self, value):
         self.msg_body = value
-
-    def set_to_recipient(self, value):
-        self._to_recipient = value
+    
+    def set_requester(self, requester):
+        self.requester = requester
+    
+    # Set roman_campbell@lawb.uscourts.gov for testing
+    def set_first_approver(self, value):
+        self.first_approver = value   
+        
+    # Set roman_campbell@lawb.uscourts.gov for testing
+    def set_final_approver(self, value):
+        self.final_approver = value
 
     def set_from_sender(self, value):
-        self._from_sender = value
+        self.from_sender = value
 
     def set_subject(self, value):
-        self._subject = value
+        selfsubject = value
 
     def set_cc_persons(self, value):
-        self._cc_persons = value
+        self.cc_persons = value
 
     def set_msg_data(self, value):
-        self._msg_data = value
+        self.msg_data = value
 
     def set_link(self, value):
-        self._link = value
+        self.link = value
 
     ##################################################################
     # GETTERS
     def get_msg_body(self):
         return self._msg_body
-
-    def get_to_recipient(self):
-        return self._to_recipient
+    
+    def get_requester(self):
+        return self.requester
+    
+    def get_first_approver(self):
+        return self.first_approver
+    
+    def get_final_approver(self):
+        return self._final_approver
 
     def get_from_sender(self):
         return self._from_sender

@@ -80,6 +80,9 @@ function AddItemsForm({
     const handleAddItem = async (newItem: FormValues) => {
         /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
         const newID = uuidv4();
+
+        
+        
         //const newReqID = "send to create reqid service";
         const updatedItem = {
             ...newItem,
@@ -114,6 +117,11 @@ function AddItemsForm({
         console.log("Form errors", errors);
     };
 
+    // This is used to set the default value for the date requested field to today's date
+    const today: Date = new Date();
+    const isoString: string = today.toISOString();
+    const formattedToday: string = isoString.split("T")[0];
+
     const form = useForm<FormValues>({
         defaultValues: {
             ID: ID,
@@ -121,7 +129,7 @@ function AddItemsForm({
             requester: "",
             recipient: "",
             phoneext: "",
-            datereq: null,
+            datereq: formattedToday,
             dateneed: null,
             orderType: "",
             itemDescription: "",
@@ -188,34 +196,6 @@ function AddItemsForm({
                         />
                     </Grid>
                 </Grid>
-                {/******************************************************************************************* */}
-                {/** RECIPIENT ****************************************************************************** */}
-                {/******************************************************************************************* */}
-                <Grid container spacing={1} alignItems="center" sx={{ mt: 4 }}>
-                    <Grid size={{ xs: 2 }}>
-                        <Typography
-                            variant="button"
-                            component="label"
-                            htmlFor="recipient"
-                        >
-                            <strong>Recipient</strong>
-                        </Typography>
-                    </Grid>
-                    <Grid size={{ xs: 6, sm: 3 }}>
-                        <TextField
-                            id="recipient"
-                            className="form-control"
-                            fullWidth
-                            variant="outlined"
-                            size="small"
-                            {...register("recipient", {
-                                required: "Name of recipient is required",
-                            })}
-                            error={!!errors.recipient}
-                            helperText={errors.recipient?.message}
-                        />
-                    </Grid>
-                </Grid>
 
                 {/******************************************************************************************* */}
                 {/** PHONE EXT ****************************************************************************** */}
@@ -264,6 +244,7 @@ function AddItemsForm({
                         <input
                             id="datereq"
                             type="date"
+                            disabled={true}
                             style={{ width: "150px" }}
                             className="form-control"
                             {...register("datereq", {
