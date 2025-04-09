@@ -72,7 +72,7 @@ export default function LoginDialog({
       console.log("Response from API: ", data);
 
       // Extract Groups from AD_groups and pass them
-      onLoginSuccess(data.AD_Groups.ACCESS_GROUP, data.AD_Groups.CUE_GROUP, data.AD_Groups.IT_GROUP);
+      onLoginSuccess(data.user.group[0], data.user.group[1], data.user.group[2]);
 
       // Store token in local storage
       const accessToken = data.access_token;

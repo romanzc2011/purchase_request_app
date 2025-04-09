@@ -6,7 +6,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
-from pydantic_schemas import PurchaseRequestSchema, AppovalSchema
 import json
 
 # Create engine and base
@@ -91,11 +90,6 @@ class Approval(Base):
         back_populates="approval",
         uselist=False
     )
-
-    def __repr__(self):
-        return (f"<Approval(reqID='{self.reqID}', requester='{self.requester}', "
-            f"recipient='{self.recipient}', budgetObjCode='{self.budgetObjCode}', "
-            f"status='{self.status}')>")
     
 Base.metadata.create_all(engine)
 my_session = sessionmaker(bind=engine)
@@ -114,9 +108,6 @@ def get_db_session():
 def get_all_approval(db_session: Session):
     results = db_session.query(Approval).all()
     return results
-
-def send_message(queue):
-    queue.put("refresh_index")
 
 ###################################################################################################
 # Insert data

@@ -3,18 +3,16 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
-from multiprocessing import Process, Queue
-from sqlalchemy import select
+from cachetools import TTLCache, cached
 import uvicorn
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Dict, Optional
 import os, threading, time, uuid, json
 from loguru import logger
 from dotenv import load_dotenv, find_dotenv
 from ldap3.core.exceptions import LDAPBindError
 from multiprocessing.dummy import Pool as ThreadPool
-from multiprocessing import Queue, Process
-from adu_ldap_service import LDAPManager
+from adu_ldap_service import LDAPManager, User
 from search_service import SearchService
 from email_service import EmailService
 from sqlalchemy.orm import Session
@@ -22,7 +20,6 @@ from ipc_service import IPC_Service
 from typing import Optional, List
 from werkzeug.utils import secure_filename
 import db_service as dbas
-import psutil
 import pydantic_schemas as ps
 import jwt  # PyJWT
 
@@ -49,6 +46,20 @@ ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
 #########################################################################
 ## APP CONFIGS
 app = FastAPI()
+
+ #####################################################################################
+# BUILD USER OBJ
+
+def build_user_object(
+    username: str, 
+    groups: dict[str,bool], 
+    email: Optional[str]
+) -> User:
+    group_names = [k for k,v in groups.items() if v]
+    return User(
+        username=username, 
+        emailaddr=email or "unknown", 
+        groups=group_names)
 
 # Set up CORS
 app.add_middleware(
@@ -95,13 +106,25 @@ def verify_jwt_token(token: str):
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+## FETCH USER - cached
+_user_cache = TTLCache(maxsize=1000, ttl=3600)  # user cache
+@cached(_user_cache)
+def fetch_user(username: str) -> User:
+    # run if cache has expired
+    conn = ldap_mgr.get_conn()
+    groups = ldap_mgr.check_user_membership(conn, username)
+    email = ldap_mgr.get_email_address(conn, username)
+    
+    return ldap_mgr.build_user_object(username, groups, email)
 
 ## GET CURRENT USER
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    user = verify_jwt_token(token)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    return user
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+    payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
+    return User(
+        username=payload["sub"],
+        emailaddr=payload["email"],
+        group=payload["groups"]
+    )
 
 ##########################################################################
 ##########################################################################
@@ -121,32 +144,26 @@ async def login(credentials: dict):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Missing username or password")
     
-    # Append ADU\ to username to match AD structure
-    adu_username = "ADU\\"+username
-    ldap_mgr.set_username(username)
-    # Connect to LDAPS server and attempt to bind which involves authentication    
+    adu_user = f"ADU\\{username}"
+    connection = ldap_mgr.get_connection(adu_user, password)
+    
     try:
-        connection = ldap_mgr.get_connection(adu_username, password)
-        
-        if connection.bound:
-            # Check user membership in AD groups
-            AD_Groups = ldap_mgr.check_user_membership(connection, username)
-            access_token = create_access_token(identity=username)
-            
-            # Create response
-            return JSONResponse(content={
-                "message": "Login successful",
-                "access_token": access_token,
-                "AD_Groups": AD_Groups
-            })
-        else:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-    except LDAPBindError:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        user = fetch_user(username)
     except Exception as e:
-        logger.warning(f"LDAP authentication error: {e}")
-        raise HTTPException(status_code=500, detail="LDAP authentication failed")
+        logger.error(f"Error fetching user: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching user details")
+    
+    expire = datetime.now(timezone.utc) + timedelta(hours=1)
+    # Encode everthing into JWT
+    to_encode = {
+        "sub":      username,
+        "email":    user.email,
+        "groups":   user.group,
+        "exp":      expire,
+    }
+    token = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm="HS256")
+    
+    return { "access_token": token, "user": user }
     
 ##########################################################################
 ## LOGOUT
@@ -197,12 +214,13 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     requester = data.get("requester")
     
     logger.info(f"Requester: {requester}")
-    
+    email_service.set_requester_name(requester)
+
     # Get emails from AD
     requester_email = ldap_mgr.get_email_address(ldap_mgr.get_conn(), requester) 
     
     logger.info(f"Requester email: {requester_email}")
-    email_service.set_requester(requester_email)
+    email_service.set_requester_email(requester_email)
     
     processed_data = pool.map(process_purchase_data, [data])
     copied_data = processed_data[0].copy()  # or use deepcopy if needed
@@ -303,14 +321,24 @@ async def approve_deny_request(data: dict, current_user: str = Depends(get_curre
     ## Setup email
     email_service.set_from_sender("Purchase Request")
     email_service.set_subject("Purchase Request Final Approval Notification")
-    email_service.set_to_recipient("roman_campbell@lawb.uscourts.gov")   # in production, this should be the final approver
     
     logger.info("approve_deny_request:")
     logger.info(data)
     
     ## Get ID and status from data
     ID = data.get("ID")
+    requester = data.get("requester")
     status = data.get("status")
+    
+    ###########################################################################
+    # Retrieve requesters email address
+    if requester_email is None:
+        requester_email = ldap_mgr.get_email_address(ldap_mgr.get_conn(), requester)
+        print(f"REQUESTER EMAIL: {requester_email}")
+    exit(0)
+    
+    
+    print(f"REQUESTER: {requester}")
     
     with next(dbas.get_db_session()) as db:
         # Check if ID exists in the database
@@ -321,6 +349,7 @@ async def approve_deny_request(data: dict, current_user: str = Depends(get_curre
         # Get ID and check current status, NEW send email to first approver and requester
         # PENDING send email to final approver
         # DENIED send email to requester
+      
         current_status = dbas.get_status_by_id(db, ID)
         
         if current_status == "NEW REQUEST":
@@ -346,6 +375,8 @@ async def approve_deny_request(data: dict, current_user: str = Depends(get_curre
         current_pendingApproval = result[2] if result else None
         current_status = result[3] if result else None
         current_newRequest = result[4] if result else None
+        
+        requester_email = ldap_mgr.get_email_address(ldap_mgr.get_conn(), ldap_mgr.set_username(requester))
     
     # This is a new request, so we need to set the status to "PENDING" and update the database
     # status is either "approve" or "deny"
@@ -356,13 +387,14 @@ async def approve_deny_request(data: dict, current_user: str = Depends(get_curre
     
         email_service.set_msg_body("Request pending approval")
         email_service.set_msg_data(data)
+        email_service.set_requester_email(requester_email)
     
     ## Request has been denied
     elif status == "deny":
         dbas.update_data(ID, 'approval', approved=False, pendingApproval=False, status="DENIED", newRequest=False)
-        
         email_service.set_msg_body("Request denied")
         email_service.set_msg_data(data)
+        email_service.set_requester_email(requester_email)
         
         logger.error(f"Request {ID} denied")
     

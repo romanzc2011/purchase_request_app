@@ -83,7 +83,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     /* APPROVE OR DENY */
     /************************************************************************************ */
     // Get the current state of newRequest, approved, and pendingApproval
-    async function handleApproveDeny(id: string, status: string) {
+    async function handleApproveDeny(id: string, requester: string, status: string) {
         try {
             const response = await fetch(API_URL2, {
                 method: 'POST',
@@ -93,6 +93,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                 },
                 body: JSON.stringify({
                     ID: id,
+                    requester: requester,
                     status: status,
                 })
             });
@@ -151,7 +152,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 REQUISITION ID
                             </TableCell>
                             {/**************************************************************************/}
-                            {/* RECIPIENT */}
+                            {/* REQUESTER */}
                             <TableCell
                                 sx={{
                                     color: "white",
@@ -159,8 +160,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-
-                                RECIPIENT
+                                REQUESTER
                             </TableCell>
                             {/**************************************************************************/}
                             {/* BUDGET OBJECT CODE */}
@@ -293,16 +293,15 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 <TableCell sx={{ color: "white" }}>
                                     {approval_data.reqID}
                                 </TableCell>
-
                                 {/**************************************************************************/}
-                                {/* RECIPIENT */}
-                                <TableCell sx={{ color: "white" }}>
-                                    {approval_data.recipient}
+                                {/* REQUISITION ID */}
+                                <TableCell sx={{ color: "white" }}> 
+                                    {approval_data.requester}
                                 </TableCell>
 
                                 {/**************************************************************************/}
                                 {/* BUDGET OBJECT CODE */}
-                                <TableCell sx={{ color: "white" }}>
+                                <TableCell sx={{ color: "white", textAlign: "center" }}>
                                     {convertBOC(approval_data.budgetObjCode)}
                                 </TableCell>
 
@@ -370,14 +369,14 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                         <Button
                                             variant="contained"
                                             color="success"
-                                            onClick={() => handleApproveDeny(approval_data.ID, 'approve')}
+                                            onClick={() => handleApproveDeny(approval_data.ID, approval_data.requester, 'approve')}
                                         >
                                             Approve
                                         </Button>
                                         <Button
                                             variant="contained"
                                             color="error"
-                                            onClick={() => handleApproveDeny(approval_data.ID, 'deny')}
+                                            onClick={() => handleApproveDeny(approval_data.ID, approval_data.requester, 'deny')}
                                         >
                                             Deny
                                         </Button>

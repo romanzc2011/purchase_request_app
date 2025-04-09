@@ -196,7 +196,6 @@ class SearchService():
         logger.info("before_commit execution")
         for model in session.new:
             model_class = model.__class__
-            logger.success(f"{model_class}")
             if hasattr(model_class, '__searchable__'):
                 logger.warning("BEFORE COMMIT")
                 self.to_update.setdefault(model_class.__name__, []).append(

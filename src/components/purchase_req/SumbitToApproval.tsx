@@ -68,7 +68,9 @@ function SubmitApprovalTable({
     // Preprocess data to calculate price
     const processedData = dataBuffer.map((item) => ({
         ...item, // Spread operator, takes all properties from item object and puts them in new object being created with .map() callback
+        priceEach: Number(item.priceEach),
         calculatedPrice: calculatePrice(item),
+
     }));
 
     /************************************************************************************ */

@@ -20,13 +20,15 @@ ldap_mgr = LDAPManager(server_name=os.getenv("LDAP_SERVER"), port=636, using_tls
 class EmailService:
     """
     A class to manage email notification operations
+    requester_name will be the jenie is that user entered on request firstname lastname together
     """
     def __init__(self, msg_body, first_approver, final_approver, from_sender, subject, cc_persons=None):
         # Init EmailService class
         self.msg_body = msg_body
         self.first_approver = first_approver
         self.final_approver = final_approver
-        self.requester = None
+        self.requester_name = None
+        self.requester_email = None
         self.from_sender = from_sender
         self.subject = subject
         self.cc_persons = cc_persons or [] # optional
@@ -42,7 +44,7 @@ class EmailService:
             outlook = win32.Dispatch("Outlook.Application")
             mail = outlook.CreateItem(0)
             
-            if not self.requester:
+            if not self.requester_email:
                 logger.warning("Requester email is not set")
                 raise ValueError("Requester email is not set")
             
@@ -86,15 +88,15 @@ class EmailService:
                 mail.Recipients.Add(self.get_first_approver())
             
             ## REQUESTER
-            if self.get_requester() is not None and NEW_REQUEST:
+            if self.get_requester_name() is not None and NEW_REQUEST:
                 mail.Subject = "Purchase Request Notification - Requester"
                 mail.HTMLBody = "<p>Dear {requester},</p><p>Your purchase request has been submitted.</p>"
-                self.msg_body = self.msg_body.replace("{requester}", self.get_requester())
-                mail.Recipients.Add(self.get_requester())
+                self.msg_body = self.msg_body.replace("{requester}", self.get_requester_name())
+                mail.Recipients.Add(self.get_requester_email())
             
             mail.Subject = self.subject
             mail.HTMLBody = self.msg_body
-            mail.To = self.get_requester()
+            mail.To = self.get_requester_email()
             mail.Recipients.Add(self.get_first_approver())
             
             # Include the CC if present
@@ -118,9 +120,13 @@ class EmailService:
     # SETTERS
     def set_msg_body(self, value):
         self.msg_body = value
-    
-    def set_requester(self, requester):
-        self.requester = requester
+        
+    def set_requester_email(self, email: str):
+        self.requester_email = email
+        
+    def set_requester_name(self, requester):
+        requester_name = ldap_mgr.get_username()
+        self.requester_name = requester_name
     
     # Set roman_campbell@lawb.uscourts.gov for testing
     def set_first_approver(self, value):
@@ -150,8 +156,11 @@ class EmailService:
     def get_msg_body(self):
         return self.msg_body
     
-    def get_requester(self):
-        return self.requester
+    def get_requester_name(self):
+        return self.requester_name
+    
+    def get_requester_email(self):
+        return self.requester_email
     
     def get_first_approver(self):
         return self.first_approver
