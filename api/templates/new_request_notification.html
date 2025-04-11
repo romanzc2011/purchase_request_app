@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Purchase Request</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .content {
+            padding: 20px;
+            background-color: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .request-details {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .request-details p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Purchase Request System</h1>
+    </div>
+    <div class="content">
+        <h2>New Purchase Request</h2>
+        <p>Hello,</p>
+        <p>A new purchase request has been submitted and requires your review.</p>
+        
+        <div class="request-details">
+            <p><strong>Request ID:</strong> {reqID}</p>
+            <p><strong>Requester:</strong> {requester}</p>
+            <p><strong>Item Description:</strong> {itemDescription}</p>
+            <p><strong>Total Price:</strong> ${totalPrice}</p>
+            <p><strong>Budget Object Code:</strong> {budgetObjCode}</p>
+            <p><strong>Fund:</strong> {fund}</p>
+            <p><strong>Location:</strong> {location}</p>
+        </div>
+        
+        <p>Please log in to the system to review and approve or deny this request.</p>
+        <a href="http://localhost:5004" class="button">Review Request</a>
+    </div>
+    <div class="footer">
+        <p>This is an automated message from the Purchase Request Approval System.</p>
+        <p>Please do not reply to this email.</p>
+    </div>
+</body>
+</html> 

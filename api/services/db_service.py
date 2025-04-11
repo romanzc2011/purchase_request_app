@@ -96,7 +96,7 @@ my_session = sessionmaker(bind=engine)
 
 ###################################################################################################
  ## Create session for functions/queries
-def get_db_session():
+def get_session():
     db = my_session()
     try:
         yield db
@@ -121,7 +121,7 @@ def insert_data(processed_data, table):
         if isinstance(value, list):
             processed_data[key] = json.dumps(value)
     
-    with next(get_db_session()) as db:
+    with next(get_session()) as db:
         if table == "purchase_request":
             new_obj = PurchaseRequest(**processed_data)
         elif table == "approval":
@@ -158,7 +158,7 @@ def update_data(ID, table, **kwargs):
     if not kwargs or not isinstance(kwargs, dict):
         raise ValueError("Update data must be a non-empty dictionary")
     
-    with next(get_db_session()) as db:
+    with next(get_session()) as db:
         if table == "purchase_request":
             obj = db.query(PurchaseRequest).filter(PurchaseRequest.ID == ID).first()
         elif table == "approval":
@@ -192,6 +192,6 @@ def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     if not columns or not isinstance(columns, list):
         raise ValueError("Columns must be a non-empty list")
     
-    with get_db_session() as db:
+    with get_session() as db:
         result = db.query(*columns).filter(condition).params(params).first()
         return result

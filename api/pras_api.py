@@ -10,18 +10,21 @@ from typing import List, Dict, Optional
 import os, threading, time, uuid, json
 from loguru import logger
 from dotenv import load_dotenv, find_dotenv
-from ldap3.core.exceptions import LDAPBindError
 from multiprocessing.dummy import Pool as ThreadPool
-from adu_ldap_service import LDAPManager, User
-from search_service import SearchService
-from email_service import EmailService
 from sqlalchemy.orm import Session
-from ipc_service import IPC_Service
 from typing import Optional, List
 from werkzeug.utils import secure_filename
-import db_service as dbas
+import services.db_service as dbas
 import pydantic_schemas as ps
 import jwt  # PyJWT
+from jwt.exceptions import ExpiredSignatureError, PyJWTError
+
+from services.auth_service import AuthService
+from services.db_service import get_session
+from services.email_service import EmailService
+from services.ipc_service import IPC_Service
+from services.ldap_service import LDAPService, User
+from services.search_service import SearchService
 
 """
 AUTHOR: Roman Campbell
@@ -33,170 +36,185 @@ for the UI. When making a purchase request, user will use the their AD username 
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
+
 # Load environment variables
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
+
+# Config variables
 UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+LDAP_SERVICE_USER = os.getenv("LDAP_SERVICE_USER", "ADU\\service_account")
+LDAP_SERVICE_PASSWORD = os.getenv("LDAP_SERVICE_PASSWORD", "")
 db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_request.db")
-search_service = SearchService()
-ldap_mgr = LDAPManager(LDAP_SERVER, 636, True)
 
-#########################################################################
-## APP CONFIGS
-app = FastAPI()
+# Initialize FastAPI app
+app = FastAPI(title="PRAS API")
 
- #####################################################################################
-# BUILD USER OBJ
-
-def build_user_object(
-    username: str, 
-    groups: dict[str,bool], 
-    email: Optional[str]
-) -> User:
-    group_names = [k for k,v in groups.items() if v]
-    return User(
-        username=username, 
-        emailaddr=email or "unknown", 
-        groups=group_names)
-
-# Set up CORS
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5002"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logger.add("./logs/pras.log", diagnose=True, rotation="7 days")
-
-##########################################################################
-# Initialize services and shared objects
-email_service = EmailService(
-    msg_body=None, 
-    first_approver="roman_campbell@lawb.uscourts.gov", # in production, this should be the first approver
-    final_approver="roman_campbell@lawb.uscourts.gov", # in production, this should be the final approver
-    from_sender="Purchase Request", 
-    subject="Purchase Request Notification"
+# Initialize service managers
+ldap_svc = LDAPService(
+    server_name=LDAP_SERVER,
+    port=int(os.getenv("LDAP_PORT")),
+    using_tls=os.getenv("LDAP_USE_TLS"),
+    service_user=LDAP_SERVICE_USER,
+    service_password=LDAP_SERVICE_PASSWORD,
+    it_group_dns=os.getenv("IT_GROUP_DNS", "False").lower() == "true",
+    cue_group_dns=os.getenv("CUE_GROUP_DNS", "False").lower() == "true",
+    access_group_dns=os.getenv("ACCESS_GROUP_DNS", "False").lower() == "true"
 )
+search_svc = SearchService()
+email_svc = EmailService(
+    from_sender="Purchase Request", 
+    subject="Purchase Request Notification",
+    first_approver_email="roman_campbell@lawb.uscourts.gov",  # First approver's email
+    final_approver_email="roman_campbell@lawb.uscourts.gov"   # Final approver's email
+)
+db_svc = next(get_session())  # Initialize with a session
+ipc_svc = IPC_Service()
+auth_svc = AuthService()
+
+# Thread safety
 lock = threading.Lock()
 
-# OAuth2 scheme placeholder (used to extract JWT token from Authorization header)
+# OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
-##########################################################################
-## JWT UTILITY FUNCTIONS
-##########################################################################
-def create_access_token(identity: str, expires_delta: timedelta = timedelta(hours=1)):
-    expire = datetime.utcnow() + expires_delta
-    to_encode = {"sub": identity, "exp": expire}
-    token = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm="HS256")
-    return token
-
-## VERIFY JWT TOKEN 
-def verify_jwt_token(token: str):
-    try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
-        return payload.get("sub")
-    except jwt.ExpiredSignatureError:
-         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
-## FETCH USER - cached
+# User caching
 _user_cache = TTLCache(maxsize=1000, ttl=3600)  # user cache
 @cached(_user_cache)
 def fetch_user(username: str) -> User:
-    # run if cache has expired
-    conn = ldap_mgr.get_conn()
-    groups = ldap_mgr.check_user_membership(conn, username)
-    email = ldap_mgr.get_email_address(conn, username)
+    connection = ldap_svc.get_connection()
+    if connection is None:
+        logger.warning(f"LDAP connection is None for user {username}, using default user object")
+        return User(username=username, email="unknown", group=[])
+        
+    groups = ldap_svc.check_user_membership(connection, username)
+    email = ldap_svc.get_email_address(connection, username)
     
-    return ldap_mgr.build_user_object(username, groups, email)
+    return ldap_svc.build_user_object(username, groups, email)
 
-## GET CURRENT USER
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
-    payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
-    return User(
-        username=payload["sub"],
-        emailaddr=payload["email"],
-        group=payload["groups"]
-    )
+# Define get_current_user function
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        # Verify the token
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token: missing username"
+            )
+            
+        # Get user email from LDAP
+        user_email = ldap_svc.get_email_address(ldap_svc.get_connection(), 
+                                                username)
+        if not user_email:
+            logger.error(f"Could not find email for user {username}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token: user not found in LDAP"
+            )
+            
+        # Get user groups from LDAP
+        user_groups = ldap_svc.get_groups()
+        if not user_groups:
+            logger.warning(f"No groups found for user {username}")
+            user_groups = []
+            
+        user = User(
+            username=username,
+            email=user_email,
+            group=user_groups
+        )
+        return user
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired"
+        )
+    except PyJWTError as e:
+        logger.error(f"JWT validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+    except Exception as e:
+        logger.error(f"Error in get_current_user: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error processing authentication"
+        )
 
-##########################################################################
-##########################################################################
-## API ENDPOINTS
-##########################################################################
-##########################################################################
-
+# API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
 @api_router.post("/login")
 async def login(credentials: dict):
-    # Expecting JSON with username/password
     username = credentials.get("username")
     password = credentials.get("password")
     if not username or not password:
         raise HTTPException(status_code=400, detail="Missing username or password")
     
     adu_user = f"ADU\\{username}"
-    connection = ldap_mgr.get_connection(adu_user, password)
+    connection = ldap_svc.create_connection(adu_user, password)
+    
+    if connection is None:
+        logger.error(f"LDAP authentication failed for user {username}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
     try:
         user = fetch_user(username)
+        access_token = auth_svc.create_access_token(identity=username)
+        refresh_token = auth_svc.create_access_token(identity=username, expires_delta=timedelta(days=7))
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": user
+        }
     except Exception as e:
-        logger.error(f"Error fetching user: {e}")
-        raise HTTPException(status_code=500, detail="Error fetching user details")
-    
-    expire = datetime.now(timezone.utc) + timedelta(hours=1)
-    # Encode everthing into JWT
-    to_encode = {
-        "sub":      username,
-        "email":    user.email,
-        "groups":   user.group,
-        "exp":      expire,
-    }
-    token = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm="HS256")
-    
-    return { "access_token": token, "user": user }
-    
-##########################################################################
-## LOGOUT
-@api_router.post("/logout")
-async def logout():
-    # In FastAPI, logging out is usually handled on the client side by discarding the token.
-    return JSONResponse(content={"msg": "Logout successful"})
+        logger.error(f"Error in login: {e}")
+        raise HTTPException(status_code=500, detail="Login error")
 
 ##########################################################################
 ## GET APPROVAL DATA
 @api_router.get("/getApprovalData", response_model=List[ps.AppovalSchema])
-async def get_approval_data(
-    current_user: str = Depends(get_current_user), 
-    db: Session = Depends(dbas.get_db_session)
-):
-    approval = dbas.get_all_approval(db)
-    
-    # Convert each approval instance to Pydantic instance in foreach
-    approval_data = [ps.AppovalSchema.model_validate(approval) for approval in approval]
-    return approval_data
+async def get_approval_data(current_user: User = Depends(get_current_user)):
+    session = next(get_session())
+    try:
+        approval = dbas.get_all_approval(session)
+        approval_data = [ps.AppovalSchema.model_validate(approval) for approval in approval]
+        return approval_data
+    finally:
+        session.close()
 
 ##########################################################################
 ## GET SEARCH DATA
 @api_router.get("/getSearchData/search", response_model=List[ps.AppovalSchema])
 async def get_search_data(
-    query: str = "", 
+    query: str = "",
     column: Optional[str] = None,
-    current_user: str = Depends(get_current_user),
-    db: Session = Depends(dbas.get_db_session)
+    current_user: User = Depends(get_current_user)
 ):
-    logger.info(f"Search for query: {query}")
-    results = search_service.execute_search(query, db)
-    logger.success(f"RESULT: {results}")
+    # If column is provided, use _exact_singleton_search instead
+    if column:
+        results = search_svc._exact_singleton_search(column, query, db=None)
+    else:
+        # Otherwise use the standard execute_search method
+        results = search_svc.execute_search(query, db=None)
+    
     return JSONResponse(content=jsonable_encoder(results))
 
 ##########################################################################
@@ -212,16 +230,34 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     
     # Extract requester 
     requester = data.get("requester")
+    logger.info(f"REQUESTER: {requester}")
     
-    logger.info(f"Requester: {requester}")
-    email_service.set_requester_name(requester)
+    ## Verify that requester is a legitimate user in AD via ldap
+    # Ensure we have a valid LDAP connection
+    if not ldap_svc.check_ldap_connection(current_user):
+        # Try to establish a new connection using service account
+        conn = ldap_svc.create_connection(LDAP_SERVICE_USER, LDAP_SERVICE_PASSWORD)
+        if conn is None:
+            logger.warning(f"Could not establish LDAP connection for user verification")
+        else:
+            # Check if the requester is a legitimate user
+            is_legitimate = ldap_svc.check_legitimate_user(conn, requester)
+            if not is_legitimate:
+                logger.error(f"Requester {requester} is not a legitimate user in AD")
+                raise HTTPException(status_code=400, detail="Invalid requester")
+    else:
+        # Get LDAP connection
+        conn = ldap_svc.get_connection()
+        # Check if the requester is a legitimate user
+        is_legitimate = ldap_svc.check_legitimate_user(conn, requester)
+        if not is_legitimate:
+            logger.error(f"Requester {requester} is not a legitimate user in AD")
+            raise HTTPException(status_code=400, detail="Invalid requester")
+    
+    # Get user info - this already includes the email address
+    user_info = fetch_user(requester)
+    logger.info(f"USER INFO: {user_info}")
 
-    # Get emails from AD
-    requester_email = ldap_mgr.get_email_address(ldap_mgr.get_conn(), requester) 
-    
-    logger.info(f"Requester email: {requester_email}")
-    email_service.set_requester_email(requester_email)
-    
     processed_data = pool.map(process_purchase_data, [data])
     copied_data = processed_data[0].copy()  # or use deepcopy if needed
     pool.map(purchase_req_commit, [copied_data])
@@ -314,94 +350,115 @@ async def get_req_id(data: dict = None, current_user: str = Depends(get_current_
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
 @api_router.post("/approveDenyRequest")
-async def approve_deny_request(data: dict, current_user: str = Depends(get_current_user)):
-    if not data:
-        raise HTTPException(status_code=400, detail="Invalid data")
-    
-    ## Setup email
-    email_service.set_from_sender("Purchase Request")
-    email_service.set_subject("Purchase Request Final Approval Notification")
-    
-    logger.info("approve_deny_request:")
-    logger.info(data)
-    
-    ## Get ID and status from data
-    ID = data.get("ID")
-    requester = data.get("requester")
-    status = data.get("status")
-    
-    ###########################################################################
-    # Retrieve requesters email address
-    if requester_email is None:
-        requester_email = ldap_mgr.get_email_address(ldap_mgr.get_conn(), requester)
-        print(f"REQUESTER EMAIL: {requester_email}")
-    exit(0)
-    
-    
-    print(f"REQUESTER: {requester}")
-    
-    with next(dbas.get_db_session()) as db:
-        # Check if ID exists in the database
-        condition = dbas.Approval.ID == data.get("ID")
-        columns = [dbas.Approval.ID, dbas.Approval.approved, dbas.Approval.pendingApproval, 
-                   dbas.Approval.status, dbas.Approval.newRequest]
+async def approve_deny_request(
+    data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        request_id = data.get("request_id")
+        action = data.get("action")
+        logger.info(f"APPROVE/DENY REQUEST: {request_id} {action}")
         
+        if not request_id or not action:
+            raise HTTPException(
+                status_code=422,
+                detail="Missing required fields: request_id and action are required"
+            )
+            
         # Get ID and check current status, NEW send email to first approver and requester
         # PENDING send email to final approver
         # DENIED send email to requester
-      
-        current_status = dbas.get_status_by_id(db, ID)
+        current_status = dbas.get_status_by_id(db_svc, request_id)
+        logger.info(f"STATUS: {current_status} CURRENT USER: {current_user}")
         
         if current_status == "NEW REQUEST":
-            # Send email to first approver and requester
-            IPC_Service().send_to_shm("NEW_REQUEST")
-            logger.info(f"ID {ID} is a new request")
-            
+            ## The request was approved, switch to pending
+            if action.lower() == "approve":
+                new_status = "PENDING"
+                dbas.update_data(request_id, "approval", status=new_status)
+                email_svc.send_notification(
+                    current_user.email,
+                    "./templates/approval_notification.html",
+                    {"request_id": request_id, "action": "approved"},
+                    "Purchase Request Approved"
+                )
+            elif action.lower() == "deny":
+                new_status = "DENIED"
+                dbas.update_data(request_id, "approval", status=new_status)
+                email_svc.send_notification(
+                    current_user.email,
+                    "./templates/denial_notification.html",
+                    {"request_id": request_id, "action": "denied"},
+                    "Purchase Request Denied"
+                )
         elif current_status == "PENDING":
-            # Send email to final approver
-            IPC_Service().send_to_shm("PENDING_APPROVAL")
-            logger.info(f"ID {ID} is pending approval")
+            if action.lower() == "approve":
+                new_status = "APPROVED" 
+                dbas.update_data(request_id, "approval", status=new_status)
+                # Send email to final approver
+                email_svc.send_notification(
+                    email_svc.final_approver_email,  # Use the final approver's email
+                    "./templates/final_approval_notification.html",
+                    {"request_id": request_id, "action": "approved"},
+                    "Purchase Request Final Approval"
+                )
+                # Send email to requester
+                email_svc.send_notification(
+                    current_user.email,  # Send to the requester
+                    "./templates/approval_notification.html",
+                    {"request_id": request_id, "action": "approved"},
+                    "Purchase Request Approved"
+                )
+            elif action.lower() == "deny":
+                new_status = "DENIED"
+                dbas.update_data(request_id, "approval", status=new_status)
+                email_svc.send_notification(
+                    current_user.email,
+                    "./templates/denial_notification.html",
+                    {"request_id": request_id, "action": "denied"},
+                    "Purchase Request Denied"
+                )
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve' or 'deny'")
         
-        # Fetch the record
-        result = db.query(*columns).filter(condition).params({"ID": ID}).first()
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="ID not found in database")
-        
-        if not ID or not status:
-            raise HTTPException(status_code=400, detail="Missing ID or status")
-        
-        current_approved = result[1] if result else None
-        current_pendingApproval = result[2] if result else None
-        current_status = result[3] if result else None
-        current_newRequest = result[4] if result else None
-        
-        requester_email = ldap_mgr.get_email_address(ldap_mgr.get_conn(), ldap_mgr.set_username(requester))
-    
-    # This is a new request, so we need to set the status to "PENDING" and update the database
-    # status is either "approve" or "deny"
-    if status == "approve" and current_newRequest and current_status == "NEW REQUEST" and not current_pendingApproval and not current_approved:
+        return {"status": "success", "message": f"Request {action.lower()}ed successfully"}
+    except Exception as e:
+        logger.error(f"Error in approve/deny request: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
-        # Update the status to "PENDING" in the database
-        dbas.update_data(ID, 'approval', approved=False, pendingApproval=True, status="PENDING", newRequest=False)
-    
-        email_service.set_msg_body("Request pending approval")
-        email_service.set_msg_data(data)
-        email_service.set_requester_email(requester_email)
-    
-    ## Request has been denied
-    elif status == "deny":
-        dbas.update_data(ID, 'approval', approved=False, pendingApproval=False, status="DENIED", newRequest=False)
-        email_service.set_msg_body("Request denied")
-        email_service.set_msg_data(data)
-        email_service.set_requester_email(requester_email)
+##########################################################################
+## REFRESH TOKEN
+@api_router.post("/refresh")
+async def refresh_token(refresh_token: dict):
+    try:
+        # Verify refresh token
+        payload = jwt.decode(refresh_token.get("refresh_token"), JWT_SECRET_KEY, algorithms=["HS256"])
+        username = payload.get("sub")
         
-        logger.error(f"Request {ID} denied")
-    
-    ## Prepare email and send to final approver, the first approver (Matt) sets it to pending_approval = true
-    ## Peter, Edmund, Ted make up final approvers, sets it to approved = true
-    email_service.send_email()
-    return {"message": "Request approved/denied successfully"} 
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+        
+        # Get the user info
+        user = fetch_user(username)
+        
+        # Create a new access token
+        access_expire = datetime.now(timezone.utc) + timedelta(hours=1)
+        to_encode = {
+            "sub":      username,
+            "email":    user.email,
+            "groups":   user.group,
+        }
+        token = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm="HS256")
+        
+        return { "access_token": token, "user": user }
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    except Exception as e:
+        logger.error(f"Error refreshing token: {e}")
+        raise HTTPException(status_code=500, detail="Error refreshing token")
 
 ##########################################################################
 ##########################################################################
@@ -455,7 +512,7 @@ def process_purchase_data(data):
 ## GENERATE REQUISITION ID
 def create_req_id(processed_data):
     requester_part = processed_data.get('requester', '')[:4]
-    boc_part = processed_data.get('budgetObjCode', '').split("-")[0][:4]
+    boc_part = processed_data.get('budgetObjCode', '')[:4]
     fund_part = processed_data.get('fund', '')[:4]
     location_part = processed_data.get('location', '')[:4]
     id_part = processed_data.get('ID', '')[9:13]  # Adjust if needed
@@ -504,17 +561,14 @@ def process_approval_data(processed_data):
     ## SENDING NOTIFICATION OF NEW REQUEST
     # Create email body and send to approver
     logger.info("Sending notification email to approver...")
-    email_template = email_service.load_email_template("./email_template.html")
-    email_body = email_template.format(**processed_data)
-    email_service.send_email(email_body)
+    email_svc.send_notification(
+        "roman_campbell@lawb.uscourts.gov",  # This should be the approver's email
+        "./templates/new_request_notification.html",
+        processed_data,
+        "New Purchase Request"
+    )
                     
     return approval_data
-
-##########################################################################
-## GET STATUS OF approval
-def get_approval_status(ID):
-    condition = dbas.Approval.ID == ID
-    columns = [dbas.Approval.approved]
 
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
@@ -522,14 +576,24 @@ def purchase_req_commit(processed_data):
     with lock:
         try:
             table = "purchase_request"
-            dbas.insert_data(processed_data, table)
-            approval_data = process_approval_data(processed_data)
-            logger.info(f"newRequest: {processed_data.get('newRequest')}")
-            
-            if processed_data.get('newRequest') == 1:
-                approval_data['status'] = "NEW REQUEST"
-                table = "approval"
-                dbas.insert_data(approval_data, table)
+            # Get a session and use it directly
+            session = next(get_session())
+            try:
+                
+                dbas.insert_data(processed_data, table)
+                session.commit()
+                
+                approval_data = process_approval_data(processed_data)
+                logger.info(f"newRequest: {processed_data.get('newRequest')}")
+                
+                if processed_data.get('newRequest') == 1:
+                    approval_data['status'] = "NEW REQUEST"
+                    table = "approval"
+                    # Call insert data
+                    dbas.insert_data(approval_data, table)
+                    session.commit()
+            finally:
+                session.close()
         except Exception as e:
             logger.error(f"Exception occurred: {e}")
 
@@ -537,4 +601,4 @@ def purchase_req_commit(processed_data):
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
-    uvicorn.run("pras:app", host="localhost", port=5004, reload=True)
+    uvicorn.run("pras_api:app", host="localhost", port=5004, reload=True)

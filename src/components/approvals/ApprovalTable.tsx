@@ -83,8 +83,10 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     /* APPROVE OR DENY */
     /************************************************************************************ */
     // Get the current state of newRequest, approved, and pendingApproval
-    async function handleApproveDeny(id: string, requester: string, status: string) {
+    async function handleApproveDeny(id: string, requester: string, action: string) {
         try {
+            console.log("Sending request with:", { request_id: id, action: action });
+            
             const response = await fetch(API_URL2, {
                 method: 'POST',
                 headers: {
@@ -92,22 +94,26 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                     'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                 },
                 body: JSON.stringify({
-                    ID: id,
-                    requester: requester,
-                    status: status,
+                    request_id: id,
+                    action: action,
                 })
             });
+            
             if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error("Error response:", errorData);
                 throw new Error(`HTTP error: ${response.status}`);
             }
+            
             const data = await response.json();
+            console.log("Response data:", data);
 
             // Invalidate the query to to trigger a refetch
             queryClient.invalidateQueries({ queryKey: ['approval_data'] });
             return data;
         }
         catch (error) {
-            console.error("FetchService.ts", error);
+            console.error("Error in handleApproveDeny:", error);
             throw error;
         }
     }
