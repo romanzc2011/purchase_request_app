@@ -1,8 +1,9 @@
-from loguru import logger
-from services.ipc_service import IPC_Service
 import pythoncom
 import win32com.client as win32
 import os
+
+from loguru import logger
+from services.ipc_service import IPC_Service
 
 """
 AUTHOR: Roman Campbell
@@ -45,13 +46,14 @@ class EmailService:
                 }
             }
         }
+        self.request_status = None
 
-    def send_notification(self, recipient, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
+    def send_notification(self, template_data=None, subject=None, request_status=None, custom_msg=None):
         """
         Send notifications based on request status or directly to a recipient
         
         Args:
-            recipient: Email address of the recipient
+            recipients: Email address(es) of the recipient(s)
             template_path: Path to the HTML template file (optional)
             template_data: Data to be used in the template (optional)
             subject: Email subject (optional)
@@ -62,104 +64,119 @@ class EmailService:
             pythoncom.CoInitialize()
             outlook = win32.Dispatch("Outlook.Application")
             
-            # If template path is provided, use it to send a direct notification
-            if template_path:
-                # Read the template file
-                with open(template_path, 'r') as file:
-                    template_content = file.read()
-                
-                # Format the template with the provided data
-                if template_data:
-                    # Replace template placeholders while preserving CSS curly braces
-                    formatted_content = template_content
-                    for key, value in template_data.items():
-                        placeholder = "{" + key + "}"
-                        formatted_content = formatted_content.replace(placeholder, str(value))
-                else:
-                    formatted_content = template_content
-                
-                # Create and send the email
-                mail = outlook.CreateItem(0)
-                mail.Subject = subject or self.subject
-                mail.HTMLBody = formatted_content
-                mail.To = recipient
-                
-                if self.cc_persons:
-                    mail.CC = "; ".join(self.cc_persons)
-                
-                mail.Send()
-                logger.info(f"Email sent to {recipient} using template {template_path}")
-                return
+            # Validate required fields
+            self._validate_required_fields()
             
-            # Otherwise, use the request_status based notification
-            if request_status:
-                self._validate_required_fields()
-                
-                if request_status == "NEW_REQUEST":
-                    self._send_new_request_notifications(outlook, custom_msg)
-                elif request_status == "PENDING":
-                    self._send_pending_notifications(outlook, custom_msg)
-                else:
-                    logger.warning(f"Unknown request status: {request_status}")
-                    
-                logger.info("Email notifications sent successfully")
+            # Otherwise use status-based approach
+            if request_status == 'NEW REQUEST':
+                self._send_email(
+                    outlook=outlook,
+                    to_email=self.recipients['first_approver']['email'],
+                    subject=self.msg_templates['NEW_REQUEST']['first_approver']['subject'],
+                    body=self.msg_templates['NEW_REQUEST']['first_approver']['body'].format(
+                        first_approver=self.recipients['first_approver']['name']
+                    ),
+                    template_path='./templates/new_request_notification.html',
+                    template_data=template_data,
+                    cc=self.cc_persons
+                )
+                self._send_email(
+                    outlook=outlook,
+                    to_email=self.recipients['requester']['email'],
+                    subject=self.msg_templates['NEW_REQUEST']['requester']['subject'],
+                    body=self.msg_templates['NEW_REQUEST']['requester']['body'].format(
+                        requester=self.recipients['requester']['name']
+                    ),
+                    template_path='./templates/requester_template.html',
+                    template_data=template_data,
+                    cc=self.cc_persons
+                )
+            elif request_status == 'PENDING':
+                self._send_email(
+                    outlook=outlook,
+                    to_email=self.recipients['final_approver']['email'],
+                    subject=self.msg_templates['PENDING']['final_approver']['subject'],
+                    body=self.msg_templates['PENDING']['final_approver']['body'].format(
+                        final_approver=self.recipients['final_approver']['name']
+                    ),
+                    template_path='./templates/final_approver_template.html',
+                    template_data=template_data,
+                    cc=self.cc_persons
+                )
             else:
-                logger.warning("No request_status provided for notification")
-            
+                logger.error(f"Unknown request status: {request_status}")
+                return
+            logger.info("Email notifications sent successfully.")
         except Exception as e:
-            logger.error(f"Error sending email notifications: {e}")
+            logger.error(f"Error sending email: {e}")
             raise
         finally:
             pythoncom.CoUninitialize()
-
-    def _send_new_request_notifications(self, outlook, custom_msg=None):
-        """Send notifications for new requests to first approver and requester"""
-        # Notify first approver
-        self._create_and_send_mail(
-            outlook,
-            to_email=self.recipients['first_approver'],
-            subject=self.msg_templates['NEW_REQUEST']['first_approver']['subject'],
-            body=custom_msg or self.msg_templates['NEW_REQUEST']['first_approver']['body'].format(
-                first_approver=self.recipients['first_approver']
-            )
-        )
-
-        # Notify requester
-        self._create_and_send_mail(
-            outlook, 
-            to_email=self.recipients['requester']['email'],
-            subject=self.msg_templates['NEW_REQUEST']['requester']['subject'],
-            body=custom_msg or self.msg_templates['NEW_REQUEST']['requester']['body'].format(
-                requester=self.recipients['requester']['name']
-            )
-        )
-
-    def _send_pending_notifications(self, outlook, custom_msg=None):
-        """Send notifications for pending requests to final approver"""
-        self._create_and_send_mail(
-            outlook,
-            to_email=self.recipients['final_approver'],
-            subject=self.msg_templates['PENDING']['final_approver']['subject'],
-            body=custom_msg or self.msg_templates['PENDING']['final_approver']['body'].format(
-                final_approver=self.recipients['final_approver']
-            ),
-            cc=[self.recipients['first_approver']]
-        )
-
-    def _create_and_send_mail(self, outlook, to_email, subject, body, cc=None):
-        """Helper method to create and send individual emails"""
+            
+    
+    # Send email
+    def _send_email(self, outlook, to_email, subject, body, cc=None, template_path=None, template_data=None):
+        """
+        Helper method to send an email using Outlook
+        
+        Args:
+            outlook: Outlook application instance
+            to_email: Recipient email address(es)
+            subject: Email subject
+            body: Email body content
+            cc: CC recipients (optional)
+            template_path: Path to HTML template file (optional)
+            template_data: Data to be used in template (optional)
+        """
         mail = outlook.CreateItem(0)
         mail.Subject = subject
-        mail.HTMLBody = body
-        mail.To = to_email
         
+        # Handle template if provided
+        if template_path and template_data:
+            try:
+                with open(template_path, 'r') as f:
+                    template = f.read()
+                
+                # Check which variables are actually in the template
+                missing_vars = []
+                for key in template_data.keys():
+                    if f"{{{key}}}" not in template:
+                        missing_vars.append(key)
+                
+                if missing_vars:
+                    logger.warning(f"Template variables not found in template: {missing_vars}")
+                
+                # Special case: Replace {requester} with the requester's name if it exists in the template
+                if "{requester}" in template and self.recipients['requester']['name']:
+                    template = template.replace("{requester}", self.recipients['requester']['name'])
+                    logger.info(f"Replaced {{requester}} with {self.recipients['requester']['name']}")
+                
+                # Replace template variables with data
+                for key, value in template_data.items():
+                    # Replace {key} with value
+                    template = template.replace("{" + key + "}", str(value))
+                mail.HTMLBody = template
+            except Exception as e:
+                logger.error(f"Error processing template: {e}")
+                mail.HTMLBody = body
+        else:
+            mail.HTMLBody = body
+        
+        # Handle multiple recipients
+        if isinstance(to_email, list):
+            mail.To = "; ".join(to_email)
+        else:
+            mail.To = to_email
+        
+        # Handle CC recipients
         if cc:
             mail.CC = "; ".join(cc)
         elif self.cc_persons:
             mail.CC = "; ".join(self.cc_persons)
-            
+        
         mail.Send()
-
+        logger.info(f"Email sent to {to_email} with subject: {subject}")
+        
     def _validate_required_fields(self):
         """Validate that all required fields are set"""
         if not self.recipients['requester']['email']:
@@ -171,18 +188,28 @@ class EmailService:
         if not self.subject:
             raise ValueError("Email subject is not set")
 
-    # Setter methods
+   #################################################################################
+    ## SETTER METHODS
     def set_requester(self, name: str, email: str):
         self.recipients['requester'] = {'name': name, 'email': email}
 
-    def set_first_approver(self, email: str):
-        self.recipients['first_approver'] = email
+    def set_first_approver(self, name: str, email: str):
+        self.recipients['first_approver'] = {'name': name, 'email': email}
 
-    def set_final_approver(self, email: str):
-        self.recipients['final_approver'] = email
+    def set_final_approver(self, name: str, email: str):
+        self.recipients['final_approver'] = {'name': name, 'email': email}      
 
     def set_cc_persons(self, cc_persons: list):
         self.cc_persons = cc_persons
+        
+    def set_request_status(self, request_status: str):
+        self.request_status = request_status
+        
+    def set_template_path(self, template_path: str):
+        self.template_path = template_path
+    
+    #################################################################################
+    ## GETTER METHODS
 
     # Getter methods
     def get_requester(self):
@@ -196,3 +223,9 @@ class EmailService:
 
     def get_cc_persons(self):
         return self.cc_persons
+    
+    def get_request_status(self):
+        return self.request_status
+    
+    def get_template_path(self):
+        return self.template_path

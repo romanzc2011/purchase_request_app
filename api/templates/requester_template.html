@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+   
+  </head>
+  <body>
+    <p>
+      
+        Purchase request has been submitted for username: {requester}
+    </p>
+    <table>
+        <thead>
+          <tr>
+            <th class="maroon-header">Statement of Need</th>
+          </tr>
+        </thead>
+        <colgroup>
+          <col style="width: 30%" />
+          <!-- Adjusts the width of the first column -->
+          <col style="width: 70%" />
+          <!-- Adjusts the width of the second column -->
+        </colgroup>
+        <tr>
+          <th>Field</th>
+          <th>Details</th>
+        </tr>
+        <tr>
+          <td>Requistion ID</td>
+          <td>{reqID}</td>
+        </tr>
+        <tr>
+          <td>Requester</td>
+          <td>{requester}</td>
+        </tr>
+        <tr>
+          <td>Date Requested</td>
+          <td>{datereq}</td>
+        </tr>
+        <tr>
+          <td>Date Needed</td>
+          <td>{dateneed}</td>
+        </tr>
+        <tr>
+          <td>Budget Code</td>
+          <td>{budgetObjCode}</td>
+        </tr>
+        <tr>
+          <td>Fund</td>
+          <td>{fund}</td>
+        </tr>
+        <tr>
+          <td>Location</td>
+          <td>{location}</td>
+        </tr>
+        <tr>
+          <td>Quantity</td>
+          <td>{quantity}</td>
+        </tr>
+        <tr>
+          <td>Price (Per Item)</td>
+          <td>${priceEach}</td>
+        </tr>
+        <tr>
+          <td>Total Price</td>
+          <td>${totalPrice}</td>
+        </tr>
+      </table>
+      <p>Please review the request.</p>
+    </body>
+  </html>

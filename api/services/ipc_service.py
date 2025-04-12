@@ -8,12 +8,11 @@ import uuid
 from loguru import logger
 
 class Message:
-    def __init__(self, content: Any, msg_type: str, priority: int = 0, ttl: Optional[int] = None):
+    def __init__(self, content: Any, msg_type: str, ttl: Optional[int] = None):
         self.id = str(uuid.uuid4())
         self.content = content
         self.type = msg_type
-        self.priority = priority
-        self.created_at = datetime.utcnow()
+        self.created_at = datetime.now(datetime.timezone.utc)
         self.ttl = ttl  # Time to live in seconds
         self.acknowledged = False
         self.ack_time = None
@@ -23,7 +22,6 @@ class Message:
             "id": self.id,
             "content": self.content,
             "type": self.type,
-            "priority": self.priority,
             "created_at": self.created_at.isoformat(),
             "ttl": self.ttl,
             "acknowledged": self.acknowledged,
@@ -35,7 +33,6 @@ class Message:
         msg = cls(
             content=data["content"],
             msg_type=data["type"],
-            priority=data["priority"],
             ttl=data["ttl"]
         )
         msg.id = data["id"]
@@ -67,12 +64,9 @@ class IPC_Service:
         self.start_processing()
 
     def send_message(self, content: Any, msg_type: str, priority: int = 0, ttl: Optional[int] = None) -> str:
-        """
-        Send a message with optional priority and time-to-live
-        Returns the message ID
-        """
+        """Send a message to the queue"""
         try:
-            message = Message(content, msg_type, priority, ttl)
+            message = Message(content, msg_type, ttl)
             self.msg_queue.put(message)
             logger.info(f"Message queued: {message.id}")
             return message.id

@@ -81,7 +81,6 @@ function AddItemsForm({
         /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
         const newID = uuidv4();
         
-        
         //const newReqID = "send to create reqid service";
         const updatedItem = {
             ...newItem,

@@ -25,6 +25,8 @@ from services.email_service import EmailService
 from services.ipc_service import IPC_Service
 from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
+from managers.ipc_manager import ipc_instance
+
 
 """
 AUTHOR: Roman Campbell
@@ -75,10 +77,13 @@ ldap_svc = LDAPService(
 search_svc = SearchService()
 email_svc = EmailService(
     from_sender="Purchase Request", 
-    subject="Purchase Request Notification",
-    first_approver_email="roman_campbell@lawb.uscourts.gov",  # First approver's email
-    final_approver_email="roman_campbell@lawb.uscourts.gov"   # Final approver's email
+    subject="Purchase Request Notification"
 )
+
+# Set the recipient emails
+email_svc.set_first_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov")
+email_svc.set_final_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov")
+
 db_svc = next(get_session())  # Initialize with a session
 ipc_svc = IPC_Service()
 auth_svc = AuthService()
@@ -106,20 +111,17 @@ def fetch_user(username: str) -> User:
 # Define get_current_user function
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
-        # Verify the token
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
-        username: str = payload.get("sub")
-        if username is None:
+        # Verify JWT token
+        username = auth_svc.verify_jwt_token(token)
+        if not username:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: missing username"
+                detail="Invalid token: no username found"
             )
             
         # Get user email from LDAP
-        user_email = ldap_svc.get_email_address(ldap_svc.get_connection(), 
-                                                username)
+        user_email = ldap_svc.get_email_address(ldap_svc.get_connection(), username)
         if not user_email:
-            logger.error(f"Could not find email for user {username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token: user not found in LDAP"
@@ -148,6 +150,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token"
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions (including our custom ones)
+        raise
     except Exception as e:
         logger.error(f"Error in get_current_user: {e}")
         raise HTTPException(
@@ -231,6 +236,14 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     # Extract requester 
     requester = data.get("requester")
     logger.info(f"REQUESTER: {requester}")
+    
+    # Get requester email address
+    requester_email = ldap_svc.get_email_address(ldap_svc.get_connection(), requester)
+    if not requester_email: 
+        logger.error(f"Could not find email for user {requester}")
+        raise HTTPException(status_code=400, detail="Invalid requester")
+    # Set the email service requester
+    email_svc.set_requester(requester, requester_email);
     
     ## Verify that requester is a legitimate user in AD via ldap
     # Ensure we have a valid LDAP connection
@@ -377,19 +390,19 @@ async def approve_deny_request(
                 new_status = "PENDING"
                 dbas.update_data(request_id, "approval", status=new_status)
                 email_svc.send_notification(
-                    current_user.email,
-                    "./templates/approval_notification.html",
-                    {"request_id": request_id, "action": "approved"},
-                    "Purchase Request Approved"
+                    recipients=current_user.email,
+                    template_path="./templates/approval_notification.html",
+                    template_data={"request_id": request_id, "action": "approved"},
+                    subject="Purchase Request Approved"
                 )
             elif action.lower() == "deny":
                 new_status = "DENIED"
                 dbas.update_data(request_id, "approval", status=new_status)
                 email_svc.send_notification(
-                    current_user.email,
-                    "./templates/denial_notification.html",
-                    {"request_id": request_id, "action": "denied"},
-                    "Purchase Request Denied"
+                    recipients=current_user.email,
+                    template_path="./templates/denial_notification.html",
+                    template_data={"request_id": request_id, "action": "denied"},
+                    subject="Purchase Request Denied"
                 )
         elif current_status == "PENDING":
             if action.lower() == "approve":
@@ -397,26 +410,35 @@ async def approve_deny_request(
                 dbas.update_data(request_id, "approval", status=new_status)
                 # Send email to final approver
                 email_svc.send_notification(
-                    email_svc.final_approver_email,  # Use the final approver's email
-                    "./templates/final_approval_notification.html",
-                    {"request_id": request_id, "action": "approved"},
-                    "Purchase Request Final Approval"
+                    recipients=email_svc.final_approver_email,  # Use the final approver's email
+                    template_path="./templates/final_approval_notification.html",
+                    template_data={"request_id": request_id, "action": "approved"},
+                    subject="Purchase Request Final Approval"
+                )
+                # Send email to current user (approver)
+                email_svc.send_notification(
+                    recipients=current_user.email,  # Send to the current approver
+                    template_path="./templates/approval_notification.html",
+                    template_data={"request_id": request_id, "action": "approved"},
+                    subject="Purchase Request Approved"
                 )
                 # Send email to requester
-                email_svc.send_notification(
-                    current_user.email,  # Send to the requester
-                    "./templates/approval_notification.html",
-                    {"request_id": request_id, "action": "approved"},
-                    "Purchase Request Approved"
-                )
+                requester_email = dbas.get_requester_email(db_svc, request_id)
+                if requester_email:
+                    email_svc.send_notification(
+                        recipients=requester_email,  # Send to the requester
+                        template_path="./templates/approval_notification.html",
+                        template_data={"request_id": request_id, "action": "approved"},
+                        subject="Purchase Request Approved"
+                    )
             elif action.lower() == "deny":
                 new_status = "DENIED"
                 dbas.update_data(request_id, "approval", status=new_status)
                 email_svc.send_notification(
-                    current_user.email,
-                    "./templates/denial_notification.html",
-                    {"request_id": request_id, "action": "denied"},
-                    "Purchase Request Denied"
+                    recipients=current_user.email,
+                    template_path="./templates/denial_notification.html",
+                    template_data={"request_id": request_id, "action": "denied"},
+                    subject="Purchase Request Denied"
                 )
         else:
             raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve' or 'deny'")
@@ -429,36 +451,38 @@ async def approve_deny_request(
 ##########################################################################
 ## REFRESH TOKEN
 @api_router.post("/refresh")
-async def refresh_token(refresh_token: dict):
+async def refresh_token(refresh_token: str):
     try:
-        # Verify refresh token
-        payload = jwt.decode(refresh_token.get("refresh_token"), JWT_SECRET_KEY, algorithms=["HS256"])
-        username = payload.get("sub")
-        
+        # Verify the refresh token
+        username = auth_svc.verify_jwt_token(refresh_token)
         if not username:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token"
+            )
+            
+        # Create new access token
+        new_access_token = auth_svc.create_access_token(identity=username)
         
-        # Get the user info
-        user = fetch_user(username)
-        
-        # Create a new access token
-        access_expire = datetime.now(timezone.utc) + timedelta(hours=1)
-        to_encode = {
-            "sub":      username,
-            "email":    user.email,
-            "groups":   user.group,
+        return {
+            "access_token": new_access_token
         }
-        token = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm="HS256")
-        
-        return { "access_token": token, "user": user }
-        
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Refresh token expired")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired"
+        )
+    except PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
     except Exception as e:
         logger.error(f"Error refreshing token: {e}")
-        raise HTTPException(status_code=500, detail="Error refreshing token")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error refreshing token"
+        )
 
 ##########################################################################
 ##########################################################################
@@ -519,6 +543,20 @@ def create_req_id(processed_data):
     return f"{requester_part}-{boc_part}-{fund_part}-{location_part}-{id_part}"
 
 ##########################################################################
+## UPDATE REQUEST STATUS
+def update_request_status(id, status):
+    # Send a message to EmailService via IPC
+    message_content = {
+        "id": id,
+        "status": status
+    }
+    ipc_instance.send_message(
+        content=message_content,
+        msg_type="REQUEST_STATUS_UPDATE"
+    )
+    logger.info(f"Request status updated: {id} to {status}")
+
+##########################################################################
 ## PROCESS APPROVAL DATA --- send new request to approval
 def process_approval_data(processed_data):
     print("PROCESSED: ", processed_data)
@@ -561,11 +599,11 @@ def process_approval_data(processed_data):
     ## SENDING NOTIFICATION OF NEW REQUEST
     # Create email body and send to approver
     logger.info("Sending notification email to approver...")
+    logger.info(f"Request status before sending notification: {approval_data['status']}")
     email_svc.send_notification(
-        "roman_campbell@lawb.uscourts.gov",  # This should be the approver's email
-        "./templates/new_request_notification.html",
-        processed_data,
-        "New Purchase Request"
+        template_data=processed_data,
+        subject="New Purchase Request",
+        request_status=approval_data['status']
     )
                     
     return approval_data
