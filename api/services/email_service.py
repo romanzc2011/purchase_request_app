@@ -48,12 +48,11 @@ class EmailService:
         }
         self.request_status = None
 
-    def send_notification(self, template_data=None, subject=None, request_status=None, custom_msg=None):
+    def send_notification(self, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
         """
         Send notifications based on request status or directly to a recipient
         
         Args:
-            recipients: Email address(es) of the recipient(s)
             template_path: Path to the HTML template file (optional)
             template_data: Data to be used in the template (optional)
             subject: Email subject (optional)
@@ -64,11 +63,15 @@ class EmailService:
             pythoncom.CoInitialize()
             outlook = win32.Dispatch("Outlook.Application")
             
+            # Set request status if provided
+            if request_status:
+                self.request_status = request_status
+            
             # Validate required fields
             self._validate_required_fields()
             
             # Otherwise use status-based approach
-            if request_status == 'NEW REQUEST':
+            if self.request_status == 'NEW REQUEST':
                 self._send_email(
                     outlook=outlook,
                     to_email=self.recipients['first_approver']['email'],
@@ -76,7 +79,7 @@ class EmailService:
                     body=self.msg_templates['NEW_REQUEST']['first_approver']['body'].format(
                         first_approver=self.recipients['first_approver']['name']
                     ),
-                    template_path='./templates/new_request_notification.html',
+                    template_path=template_path,
                     template_data=template_data,
                     cc=self.cc_persons
                 )
@@ -87,11 +90,12 @@ class EmailService:
                     body=self.msg_templates['NEW_REQUEST']['requester']['body'].format(
                         requester=self.recipients['requester']['name']
                     ),
-                    template_path='./templates/requester_template.html',
+                    template_path=template_path,
                     template_data=template_data,
                     cc=self.cc_persons
                 )
-            elif request_status == 'PENDING':
+                # Send email to final approver
+            elif self.request_status == 'PENDING':
                 self._send_email(
                     outlook=outlook,
                     to_email=self.recipients['final_approver']['email'],
@@ -99,12 +103,12 @@ class EmailService:
                     body=self.msg_templates['PENDING']['final_approver']['body'].format(
                         final_approver=self.recipients['final_approver']['name']
                     ),
-                    template_path='./templates/final_approver_template.html',
+                    template_path=template_path,
                     template_data=template_data,
                     cc=self.cc_persons
                 )
             else:
-                logger.error(f"Unknown request status: {request_status}")
+                logger.error(f"Unknown request status: {self.request_status}")
                 return
             logger.info("Email notifications sent successfully.")
         except Exception as e:
@@ -178,15 +182,26 @@ class EmailService:
         logger.info(f"Email sent to {to_email} with subject: {subject}")
         
     def _validate_required_fields(self):
-        """Validate that all required fields are set"""
-        if not self.recipients['requester']['email']:
-            raise ValueError("Requester email is not set")
-        if not self.recipients['first_approver']:
-            raise ValueError("First approver email is not set")
-        if not self.recipients['final_approver']:
-            raise ValueError("Final approver email is not set")
+        """
+        Validate that all required fields are set based on the current request status
+        """
+        # Always check subject
         if not self.subject:
             raise ValueError("Email subject is not set")
+            
+        # Check fields based on request status
+        if self.request_status == 'NEW REQUEST':
+            if not self.recipients['requester']['email']:
+                raise ValueError("Requester email is not set")
+            if not self.recipients['first_approver']['email']:
+                raise ValueError("First approver email is not set")
+        elif self.request_status == 'PENDING':
+            if not self.recipients['final_approver']['email']:
+                raise ValueError("Final approver email is not set")
+        else:
+            # For custom notifications, check if recipient is set
+            if not hasattr(self, 'recipients') or not any(self.recipients.values()):
+                raise ValueError("No recipient email is set")
 
    #################################################################################
     ## SETTER METHODS

@@ -235,6 +235,11 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     
     # Extract requester 
     requester = data.get("requester")
+    ldap_svc.set_requester(requester)
+    if not requester:
+        logger.error(f"Requester not found in data: {data}")
+        raise HTTPException(status_code=400, detail="Invalid requester")
+    # Log the requester
     logger.info(f"REQUESTER: {requester}")
     
     # Get requester email address
@@ -363,34 +368,26 @@ async def get_req_id(data: dict = None, current_user: str = Depends(get_current_
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
 @api_router.post("/approveDenyRequest")
-async def approve_deny_request(
-    data: dict,
-    current_user: User = Depends(get_current_user)
-):
+async def approve_deny_request(data: dict, current_user: User = Depends(get_current_user)):
     try:
         request_id = data.get("request_id")
         action = data.get("action")
-        logger.info(f"APPROVE/DENY REQUEST: {request_id} {action}")
         
         if not request_id or not action:
-            raise HTTPException(
-                status_code=422,
-                detail="Missing required fields: request_id and action are required"
-            )
+            raise HTTPException(status_code=400, detail="Missing request_id or action")
             
-        # Get ID and check current status, NEW send email to first approver and requester
-        # PENDING send email to final approver
-        # DENIED send email to requester
-        current_status = dbas.get_status_by_id(db_svc, request_id)
-        logger.info(f"STATUS: {current_status} CURRENT USER: {current_user}")
-        
+        # Get current status
+        current_status = dbas.get_status_by_id(request_id)
+        if not current_status:
+            raise HTTPException(status_code=404, detail="Request not found")
+            
+        # Process based on current status
         if current_status == "NEW REQUEST":
-            ## The request was approved, switch to pending
             if action.lower() == "approve":
                 new_status = "PENDING"
                 dbas.update_data(request_id, "approval", status=new_status)
+                email_svc.set_request_status("NEW REQUEST")
                 email_svc.send_notification(
-                    recipients=current_user.email,
                     template_path="./templates/approval_notification.html",
                     template_data={"request_id": request_id, "action": "approved"},
                     subject="Purchase Request Approved"
@@ -398,8 +395,8 @@ async def approve_deny_request(
             elif action.lower() == "deny":
                 new_status = "DENIED"
                 dbas.update_data(request_id, "approval", status=new_status)
+                email_svc.set_request_status("NEW REQUEST")
                 email_svc.send_notification(
-                    recipients=current_user.email,
                     template_path="./templates/denial_notification.html",
                     template_data={"request_id": request_id, "action": "denied"},
                     subject="Purchase Request Denied"
@@ -409,15 +406,15 @@ async def approve_deny_request(
                 new_status = "APPROVED" 
                 dbas.update_data(request_id, "approval", status=new_status)
                 # Send email to final approver
+                email_svc.set_request_status("PENDING")
                 email_svc.send_notification(
-                    recipients=email_svc.final_approver_email,  # Use the final approver's email
                     template_path="./templates/final_approval_notification.html",
                     template_data={"request_id": request_id, "action": "approved"},
                     subject="Purchase Request Final Approval"
                 )
                 # Send email to current user (approver)
+                email_svc.set_request_status("PENDING")
                 email_svc.send_notification(
-                    recipients=current_user.email,  # Send to the current approver
                     template_path="./templates/approval_notification.html",
                     template_data={"request_id": request_id, "action": "approved"},
                     subject="Purchase Request Approved"
@@ -425,8 +422,8 @@ async def approve_deny_request(
                 # Send email to requester
                 requester_email = dbas.get_requester_email(db_svc, request_id)
                 if requester_email:
+                    email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
-                        recipients=requester_email,  # Send to the requester
                         template_path="./templates/approval_notification.html",
                         template_data={"request_id": request_id, "action": "approved"},
                         subject="Purchase Request Approved"
@@ -434,8 +431,8 @@ async def approve_deny_request(
             elif action.lower() == "deny":
                 new_status = "DENIED"
                 dbas.update_data(request_id, "approval", status=new_status)
+                email_svc.set_request_status("PENDING")
                 email_svc.send_notification(
-                    recipients=current_user.email,
                     template_path="./templates/denial_notification.html",
                     template_data={"request_id": request_id, "action": "denied"},
                     subject="Purchase Request Denied"

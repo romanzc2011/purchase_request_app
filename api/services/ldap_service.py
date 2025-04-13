@@ -49,6 +49,7 @@ class LDAPService:
         self.using_tls = using_tls
         self.service_user = service_user
         self.service_password = service_password
+        self.requester = None
         self.it_group_dns = it_group_dns
         self.cue_group_dns = cue_group_dns
         self.access_group_dns = access_group_dns
@@ -246,12 +247,16 @@ class LDAPService:
             return None
 
     #####################################################################################
-    # GET/SET CONNECTION AND AUTH STATUS/GROUPS
+    # SETTERS
+    
     def set_is_authenticated(self, value):
         self.is_authenticated = value
         
-    def get_is_authenticated(self):
-        return self.is_authenticated
+    def set_username(self, username):
+        self.username = username
+    
+    def set_requester(self, requester):
+        self.requester = requester
     
     def set_connection(self, connection):
         self.connection = connection
@@ -259,16 +264,22 @@ class LDAPService:
     def set_groups(self, groups: dict[str, bool]):
         self.groups = groups
         
+    
+    
+    #####################################################################################
+    # GETTERS
+    
+    def get_requester(self):
+        return self.requester
+    
+    def get_username(self):
+        return self.username
+    
     def get_groups(self):
         return self.groups
         
     def get_connection(self):
         return self.connection
     
-    #####################################################################################
-    # GET/SET USERNAME
-    def set_username(self, username):
-        self.username = username
-    
-    def get_username(self):
-        return self.username
+    def get_is_authenticated(self):
+        return self.is_authenticated
