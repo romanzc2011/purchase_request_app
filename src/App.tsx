@@ -9,11 +9,10 @@ import AlertMessage from "./components/AlertMessage";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 import ApprovalsTable from "./components/approvals/ApprovalTable";
-import { v4 as uuidv4 } from "uuid";
-import { IFile } from "./types/IFile";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ApprovalPageMain from "./components/approvals/ApprovalPageMain";
-
-const drawerWidth = 195;
+import { IFile } from "./types/IFile";
+const baseURL = import.meta.env.VITE_API_URL;
 
 interface AppProps {
     isLoggedIn: boolean;
@@ -29,9 +28,28 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
+    const [ID, setID] = useState<string>("");
 
-    // Setting ID like this ensures a new ID when the state changes and re-render occurs
-    const [ID, setID] = useState(() => uuidv4());
+    useEffect(() => {
+        // Get initial ID from backend
+        const fetchInitialID = async () => {
+            try {
+                const response = await fetch(`${baseURL}/api/getReqID`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                setID(data.reqID);
+            } catch (error) {
+                console.error('Error fetching initial ID:', error);
+            }
+        };
+        fetchInitialID();
+    }, []);
 
     // Function to toggle the sidebar
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -98,7 +116,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                 component={"main"}
                 sx={{
                     padding: 3,
-                    marginLeft: sidebarOpen ? `${drawerWidth}px` : "60px", // Adjust dynamically
+                    marginLeft: sidebarOpen ? "195px" : "60px", // Adjust dynamically
                     transition: "margin 0.3s ease", // Smooth transition
                 }}
             >

@@ -1,7 +1,6 @@
 import { FieldErrors, useForm } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
 import React from "react";
-import { useMutation } from "@tanstack/react-query";
 import "./LearningDev";
 import { Box } from "@mui/material";
 import LearningDev from "./LearningDev";
@@ -17,18 +16,10 @@ import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
 import { IFile } from "../../types/IFile";
-import { v4 as uuidv4 } from "uuid";
 import InfoIcon from "@mui/icons-material/Info";
 import Tooltip from "@mui/material/Tooltip";
 import Justification from "./Justification";
 import AddComments from "./AddComments";
-
-/************************************************************************************ */
-/* CONFIG API URL- */
-/************************************************************************************ */
-const baseURL = import.meta.env.VITE_API_URL;
-const API_CALL: string = "/api/getReqID";
-const API_URL = `${baseURL}${API_CALL}`;
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -43,69 +34,34 @@ interface AddItemsProps {
 }
 
 /*************************************************************************************** */
-/* GENERATE REQUISITION ID */
-/*************************************************************************************** */
-async function generateReqID(requestData: FormValues): Promise<{ reqID: string }>  {
-    const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify(requestData),
-    });
-    if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-    }
-    return response.json();
-}
-
-/*************************************************************************************** */
 /* ADD ITEMS FORM */
 /*************************************************************************************** */
 function AddItemsForm({
     ID,
     setDataBuffer,
+    setIsSubmitted,
     setID,
     fileInfo,
     setFileInfo,
 }: AddItemsProps) {
-    const { mutate: generateReqIDMutation } = useMutation<{ reqID: string }, Error, FormValues>({
-        mutationFn: generateReqID,
-    });
-
     /*************************************************************************************** */
     /* HANDLE ADD ITEM function */
     /*************************************************************************************** */
     const handleAddItem = async (newItem: FormValues) => {
-        /* Becausee a user could upload a file first, if user uploads a file first then it will create a uuid */
-        const newID = uuidv4();
-        
-        //const newReqID = "send to create reqid service";
+        // Use the ID from the parent component directly
         const updatedItem = {
             ...newItem,
-            ID: newID,
+            ID: ID,
             price: Number(newItem.priceEach) || 0,
             fund: newItem.fund || "",
             budgetObjCode: newItem.budgetObjCode || "",
         };
 
-        // Trigger the mutation to generate a reqID
-        generateReqIDMutation(updatedItem, {
-            onSuccess: (data: { reqID: string }) => {
-                // Update the item with the generated reqID
-                updatedItem.reqID = data.reqID;
-                console.log("Received reqID: ", data.reqID);
-                // Now update the buffer and state
-                setDataBuffer((prev) => [...prev, updatedItem]);
-                setID(newID);
-                reset();
-                console.log("Item Added: ", updatedItem);
-            },
-            onError: (err) => {
-                console.error("Error generating reqID", err);
-            },
-        });
+        // Update the buffer and state
+        setDataBuffer((prev) => [...prev, updatedItem]);
+        setID(ID);
+        reset();
+        console.log("Item Added: ", updatedItem);
     };
 
     /*************************************************************************************** */

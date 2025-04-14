@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
-import json
+import uuid
 
 # Create engine and base
 engine = create_engine('sqlite:///db/purchase_request.db', echo=True)
@@ -18,7 +18,10 @@ my_session = sessionmaker(engine)
 class PurchaseRequest(Base):
     __tablename__ = "purchase_request"
 
-    ID: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    # UUID as primary key
+    uuid: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    # Sequential ID for user-facing operations
+    ID: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     reqID: Mapped[str] = mapped_column(String, nullable=False)
     requester: Mapped[str] = mapped_column(String, nullable=False)
     recipient: Mapped[str] = mapped_column(String, nullable=False)
@@ -43,13 +46,12 @@ class PurchaseRequest(Base):
     approved: Mapped[bool] = mapped_column(Boolean)
     createdTime: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
-     # Set up a one-to-one relationship with Approval on the parent side
+    # Set up a one-to-one relationship with Approval on the parent side
     approval = relationship(
         "Approval",
         cascade="all, delete-orphan",
         back_populates="purchase_request",
-        uselist=False,
-        single_parent=True  # Ensures that each PurchaseRequest has at most one Approval.
+        uselist=False
     )
 
     def __repr__(self):
@@ -63,23 +65,33 @@ class Approval(Base):
                       'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
                       'approved', 'pendingApproval', 'createdTime', 'approvedTime', 'deniedTime']
 
-    #  Use the same ID as purchase_request, creating a one-to-one relationship
-    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_request.ID"), primary_key=True, nullable=False)
+    # UUID as primary key
+    uuid: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    # Sequential ID for user-facing operations
+    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_request.ID"), nullable=False, unique=True)
     reqID: Mapped[str] = mapped_column(String, nullable=False)
     requester: Mapped[str] = mapped_column(String, nullable=False)
     recipient: Mapped[str] = mapped_column(String, nullable=False)
-    budgetObjCode: Mapped[str] = mapped_column(String)
-    fund: Mapped[str] = mapped_column(String)
-    quantity: Mapped[int] = mapped_column(Integer)
+    phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
+    datereq: Mapped[str] = mapped_column(String)      
+    dateneed: Mapped[str] = mapped_column(String)      
+    orderType: Mapped[str] = mapped_column(String)
+    fileAttachments: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
     itemDescription: Mapped[str] = mapped_column(Text)
     justification: Mapped[str] = mapped_column(Text)
-    totalPrice: Mapped[float] = mapped_column(Float)
+    addComments: Mapped[Optional[str]] = mapped_column(Text) 
+    trainNotAval: Mapped[str] = mapped_column(Text, nullable=True)
+    needsNotMeet: Mapped[str] = mapped_column(Text, nullable=True)
+    budgetObjCode: Mapped[str] = mapped_column(String)
+    fund: Mapped[str] = mapped_column(String)
     priceEach: Mapped[float] = mapped_column(Float)
+    totalPrice: Mapped[float] = mapped_column(Float)
     location: Mapped[str] = mapped_column(String)
+    quantity: Mapped[int] = mapped_column(Integer)
     newRequest: Mapped[bool] = mapped_column(Boolean)
     pendingApproval: Mapped[bool] = mapped_column(Boolean)
     approved: Mapped[bool] = mapped_column(Boolean)
-    status: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, nullable=False)
     createdTime: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     approvedTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     deniedTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
@@ -111,27 +123,32 @@ def get_all_approval(db_session: Session):
 
 ###################################################################################################
 # Insert data
-def insert_data(processed_data, table):
-    logger.info(f"Inserting data into {table}, data: {processed_data}")
+def insert_data(data, table):
+    logger.info(f"Inserting data into {table}: {data}")
     
-    if not processed_data or not isinstance(processed_data, dict):
-        raise ValueError("Processed data must be a non-empty dictionary")
-    
-    for key, value in processed_data.items():
-        if isinstance(value, list):
-            processed_data[key] = json.dumps(value)
+    if not data or not isinstance(data, dict):
+        raise ValueError("Data must be a non-empty dictionary")
     
     with next(get_session()) as db:
-        if table == "purchase_request":
-            new_obj = PurchaseRequest(**processed_data)
-        elif table == "approval":
-            new_obj = Approval(**processed_data)
-        else:
-            raise ValueError(f"Unsupported table: {table}")
-
-        db.add(new_obj)
-        db.commit()
-        logger.info(f"Successfully inserted data into {table}")
+        try:
+            if table == "purchase_request":
+                # Create new PurchaseRequest with UUID
+                obj = PurchaseRequest(**data)
+                db.add(obj)
+            elif table == "approval":
+                # Create new Approval with UUID
+                obj = Approval(**data)
+                db.add(obj)
+            else:
+                raise ValueError(f"Unsupported table: {table}")
+            
+            db.commit()
+            logger.info(f"Successfully inserted data into {table}")
+            return obj
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error inserting data into {table}: {e}")
+            raise
 
 ###################################################################################################
 # Get status of request from Approval table
@@ -141,7 +158,11 @@ def get_status_by_id(db_session: Session, ID: str):
     if not ID:
         raise ValueError("ID must be a non-empty string")
     
+    # First try to find by sequential ID
     result = db_session.query(Approval).filter(Approval.ID == ID).first()
+    if not result:
+        # If not found, try UUID
+        result = db_session.query(Approval).filter(Approval.id == ID).first()
     
     if result:
         return result.status
@@ -160,9 +181,17 @@ def update_data(ID, table, **kwargs):
     
     with next(get_session()) as db:
         if table == "purchase_request":
+            # Try sequential ID first
             obj = db.query(PurchaseRequest).filter(PurchaseRequest.ID == ID).first()
+            if not obj:
+                # If not found, try UUID
+                obj = db.query(PurchaseRequest).filter(PurchaseRequest.id == ID).first()
         elif table == "approval":
+            # Try sequential ID first
             obj = db.query(Approval).filter(Approval.ID == ID).first()
+            if not obj:
+                # If not found, try UUID
+                obj = db.query(Approval).filter(Approval.id == ID).first()
         else:
             raise ValueError(f"Unsupported table: {table}")
         
@@ -195,3 +224,17 @@ def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     with get_session() as db:
         result = db.query(*columns).filter(condition).params(params).first()
         return result
+    
+###################################################################################################
+# Get last 4 digits of the ID from the database
+def get_last_id(requester):
+    with next(get_session()) as db:
+        result = db.query(PurchaseRequest).filter(PurchaseRequest.requester == requester).order_by(PurchaseRequest.ID.desc()).first()
+        if result:
+            # Extract the last 4 digits from the sequential ID
+            id_parts = result.ID.split('-')
+            if len(id_parts) > 1:
+                return id_parts[-1]
+            return "0000"
+        else:
+            return "0000"

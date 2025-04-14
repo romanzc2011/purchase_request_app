@@ -91,7 +91,6 @@ function SubmitApprovalTable({
 
         // Retrieve access to from local storage
         const accessToken = localStorage.getItem("access_token");
-        console.log("TOKEN: ", accessToken);
 
         // Loop over provessedData and send each request separately
         for (const item of processedData) {
@@ -138,7 +137,7 @@ function SubmitApprovalTable({
                 >
                     <TableRow>
                         <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                            Requisition ID
+                            ID
                         </TableCell>
                         <TableCell sx={{ color: "white", fontWeight: "bold" }}>
                             Budget Object Code
@@ -167,7 +166,7 @@ function SubmitApprovalTable({
                     {processedData.map((item) => (
                         <TableRow key={item.ID}>
                             <TableCell sx={{ color: "white" }}>
-                                {item.reqID}
+                                {item.ID}
                             </TableCell>
                             <TableCell sx={{ color: "white" }}>
                                 {convertBOC(item.budgetObjCode)}

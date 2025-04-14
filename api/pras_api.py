@@ -27,7 +27,6 @@ from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
 from managers.ipc_manager import ipc_instance
 
-
 """
 AUTHOR: Roman Campbell
 DATE: 01/03/2025
@@ -361,6 +360,7 @@ async def log_requests(request: Request, call_next):
 async def get_req_id(data: dict = None, current_user: str = Depends(get_current_user)):
     if data is None:
         data = {}
+        
     req_id = create_req_id(data)
     logger.success("Requisition id created.")
     return JSONResponse(content={"reqID": req_id})
@@ -537,14 +537,17 @@ def process_purchase_data(data):
     return local_purchase_cols
 
 ##########################################################################
-## GENERATE REQUISITION ID
+## GENERATE REQUISITION ID - based on yyyymmdd-01 (auto incremented)
 def create_req_id(processed_data):
-    requester_part = processed_data.get('requester', '')[:4]
-    boc_part = processed_data.get('budgetObjCode', '')[:4]
-    fund_part = processed_data.get('fund', '')[:4]
-    location_part = processed_data.get('location', '')[:4]
-    id_part = processed_data.get('ID', '')[9:13]  # Adjust if needed
-    return f"{requester_part}-{boc_part}-{fund_part}-{location_part}-{id_part}"
+    # Get the current date in yyyymmdd format
+    current_date = datetime.now().strftime("%Y%m%d")
+    
+    # Get the last 4 digits of the ID from the database
+    last_id = dbas.get_last_id(processed_data.get('requester', ''))
+    
+    # Increment last 4 digits by 1
+    new_id = str(int(last_id) + 1).zfill(4)  # Ensure it's always 4 digits
+    return f"{current_date}-{new_id}"
 
 ##########################################################################
 ## UPDATE REQUEST STATUS
@@ -591,7 +594,7 @@ def process_approval_data(processed_data):
     allowed_keys = [
         'ID', 'reqID', 'requester', 'recipient', 'budgetObjCode',  'fund', 
         'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location', 
-        'newRequest', 'pendingApproval', 'approved'
+        'newRequest', 'pendingApproval', 'approved', 'phoneext', 'datereq', 'dateneed', 'orderType'
     ]
     
     # Populate approval_data from processed_data
@@ -621,6 +624,9 @@ def purchase_req_commit(processed_data):
             # Get a session and use it directly
             session = next(get_session())
             try:
+                # Generate a new ID using create_req_id if not already present
+                if 'ID' not in processed_data or not processed_data['ID']:
+                    processed_data['ID'] = create_req_id(processed_data)
                 
                 dbas.insert_data(processed_data, table)
                 session.commit()

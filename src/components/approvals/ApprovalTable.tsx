@@ -9,13 +9,16 @@ import {
     TableRow,
     Paper,
     Typography,
+    TextField,
 } from "@mui/material";
+import Buttons from "../purchase_req/Buttons";
 import { FormValues } from "../../types/formTypes";
 import { Box, Button } from "@mui/material";
 import { convertBOC } from "../../utils/bocUtils";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import MoreDataButton from "./MoreDataButton";
 import { fetchSearchData } from "./SearchBar";
+import { useForm } from "react-hook-form";
 
 /************************************************************************************ */
 /* CONFIG API URL- */
@@ -25,6 +28,7 @@ const API_CALL1: string = "/api/getApprovalData";
 const API_CALL2: string = "/api/approveDenyRequest";
 const API_URL2 = `${baseURL}${API_CALL2}`;
 const API_URL1 = `${baseURL}${API_CALL1}`;
+const { register, handleSubmit, formState: { errors } } = useForm();
 
 /* INTERFACE */
 interface ApprovalTableProps {
@@ -49,6 +53,12 @@ const fetchApprovalData = async () => {
     const jsonData = await response.json();
     console.log(jsonData);
     return jsonData;
+}
+
+/************************************************************************************ */
+/* ASSIGN REQUISITION ID */
+/************************************************************************************ */
+async function assignReqID(reqID: string) {
 }
 
 /************************************************************************************ */
@@ -86,7 +96,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
     async function handleApproveDeny(id: string, requester: string, action: string) {
         try {
             console.log("Sending request with:", { request_id: id, action: action });
-            
+
             const response = await fetch(API_URL2, {
                 method: 'POST',
                 headers: {
@@ -98,13 +108,13 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                     action: action,
                 })
             });
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 console.error("Error response:", errorData);
                 throw new Error(`HTTP error: ${response.status}`);
             }
-            
+
             const data = await response.json();
             console.log("Response data:", data);
 
@@ -155,7 +165,18 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                     textAlign: "center",
                                 }}
                             >
-                                REQUISITION ID
+                                REQUISITION #
+                            </TableCell>
+                            {/**************************************************************************/}
+                            {/* ID */}
+                            <TableCell
+                                sx={{
+                                    color: "white",
+                                    fontWeight: "bold",
+                                    textAlign: "center",
+                                }}
+                            >
+                                ID
                             </TableCell>
                             {/**************************************************************************/}
                             {/* REQUESTER */}
@@ -297,11 +318,34 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 {/**************************************************************************/}
                                 {/* REQUISITION ID */}
                                 <TableCell sx={{ color: "white" }}>
-                                    {approval_data.reqID}
+
+                                    <Box sx={{ display: "flex", gap: "5px" }}>
+                                        <Buttons
+                                            className="btn btn-maroon"
+                                            disabled={true}
+                                            label="Assign"
+                                            onClick={() => assignReqID(approval_data.ID)}
+                                        />
+                                        <TextField
+                                            id="reqID"
+                                            disabled={true}
+                                            
+                                            className="form-control"
+                                            fullWidth
+                                            variant="outlined"
+                                            size="small"
+
+                                        />
+                                    </Box>
+                                </TableCell>
+                                {/**************************************************************************/}
+                                {/* ID */}
+                                <TableCell sx={{ color: "white" }}>
+                                    {approval_data.ID}
                                 </TableCell>
                                 {/**************************************************************************/}
                                 {/* REQUISITION ID */}
-                                <TableCell sx={{ color: "white" }}> 
+                                <TableCell sx={{ color: "white" }}>
                                     {approval_data.requester}
                                 </TableCell>
 
@@ -353,7 +397,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 {/**************************************************************************/}
                                 {/* ITEM DESCRIPTION */}
                                 <TableCell sx={{ color: "white", textAlign: "center" }}>
-                                        {approval_data.itemDescription}
+                                    {approval_data.itemDescription}
                                 </TableCell>
 
                                 {/**************************************************************************/}
@@ -400,7 +444,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                     </TableBody>
                     <tfoot>
                         <TableRow>
-                            <TableCell colSpan={6}>
+                            <TableCell colSpan={7}>
 
                             </TableCell>
 
