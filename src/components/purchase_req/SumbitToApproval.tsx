@@ -14,10 +14,44 @@ import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
 import React, { useEffect } from "react";
 import UploadFile from "../../services/UploadHandler";
-
+import { v4 as uuidv4 } from 'uuid';
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
 const API_URL = `${baseURL}${API_CALL}`;
+
+export const useUUIDStore = () => {
+    const queryClient = useQueryClient();
+    
+    // Get UUIDs from the query cache
+    const { data: uuids = {} } = useQuery<Record<string, string>>({
+        queryKey: ['uuids'],
+        queryFn: () => ({}),
+        staleTime: Infinity,
+    });
+    
+    // Set a UUID for a specific ID
+    const setUUID = (id: string, uuid: string) => {
+        console.log(`Setting UUID for ID ${id}: ${uuid}`);
+        queryClient.setQueryData(['uuids'], (oldData: Record<string, string> = {}) => {
+            const newData = {
+                ...oldData,
+                [id]: uuid
+            };
+            console.log("Updated UUID store:", newData);
+            return newData;
+        });
+    };
+    
+    // Get a UUID for a specific ID
+    const getUUID = (id: string) => {
+        const uuid = uuids[id];
+        console.log(`Getting UUID for ID ${id}: ${uuid || 'not found'}`);
+        return uuid;
+    };
+    
+    return { uuids, setUUID, getUUID };
+};
 
 /************************************************************************************ */
 /* INTERFACE PROPS */
@@ -25,11 +59,11 @@ const API_URL = `${baseURL}${API_CALL}`;
 interface SubmitApprovalTableProps {
     dataBuffer: FormValues[];
     onDelete: (ID: string) => void;
-    ID: string;
+    ID?: string;
     fileInfo: IFile[];
     isSubmitted: boolean;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
-    setID: React.Dispatch<React.SetStateAction<string>>;
+    setID?: React.Dispatch<React.SetStateAction<string>>;
     setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
@@ -42,8 +76,12 @@ function SubmitApprovalTable({
     isSubmitted,
     setIsSubmitted,
     setDataBuffer,
-    setFileInfo
+    setFileInfo,
+    setID
 }: SubmitApprovalTableProps) {
+
+    // Use our custom hook to manage UUIDs
+    const { setUUID } = useUUIDStore();
 
     /* Check if table has been submitted */
     useEffect(() => {
@@ -67,54 +105,67 @@ function SubmitApprovalTable({
 
     // Preprocess data to calculate price
     const processedData = dataBuffer.map((item) => ({
-        ...item, // Spread operator, takes all properties from item object and puts them in new object being created with .map() callback
+        ...item,
         priceEach: Number(item.priceEach),
-        calculatedPrice: calculatePrice(item),
-
+        calculatedPrice: calculatePrice(item)
     }));
 
     /************************************************************************************ */
     /* SUBMIT DATA --- send to backend to add to database */
     /************************************************************************************ */
     const handleSubmitData = async (processedData: FormValues[]) => {
-
-        /* UploadFile is function in UploadHandler that is making the call to the service to
-            handle the upload */
-        // Find all files not uploaded
-        const filesToUpload = fileInfo.filter(file => file.status !== "success");
-
-        if(filesToUpload.length > 0) {
-            for(const file of filesToUpload) {
-                await UploadFile({ file, ID, setFileInfo });
+        try {
+            // Use a default ID if not provided
+            const requestId = ID || `TEMP-${Date.now()}`;
+            
+            // Get the requester from the first item
+            const requester = processedData[0]?.requester;
+            if (!requester) {
+                throw new Error("Requester is required");
             }
-        }
-
-        // Retrieve access to from local storage
-        const accessToken = localStorage.getItem("access_token");
-
-        // Loop over provessedData and send each request separately
-        for (const item of processedData) {
-            try {
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${accessToken}`,
-                    },
-                    body: JSON.stringify(item),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error: ${response.status}`);
-                }
-
-                const data = await response.json();
-                console.log("Response from POST request:", data);
-            } catch (error) {
-                console.error("Error sending data for item", ID, error);
+            
+            // Process each item in the data buffer
+            const processedItems = processedData.map(item => ({
+                ...item,
+                ID: requestId,
+                UUID: item.UUID || uuidv4()
+            }));
+            
+            // Create a single object with the requester and items
+            const requestData = {
+                requester: requester,
+                items: processedItems
+            };
+            
+            // Send the data to the backend
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                },
+                body: JSON.stringify(requestData),
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            
+            const result = await response.json();
+            console.log("Submission result:", result);
+            
+            // Reset the form and data buffer
+            setIsSubmitted(true);
+            setDataBuffer([]);
+            
+            // Update the ID if setID is provided
+            if (setID) {
+                setID(requestId);
+            }
+            
+        } catch (error) {
+            console.error("Error submitting data:", error);
         }
-        setIsSubmitted(true);
     };
 
     return (

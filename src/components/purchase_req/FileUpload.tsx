@@ -9,7 +9,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import Button from "@mui/material/Button";
 
 interface FileUploadProps {
-    ID: string;
+    ID?: string;
     isSubmitted: boolean;
     fileInfo: IFile[];
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
@@ -68,7 +68,7 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
 
         // Check if file has been uploaded, if so, delete it, this is if user changes their mind
         if (file.status === "success") {
-            apiDeleteFile(ID, file.name).catch((error) =>
+            apiDeleteFile(ID || "", file.name).catch((error) =>
                 console.error("Error deleting file: ", error)
             );
         }

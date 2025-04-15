@@ -28,30 +28,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
-    const [ID, setID] = useState<string>("");
+    // Default ID for components that need it
+    const defaultId = `TEMP-${Date.now()}`;
 
-    useEffect(() => {
-        // Get initial ID from backend
-        const fetchInitialID = async () => {
-            try {
-                const response = await fetch(`${baseURL}/api/getReqID`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                    },
-                    body: JSON.stringify({})
-                });
-                const data = await response.json();
-                setID(data.reqID);
-            } catch (error) {
-                console.error('Error fetching initial ID:', error);
-            }
-        };
-        fetchInitialID();
-    }, []);
-
-    // Function to toggle the sidebar
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
     /* *********************************************************************************** */
@@ -133,11 +112,10 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                                 {/* ADD ITEMS TO FORM - component */}
                                 {/********************************************************************* */}
                                 <AddItemsForm
-                                    ID={ID}
+                                    ID={defaultId}
                                     fileInfo={fileInfo}
                                     setDataBuffer={setDataBuffer}
                                     setIsSubmitted={setIsSubmitted}
-                                    setID={setID}
                                     setFileInfo={setFileInfo}
                                 />
 
@@ -151,13 +129,12 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                                     style={{ marginTop: "20px" }}
                                 >
                                     <SubmitApprovalTable
-                                        ID={ID}
+                                        ID={defaultId}
                                         dataBuffer={dataBuffer}
                                         onDelete={onDelete}
                                         fileInfo={fileInfo}
                                         isSubmitted={isSubmitted}
                                         setIsSubmitted={setIsSubmitted}
-                                        setID={setID}
                                         setDataBuffer={setDataBuffer}
                                         setFileInfo={setFileInfo}
                                     />

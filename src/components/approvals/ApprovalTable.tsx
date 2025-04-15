@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
     Table,
     TableBody,
@@ -8,147 +8,62 @@ import {
     TableHead,
     TableRow,
     Paper,
+    Box,
     Typography,
-    TextField,
 } from "@mui/material";
-import Buttons from "../purchase_req/Buttons";
+import ApprovalsTableRow from "./ApprovalsTableRow";
 import { FormValues } from "../../types/formTypes";
-import { Box, Button } from "@mui/material";
-import { convertBOC } from "../../utils/bocUtils";
-import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import MoreDataButton from "./MoreDataButton";
 import { fetchSearchData } from "./SearchBar";
-import { useForm } from "react-hook-form";
 
-/************************************************************************************ */
-/* CONFIG API URL- */
-/************************************************************************************ */
-const baseURL = import.meta.env.VITE_API_URL;
-const API_CALL1: string = "/api/getApprovalData";
-const API_CALL2: string = "/api/approveDenyRequest";
-const API_URL2 = `${baseURL}${API_CALL2}`;
-const API_URL1 = `${baseURL}${API_CALL1}`;
-const { register, handleSubmit, formState: { errors } } = useForm();
-
-/* INTERFACE */
 interface ApprovalTableProps {
     onDelete: (ID: number) => void;
     resetTable: () => void;
     searchQuery: string;
 }
 
-/************************************************************************************ */
-/* FETCHING APPROVAL DATA FUNCTION for useQuery */
-/************************************************************************************ */
-const fetchApprovalData = async () => {
+const API_CALL1 = "/api/getApprovalData";
+const API_URL1 = `${import.meta.env.VITE_API_URL}${API_CALL1}`;
+
+async function fetchApprovalData() {
     const response = await fetch(API_URL1, {
         headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
     });
-
-    if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-    }
-    const jsonData = await response.json();
-    console.log(jsonData);
-    return jsonData;
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+    return response.json();
 }
 
-/************************************************************************************ */
-/* ASSIGN REQUISITION ID */
-/************************************************************************************ */
-async function assignReqID(reqID: string) {
-}
-
-/************************************************************************************ */
-/* APPROVALS TABLE */
-/************************************************************************************ */
-function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
-    const queryClient = useQueryClient();
-    const {
-        data: searchData,
-    } = useQuery({
-        queryKey: ['search-data', searchQuery],
+export default function ApprovalTable({
+    searchQuery,
+    onDelete,
+    resetTable,
+}: ApprovalTableProps) {
+    const { data: searchData } = useQuery({
+        queryKey: ["search_data", searchQuery],
         queryFn: () => fetchSearchData(searchQuery),
-        enabled: !!searchQuery,  // only run when searchQuery exists
     });
 
     const { data: approvalData } = useQuery({
-        queryKey: ['approval_data'],
+        queryKey: ["approval_data"],
         queryFn: fetchApprovalData,
-        enabled: !searchQuery,
     });
 
-    // if searchQuery exists use searchData otherwise use approvalData
-    let retval;
-    if (searchQuery) {
-        retval = searchData ? searchData : []
-    } else {
-        retval = approvalData ? approvalData : [];
-    }
-
-    // Check if the data is empty and display a message if it is
-    /************************************************************************************ */
-    /* APPROVE OR DENY */
-    /************************************************************************************ */
-    // Get the current state of newRequest, approved, and pendingApproval
-    async function handleApproveDeny(id: string, requester: string, action: string) {
-        try {
-            console.log("Sending request with:", { request_id: id, action: action });
-
-            const response = await fetch(API_URL2, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-                },
-                body: JSON.stringify({
-                    request_id: id,
-                    action: action,
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error("Error response:", errorData);
-                throw new Error(`HTTP error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log("Response data:", data);
-
-            // Invalidate the query to to trigger a refetch
-            queryClient.invalidateQueries({ queryKey: ['approval_data'] });
-            return data;
-        }
-        catch (error) {
-            console.error("Error in handleApproveDeny:", error);
-            throw error;
-        }
-    }
-
-    async function handleDownload() {
-        // Handle download action here      
-        console.log("Download clicked");
-        // Add your logic to download the item
-    }
-    /************************************************************************************ */
-    /* APPROVAL TABLE */
-
+    const rows: FormValues[] = searchQuery
+        ? searchData || []
+        : approvalData || [];
     return (
-        <Box sx={{ overflowX: "auto", height: '100vh', width: "100%" }}>
+        <Box sx={{ overflowX: "auto", height: "100vh", width: "100%" }}>
             <TableContainer
                 component={Paper}
                 sx={{
-                    background: " #2c2c2c",
-                    color: "white", // Ensure text contrast
-                    borderRadius: "10px",
-                    width: "100%",
-                    marginTop: "20px",
+                    background: "#2c2c2c",
+                    color: "white",
+                    borderRadius: 2,
+                    mt: 2,
                 }}
             >
-                <Table sx={{ minWidth: 800, tableLayout: "auto" }}>
+                <Table sx={{ minWidth: 800 }}>
                     <TableHead
                         sx={{
                             background:
@@ -156,293 +71,45 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                         }}
                     >
                         <TableRow>
-                            {/**************************************************************************/}
-                            {/* REQUISITION ID */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-                                REQUISITION #
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* ID */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-                                ID
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* REQUESTER */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-                                REQUESTER
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* BUDGET OBJECT CODE */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                BUDGET OBJECT CODE
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* FUND */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                FUND
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* LOCATION */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                LOCATION
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* QUANTITY */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                QUANTITY
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* PRICE EACH */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                PRICE EACH
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* ESTIMATED PRICE */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                LINE TOTAL
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* ITEM DESCRIPTION */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                ITEM DESCRIPTION
-                            </TableCell>
-
-                            {/**************************************************************************/}
-                            {/* JUSTIFICATION */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                JUSTIFICATION
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* STATUS */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                STATUS
-                            </TableCell>
-                            {/**************************************************************************/}
-                            {/* ACTIONS */}
-                            <TableCell
-                                sx={{
-                                    color: "white",
-                                    fontWeight: "bold",
-                                    textAlign: "center",
-                                }}
-                            >
-
-                                ACTIONS
-                            </TableCell>
+                            {[
+                                "REQUISITION #",
+                                "ID",
+                                "REQUESTER",
+                                "BUDGET OBJECT CODE",
+                                "FUND",
+                                "LOCATION",
+                                "QUANTITY",
+                                "PRICE EACH",
+                                "LINE TOTAL",
+                                "ITEM DESCRIPTION",
+                                "JUSTIFICATION",
+                                "STATUS",
+                                "ACTIONS",
+                            ].map((label) => (
+                                <TableCell
+                                    key={label}
+                                    sx={{
+                                        color: "white",
+                                        fontWeight: "bold",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    {label}
+                                </TableCell>
+                            ))}
                         </TableRow>
                     </TableHead>
+
                     <TableBody sx={{ textAlign: "center" }}>
-                        {retval.map((approval_data: FormValues) => (
-                            <TableRow key={approval_data.ID}>
-                                {/**************************************************************************/}
-                                {/* REQUISITION ID */}
-                                <TableCell sx={{ color: "white" }}>
-
-                                    <Box sx={{ display: "flex", gap: "5px" }}>
-                                        <Buttons
-                                            className="btn btn-maroon"
-                                            disabled={true}
-                                            label="Assign"
-                                            onClick={() => assignReqID(approval_data.ID)}
-                                        />
-                                        <TextField
-                                            id="reqID"
-                                            disabled={true}
-                                            
-                                            className="form-control"
-                                            fullWidth
-                                            variant="outlined"
-                                            size="small"
-
-                                        />
-                                    </Box>
-                                </TableCell>
-                                {/**************************************************************************/}
-                                {/* ID */}
-                                <TableCell sx={{ color: "white" }}>
-                                    {approval_data.ID}
-                                </TableCell>
-                                {/**************************************************************************/}
-                                {/* REQUISITION ID */}
-                                <TableCell sx={{ color: "white" }}>
-                                    {approval_data.requester}
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* BUDGET OBJECT CODE */}
-                                <TableCell sx={{ color: "white", textAlign: "center" }}>
-                                    {convertBOC(approval_data.budgetObjCode)}
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* FUND */}
-                                <TableCell sx={{ color: "white" }}>
-                                    {approval_data.fund}
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* LOCATION */}
-                                <TableCell sx={{ color: "white" }}>
-                                    {approval_data.location}
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* QUANTITY */}
-                                <TableCell
-                                    sx={{ color: "white", textAlign: "center" }}
-                                >
-                                    {approval_data.quantity}
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* PRICE */}
-                                <TableCell
-                                    sx={{ color: "white", textAlign: "center" }}
-                                >
-                                    {typeof approval_data.priceEach === "number"
-                                        ? approval_data.priceEach.toFixed(2)
-                                        : "0.00"}
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* ESTIMATED PRICE */}
-                                <TableCell
-                                    sx={{ color: "white", textAlign: "center" }}
-                                >
-                                    {typeof approval_data.totalPrice === "number"
-                                        ? approval_data.totalPrice.toFixed(2)
-                                        : "0.00"}
-                                </TableCell>
-                                {/**************************************************************************/}
-                                {/* ITEM DESCRIPTION */}
-                                <TableCell sx={{ color: "white", textAlign: "center" }}>
-                                    {approval_data.itemDescription}
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* JUSTIFICATION */}
-                                <TableCell sx={{ color: "white", textAlign: "center" }}>
-                                    <MoreDataButton name="Justification" data={approval_data.justification} />
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* STATUS */}
-                                <TableCell sx={{ color: "white", textAlign: "center" }}>
-                                    {approval_data.status}
-                                </TableCell>
-
-                                {/**************************************************************************/}
-                                {/* APPROVE/DENY BUTTONS */}
-                                <TableCell>
-                                    <Box sx={{ display: "flex", gap: "10px" }}>
-                                        <Button
-                                            variant="contained"
-                                            color="success"
-                                            onClick={() => handleApproveDeny(approval_data.ID, approval_data.requester, 'approve')}
-                                        >
-                                            Approve
-                                        </Button>
-                                        <Button
-                                            variant="contained"
-                                            color="error"
-                                            onClick={() => handleApproveDeny(approval_data.ID, approval_data.requester, 'deny')}
-                                        >
-                                            Deny
-                                        </Button>
-                                        <Button
-                                            variant="contained"
-                                            color="primary"
-                                            onClick={() => handleDownload}
-                                        >
-                                            <DownloadOutlinedIcon />
-                                        </Button>
-                                    </Box>
-                                </TableCell>
-                            </TableRow>
+                        {rows.map((approval_data) => (
+                            <ApprovalsTableRow
+                                key={approval_data.ID}
+                                approval_data={approval_data}
+                            />
                         ))}
                     </TableBody>
-                    <tfoot>
+
+                     <tfoot>
                         <TableRow>
                             <TableCell colSpan={7}>
 
@@ -470,7 +137,7 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
                                 }}
                             >
                                 Total: $
-                                {retval
+                                {rows
                                     .reduce(
                                         (acc: number, approval_data: FormValues) =>
                                             acc +
@@ -486,5 +153,3 @@ function ApprovalsTable({ searchQuery }: ApprovalTableProps) {
         </Box>
     );
 }
-
-export default ApprovalsTable;

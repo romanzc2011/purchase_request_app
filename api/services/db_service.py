@@ -66,7 +66,7 @@ class Approval(Base):
                       'approved', 'pendingApproval', 'createdTime', 'approvedTime', 'deniedTime']
 
     # UUID as primary key
-    uuid: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     # Sequential ID for user-facing operations
     ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_request.ID"), nullable=False, unique=True)
     reqID: Mapped[str] = mapped_column(String, nullable=False)
@@ -124,6 +124,7 @@ def get_all_approval(db_session: Session):
 ###################################################################################################
 # Insert data
 def insert_data(data, table):
+    # Get last id if there is one 
     logger.info(f"Inserting data into {table}: {data}")
     
     if not data or not isinstance(data, dict):
@@ -133,6 +134,7 @@ def insert_data(data, table):
         try:
             if table == "purchase_request":
                 # Create new PurchaseRequest with UUID
+                data['ID'] = get_next_request_id()
                 obj = PurchaseRequest(**data)
                 db.add(obj)
             elif table == "approval":
@@ -198,6 +200,14 @@ def update_data(ID, table, **kwargs):
         if obj:
             for key, value in kwargs.items():
                 if hasattr(obj, key):
+                    # Special handling for UUID field
+                    if key == "uuid" and value:
+                        # Check if the UUID already exists in the database
+                        existing = db.query(PurchaseRequest).filter(PurchaseRequest.id == value).first()
+                        if existing and existing.id != obj.id:
+                            logger.warning(f"UUID {value} already exists in the database")
+                            continue
+                    
                     setattr(obj, key, value)
                 else:
                     raise ValueError(f"Invalid field: {key}")
@@ -227,14 +237,58 @@ def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     
 ###################################################################################################
 # Get last 4 digits of the ID from the database
-def get_last_id(requester):
+def _get_last_id() -> Optional[str]:
+    """
+    Return the full most‐recent PurchaseRequest.ID (e.g. "20250414-0007"),
+    or None if the table is empty.
+    """
     with next(get_session()) as db:
-        result = db.query(PurchaseRequest).filter(PurchaseRequest.requester == requester).order_by(PurchaseRequest.ID.desc()).first()
-        if result:
-            # Extract the last 4 digits from the sequential ID
-            id_parts = result.ID.split('-')
-            if len(id_parts) > 1:
-                return id_parts[-1]
-            return "0000"
-        else:
-            return "0000"
+        row = (
+            db.query(PurchaseRequest.ID)
+            .order_by(PurchaseRequest.ID.desc())
+            .limit(1)
+            .first()
+        )
+        # Return just the ID string, not the tuple
+        return row[0] if row else None
+    
+###################################################################################################
+# Get next  request ID
+def get_next_request_id() -> str:
+    """
+    Build the next ID in "YYYYMMDD-XXXX" format:
+    - If today's date ≠ last ID's date, start at 0001
+    - Otherwise increment the last 4‑digit suffix
+    """
+    today = datetime.now().strftime("%Y%m%d")
+    last_id = _get_last_id()
+    
+    if not last_id:
+        logger.info("No previous IDs found, starting with 0001")
+        next_suffix = 1
+    else:
+        try:
+            # Check if the ID has the expected format
+            if '-' not in last_id:
+                logger.warning(f"Invalid ID format: {last_id}, starting with 0001")
+                next_suffix = 1
+            else:
+                parts = last_id.split('-', 1)
+                if len(parts) != 2:
+                    logger.warning(f"Invalid ID format: {last_id}, starting with 0001")
+                    next_suffix = 1
+                else:
+                    try:
+                        last_suffix = int(parts[1])
+                        next_suffix = last_suffix + 1
+                        logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
+                    except ValueError:
+                        logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
+                        next_suffix = 1
+        except Exception as e:
+            logger.error(f"Error processing last ID: {e}, starting with 0001")
+            next_suffix = 1
+    
+    return f"{today}-{next_suffix:04d}"
+            
+        

@@ -229,25 +229,26 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     if not data:
         raise HTTPException(status_code=400, detail="Invalid data")
     
-    from multiprocessing.dummy import Pool as ThreadPool
-    pool = ThreadPool()
-    
     # Extract requester 
     requester = data.get("requester")
-    ldap_svc.set_requester(requester)
     if not requester:
         logger.error(f"Requester not found in data: {data}")
         raise HTTPException(status_code=400, detail="Invalid requester")
+    
     # Log the requester
     logger.info(f"REQUESTER: {requester}")
+    
+    # Set the requester in the LDAP service
+    ldap_svc.set_requester(requester)
     
     # Get requester email address
     requester_email = ldap_svc.get_email_address(ldap_svc.get_connection(), requester)
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
         raise HTTPException(status_code=400, detail="Invalid requester")
+    
     # Set the email service requester
-    email_svc.set_requester(requester, requester_email);
+    email_svc.set_requester(requester, requester_email)
     
     ## Verify that requester is a legitimate user in AD via ldap
     # Ensure we have a valid LDAP connection
@@ -275,12 +276,23 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     user_info = fetch_user(requester)
     logger.info(f"USER INFO: {user_info}")
 
-    processed_data = pool.map(process_purchase_data, [data])
-    copied_data = processed_data[0].copy()  # or use deepcopy if needed
-    pool.map(purchase_req_commit, [copied_data])
-    pool.close()
-    pool.join()
+    # Process each item in the items array
+    items = data.get("items", [])
+    if not items:
+        logger.error("No items found in request data")
+        raise HTTPException(status_code=400, detail="No items found in request data")
+    
+    # Process each item
+    for item in items:
+        # Add the requester to each item
+        item["requester"] = requester
         
+        # Process the purchase data
+        processed_data = process_purchase_data(item)
+        
+        # Commit the purchase request
+        purchase_req_commit(processed_data)
+    
     return JSONResponse(content={"message": "Processing started in background"})
     
 ##########################################################################
@@ -355,15 +367,35 @@ async def log_requests(request: Request, call_next):
     return response
 
 #########################################################################
-## GET REQ ID -- send back to caller
-@api_router.post("/getReqID")
-async def get_req_id(data: dict = None, current_user: str = Depends(get_current_user)):
-    if data is None:
-        data = {}
+## ASSIGN REQUISITION ID
+## This is called from the frontend to assign a requisition ID
+## to the purchase request. It also updates the UUID in the approval table.
+@api_router.post("/assignReqID")
+async def assign_req_id(data: dict, current_user: User = Depends(get_current_user)):
+    try:
+        logger.info(f"DATA: {data}")
+        #  Check for both "ID" and "request_id" keys
+        reqID = data.get("reqID")
+        ID = data.get("ID")
+        if not reqID:
+            raise HTTPException(status_code=400, detail="Missing reqID")
         
-    req_id = create_req_id(data)
-    logger.success("Requisition id created.")
-    return JSONResponse(content={"reqID": req_id})
+        # Get the UUID from the frontend
+        uuid = data.get("UUID")
+        if not uuid:
+            raise HTTPException(status_code=400, detail="Missing UUID")
+        
+        # Update the approval table with the requisition ID and UUID
+        with next(dbas.get_session()) as session:
+            # Update both reqID and uuid in a single call
+            dbas.update_data(ID, "approval", reqID=reqID, uuid=uuid)
+            logger.info(f"Updated requisition ID to {reqID} and UUID to {uuid}")
+        
+    except Exception as e:
+        logger.error(f"Error in assign_req_id: {e}")
+        raise HTTPException(status_code=500, detail=f"Error in assign_req_id: {e}")
+    
+    return {"status": "success", "message": "Requisition ID assigned successfully"}
 
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
@@ -373,17 +405,17 @@ async def get_req_id(data: dict = None, current_user: str = Depends(get_current_
 @api_router.post("/approveDenyRequest")
 async def approve_deny_request(data: dict, current_user: User = Depends(get_current_user)):
     try:
-        # Check for both "ID" and "request_id" keys
-        request_id = data.get("request_id") or data.get("ID")
-        logger.info(f"Request ID: {request_id}")
+        # Check for both "ID" and "id" keys
+        id = data.get("ID")
+        logger.info(f"Request ID: {id}")
         action = data.get("action")
         
-        if not request_id or not action:
-            raise HTTPException(status_code=400, detail="Missing request_id or action")
+        if not id or not action:
+            raise HTTPException(status_code=400, detail="Missing id or action")
             
         # Get current status using a proper session
         with next(dbas.get_session()) as session:
-            current_status = dbas.get_status_by_id(session, request_id)
+            current_status = dbas.get_status_by_id(session, id)
             if not current_status:
                 raise HTTPException(status_code=404, detail="Request not found")
                 
@@ -392,56 +424,56 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                 logger.info("SEND TO FINAL APPROVER")
                 if action.lower() == "approve":
                     new_status = "PENDING"
-                    dbas.update_data(request_id, "approval", status=new_status)
+                    dbas.update_data(id, "approval", status=new_status)
                     email_svc.set_request_status("NEW REQUEST")
                     email_svc.send_notification(
                         template_path="./templates/approval_notification.html",
-                        template_data={"request_id": request_id, "action": "approved"},
+                        template_data={"id": id, "action": "approved"},
                         subject="Purchase Request Approved"
                     )
                 elif action.lower() == "deny":
                     new_status = "DENIED"
-                    dbas.update_data(request_id, "approval", status=new_status)
+                    dbas.update_data(id, "approval", status=new_status)
                     email_svc.set_request_status("NEW REQUEST")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
-                        template_data={"request_id": request_id, "action": "denied"},
+                        template_data={"id": id, "action": "denied"},
                         subject="Purchase Request Denied"
                     )
             elif current_status == "PENDING":
                 if action.lower() == "approve":
                     new_status = "APPROVED" 
-                    dbas.update_data(request_id, "approval", status=new_status)
+                    dbas.update_data(id, "approval", status=new_status)
                     # Send email to final approver
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/final_approval_notification.html",
-                        template_data={"request_id": request_id, "action": "approved"},
+                        template_data={"id": id, "action": "approved"},
                         subject="Purchase Request Final Approval"
                     )
                     # Send email to current user (approver)
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/approval_notification.html",
-                        template_data={"request_id": request_id, "action": "approved"},
+                        template_data={"id": id, "action": "approved"},
                         subject="Purchase Request Approved"
                     )
                     # Send email to requester
-                    requester_email = dbas.get_requester_email(session, request_id)
+                    requester_email = dbas.get_requester_email(session, id)
                     if requester_email:
                         email_svc.set_request_status("PENDING")
                         email_svc.send_notification(
                             template_path="./templates/approval_notification.html",
-                            template_data={"request_id": request_id, "action": "approved"},
+                            template_data={"id": id, "action": "approved"},
                             subject="Purchase Request Approved"
                         )
                 elif action.lower() == "deny":
                     new_status = "DENIED"
-                    dbas.update_data(request_id, "approval", status=new_status)
+                    dbas.update_data(id, "approval", status=new_status)
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
-                        template_data={"request_id": request_id, "action": "denied"},
+                        template_data={"id": id, "action": "denied"},
                         subject="Purchase Request Denied"
                     )
             else:
@@ -504,7 +536,10 @@ def process_purchase_data(data):
         local_purchase_cols = {col.name: None for col in dbas.PurchaseRequest.__table__.columns}
         try:
             for k, v in data.items():
-                if k in local_purchase_cols:
+                # Handle the UUID field from the frontend
+                if k == "UUID" and "uuid" in local_purchase_cols:
+                    local_purchase_cols["uuid"] = v
+                elif k in local_purchase_cols:
                     local_purchase_cols[k] = v
                     
             if 'learnAndDev' in local_purchase_cols:
@@ -535,19 +570,6 @@ def process_purchase_data(data):
             logger.error(f"Error in process_purchase_data: {e}")
             
     return local_purchase_cols
-
-##########################################################################
-## GENERATE REQUISITION ID - based on yyyymmdd-01 (auto incremented)
-def create_req_id(processed_data):
-    # Get the current date in yyyymmdd format
-    current_date = datetime.now().strftime("%Y%m%d")
-    
-    # Get the last 4 digits of the ID from the database
-    last_id = dbas.get_last_id(processed_data.get('requester', ''))
-    
-    # Increment last 4 digits by 1
-    new_id = str(int(last_id) + 1).zfill(4)  # Ensure it's always 4 digits
-    return f"{current_date}-{new_id}"
 
 ##########################################################################
 ## UPDATE REQUEST STATUS
@@ -599,7 +621,10 @@ def process_approval_data(processed_data):
     
     # Populate approval_data from processed_data
     for key, value in processed_data.items():
-        if key in allowed_keys:
+        # Handle the UUID field from the frontend
+        if key == "UUID":
+            approval_data["uuid"] = value
+        elif key in allowed_keys:
             approval_data[key] = value
             
     ##########################################################################
@@ -624,10 +649,6 @@ def purchase_req_commit(processed_data):
             # Get a session and use it directly
             session = next(get_session())
             try:
-                # Generate a new ID using create_req_id if not already present
-                if 'ID' not in processed_data or not processed_data['ID']:
-                    processed_data['ID'] = create_req_id(processed_data)
-                
                 dbas.insert_data(processed_data, table)
                 session.commit()
                 

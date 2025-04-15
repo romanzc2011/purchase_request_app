@@ -20,16 +20,17 @@ import InfoIcon from "@mui/icons-material/Info";
 import Tooltip from "@mui/material/Tooltip";
 import Justification from "./Justification";
 import AddComments from "./AddComments";
+import { v4 as uuidv4 } from "uuid";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
 /*************************************************************************************** */
 interface AddItemsProps {
-    ID: string;
+    ID?: string;
     fileInfo: IFile[];
     setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
-    setID: React.Dispatch<React.SetStateAction<string>>;
+    setID?: React.Dispatch<React.SetStateAction<string>>;
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
@@ -48,20 +49,29 @@ function AddItemsForm({
     /* HANDLE ADD ITEM function */
     /*************************************************************************************** */
     const handleAddItem = async (newItem: FormValues) => {
-        // Use the ID from the parent component directly
-        const updatedItem = {
+        // Generate a UUID for the item
+        const uuid = uuidv4();
+        
+        // Create a new item with the UUID
+        const itemToAdd: FormValues = {
             ...newItem,
-            ID: ID,
-            price: Number(newItem.priceEach) || 0,
-            fund: newItem.fund || "",
-            budgetObjCode: newItem.budgetObjCode || "",
+            UUID: uuid,
+            priceEach: newItem.priceEach,
+            // Use a default ID if not provided
+            ID: ID || `TEMP-${Date.now()}`,
+            status: "NEW REQUEST"
         };
-
-        // Update the buffer and state
-        setDataBuffer((prev) => [...prev, updatedItem]);
-        setID(ID);
+        
+        // Add the item to the data buffer
+        setDataBuffer((prev) => [...prev, itemToAdd]);
+        
+        // Update the ID if setID is provided
+        if (setID) {
+            setID(itemToAdd.ID);
+        }
+        
+        // Reset the form
         reset();
-        console.log("Item Added: ", updatedItem);
     };
 
     /*************************************************************************************** */
@@ -78,6 +88,7 @@ function AddItemsForm({
 
     const form = useForm<FormValues>({
         defaultValues: {
+            UUID: "",
             ID: ID,
             reqID: "",
             requester: "",
