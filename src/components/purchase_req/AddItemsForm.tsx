@@ -73,7 +73,7 @@ function AddItemsForm({
         try {
             // Generate a new UUID for the item
             const uuid = uuidv4();
-            setUUID(data.ID, uuid);
+            
             // Get a new ID from the backend
             const response = await createNewID();
             const newId = response.ID; // Extract the ID from the response object
@@ -87,6 +87,9 @@ function AddItemsForm({
                 ID: newId, // Use the extracted ID
                 status: "NEW REQUEST"
             };
+            
+            // Store the UUID in the UUID store AFTER we have the ID
+            setUUID(newId, uuid);
             
             console.log("Item to add:", itemToAdd);
             

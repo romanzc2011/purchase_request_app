@@ -40,7 +40,7 @@ export default function ApprovalsTableRow({
         mutationFn: async (newReqID: string) => {
             try {
                 // Get the UUID from the store
-                const uuid = getUUID(approval_data.ID);
+                const uuid = await getUUID(approval_data.ID);
                 console.log("UUID:", uuid);
                 
                 if (!uuid) {

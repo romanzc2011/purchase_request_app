@@ -164,14 +164,30 @@ def get_status_by_id(db_session: Session, ID: str):
     result = db_session.query(Approval).filter(Approval.ID == ID).first()
     if not result:
         # If not found, try UUID
-        result = db_session.query(Approval).filter(Approval.id == ID).first()
+        result = db_session.query(Approval).filter(Approval.UUID == ID).first()
     
     if result:
         return result.status
     else:
         logger.error(f"Object with ID {ID} not found in Approval table")
         raise ValueError(f"Object with ID {ID} not found in Approval table")
-
+    
+###################################################################################################
+# Get UUID from Approval table
+def get_uuid_by_id(db_session: Session, ID: str):
+    logger.info(f"Fetching UUID for ID: {ID}")
+    
+    if not ID:
+        raise ValueError("ID must be a non-empty string")
+    
+    with next(get_session()) as db:
+        # First try to find by sequential ID
+        result = db.query(Approval).filter(Approval.ID == ID).first()
+        if result:
+            return result.UUID
+        else:
+            logger.error(f"Object with ID {ID} not found in Approval table")
+            raise ValueError(f"Object with ID {ID} not found in Approval table")
 
 ###################################################################################################
 # Update data
@@ -187,13 +203,13 @@ def update_data(ID, table, **kwargs):
             obj = db.query(PurchaseRequest).filter(PurchaseRequest.ID == ID).first()
             if not obj:
                 # If not found, try UUID
-                obj = db.query(PurchaseRequest).filter(PurchaseRequest.id == ID).first()
+                obj = db.query(PurchaseRequest).filter(PurchaseRequest.UUID == ID).first()
         elif table == "approval":
             # Try sequential ID first
             obj = db.query(Approval).filter(Approval.ID == ID).first()
             if not obj:
                 # If not found, try UUID
-                obj = db.query(Approval).filter(Approval.id == ID).first()
+                obj = db.query(Approval).filter(Approval.UUID == ID).first()
         else:
             raise ValueError(f"Unsupported table: {table}")
         
@@ -203,8 +219,8 @@ def update_data(ID, table, **kwargs):
                     # Special handling for UUID field
                     if key == "uuid" and value:
                         # Check if the UUID already exists in the database
-                        existing = db.query(PurchaseRequest).filter(PurchaseRequest.id == value).first()
-                        if existing and existing.id != obj.id:
+                        existing = db.query(PurchaseRequest).filter(PurchaseRequest.UUID == value).first()
+                        if existing and existing.UUID != obj.UUID:
                             logger.warning(f"UUID {value} already exists in the database")
                             continue
                     

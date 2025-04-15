@@ -371,19 +371,23 @@ async def log_requests(request: Request, call_next):
 ## This is called from the frontend to assign a requisition ID
 ## to the purchase request. It also updates the UUID in the approval table.
 @api_router.post("/assignReqID")
-async def assign_req_id(current_user: User = Depends(get_current_user)):
-    try:
-        # Request comes in for new id, call the get request id from db svc
-        id = db_svc.get_request_id()
-        if not id:
-            raise HTTPException(status_code=404, detail="No new ID available")
-        else:
-            logger.info(f"New ID: {id}")
-            return {"ID": id}
-    except Exception as e:
-        logger.error(f"Error assigning requisition ID: {e}")
-        raise HTTPException(status_code=500, detail=f"Error assigning requisition ID: {str(e)}")
-
+async def assign_req_id(data: dict, current_user: User = Depends(get_current_user)):
+    logger.info(f"Assigning requisition ID: {data.get('reqID')}")
+    
+    # Get the original ID from the request
+    original_id = data.get('ID')
+    if not original_id:
+        raise HTTPException(status_code=400, detail="Missing ID in request")
+    
+    ## Retrieve the UUID from the database
+    uuid = dbas.get_uuid_by_id(dbas.get_session(), ID=original_id)
+    
+    if not uuid:
+        raise HTTPException(status_code=400, detail="Missing UUID in request")
+    
+    # Update the database with the requisition ID using the original ID
+    dbas.update_data(uuid, "approval", reqID=data.get('reqID'))
+    return {"message": "Requisition ID assigned successfully"}
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
 ## Approval status is NEW REQUEST, this gets sent to requester and first approver
@@ -519,6 +523,19 @@ async def create_new_id(request: Request):
         return {"ID": new_id}
     except Exception as e:
         logger.error(f"Error creating new ID: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@api_router.get("/getUUID/{ID}")
+async def get_uuid(ID: str, current_user: User = Depends(get_current_user)):
+    try:
+        # Get a session from the generator
+        with next(dbas.get_session()) as session:
+            # Get the UUID from database
+            uuid = dbas.get_uuid_by_id(session, ID)
+            
+            return {"uuid": uuid}
+    except Exception as e:
+        logger.error(f"Error getting UUID: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 ##########################################################################
