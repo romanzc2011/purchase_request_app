@@ -24,7 +24,6 @@ class PurchaseRequest(Base):
     ID: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     reqID: Mapped[str] = mapped_column(String, nullable=False)
     requester: Mapped[str] = mapped_column(String, nullable=False)
-    recipient: Mapped[str] = mapped_column(String, nullable=False)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
     datereq: Mapped[str] = mapped_column(String)      
     dateneed: Mapped[str] = mapped_column(String)      
@@ -52,18 +51,19 @@ class PurchaseRequest(Base):
         cascade="all, delete-orphan",
         back_populates="purchase_request",
         uselist=False
+        
     )
 
     def __repr__(self):
-        return f"<PurchaseRequest(reqID='{self.reqID}', requester='{self.requester}', recipient='{self.recipient}')>"
+        return f"<PurchaseRequest(reqID='{self.reqID}', requester='{self.requester}')>"
 
 ###################################################################################################
 ## approval TABLE
 class Approval(Base):
     __tablename__ =  "approval"
-    __searchable__ = ['ID', 'reqID', 'requester', 'recipient', 'budgetObjCode','fund', 
+    __searchable__ = ['ID', 'reqID', 'requester', 'budgetObjCode', 'fund', 
                       'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
-                      'approved', 'pendingApproval', 'createdTime', 'approvedTime', 'deniedTime']
+                      'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
 
     # UUID as primary key
     UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -71,7 +71,6 @@ class Approval(Base):
     ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_request.ID"), nullable=False, unique=True)
     reqID: Mapped[str] = mapped_column(String, nullable=False)
     requester: Mapped[str] = mapped_column(String, nullable=False)
-    recipient: Mapped[str] = mapped_column(String, nullable=False)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
     datereq: Mapped[str] = mapped_column(String)      
     dateneed: Mapped[str] = mapped_column(String)      
@@ -173,21 +172,48 @@ def get_status_by_id(db_session: Session, ID: str):
         raise ValueError(f"Object with ID {ID} not found in Approval table")
     
 ###################################################################################################
-# Get UUID from Approval table
+# Get requester from Approval table by UUID
+def get_requester_by_uuid(db_session: Session, uuid: str):
+    logger.info(f"Fetching requester for UUID: {uuid}")
+    
+    # Query the Approval table to get the requester field for the given UUID
+    result = db_session.query(Approval.requester).filter(Approval.UUID == uuid).first()
+    logger.info(f"Requester: {result}")
+    
+    if result:
+        return result[0]  # Return just the requester string
+    else:
+        logger.warning(f"No requester found for UUID: {uuid}")
+        return None
+
+###################################################################################################
+# UUID cache to improve performance
+_uuid_cache = {}
+
+# Get UUID by ID with caching
+def get_uuid_by_id_cached(db_session: Session, ID: str):
+    """
+    Get UUID by ID with caching for better performance.
+    """
+    # Check cache first
+    if ID in _uuid_cache:
+        logger.info(f"UUID cache hit for ID: {ID}")
+        return _uuid_cache[ID]
+    
+    # If not in cache, get from database
+    uuid = get_uuid_by_id(db_session, ID)
+    
+    # Store in cache if found
+    if uuid:
+        _uuid_cache[ID] = uuid
+        logger.info(f"Added UUID to cache for ID: {ID}")
+    
+    return uuid
+
+###################################################################################################
+# Get UUID by ID
 def get_uuid_by_id(db_session: Session, ID: str):
-    logger.info(f"Fetching UUID for ID: {ID}")
-    
-    if not ID:
-        raise ValueError("ID must be a non-empty string")
-    
-    with next(get_session()) as db:
-        # First try to find by sequential ID
-        result = db.query(Approval).filter(Approval.ID == ID).first()
-        if result:
-            return result.UUID
-        else:
-            logger.error(f"Object with ID {ID} not found in Approval table")
-            raise ValueError(f"Object with ID {ID} not found in Approval table")
+    return db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
 
 ###################################################################################################
 # Update data
@@ -301,5 +327,67 @@ def get_next_request_id() -> str:
             next_suffix = 1
     
     return f"{today}-{next_suffix:04d}"
+            
+###################################################################################################
+# Get status of request from Approval table by UUID
+def get_status_by_uuid(db_session: Session, uuid: str):
+    logger.info(f"Fetching status for UUID: {uuid}")
+    
+    if not uuid:
+        raise ValueError("UUID must be a non-empty string")
+    
+    result = db_session.query(Approval.status).filter(Approval.UUID == uuid).first()
+    
+    if result:
+        return result[0]  # Return just the status string
+    else:
+        logger.warning(f"No status found for UUID: {uuid}")
+        return None
+
+###################################################################################################
+# Update data by UUID
+def update_data_by_uuid(uuid: str, table: str, **kwargs):
+    logger.info(f"Updating {table} with UUID {uuid}, data: {kwargs}")
+    
+    if not kwargs or not isinstance(kwargs, dict):
+        raise ValueError("Update data must be a non-empty dictionary")
+    
+    with next(get_session()) as db:
+        if table == "purchase_request":
+            obj = db.query(PurchaseRequest).filter(PurchaseRequest.UUID == uuid).first()
+        elif table == "approval":
+            obj = db.query(Approval).filter(Approval.UUID == uuid).first()
+        else:
+            raise ValueError(f"Unsupported table: {table}")
+        
+        if obj:
+            for key, value in kwargs.items():
+                if hasattr(obj, key):
+                    setattr(obj, key, value)
+                else:
+                    raise ValueError(f"Invalid field: {key}")
+            
+            db.commit()
+            logger.info(f"Successfully updated {table} with UUID {uuid}")
+        else:
+            logger.error(f"Object with UUID {uuid} not found in {table}")
+            raise ValueError(f"Object with UUID {uuid} not found in {table}")
+            
+###################################################################################################
+# Get UUIDs for multiple IDs
+def get_uuids_by_ids(db_session: Session, ids: list):
+    """
+    Get UUIDs for multiple IDs.
+    Returns a dictionary mapping IDs to UUIDs.
+    """
+    logger.info(f"Getting UUIDs for {len(ids)} IDs")
+    
+    result = {}
+    for id in ids:
+        uuid = get_uuid_by_id(db_session, id)
+        if uuid:
+            result[id] = uuid
+    
+    return result
             
         

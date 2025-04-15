@@ -121,7 +121,6 @@ function AddItemsForm({
             ID: "",
             reqID: "",
             requester: "",
-            recipient: "",
             phoneext: "",
             datereq: formattedToday,
             dateneed: null,

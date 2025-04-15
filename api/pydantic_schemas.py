@@ -14,7 +14,6 @@ class PurchaseRequestSchema(BaseModel):
     ID: str
     reqID: str
     requester: str
-    recipient: str
     phoneext: int
     datereq: str
     dateneed: str
@@ -37,13 +36,12 @@ class PurchaseRequestSchema(BaseModel):
     createdTime: datetime
 
 # approval schema
-class AppovalSchema(BaseModel):
+class ApprovalSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     ID: str
     reqID: str
     requester: str
-    recipient: str
     budgetObjCode: str
     fund: str
     itemDescription: str

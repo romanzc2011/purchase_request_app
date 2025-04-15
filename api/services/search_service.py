@@ -46,7 +46,6 @@ class SearchService:
         ID=ID(stored=True, unique=True),
         reqID=ID(stored=True),             
         requester=TEXT(stored=True, analyzer=StemmingAnalyzer()),        
-        recipient=TEXT(stored=True, analyzer=StemmingAnalyzer()),        
         budgetObjCode=ID(stored=True),    
         fund=ID(stored=True),             
         quantity=NUMERIC(stored=True, numtype=int, bits=16),  # Reduced bits
@@ -63,7 +62,7 @@ class SearchService:
     )
     
     searchable_fields = [
-        'ID', 'reqID', 'requester', 'recipient', 'budgetObjCode', 'fund', 'priceEach','totalPrice',
+        'ID', 'reqID', 'requester','budgetObjCode', 'fund', 'priceEach','totalPrice',
         'location', 'status','quantity','createdTime'
     ]
     

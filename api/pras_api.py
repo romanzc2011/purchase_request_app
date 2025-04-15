@@ -25,6 +25,7 @@ from services.email_service import EmailService
 from services.ipc_service import IPC_Service
 from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
+from services.uuid_service import uuid_service
 from managers.ipc_manager import ipc_instance
 
 """
@@ -32,7 +33,7 @@ AUTHOR: Roman Campbell
 DATE: 01/03/2025
 NAME: PRAS - (Purchase Request Approval System)
 Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
-for the UI. When making a purchase request, user will use the their AD username for requestor/recipient.
+for the UI. When making a purchase request, user will use the their AD username for requestor.
 
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
@@ -79,7 +80,7 @@ email_svc = EmailService(
     subject="Purchase Request Notification"
 )
 
-# Set the recipient emails
+# Set the approvers emails
 email_svc.set_first_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov")
 email_svc.set_final_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov")
 
@@ -194,19 +195,19 @@ async def login(credentials: dict):
 
 ##########################################################################
 ## GET APPROVAL DATA
-@api_router.get("/getApprovalData", response_model=List[ps.AppovalSchema])
+@api_router.get("/getApprovalData", response_model=List[ps.ApprovalSchema])
 async def get_approval_data(current_user: User = Depends(get_current_user)):
     session = next(get_session())
     try:
         approval = dbas.get_all_approval(session)
-        approval_data = [ps.AppovalSchema.model_validate(approval) for approval in approval]
+        approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approval]
         return approval_data
     finally:
         session.close()
 
 ##########################################################################
 ## GET SEARCH DATA
-@api_router.get("/getSearchData/search", response_model=List[ps.AppovalSchema])
+@api_router.get("/getSearchData/search", response_model=List[ps.ApprovalSchema])
 async def get_search_data(
     query: str = "",
     column: Optional[str] = None,
@@ -379,15 +380,17 @@ async def assign_req_id(data: dict, current_user: User = Depends(get_current_use
     if not original_id:
         raise HTTPException(status_code=400, detail="Missing ID in request")
     
-    ## Retrieve the UUID from the database
-    uuid = dbas.get_uuid_by_id(dbas.get_session(), ID=original_id)
+    # Get the UUID using the UUID service
+    with next(get_session()) as session:
+        uuid = uuid_service.get_uuid_by_id(session, original_id)
     
     if not uuid:
         raise HTTPException(status_code=400, detail="Missing UUID in request")
     
-    # Update the database with the requisition ID using the original ID
+    # Update the database with the requisition ID using the UUID
     dbas.update_data(uuid, "approval", reqID=data.get('reqID'))
     return {"message": "Requisition ID assigned successfully"}
+
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
 ## Approval status is NEW REQUEST, this gets sent to requester and first approver
@@ -403,9 +406,24 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
         
         if not id or not action:
             raise HTTPException(status_code=400, detail="Missing id or action")
+        
+        # Use a single session for all database operations
+        with next(get_session()) as session:
+            # Get the UUID using the UUID service
+            uuid = uuid_service.get_uuid_by_id(session, id)
+            logger.info(f"UUID: {uuid}")
             
-        # Get current status using a proper session
-        with next(dbas.get_session()) as session:
+            if not uuid:
+                raise HTTPException(status_code=404, detail="UUID not found")
+            
+            # Get requester using the same session and the UUID
+            requester = dbas.get_requester_by_uuid(session, uuid)
+            logger.info(f"Requester: {requester}")
+            
+            if not requester:
+                raise HTTPException(status_code=404, detail="Requester not found")
+                
+            # Get current status
             current_status = dbas.get_status_by_id(session, id)
             if not current_status:
                 raise HTTPException(status_code=404, detail="Request not found")
@@ -415,7 +433,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                 logger.info("SEND TO FINAL APPROVER")
                 if action.lower() == "approve":
                     new_status = "PENDING"
-                    dbas.update_data(id, "approval", status=new_status)
+                    dbas.update_data(uuid, "approval", status=new_status)
                     email_svc.set_request_status("NEW REQUEST")
                     email_svc.send_notification(
                         template_path="./templates/approval_notification.html",
@@ -424,7 +442,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     )
                 elif action.lower() == "deny":
                     new_status = "DENIED"
-                    dbas.update_data(id, "approval", status=new_status)
+                    dbas.update_data(uuid, "approval", status=new_status)
                     email_svc.set_request_status("NEW REQUEST")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
@@ -434,7 +452,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
             elif current_status == "PENDING":
                 if action.lower() == "approve":
                     new_status = "APPROVED" 
-                    dbas.update_data(id, "approval", status=new_status)
+                    dbas.update_data(uuid, "approval", status=new_status)
                     # Send email to final approver
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
@@ -450,17 +468,16 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                         subject="Purchase Request Approved"
                     )
                     # Send email to requester
-                    requester_email = dbas.get_requester_email(session, id)
-                    if requester_email:
-                        email_svc.set_request_status("PENDING")
-                        email_svc.send_notification(
-                            template_path="./templates/approval_notification.html",
-                            template_data={"id": id, "action": "approved"},
-                            subject="Purchase Request Approved"
-                        )
+                    email_svc.set_requester(requester, None)  # We don't have the email, but the service will handle it
+                    email_svc.set_request_status("PENDING")
+                    email_svc.send_notification(
+                        template_path="./templates/approval_notification.html",
+                        template_data={"id": id, "action": "approved"},
+                        subject="Purchase Request Approved"
+                    )
                 elif action.lower() == "deny":
                     new_status = "DENIED"
-                    dbas.update_data(id, "approval", status=new_status)
+                    dbas.update_data(uuid, "approval", status=new_status)
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
@@ -526,17 +543,20 @@ async def create_new_id(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
     
 @api_router.get("/getUUID/{ID}")
-async def get_uuid(ID: str, current_user: User = Depends(get_current_user)):
-    try:
-        # Get a session from the generator
-        with next(dbas.get_session()) as session:
-            # Get the UUID from database
-            uuid = dbas.get_uuid_by_id(session, ID)
+async def get_uuid_by_id_endpoint(ID: str, current_user: User = Depends(get_current_user)):
+    """
+    Get the UUID for a given ID.
+    This endpoint can be used by other programs to retrieve the UUID.
+    """
+    logger.info(f"Getting UUID for ID: {ID}")
+    
+    with next(dbas.get_session()) as session:
+        uuid = dbas.get_uuid_by_id(session, ID)
+        
+        if not uuid:
+            raise HTTPException(status_code=404, detail=f"No UUID found for ID: {ID}")
             
-            return {"uuid": uuid}
-    except Exception as e:
-        logger.error(f"Error getting UUID: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"uuid": uuid}
 
 ##########################################################################
 ##########################################################################
@@ -632,7 +652,7 @@ def process_approval_data(processed_data):
     
     # Define allowed keys that correspond to the Approval model's columns.
     allowed_keys = [
-        'ID', 'reqID', 'requester', 'recipient', 'budgetObjCode',  'fund', 
+        'ID', 'reqID', 'requester', 'budgetObjCode',  'fund', 
         'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location', 
         'newRequest', 'pendingApproval', 'approved', 'phoneext', 'datereq', 'dateneed', 'orderType'
     ]
@@ -689,3 +709,24 @@ def purchase_req_commit(processed_data):
 ##########################################################################
 if __name__ == "__main__":
     uvicorn.run("pras_api:app", host="localhost", port=5004, reload=True)
+
+@api_router.post("/getUUIDs")
+async def get_uuids_by_ids(data: dict, current_user: User = Depends(get_current_user)):
+    """
+    Get UUIDs for multiple IDs.
+    This endpoint accepts a list of IDs and returns a mapping of IDs to UUIDs.
+    """
+    logger.info(f"Getting UUIDs for multiple IDs")
+    
+    ids = data.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="No IDs provided")
+    
+    result = {}
+    with next(dbas.get_session()) as session:
+        for id in ids:
+            uuid = dbas.get_uuid_by_id(session, id)
+            if uuid:
+                result[id] = uuid
+    
+    return {"uuid_map": result}

@@ -160,7 +160,10 @@ export default function ApprovalsTableRow({
                         size="small"
                         inputProps={{
                             readOnly: Boolean(approval_data.reqID),
-                            style: { width: '50px' }
+                            style: { 
+                                width: '50px',
+                                color: approval_data.reqID ? 'green' : 'inherit'
+                            }
                         }}
                         onChange={(e) => setDraftReqID(e.target.value)}
                         sx={{

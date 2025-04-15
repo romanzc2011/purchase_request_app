@@ -8,7 +8,6 @@ export type FormValues = {
   ID: string;
   reqID: string;
   requester: string;
-  recipient: string;
   phoneext: string;
   datereq: string;
   dateneed: Date | null;
