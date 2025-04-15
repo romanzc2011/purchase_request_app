@@ -422,7 +422,14 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
             
             if not requester:
                 raise HTTPException(status_code=404, detail="Requester not found")
-                
+            
+            # Now get requester email with ldap
+            requester_email = ldap_svc.get_email_address(ldap_svc.get_connection(), requester)
+            logger.info(f"Requester email: {requester_email}")
+            
+            # Set requester email
+            email_svc.set_requester(requester, requester_email)
+            
             # Get current status
             current_status = dbas.get_status_by_id(session, id)
             if not current_status:
@@ -434,7 +441,12 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                 if action.lower() == "approve":
                     new_status = "PENDING"
                     dbas.update_data(uuid, "approval", status=new_status)
-                    email_svc.set_request_status("NEW REQUEST")
+                    
+                    # Set final approver email
+                    final_approver_email = ldap_svc.get_email_address(ldap_svc.get_connection(), current_user.username)
+                    email_svc.set_final_approver(current_user.username, final_approver_email)
+                    
+                    email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/approval_notification.html",
                         template_data={"id": id, "action": "approved"},
