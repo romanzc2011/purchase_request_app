@@ -367,35 +367,22 @@ async def log_requests(request: Request, call_next):
     return response
 
 #########################################################################
-## ASSIGN REQUISITION ID
+## ASSIGN REQUISITION ID - IRQ number that is retrieved from JFIMS by Lela
 ## This is called from the frontend to assign a requisition ID
 ## to the purchase request. It also updates the UUID in the approval table.
 @api_router.post("/assignReqID")
-async def assign_req_id(data: dict, current_user: User = Depends(get_current_user)):
+async def assign_req_id(current_user: User = Depends(get_current_user)):
     try:
-        logger.info(f"DATA: {data}")
-        #  Check for both "ID" and "request_id" keys
-        reqID = data.get("reqID")
-        ID = data.get("ID")
-        if not reqID:
-            raise HTTPException(status_code=400, detail="Missing reqID")
-        
-        # Get the UUID from the frontend
-        uuid = data.get("UUID")
-        if not uuid:
-            raise HTTPException(status_code=400, detail="Missing UUID")
-        
-        # Update the approval table with the requisition ID and UUID
-        with next(dbas.get_session()) as session:
-            # Update both reqID and uuid in a single call
-            dbas.update_data(ID, "approval", reqID=reqID, uuid=uuid)
-            logger.info(f"Updated requisition ID to {reqID} and UUID to {uuid}")
-        
+        # Request comes in for new id, call the get request id from db svc
+        id = db_svc.get_request_id()
+        if not id:
+            raise HTTPException(status_code=404, detail="No new ID available")
+        else:
+            logger.info(f"New ID: {id}")
+            return {"ID": id}
     except Exception as e:
-        logger.error(f"Error in assign_req_id: {e}")
-        raise HTTPException(status_code=500, detail=f"Error in assign_req_id: {e}")
-    
-    return {"status": "success", "message": "Requisition ID assigned successfully"}
+        logger.error(f"Error assigning requisition ID: {e}")
+        raise HTTPException(status_code=500, detail=f"Error assigning requisition ID: {str(e)}")
 
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
@@ -519,6 +506,20 @@ async def refresh_token(refresh_token: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error refreshing token"
         )
+        
+@api_router.post("/createNewID")
+async def create_new_id(request: Request):
+    """
+    Create a new ID for a purchase request.
+    """
+    try:
+        # Get the next request ID using the function from db_service
+        new_id = dbas.get_next_request_id()
+        logger.info(f"Created new ID: {new_id}")
+        return {"ID": new_id}
+    except Exception as e:
+        logger.error(f"Error creating new ID: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 ##########################################################################
 ##########################################################################

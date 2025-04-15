@@ -268,23 +268,18 @@ def get_next_request_id() -> str:
         next_suffix = 1
     else:
         try:
-            # Check if the ID has the expected format
-            if '-' not in last_id:
+            parts = last_id.split('-', 1)
+            if len(parts) != 2:
                 logger.warning(f"Invalid ID format: {last_id}, starting with 0001")
                 next_suffix = 1
             else:
-                parts = last_id.split('-', 1)
-                if len(parts) != 2:
-                    logger.warning(f"Invalid ID format: {last_id}, starting with 0001")
+                try:
+                    last_suffix = int(parts[1])
+                    next_suffix = last_suffix + 1
+                    logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
+                except ValueError:
+                    logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
                     next_suffix = 1
-                else:
-                    try:
-                        last_suffix = int(parts[1])
-                        next_suffix = last_suffix + 1
-                        logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
-                    except ValueError:
-                        logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
-                        next_suffix = 1
         except Exception as e:
             logger.error(f"Error processing last ID: {e}, starting with 0001")
             next_suffix = 1

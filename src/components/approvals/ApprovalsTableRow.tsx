@@ -12,8 +12,10 @@ import { FormValues } from "../../types/formTypes";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import MoreDataButton from "./MoreDataButton";
 import { convertBOC } from "../../utils/bocUtils";
-import WarninIcon from '@mui/icons-material/WarningAmber';
-import { useUUIDStore } from "../purchase_req/SumbitToApproval";
+import WarningIcon from '@mui/icons-material/WarningAmber';
+import PendingIcon from '@mui/icons-material/Pending';
+import SuccessIcon from '@mui/icons-material/CheckCircleOutline';
+import { useUUIDStore } from "../../services/UUIDService";
 
 const API_URL_ASSIGN = `${import.meta.env.VITE_API_URL}/api/assignReqID`;
 const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
@@ -258,8 +260,11 @@ export default function ApprovalsTableRow({
                 }}
             >
                 {/* Status Icon and Text */}
+                {/* WARNING */}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                    {approval_data.status === "NEW REQUEST" && <WarninIcon />}
+                    {approval_data.status === "NEW REQUEST" && <WarningIcon />}
+                    {approval_data.status === "PENDING" && <PendingIcon />}
+                    {approval_data.status === "APPROVED" && <SuccessIcon />}
                     {approval_data.status}
                 </Box>
             </TableCell>

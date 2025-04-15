@@ -122,7 +122,6 @@ export default function LoginDialog({
 
           {/* USERNAME INPUT */}
           <TextField
-            autoFocus
             margin="dense"
             label="Username"
             type="text"

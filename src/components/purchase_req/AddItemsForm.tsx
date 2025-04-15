@@ -21,6 +21,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Justification from "./Justification";
 import AddComments from "./AddComments";
 import { v4 as uuidv4 } from "uuid";
+import { useUUIDStore } from "../../services/UUIDService";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -45,33 +46,58 @@ function AddItemsForm({
     fileInfo,
     setFileInfo,
 }: AddItemsProps) {
+    const { setUUID } = useUUIDStore();
+    /*************************************************************************************** */
+    /* CREATE NEW ID -- get from backend */
+    /*************************************************************************************** */
+    async function createNewID() {
+        const response = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/createNewID`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                },
+            }
+        );
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        console.log("New ID response", response);
+        return response.json();
+    }
+
     /*************************************************************************************** */
     /* HANDLE ADD ITEM function */
     /*************************************************************************************** */
-    const handleAddItem = async (newItem: FormValues) => {
-        // Generate a UUID for the item
-        const uuid = uuidv4();
-        
-        // Create a new item with the UUID
-        const itemToAdd: FormValues = {
-            ...newItem,
-            UUID: uuid,
-            priceEach: newItem.priceEach,
-            // Use a default ID if not provided
-            ID: ID || `TEMP-${Date.now()}`,
-            status: "NEW REQUEST"
-        };
-        
-        // Add the item to the data buffer
-        setDataBuffer((prev) => [...prev, itemToAdd]);
-        
-        // Update the ID if setID is provided
-        if (setID) {
-            setID(itemToAdd.ID);
+    const handleAddItem = async (data: FormValues) => {
+        try {
+            // Generate a new UUID for the item
+            const uuid = uuidv4();
+            setUUID(data.ID, uuid);
+            // Get a new ID from the backend
+            const response = await createNewID();
+            const newId = response.ID; // Extract the ID from the response object
+            console.log("New ID handleAddItem", newId);
+            
+            // Create a new item with the UUID and ID
+            const itemToAdd: FormValues = {
+                ...data,
+                UUID: uuid,
+                priceEach: data.priceEach, // Keep as string to match FormValues type
+                ID: newId, // Use the extracted ID
+                status: "NEW REQUEST"
+            };
+            
+            console.log("Item to add:", itemToAdd);
+            
+            // Add the item to the data buffer
+            setDataBuffer(prev => [...prev, itemToAdd]);
+            
+            // Reset the form
+            reset();
+        } catch (error) {
+            console.error("Error adding item:", error);
         }
-        
-        // Reset the form
-        reset();
     };
 
     /*************************************************************************************** */
@@ -89,7 +115,7 @@ function AddItemsForm({
     const form = useForm<FormValues>({
         defaultValues: {
             UUID: "",
-            ID: ID,
+            ID: "",
             reqID: "",
             requester: "",
             recipient: "",
