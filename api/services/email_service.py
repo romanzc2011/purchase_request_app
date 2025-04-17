@@ -4,6 +4,8 @@ import os
 
 from loguru import logger
 from services.ipc_service import IPC_Service
+from docxtpl import DocxTemplate
+from docx2pdf import convert
 
 """
 AUTHOR: Roman Campbell
@@ -28,6 +30,13 @@ class EmailService:
             'first_approver': { 'name': None, 'email': None },
             'final_approver': { 'name': None, 'email': None }
         }
+        # Get the project root directory (where the api folder is located)
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Create rendered_templates directory if it doesn't exist
+        self.rendered_dir = os.path.join(self.project_root, "rendered_templates")
+        os.makedirs(self.rendered_dir, exist_ok=True)
+        logger.info(f"Rendered templates directory: {self.rendered_dir}")
+        
         self.msg_templates = {
             'NEW_REQUEST': {
                 'first_approver': {
@@ -47,6 +56,29 @@ class EmailService:
             }
         }
         self.request_status = None
+
+    def _convert_to_pdf(self, docx_path):
+        """
+        Convert a Word document to PDF
+        
+        Args:
+            docx_path: Path to the Word document
+            
+        Returns:
+            str: Path to the generated PDF file
+        """
+        try:
+            # Generate PDF path in the same directory as the DOCX
+            pdf_path = os.path.splitext(docx_path)[0] + '.pdf'
+            
+            # Convert the document
+            convert(docx_path, pdf_path)
+            logger.info(f"Successfully converted {docx_path} to PDF: {pdf_path}")
+            
+            return pdf_path
+        except Exception as e:
+            logger.error(f"Error converting document to PDF: {e}")
+            raise
 
     def send_notification(self, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
         """
@@ -135,34 +167,50 @@ class EmailService:
         mail = outlook.CreateItem(0)
         mail.Subject = subject
         
-        # Handle template if provided
         if template_path and template_data:
             try:
-                with open(template_path, 'r') as f:
-                    template = f.read()
+                # Convert template path to absolute path if it's relative
+                if not os.path.isabs(template_path):
+                    template_path = os.path.join(self.project_root, template_path)
                 
-                # Check which variables are actually in the template
-                missing_vars = []
-                for key in template_data.keys():
-                    if f"{{{key}}}" not in template:
-                        missing_vars.append(key)
+                # Generate a unique filename for this email
+                rendered_file = os.path.join(self.rendered_dir, f"rendered_template_{os.urandom(4).hex()}.docx")
                 
-                if missing_vars:
-                    logger.warning(f"Template variables not found in template: {missing_vars}")
+                # Log the template data for debugging
+                logger.debug(f"Template data: {template_data}")
+                logger.debug(f"Template path: {template_path}")
+                logger.debug(f"Rendered file path: {rendered_file}")
                 
-                # Special case: Replace {requester} with the requester's name if it exists in the template
-                if "{requester}" in template and self.recipients['requester']['name']:
-                    template = template.replace("{requester}", self.recipients['requester']['name'])
-                    logger.info(f"Replaced {{requester}} with {self.recipients['requester']['name']}")
+                # Render the template
+                template = DocxTemplate(template_path)
+                try:
+                    template.render(template_data)
+                except Exception as e:
+                    logger.error(f"Template rendering error: {str(e)}")
+                    logger.error("Template data structure:")
+                    for key, value in template_data.items():
+                        logger.error(f"{key}: {type(value)} = {value}")
+                    raise
                 
-                # Replace template variables with data
-                for key, value in template_data.items():
-                    # Replace {key} with value
-                    template = template.replace("{" + key + "}", str(value))
-                mail.HTMLBody = template
+                template.save(rendered_file)
+                
+                # Verify the file exists before converting
+                if not os.path.exists(rendered_file):
+                    raise FileNotFoundError(f"Rendered file not found at: {rendered_file}")
+                
+                # Convert to PDF
+                pdf_file = self._convert_to_pdf(rendered_file)
+                
+                # Attach both the DOCX and PDF
+                mail.Attachments.Add(pdf_file)
+                logger.info(f"Attached documents: {rendered_file} and {pdf_file}")
+                
+                # Set the email body
+                mail.HTMLBody = body or "Please see the attached document."
+                
             except Exception as e:
                 logger.error(f"Error processing template: {e}")
-                mail.HTMLBody = body
+                raise
         else:
             mail.HTMLBody = body
         
@@ -178,8 +226,25 @@ class EmailService:
         elif self.cc_persons:
             mail.CC = "; ".join(self.cc_persons)
         
-        mail.Send()
-        logger.info(f"Email sent to {to_email} with subject: {subject}")
+        try:
+            mail.Send()
+            logger.info(f"Email sent to {to_email} with subject: {subject}")
+            
+            # Clean up the rendered files after sending
+            if template_path and template_data:
+                try:
+                    if os.path.exists(rendered_file):
+                        os.remove(rendered_file)
+                        logger.info(f"Cleaned up rendered DOCX file: {rendered_file}")
+                    if os.path.exists(pdf_file):
+                        os.remove(pdf_file)
+                        logger.info(f"Cleaned up rendered PDF file: {pdf_file}")
+                except Exception as e:
+                    logger.warning(f"Could not clean up rendered files: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Failed to send email to {to_email}: {e}")
+            raise
         
     def _validate_required_fields(self):
         """

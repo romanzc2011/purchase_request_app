@@ -90,11 +90,6 @@ ipc_svc = IPC_Service()
 auth_svc = AuthService()
 pdf_svc = PDFService()
 
-# PDF TEST
-pdf_svc.create_pdf("sample_report.pdf")
-pdf_svc.create_pdf_with_header_footer("sample_reportimg.pdf")
-pdf_svc.create_purchase_request_pdf(output_filename="sample_purchase_request.pdf")
-
 # Thread safety
 lock = threading.Lock()
 
@@ -245,6 +240,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     
     # Log the requester
     logger.info(f"REQUESTER: {requester}")
+    logger.info(f"DATA: {data}")
     
     # Set the requester in the LDAP service
     ldap_svc.set_requester(requester)
@@ -274,6 +270,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     else:
         # Get LDAP connection
         conn = ldap_svc.get_connection()
+        
         # Check if the requester is a legitimate user
         is_legitimate = ldap_svc.check_legitimate_user(conn, requester)
         if not is_legitimate:
@@ -687,10 +684,16 @@ def process_approval_data(processed_data):
     ##########################################################################
     ## SENDING NOTIFICATION OF NEW REQUEST
     # Create email body and send to approver
+    
+    # Get request status to determine correct template
+    if approval_data['status'] == "NEW REQUEST":
+        template_path = "./templates/son_template_lines.docx"
+        
     logger.info("Sending notification email to approver...")
     logger.info(f"Request status before sending notification: {approval_data['status']}")
     email_svc.send_notification(
         template_data=processed_data,
+        template_path=template_path,
         subject="New Purchase Request",
         request_status=approval_data['status']
     )
