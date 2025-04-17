@@ -26,6 +26,7 @@ from services.ipc_service import IPC_Service
 from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
 from services.uuid_service import uuid_service
+from services.pdf_service import PDFService
 from managers.ipc_manager import ipc_instance
 
 """
@@ -87,6 +88,12 @@ email_svc.set_final_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov
 db_svc = next(get_session())  # Initialize with a session
 ipc_svc = IPC_Service()
 auth_svc = AuthService()
+pdf_svc = PDFService()
+
+# PDF TEST
+pdf_svc.create_pdf("sample_report.pdf")
+pdf_svc.create_pdf_with_header_footer("sample_reportimg.pdf")
+pdf_svc.create_purchase_request_pdf(output_filename="sample_purchase_request.pdf")
 
 # Thread safety
 lock = threading.Lock()
