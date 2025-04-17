@@ -8,8 +8,6 @@ import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
 import AlertMessage from "./components/AlertMessage";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
-import ApprovalsTable from "./components/approvals/ApprovalTable";
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ApprovalPageMain from "./components/approvals/ApprovalPageMain";
 import { IFile } from "./types/IFile";
 const baseURL = import.meta.env.VITE_API_URL;
@@ -28,7 +26,8 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
-    // Default ID for components that need it
+    
+    // Default ID for coms that need it
     const defaultId = `TEMP-${Date.now()}`;
 
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);

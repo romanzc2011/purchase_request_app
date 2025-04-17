@@ -21,7 +21,7 @@ class PurchaseRequest(Base):
     # UUID as primary key
     uuid: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     # Sequential ID for user-facing operations
-    ID: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    ID: Mapped[str] = mapped_column(String, nullable=False)
     reqID: Mapped[str] = mapped_column(String, nullable=False)
     requester: Mapped[str] = mapped_column(String, nullable=False)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -68,7 +68,7 @@ class Approval(Base):
     # UUID as primary key
     UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     # Sequential ID for user-facing operations
-    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_request.ID"), nullable=False, unique=True)
+    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_request.UUID"), nullable=False)
     reqID: Mapped[str] = mapped_column(String, nullable=False)
     requester: Mapped[str] = mapped_column(String, nullable=False)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)

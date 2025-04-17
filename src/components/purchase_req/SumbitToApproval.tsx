@@ -13,9 +13,8 @@ import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
 import React, { useEffect } from "react";
-import UploadFile from "../../services/UploadHandler";
 import { v4 as uuidv4 } from 'uuid';
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
 const API_URL = `${baseURL}${API_CALL}`;
@@ -58,6 +57,7 @@ function SubmitApprovalTable({
         }
     }, [isSubmitted, setDataBuffer, setIsSubmitted]);
 
+
     /************************************************************************************ */
     /* CALCULATE PRICE -- helper function to convert price/quantity to number and do
          calculations */
@@ -74,6 +74,10 @@ function SubmitApprovalTable({
         priceEach: Number(item.priceEach),
         calculatedPrice: calculatePrice(item)
     }));
+
+    /* Check if data buffer is multiple items */
+    const itemCount = dataBuffer.length;
+    console.log("itemCount==", itemCount);
 
     /************************************************************************************ */
     /* SUBMIT DATA --- send to backend to add to database */
@@ -99,7 +103,8 @@ function SubmitApprovalTable({
             // Create a single object with the requester and items
             const requestData = {
                 requester: requester,
-                items: processedItems
+                items: processedItems,
+                itemCount: itemCount
             };
             
             // Send the data to the backend
