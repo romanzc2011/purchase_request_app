@@ -105,8 +105,21 @@ function SubmitApprovalTable({
     /************************************************************************************ */
     const handleSubmitData = async (processedData: FormValues[]) => {
         try {
-            // Use a default ID if not provided
-            const requestId = ID || `TEMP-${Date.now()}`;
+            // Get a proper ID from the backend
+            const idRequest = await fetch(`${baseURL}/api/createNewID`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                },
+            });
+            
+            if (!idRequest.ok) {
+                throw new Error(`Failed to get ID: ${idRequest.status}`);
+            }
+            
+            const idData = await idRequest.json();
+            const requestId = idData.ID;
             
             // Get the requester from the first item
             const requester = processedData[0]?.requester;
@@ -141,6 +154,7 @@ function SubmitApprovalTable({
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
+            console.log("dataBuffer, isArray==", Array.isArray(dataBuffer)," length==", dataBuffer.length)
             
             const result = await response.json();
             console.log("Submission result:", result);

@@ -19,8 +19,7 @@ class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
 
     UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    IRQ1_ID: Mapped[str] = mapped_column(String, nullable=True)
+    ID: Mapped[str] = mapped_column(String, unique=False, nullable=False)
     requester: Mapped[str] = mapped_column(String, nullable=False)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
     datereq: Mapped[str] = mapped_column(String)      
@@ -128,7 +127,6 @@ def insert_data(data, table):
         try:
             if table == "purchase_requests":
                 # Create new PurchaseRequest with uuid
-                data['ID'] = get_next_request_id()
                 obj = PurchaseRequest(**data)
                 db.add(obj)
             elif table == "approval":
@@ -281,9 +279,10 @@ def _get_last_id() -> Optional[str]:
     or None if the table is empty.
     """
     with next(get_session()) as db:
+        # Query the Approval table instead of PurchaseRequest
         row = (
-            db.query(PurchaseRequest.ID)
-            .order_by(PurchaseRequest.ID.desc())
+            db.query(Approval.ID)
+            .order_by(Approval.ID.desc())
             .limit(1)
             .first()
         )
@@ -311,13 +310,18 @@ def get_next_request_id() -> str:
                 logger.warning(f"Invalid ID format: {last_id}, starting with 0001")
                 next_suffix = 1
             else:
-                try:
-                    last_suffix = int(parts[1])
-                    next_suffix = last_suffix + 1
-                    logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
-                except ValueError:
-                    logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
+                last_date, last_suffix = parts
+                if last_date != today:
+                    # New day, start at 0001
                     next_suffix = 1
+                else:
+                    try:
+                        last_suffix = int(last_suffix)
+                        next_suffix = last_suffix + 1
+                        logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
+                    except ValueError:
+                        logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
+                        next_suffix = 1
         except Exception as e:
             logger.error(f"Error processing last ID: {e}, starting with 0001")
             next_suffix = 1

@@ -119,7 +119,7 @@ function AddItemsForm({
         defaultValues: {
             UUID: "",
             ID: "",
-            reqID: "",
+            IRQ1_ID: "",
             requester: "",
             phoneext: "",
             datereq: formattedToday,

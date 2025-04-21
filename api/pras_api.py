@@ -234,6 +234,14 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     
     # Extract requester 
     requester = data.get("requester")
+    items = data.get("items", [])
+    item_count = data.get("itemCount", len(items))
+    
+    logger.info(f"ITEM COUNT: {item_count}")
+    logger.info(f"ITEMS: {items}")
+    logger.info(f"REQUESTER: {requester}")
+    logger.info(f"DATA: {data}")
+    
     if not requester:
         logger.error(f"Requester not found in data: {data}")
         raise HTTPException(status_code=400, detail="Invalid requester")
@@ -287,8 +295,19 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         logger.error("No items found in request data")
         raise HTTPException(status_code=400, detail="No items found in request data")
     
+    # Get the shared ID from the first item, but ensure it's not a temporary ID
+    first_item_id = items[0].get("ID") if items else None
+    if not first_item_id or first_item_id.startswith("TEMP-"):
+        shared_id = dbas.get_next_request_id()
+        logger.info(f"Generated new shared ID: {shared_id}")
+    else:
+        shared_id = first_item_id
+        logger.info(f"Using existing shared ID: {shared_id}")
+    
     # Process each item
     for item in items:
+        # Ensure all items share the same ID
+        item["ID"] = shared_id
         # Add the requester to each item
         item["requester"] = requester
         
@@ -604,7 +623,6 @@ def process_purchase_data(data):
             if 'priceEach' in local_purchase_cols and 'quantity' in local_purchase_cols:
                 
                 try:
-                    print(local_purchase_cols['priceEach'])
                     local_purchase_cols['priceEach'] = float(local_purchase_cols['priceEach'])
                     local_purchase_cols['quantity'] = int(local_purchase_cols['quantity'])
                     if local_purchase_cols['priceEach'] < 0 or local_purchase_cols['quantity'] <= 0:
@@ -682,7 +700,10 @@ def process_approval_data(processed_data):
             approval_data[key] = value
     
     # Set default values for required fields if not present
-    approval_data['IRQ1_ID'] = processed_data.get('IRQ1_ID', '')  # Only use IRQ1_ID if provided
+    # Handle IRQ1_ID - convert empty string to None to avoid unique constraint violation
+    irq1_id = processed_data.get('IRQ1_ID', '')
+    approval_data['IRQ1_ID'] = None if irq1_id == '' else irq1_id
+    
     approval_data['newRequest'] = processed_data.get('newRequest', True)
     approval_data['pendingApproval'] = processed_data.get('pendingApproval', False)
     approval_data['approved'] = processed_data.get('approved', False)
