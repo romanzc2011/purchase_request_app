@@ -6,6 +6,7 @@ from loguru import logger
 from services.ipc_service import IPC_Service
 from docxtpl import DocxTemplate
 from docx2pdf import convert
+from docx import Document
 
 """
 AUTHOR: Roman Campbell
@@ -173,43 +174,56 @@ class EmailService:
                 if not os.path.isabs(template_path):
                     template_path = os.path.join(self.project_root, template_path)
                 
-                # Generate a unique filename for this email
-                rendered_file = os.path.join(self.rendered_dir, f"rendered_template_{os.urandom(4).hex()}.docx")
-                
                 # Log the template data for debugging
                 logger.debug(f"Template data: {template_data}")
                 logger.debug(f"Template path: {template_path}")
-                logger.debug(f"Rendered file path: {rendered_file}")
                 
-                # Render the template
-                template = DocxTemplate(template_path)
-                try:
-                    template.render(template_data)
-                except Exception as e:
-                    logger.error(f"Template rendering error: {str(e)}")
-                    logger.error("Template data structure:")
+                # Check if the template is a Word document (.docx)
+                if template_path.lower().endswith('.docx'):
+                    # Use docxtpl to render the Word template
+                    doc = DocxTemplate(template_path)
+                    doc.render(template_data)
+                    
+                    # Save the rendered document to a temporary file
+                    rendered_docx_path = os.path.join(self.rendered_dir, f"rendered_{os.path.basename(template_path)}")
+                    doc.save(rendered_docx_path)
+                    
+                    # Attach the rendered document to the email
+                    mail.Attachments.Add(rendered_docx_path)
+                    
+                    # Set a simple HTML body that mentions the attachment
+                    template_content = f"""
+                    <html>
+                    <body>
+                        <p>Please find the attached document for your review.</p>
+                        <p>This is an automated message from the Purchase Request System.</p>
+                    </body>
+                    </html>
+                    """
+                else:
+                    # For HTML templates, read as text
+                    try:
+                        with open(template_path, 'r', encoding='utf-8') as file:
+                            template_content = file.read()
+                    except UnicodeDecodeError:
+                        # If UTF-8 fails, try with a different encoding
+                        logger.warning(f"Failed to read template with UTF-8 encoding, trying with latin-1")
+                        with open(template_path, 'r', encoding='latin-1') as file:
+                            template_content = file.read()
+                    
+                    # Replace template variables
                     for key, value in template_data.items():
-                        logger.error(f"{key}: {type(value)} = {value}")
-                    raise
-                
-                template.save(rendered_file)
-                
-                # Verify the file exists before converting
-                if not os.path.exists(rendered_file):
-                    raise FileNotFoundError(f"Rendered file not found at: {rendered_file}")
-                
-                # Convert to PDF
-                # pdf_file = self._convert_to_pdf(rendered_file)
-                
-                # Attach both the DOCX and PDF
-                mail.Attachments.Add(rendered_file)
-                logger.info(f"Attached documents: {rendered_file} ")
+                        template_content = template_content.replace(f"{{{key}}}", str(value))
+                        template_content = template_content.replace(f"{{{{request_id}}}}", str(value))
                 
                 # Set the email body
-                mail.HTMLBody = body or "Please see the attached document."
+                mail.HTMLBody = template_content
                 
             except Exception as e:
                 logger.error(f"Error processing template: {e}")
+                logger.error("Template data structure:")
+                for key, value in template_data.items():
+                    logger.error(f"{key}: {type(value)} = {value}")
                 raise
         else:
             mail.HTMLBody = body
@@ -229,19 +243,6 @@ class EmailService:
         try:
             mail.Send()
             logger.info(f"Email sent to {to_email} with subject: {subject}")
-            
-            # Clean up the rendered files after sending
-            if template_path and template_data:
-                try:
-                    if os.path.exists(rendered_file):
-                        os.remove(rendered_file)
-                        logger.info(f"Cleaned up rendered DOCX file: {rendered_file}")
-                    if os.path.exists(pdf_file):
-                        os.remove(pdf_file)
-                        logger.info(f"Cleaned up rendered PDF file: {pdf_file}")
-                except Exception as e:
-                    logger.warning(f"Could not clean up rendered files: {e}")
-                    
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {e}")
             raise

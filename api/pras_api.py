@@ -393,7 +393,7 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
     
     # Update the database with the requisition ID using the UUID
     dbas.update_data(uuid, "approval", IRQ1_ID=data.get('IRQ1_ID'))
-    return {"message": "Requisition ID assigned successfully"}
+    return {"IRQ1_ID_ASSIGNED": True}
 
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
@@ -404,18 +404,18 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
 async def approve_deny_request(data: dict, current_user: User = Depends(get_current_user)):
     try:
         # Check for both "ID" and "id" keys
-        id = data.get("ID")
-        logger.info(f"Request ID: {id}")
+        ID = data.get("ID")
+        logger.info(f"Request ID: {ID}")
         action = data.get("action")
         
-        if not id or not action:
-            raise HTTPException(status_code=400, detail="Missing id or action")
+        if not ID or not action:
+            raise HTTPException(status_code=400, detail="Missing ID or action")
         
         # Use a single session for all database operations
         with next(get_session()) as session:
             # Get the UUID using the UUID service
-            UUID = uuid_service.get_uuid_by_id(session, id)
-            logger.info(f"UUID: {uuid}")
+            UUID = uuid_service.get_uuid_by_id(session, ID)
+            logger.info(f"UUID: {UUID}")
             
             if not UUID:
                 raise HTTPException(status_code=404, detail="UUID not found")
@@ -435,7 +435,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
             email_svc.set_requester(requester, requester_email)
             
             # Get current status
-            current_status = dbas.get_status_by_id(session, id)
+            current_status = dbas.get_status_by_id(session, ID)
             if not current_status:
                 raise HTTPException(status_code=404, detail="Request not found")
                 
@@ -453,7 +453,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/approval_notification.html",
-                        template_data={"id": id, "action": "approved"},
+                        template_data={"ID": ID, "action": "approved"},
                         subject="Purchase Request Approved"
                     )
                 elif action.lower() == "deny":
@@ -462,7 +462,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     email_svc.set_request_status("NEW REQUEST")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
-                        template_data={"id": id, "action": "denied"},
+                        template_data={"ID": ID, "action": "denied"},
                         subject="Purchase Request Denied"
                     )
             elif current_status == "PENDING":
@@ -473,14 +473,14 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/final_approval_notification.html",
-                        template_data={"id": id, "action": "approved"},
+                        template_data={"ID": ID, "action": "approved"},
                         subject="Purchase Request Final Approval"
                     )
                     # Send email to current user (approver)
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/approval_notification.html",
-                        template_data={"id": id, "action": "approved"},
+                        template_data={"ID": ID, "action": "approved"},
                         subject="Purchase Request Approved"
                     )
                     # Send email to requester
@@ -488,7 +488,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/approval_notification.html",
-                        template_data={"id": id, "action": "approved"},
+                        template_data={"ID": ID, "action": "approved"},
                         subject="Purchase Request Approved"
                     )
                 elif action.lower() == "deny":
@@ -497,7 +497,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
-                        template_data={"id": id, "action": "denied"},
+                        template_data={"ID": ID, "action": "denied"},
                         subject="Purchase Request Denied"
                     )
             else:

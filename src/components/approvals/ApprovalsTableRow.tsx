@@ -36,6 +36,15 @@ export default function ApprovalsTableRow({
 
     // Get UUID for the item
     const { getUUID } = useUUIDStore();
+    const [isIRQ1Assigned, setIsIRQ1Assigned] = useState<boolean>(
+        Boolean(approval_data.IRQ1_ID)
+    );
+
+    // Update local state when approval_data changes
+    React.useEffect(() => {
+        setIRQ1_ID(approval_data.IRQ1_ID || "");
+        setIsIRQ1Assigned(Boolean(approval_data.IRQ1_ID));
+    }, [approval_data.IRQ1_ID]);
 
     // 2) mutation to assign ReqID
     const assignIRQ1Mutation = useMutation({
@@ -79,7 +88,14 @@ export default function ApprovalsTableRow({
                 }
                 
                 const data = await res.json();
-                console.log("Success response:", data);
+                console.log("RESPONSE:", data);
+
+                if(data.IRQ1_ID_ASSIGNED) {
+                    setIsIRQ1Assigned(true);
+                    // Update the local IRQ1_ID state to match the assigned value
+                    setIRQ1_ID(data.IRQ1_ID || showIRQ1_ID);
+                }
+
                 return data;
             } catch (error) {
                 console.error("Error in assignReqIDMutation:", error);
@@ -133,8 +149,6 @@ export default function ApprovalsTableRow({
         }
     });
 
-    
-
     // stub download handler
     const handleDownload = () => {
         console.log("Download clicked for", approval_data.ID);
@@ -154,24 +168,33 @@ export default function ApprovalsTableRow({
                 <Box sx={{ display: "flex", gap: "5px" }}>
                     <Buttons
                         className="btn btn-maroon"
+                        disabled={isIRQ1Assigned}
                         label={approval_data.IRQ1_ID ? "Assigned" : "Assign"}
                         onClick={() => assignIRQ1Mutation.mutate(showIRQ1_ID)}
                     />
                     <TextField
                         id="IRQ1_ID"
                         value={showIRQ1_ID}
+                        disabled={isIRQ1Assigned}
                         className="form-control"
                         fullWidth
                         variant="outlined"
                         size="small"
                         onChange={(e) => setIRQ1_ID(e.target.value)}
                         sx={{
-                            backgroundColor: approval_data.IRQ1_ID ? 'rgba(0, 128, 0, 0.1)' : 'white',
+                            backgroundColor: approval_data.IRQ1_ID ? 'rgba(0, 128, 0, 0.2)' : 'white',
                             width: '100px',
                             '& .MuiOutlinedInput-root': {
                                 '& fieldset': {
                                     borderColor: approval_data.IRQ1_ID ? 'green' : 'red',
                                     borderWidth: '2px',
+                                },
+                                '&.Mui-disabled': {
+                                    backgroundColor: 'rgba(0, 128, 0, 0.2)',
+                                    '& .MuiOutlinedInput-input': {
+                                        color: '#00ff00',
+                                        WebkitTextFillColor: '#00ff00',
+                                    },
                                 },
                             },
                         }}

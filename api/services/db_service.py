@@ -9,7 +9,7 @@ from typing import Optional
 import uuid
 
 # Create engine and base
-engine = create_engine('sqlite:///db/purchase_request.db', echo=True)
+engine = create_engine('sqlite:///db/purchase_request.db', echo=False)
 Base = declarative_base()
 my_session = sessionmaker(engine)
 
@@ -63,7 +63,7 @@ class Approval(Base):
     
     # Sequential ID for user-facing operations
     ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
-    IRQ1_ID: Mapped[str] = mapped_column(String, nullable=True)
+    IRQ1_ID: Mapped[str] = mapped_column(String, nullable=True, unique=True)
     requester: Mapped[str] = mapped_column(String, nullable=False)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
     datereq: Mapped[str] = mapped_column(String)      
@@ -168,17 +168,17 @@ def get_status_by_id(db_session: Session, ID: str):
     
 ###################################################################################################
 # Get requester from Approval table by uuid
-def get_requester_by_uuid(db_session: Session, uuid: str):
-    logger.info(f"Fetching requester for uuid: {uuid}")
+def get_requester_by_UUID(db_session: Session, UUID: str):
+    logger.info(f"Fetching requester for UUID: {UUID}")
     
     # Query the Approval table to get the requester field for the given uuid
-    result = db_session.query(Approval.requester).filter(Approval.uuid == uuid).first()
+    result = db_session.query(Approval.requester).filter(Approval.UUID == UUID).first()
     logger.info(f"Requester: {result}")
     
     if result:
         return result[0]  # Return just the requester string
     else:
-        logger.warning(f"No requester found for uuid: {uuid}")
+        logger.warning(f"No requester found for UUID: {UUID}")
         return None
 
 ###################################################################################################
