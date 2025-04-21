@@ -8,12 +8,18 @@ import {
     TableRow,
     Paper,
     Button,
+    Box,
+    IconButton,
+    Collapse,
+    Typography,
 } from "@mui/material";
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { v4 as uuidv4 } from 'uuid';
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
@@ -46,6 +52,15 @@ function SubmitApprovalTable({
     setID
 }: SubmitApprovalTableProps) {
 
+    // State for expanded rows
+    const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+    
+    // Toggle row expansion
+    const toggleRowExpanded = (id: string) =>
+        setExpandedRows((prev) => ({
+            ...prev,
+            [id]: !prev[id],
+        }));
 
     /* Check if table has been submitted */
     useEffect(() => {
@@ -78,6 +93,12 @@ function SubmitApprovalTable({
     /* Check if data buffer is multiple items */
     const itemCount = dataBuffer.length;
     console.log("itemCount==", itemCount);
+
+    // Group items by ID
+    const groupedItems = processedData.reduce<Record<string, FormValues[]>>((acc, item) => {
+        (acc[item.ID] = acc[item.ID] || []).push(item);
+        return acc;
+    }, {});
 
     /************************************************************************************ */
     /* SUBMIT DATA --- send to backend to add to database */
@@ -157,6 +178,7 @@ function SubmitApprovalTable({
                     }}
                 >
                     <TableRow>
+                        <TableCell sx={{ width: 40 }} /> {/* expand/collapse */}
                         <TableCell sx={{ color: "white", fontWeight: "bold" }}>
                             ID
                         </TableCell>
@@ -184,45 +206,146 @@ function SubmitApprovalTable({
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                    {processedData.map((item) => (
-                        <TableRow key={item.ID}>
-                            <TableCell sx={{ color: "white" }}>
-                                {item.ID}
-                            </TableCell>
-                            <TableCell sx={{ color: "white" }}>
-                                {convertBOC(item.budgetObjCode)}
-                            </TableCell>
-                            <TableCell sx={{ color: "white" }}>
-                                {item.fund}
-                            </TableCell>
-                            <TableCell sx={{ color: "white" }}>
-                                {item.location}
-                            </TableCell>
-                            <TableCell sx={{ color: "white" }}>
-                                {item.quantity}
-                            </TableCell>
-                            <TableCell sx={{ color: "white" }}>
-                                {typeof item.priceEach === "number"
-                                    ? item.priceEach.toFixed(2)
-                                    : "0.00"}
-                            </TableCell>
-                            <TableCell sx={{ color: "white" }}>
-                                {typeof item.calculatedPrice === "number"
-                                    ? item.calculatedPrice.toFixed(2)
-                                    : "0.00"}
-                            </TableCell>
-                            <TableCell>
-                                <Button
-                                    variant="contained"
-                                    color="error"
-                                    onClick={() => {
-                                        onDelete(item.ID);
-                                    }}
-                                >
-                                    Delete
-                                </Button>
-                            </TableCell>
-                        </TableRow>
+                    {Object.entries(groupedItems).map(([id, items]) => (
+                        <React.Fragment key={id}>
+                            {/* Main row with expand/collapse button */}
+                            <TableRow>
+                                <TableCell>
+                                    {items.length > 1 && (
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => toggleRowExpanded(id)}
+                                            sx={{ color: "white" }}
+                                        >
+                                            {expandedRows[id] ? (
+                                                <KeyboardArrowUpIcon />
+                                            ) : (
+                                                <KeyboardArrowDownIcon />
+                                            )}
+                                        </IconButton>
+                                    )}
+                                </TableCell>
+                                <TableCell sx={{ color: "white" }}>
+                                    {items[0].ID}
+                                </TableCell>
+                                <TableCell sx={{ color: "white" }}>
+                                    {convertBOC(items[0].budgetObjCode)}
+                                </TableCell>
+                                <TableCell sx={{ color: "white" }}>
+                                    {items[0].fund}
+                                </TableCell>
+                                <TableCell sx={{ color: "white" }}>
+                                    {items[0].location}
+                                </TableCell>
+                                <TableCell sx={{ color: "white" }}>
+                                    {items[0].quantity}
+                                </TableCell>
+                                <TableCell sx={{ color: "white" }}>
+                                    {typeof items[0].priceEach === "number"
+                                        ? items[0].priceEach.toFixed(2)
+                                        : "0.00"}
+                                </TableCell>
+                                <TableCell sx={{ color: "white" }}>
+                                    {typeof items[0].totalPrice === "number"
+                                        ? items[0].totalPrice.toFixed(2)
+                                        : "0.00"}
+                                </TableCell>
+                                <TableCell>
+                                    <Button
+                                        variant="contained"
+                                        color="error"
+                                        onClick={() => {
+                                            onDelete(items[0].ID);
+                                        }}
+                                    >
+                                        Delete
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+
+                            {/* Collapsible rows for additional items */}
+                            {items.length > 1 && (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={9}
+                                        sx={{ p: 0, background: "#3c3c3c" }}
+                                    >
+                                        <Collapse
+                                            in={expandedRows[id]}
+                                            timeout="auto"
+                                            unmountOnExit
+                                        >
+                                            <Box sx={{ m: 2 }}>
+                                                <Typography
+                                                    variant="h6"
+                                                    gutterBottom
+                                                    component="div"
+                                                    sx={{ color: "white" }}
+                                                >
+                                                    Additional Items
+                                                </Typography>
+                                                <Table size="small" aria-label="additional items">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            {[
+                                                                "ID",
+                                                                "Budget Object Code",
+                                                                "Fund",
+                                                                "Location",
+                                                                "Quantity",
+                                                                "Price Each",
+                                                                "Line Total",
+                                                            ].map((label) => (
+                                                                <TableCell
+                                                                    key={label}
+                                                                    sx={{
+                                                                        color: "white",
+                                                                        fontWeight: "bold",
+                                                                    }}
+                                                                >
+                                                                    {label}
+                                                                </TableCell>
+                                                            ))}
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {items.slice(1).map((item, idx) => (
+                                                            <TableRow key={idx}>
+                                                                <TableCell sx={{ color: "white" }}>
+                                                                    {item.ID}
+                                                                </TableCell>
+                                                                <TableCell sx={{ color: "white" }}>
+                                                                    {convertBOC(item.budgetObjCode)}
+                                                                </TableCell>
+                                                                <TableCell sx={{ color: "white" }}>
+                                                                    {item.fund}
+                                                                </TableCell>
+                                                                <TableCell sx={{ color: "white" }}>
+                                                                    {item.location}
+                                                                </TableCell>
+                                                                <TableCell sx={{ color: "white" }}>
+                                                                    {item.quantity}
+                                                                </TableCell>
+                                                                <TableCell sx={{ color: "white" }}>
+                                                                    {typeof item.priceEach === "number"
+                                                                        ? item.priceEach.toFixed(2)
+                                                                        : "0.00"}
+                                                                </TableCell>
+                                                                <TableCell sx={{ color: "white" }}>
+                                                                    {typeof item.totalPrice === "number"
+                                                                        ? item.totalPrice.toFixed(2)
+                                                                        : "0.00"}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </Box>
+                                        </Collapse>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </React.Fragment>
                     ))}
                 </TableBody>
 
@@ -257,7 +380,7 @@ function SubmitApprovalTable({
                             sx={{ color: "white", textAlign: "right" }}
                         ></TableCell>
                         <TableCell
-                            colSpan={2}
+                            colSpan={3}
                             sx={{
                                 color: "white",
                                 fontWeight: "bold",

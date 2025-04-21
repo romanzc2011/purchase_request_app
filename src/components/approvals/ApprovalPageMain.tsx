@@ -5,7 +5,7 @@ import SearchBar from "./SearchBar";
 
 /* INTERFACE */
 interface ApprovalTableProps {
-    onDelete: (ID: number) => void;
+    onDelete: (ID: string) => void;
     resetTable: () => void;
 }
 
@@ -17,10 +17,10 @@ function ApprovalPageMain({onDelete, resetTable }: ApprovalTableProps) {
         <div>
             <SearchBar setSearchQuery={setSearchQuery} />
             <ApprovalsTable
-                onDelete={(ID: number) =>
+                onDelete={(ID: string) =>
                     setDataBuffer(
                         dataBuffer.filter(
-                            (item) => item.ID !== ID.toString()
+                            (item) => item.ID !== ID
                         )
                     )
                 }

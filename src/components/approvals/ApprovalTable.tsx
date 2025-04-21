@@ -22,7 +22,7 @@ import { FormValues } from "../../types/formTypes";
 import { fetchSearchData } from "./SearchBar";
 
 interface ApprovalTableProps {
-  onDelete: (ID: number) => void;
+  onDelete: (ID: string) => void;
   resetTable: () => void;
   searchQuery: string;
 }
@@ -60,7 +60,8 @@ export default function ApprovalTable({
     : approvalData || [];
 
   const groupedRows = rows.reduce<Record<string, FormValues[]>>((acc, row) => {
-    (acc[row.ID] = acc[row.ID] || []).push(row);
+    const id = String(row.ID);
+    (acc[id] = acc[id] || []).push(row);
     return acc;
   }, {});
 

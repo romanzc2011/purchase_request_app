@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { Routes, Route } from "react-router-dom";
@@ -10,6 +10,7 @@ import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 import ApprovalPageMain from "./components/approvals/ApprovalPageMain";
 import { IFile } from "./types/IFile";
+import LoginDialog from "./components/LoginDialog";
 const baseURL = import.meta.env.VITE_API_URL;
 
 interface AppProps {
@@ -26,6 +27,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
+    const [loginOpen, setLoginOpen] = useState(!isLoggedIn);
     
     // Default ID for coms that need it
     const defaultId = `TEMP-${Date.now()}`;
@@ -44,6 +46,11 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
         );
     };
 
+    const handleLoginSuccess = (ACCESS_GROUP: boolean, CUE_GROUP: boolean, IT_GROUP: boolean) => {
+        // Handle login success
+        setLoginOpen(false);
+    };
+
     /* *********************************************************************************** */
     // Update the title and icon of app
     useEffect(() => {
@@ -57,21 +64,16 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     if (isLoggedIn) {
         element = (
             <ApprovalPageMain
-                onDelete={(ID: number) =>
-                    setDataBuffer(
-                        dataBuffer.filter(
-                            (item) => item.ID !== ID.toString()
-                        )
-                    )
-                }
+                onDelete={onDelete}
                 resetTable={resetTable}
             />
         );
     } else {
         element = (
-            <AlertMessage
-                severity="error"
-                alertText="Please log in to view this page."
+            <LoginDialog
+                open={loginOpen}
+                onClose={() => setLoginOpen(false)}
+                onLoginSuccess={handleLoginSuccess}
             />
         );
     }
