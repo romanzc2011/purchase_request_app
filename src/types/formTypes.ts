@@ -26,6 +26,7 @@ export type FormValues = {
     needsNotMeet: string
   };
   quantity: number;
+  price: number;
   priceEach: number;
   totalPrice: number;
   fund: string;

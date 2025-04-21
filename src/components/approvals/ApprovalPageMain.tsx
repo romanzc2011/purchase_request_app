@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FormValues } from "../../types/formTypes";
-import ApprovalsTable from "./ApprovalTable";
+//import ApprovalsTable from "./ApprovalTable";
+import ApprovalTableDG from "./ApprovalTableDG";
 import SearchBar from "./SearchBar";
 
 /* INTERFACE */
@@ -16,7 +17,7 @@ function ApprovalPageMain({onDelete, resetTable }: ApprovalTableProps) {
     return (
         <div>
             <SearchBar setSearchQuery={setSearchQuery} />
-            <ApprovalsTable
+            <ApprovalTableDG
                 onDelete={(ID: string) =>
                     setDataBuffer(
                         dataBuffer.filter(

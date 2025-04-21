@@ -12,6 +12,7 @@ import {
   ListItemIcon,
   IconButton,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import BKSeal from "../../assets/seal_no_border.png";
 import CheckCircleSharpIcon from "@mui/icons-material/CheckCircleSharp";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
@@ -36,6 +37,8 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
   CUE_GROUP,
   IT_GROUP,
 }) => {
+const theme = useTheme();
+
   return (
     <Box sx={{ display: "flex" }}>
       {/* HEADER */}
@@ -99,6 +102,7 @@ const PurchaseSideBar: React.FC<PurchaseSideBarProps> = ({
       <Drawer
         variant="permanent"
         sx={{
+          zIndex: theme.zIndex.drawer + 1,
           width: isOpen ? drawerWidth : collapseWidth,
           position: "fixed", // Fix the Drawer to the left side
           flexShrink: 0,
