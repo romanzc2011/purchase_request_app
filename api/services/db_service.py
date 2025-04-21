@@ -16,13 +16,11 @@ my_session = sessionmaker(engine)
 ###################################################################################################
 ## PURCHASE REQUEST
 class PurchaseRequest(Base):
-    __tablename__ = "purchase_request"
+    __tablename__ = "purchase_requests"
 
-    # UUID as primary key
-    uuid: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    # Sequential ID for user-facing operations
-    ID: Mapped[str] = mapped_column(String, nullable=False)
-    reqID: Mapped[str] = mapped_column(String, nullable=False)
+    UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ID: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    IRQ1_ID: Mapped[str] = mapped_column(String, nullable=True)
     requester: Mapped[str] = mapped_column(String, nullable=False)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
     datereq: Mapped[str] = mapped_column(String)      
@@ -36,40 +34,36 @@ class PurchaseRequest(Base):
     needsNotMeet: Mapped[str] = mapped_column(Text, nullable=True)
     budgetObjCode: Mapped[str] = mapped_column(String)
     fund: Mapped[str] = mapped_column(String)
+    newRequest: Mapped[bool] = mapped_column(Boolean)
+    pendingApproval: Mapped[bool] = mapped_column(Boolean)
+    approved: Mapped[bool] = mapped_column(Boolean)
+    status: Mapped[str] = mapped_column(String, nullable=False)
     priceEach: Mapped[float] = mapped_column(Float)
     totalPrice: Mapped[float] = mapped_column(Float)
     location: Mapped[str] = mapped_column(String)
     quantity: Mapped[int] = mapped_column(Integer)
-    newRequest: Mapped[bool] = mapped_column(Boolean)
-    pendingApproval: Mapped[bool] = mapped_column(Boolean)
-    approved: Mapped[bool] = mapped_column(Boolean)
     createdTime: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
-    # Set up a one-to-one relationship with Approval on the parent side
-    approval = relationship(
-        "Approval",
-        cascade="all, delete-orphan",
-        back_populates="purchase_request",
-        uselist=False
-        
-    )
+    __searchable__ = ['ID', 'IRQ1_ID', 'requester', 'budgetObjCode', 'fund',
+                     'location', 'quantity', 'priceEach', 'totalPrice', 'status']
 
-    def __repr__(self):
-        return f"<PurchaseRequest(reqID='{self.reqID}', requester='{self.requester}')>"
+    # Add relationship to Approval
+    approval = relationship("Approval", back_populates="purchase_request", uselist=False, foreign_keys="[Approval.ID]")
 
 ###################################################################################################
 ## approval TABLE
 class Approval(Base):
     __tablename__ =  "approval"
-    __searchable__ = ['ID', 'reqID', 'requester', 'budgetObjCode', 'fund', 
+    __searchable__ = ['ID', 'IRQ1_ID', 'requester', 'budgetObjCode', 'fund', 
                       'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
                       'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
 
-    # UUID as primary key
+    # Add UUID as primary key
     UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    
     # Sequential ID for user-facing operations
-    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_request.UUID"), nullable=False)
-    reqID: Mapped[str] = mapped_column(String, nullable=False)
+    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
+    IRQ1_ID: Mapped[str] = mapped_column(String, nullable=True)
     requester: Mapped[str] = mapped_column(String, nullable=False)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
     datereq: Mapped[str] = mapped_column(String)      
@@ -99,7 +93,8 @@ class Approval(Base):
     purchase_request = relationship(
         "PurchaseRequest",
         back_populates="approval",
-        uselist=False
+        uselist=False,
+        foreign_keys=[ID]
     )
     
 Base.metadata.create_all(engine)
@@ -131,13 +126,13 @@ def insert_data(data, table):
     
     with next(get_session()) as db:
         try:
-            if table == "purchase_request":
-                # Create new PurchaseRequest with UUID
+            if table == "purchase_requests":
+                # Create new PurchaseRequest with uuid
                 data['ID'] = get_next_request_id()
                 obj = PurchaseRequest(**data)
                 db.add(obj)
             elif table == "approval":
-                # Create new Approval with UUID
+                # Create new Approval with uuid
                 obj = Approval(**data)
                 db.add(obj)
             else:
@@ -162,8 +157,8 @@ def get_status_by_id(db_session: Session, ID: str):
     # First try to find by sequential ID
     result = db_session.query(Approval).filter(Approval.ID == ID).first()
     if not result:
-        # If not found, try UUID
-        result = db_session.query(Approval).filter(Approval.UUID == ID).first()
+        # If not found, try uuid
+        result = db_session.query(Approval).filter(Approval.uuid == ID).first()
     
     if result:
         return result.status
@@ -172,48 +167,49 @@ def get_status_by_id(db_session: Session, ID: str):
         raise ValueError(f"Object with ID {ID} not found in Approval table")
     
 ###################################################################################################
-# Get requester from Approval table by UUID
+# Get requester from Approval table by uuid
 def get_requester_by_uuid(db_session: Session, uuid: str):
-    logger.info(f"Fetching requester for UUID: {uuid}")
+    logger.info(f"Fetching requester for uuid: {uuid}")
     
-    # Query the Approval table to get the requester field for the given UUID
-    result = db_session.query(Approval.requester).filter(Approval.UUID == uuid).first()
+    # Query the Approval table to get the requester field for the given uuid
+    result = db_session.query(Approval.requester).filter(Approval.uuid == uuid).first()
     logger.info(f"Requester: {result}")
     
     if result:
         return result[0]  # Return just the requester string
     else:
-        logger.warning(f"No requester found for UUID: {uuid}")
+        logger.warning(f"No requester found for uuid: {uuid}")
         return None
 
 ###################################################################################################
-# UUID cache to improve performance
+# uuid cache to improve performance
 _uuid_cache = {}
 
-# Get UUID by ID with caching
+# Get uuid by ID with caching
 def get_uuid_by_id_cached(db_session: Session, ID: str):
     """
-    Get UUID by ID with caching for better performance.
+    Get uuid by ID with caching for better performance.
     """
     # Check cache first
     if ID in _uuid_cache:
-        logger.info(f"UUID cache hit for ID: {ID}")
+        logger.info(f"uuid cache hit for ID: {ID}")
         return _uuid_cache[ID]
     
     # If not in cache, get from database
-    uuid = get_uuid_by_id(db_session, ID)
+    UUID = get_uuid_by_id(db_session, ID)
     
     # Store in cache if found
     if uuid:
         _uuid_cache[ID] = uuid
-        logger.info(f"Added UUID to cache for ID: {ID}")
+        logger.info(f"Added uuid to cache for ID: {ID}")
     
-    return uuid
+    return UUID
 
 ###################################################################################################
-# Get UUID by ID
+# Get uuid by ID
 def get_uuid_by_id(db_session: Session, ID: str):
-    return db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
+    result = db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
+    return result[0] if result else None
 
 ###################################################################################################
 # Update data
@@ -224,17 +220,17 @@ def update_data(ID, table, **kwargs):
         raise ValueError("Update data must be a non-empty dictionary")
     
     with next(get_session()) as db:
-        if table == "purchase_request":
+        if table == "purchase_requests":
             # Try sequential ID first
             obj = db.query(PurchaseRequest).filter(PurchaseRequest.ID == ID).first()
             if not obj:
-                # If not found, try UUID
+                # If not found, try uuid
                 obj = db.query(PurchaseRequest).filter(PurchaseRequest.UUID == ID).first()
         elif table == "approval":
             # Try sequential ID first
             obj = db.query(Approval).filter(Approval.ID == ID).first()
             if not obj:
-                # If not found, try UUID
+                # If not found, try uuid
                 obj = db.query(Approval).filter(Approval.UUID == ID).first()
         else:
             raise ValueError(f"Unsupported table: {table}")
@@ -242,9 +238,9 @@ def update_data(ID, table, **kwargs):
         if obj:
             for key, value in kwargs.items():
                 if hasattr(obj, key):
-                    # Special handling for UUID field
-                    if key == "uuid" and value:
-                        # Check if the UUID already exists in the database
+                    # Special handling for uuid field
+                    if key == "UUID" and value:
+                        # Check if the uuid already exists in the database
                         existing = db.query(PurchaseRequest).filter(PurchaseRequest.UUID == value).first()
                         if existing and existing.UUID != obj.UUID:
                             logger.warning(f"UUID {value} already exists in the database")
@@ -266,7 +262,7 @@ def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     """
     model_class: SQLAlchemy ORM model (e.g., PurchaseRequest)
     columns: list of attributes (e.g., [PurchaseRequest.requester, PurchaseRequest.fund])
-    condition: SQLAlchemy filter expression (e.g., PurchaseRequest.reqID == :req_id)
+    condition: SQLAlchemy filter expression (e.g., PurchaseRequest.IRQ1_ID == :req_id)
     params: dictionary of bind parameters (e.g., {"req_id": "REQ-001"})
     """
     
@@ -329,34 +325,34 @@ def get_next_request_id() -> str:
     return f"{today}-{next_suffix:04d}"
             
 ###################################################################################################
-# Get status of request from Approval table by UUID
+# Get status of request from Approval table by uuid
 def get_status_by_uuid(db_session: Session, uuid: str):
-    logger.info(f"Fetching status for UUID: {uuid}")
+    logger.info(f"Fetching status for uuid: {uuid}")
     
     if not uuid:
-        raise ValueError("UUID must be a non-empty string")
+        raise ValueError("uuid must be a non-empty string")
     
-    result = db_session.query(Approval.status).filter(Approval.UUID == uuid).first()
+    result = db_session.query(Approval.status).filter(Approval.uuid == uuid).first()
     
     if result:
         return result[0]  # Return just the status string
     else:
-        logger.warning(f"No status found for UUID: {uuid}")
+        logger.warning(f"No status found for uuid: {uuid}")
         return None
 
 ###################################################################################################
-# Update data by UUID
+# Update data by uuid
 def update_data_by_uuid(uuid: str, table: str, **kwargs):
-    logger.info(f"Updating {table} with UUID {uuid}, data: {kwargs}")
+    logger.info(f"Updating {table} with uuid {uuid}, data: {kwargs}")
     
     if not kwargs or not isinstance(kwargs, dict):
         raise ValueError("Update data must be a non-empty dictionary")
     
     with next(get_session()) as db:
-        if table == "purchase_request":
-            obj = db.query(PurchaseRequest).filter(PurchaseRequest.UUID == uuid).first()
+        if table == "purchase_requests":
+            obj = db.query(PurchaseRequest).filter(PurchaseRequest.uuid == uuid).first()
         elif table == "approval":
-            obj = db.query(Approval).filter(Approval.UUID == uuid).first()
+            obj = db.query(Approval).filter(Approval.uuid == uuid).first()
         else:
             raise ValueError(f"Unsupported table: {table}")
         
@@ -368,19 +364,19 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
                     raise ValueError(f"Invalid field: {key}")
             
             db.commit()
-            logger.info(f"Successfully updated {table} with UUID {uuid}")
+            logger.info(f"Successfully updated {table} with uuid {uuid}")
         else:
-            logger.error(f"Object with UUID {uuid} not found in {table}")
-            raise ValueError(f"Object with UUID {uuid} not found in {table}")
+            logger.error(f"Object with uuid {uuid} not found in {table}")
+            raise ValueError(f"Object with uuid {uuid} not found in {table}")
             
 ###################################################################################################
-# Get UUIDs for multiple IDs
+# Get uuids for multiple IDs
 def get_uuids_by_ids(db_session: Session, ids: list):
     """
-    Get UUIDs for multiple IDs.
-    Returns a dictionary mapping IDs to UUIDs.
+    Get uuids for multiple IDs.
+    Returns a dictionary mapping IDs to uuids.
     """
-    logger.info(f"Getting UUIDs for {len(ids)} IDs")
+    logger.info(f"Getting uuids for {len(ids)} IDs")
     
     result = {}
     for id in ids:

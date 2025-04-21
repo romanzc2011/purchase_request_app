@@ -1,13 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-const STORAGE_KEY = 'uuid_store';
+const STORAGE_KEY = 'UUID_store';
 
 export const useUUIDStore = () => {
     const queryClient = useQueryClient();
     
     // Get UUIDs from localStorage or query cache
-    const { data: uuids = {} } = useQuery<Record<string, string>>({
-        queryKey: ['uuids'],
+    const { data: UUIDs = {} } = useQuery<Record<string, string>>({
+        queryKey: ['UUIDs'],
         queryFn: () => {
             // Try to get from localStorage first
             const stored = localStorage.getItem(STORAGE_KEY);
@@ -24,12 +24,12 @@ export const useUUIDStore = () => {
     });
     
     // Set a UUID for a specific ID
-    const setUUID = (id: string, uuid: string) => {
-        console.log(`Setting UUID for ID ${id}: ${uuid}`);
-        queryClient.setQueryData(['uuids'], (oldData: Record<string, string> = {}) => {
+    const setUUID = (ID: string, UUID: string) => {
+        console.log(`Setting UUID for ID ${ID}: ${UUID}`);
+        queryClient.setQueryData(['UUIDs'], (oldData: Record<string, string> = {}) => {
             const newData = {
                 ...oldData,
-                [id]: uuid
+                [ID]: UUID
             };
             // Persist to localStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
@@ -39,15 +39,15 @@ export const useUUIDStore = () => {
     };
     
     // Get a UUID for a specific ID
-    const getUUID = async (id: string) => {
+    const getUUID = async (ID: string) => {
         // Try localStorage first
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
             try {
                 const storedData = JSON.parse(stored);
-                if (storedData[id]) {
-                    console.log(`Getting UUID for ID ${id} from localStorage: ${storedData[id]}`);
-                    return storedData[id];
+                if (storedData[ID]) {
+                    console.log(`Getting UUID for ID ${ID} from localStorage: ${storedData[ID]}`);
+                    return storedData[ID];
                 }
             } catch (e) {
                 console.error('Error parsing stored UUIDs:', e);
@@ -55,16 +55,16 @@ export const useUUIDStore = () => {
         }
         
         // Try query cache
-        const uuid = uuids[id];
-        if (uuid) {
-            console.log(`Getting UUID for ID ${id} from cache: ${uuid}`);
-            return uuid;
+        const UUID = UUIDs[ID];
+        if (UUID) {
+            console.log(`Getting UUID for ID ${ID} from cache: ${UUID}`);
+            return UUID;
         }
         
         // If not found in cache or localStorage, try to fetch from backend
-        console.log(`UUID not found in cache for ID ${id}, trying backend...`);
+        console.log(`UUID not found in cache for ID ${ID}, trying backend...`);
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/getUUID/${id}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/getUUID/${ID}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -74,21 +74,21 @@ export const useUUIDStore = () => {
             
             if (response.ok) {
                 const data = await response.json();
-                if (data.uuid) {
-                    console.log(`Got UUID from backend for ID ${id}: ${data.uuid}`);
+                if (data.UUID) {
+                    console.log(`Got UUID from backend for ID ${ID}: ${data.UUID}`);
                     // Store in cache and localStorage for future use
-                    setUUID(id, data.uuid);
-                    return data.uuid;
+                    setUUID(ID, data.UUID);
+                    return data.UUID;
                 }
             }
             
-            console.log(`No UUID found in backend for ID ${id}`);
+            console.log(`No UUID found in backend for ID ${ID}`);
             return null;
         } catch (error) {
-            console.error(`Error fetching UUID from backend for ID ${id}:`, error);
+            console.error(`Error fetching UUID from backend for ID ${ID}:`, error);
             return null;
         }
     };
     
-    return { uuids, setUUID, getUUID };
+    return { UUIDs, setUUID, getUUID };
 };

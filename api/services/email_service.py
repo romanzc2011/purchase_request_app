@@ -57,28 +57,28 @@ class EmailService:
         }
         self.request_status = None
 
-    def _convert_to_pdf(self, docx_path):
-        """
-        Convert a Word document to PDF
+    # def _convert_to_pdf(self, docx_path):
+    #     """
+    #     Convert a Word document to PDF
         
-        Args:
-            docx_path: Path to the Word document
+    #     Args:
+    #         docx_path: Path to the Word document
             
-        Returns:
-            str: Path to the generated PDF file
-        """
-        try:
-            # Generate PDF path in the same directory as the DOCX
-            pdf_path = os.path.splitext(docx_path)[0] + '.pdf'
+    #     Returns:
+    #         str: Path to the generated PDF file
+    #     """
+    #     try:
+    #         # Generate PDF path in the same directory as the DOCX
+    #         pdf_path = os.path.splitext(docx_path)[0] + '.pdf'
             
-            # Convert the document
-            convert(docx_path, pdf_path)
-            logger.info(f"Successfully converted {docx_path} to PDF: {pdf_path}")
+    #         # Convert the document
+    #         convert(docx_path, pdf_path)
+    #         logger.info(f"Successfully converted {docx_path} to PDF: {pdf_path}")
             
-            return pdf_path
-        except Exception as e:
-            logger.error(f"Error converting document to PDF: {e}")
-            raise
+    #         return pdf_path
+    #     except Exception as e:
+    #         logger.error(f"Error converting document to PDF: {e}")
+    #         raise
 
     def send_notification(self, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
         """
@@ -199,11 +199,11 @@ class EmailService:
                     raise FileNotFoundError(f"Rendered file not found at: {rendered_file}")
                 
                 # Convert to PDF
-                pdf_file = self._convert_to_pdf(rendered_file)
+                # pdf_file = self._convert_to_pdf(rendered_file)
                 
                 # Attach both the DOCX and PDF
-                mail.Attachments.Add(pdf_file)
-                logger.info(f"Attached documents: {rendered_file} and {pdf_file}")
+                mail.Attachments.Add(rendered_file)
+                logger.info(f"Attached documents: {rendered_file} ")
                 
                 # Set the email body
                 mail.HTMLBody = body or "Please see the attached document."

@@ -12,7 +12,7 @@ class PurchaseRequestSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     ID: str
-    reqID: str
+    IRQ1_ID: Optional[str] = None
     requester: str
     phoneext: int
     datereq: str
@@ -40,7 +40,7 @@ class ApprovalSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     ID: str
-    reqID: str
+    IRQ1_ID: Optional[str] = None
     requester: str
     budgetObjCode: str
     fund: str

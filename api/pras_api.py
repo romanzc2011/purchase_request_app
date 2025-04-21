@@ -375,9 +375,9 @@ async def log_requests(request: Request, call_next):
 ## ASSIGN REQUISITION ID - IRQ number that is retrieved from JFIMS by Lela
 ## This is called from the frontend to assign a requisition ID
 ## to the purchase request. It also updates the UUID in the approval table.
-@api_router.post("/assignReqID")
-async def assign_req_id(data: dict, current_user: User = Depends(get_current_user)):
-    logger.info(f"Assigning requisition ID: {data.get('reqID')}")
+@api_router.post("/assignIRQ1_ID")
+async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_user)):
+    logger.info(f"Assigning requisition ID: {data.get('IRQ1_ID')}")
     
     # Get the original ID from the request
     original_id = data.get('ID')
@@ -392,7 +392,7 @@ async def assign_req_id(data: dict, current_user: User = Depends(get_current_use
         raise HTTPException(status_code=400, detail="Missing UUID in request")
     
     # Update the database with the requisition ID using the UUID
-    dbas.update_data(uuid, "approval", reqID=data.get('reqID'))
+    dbas.update_data(uuid, "approval", IRQ1_ID=data.get('IRQ1_ID'))
     return {"message": "Requisition ID assigned successfully"}
 
 ##########################################################################
@@ -414,14 +414,14 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
         # Use a single session for all database operations
         with next(get_session()) as session:
             # Get the UUID using the UUID service
-            uuid = uuid_service.get_uuid_by_id(session, id)
+            UUID = uuid_service.get_uuid_by_id(session, id)
             logger.info(f"UUID: {uuid}")
             
-            if not uuid:
+            if not UUID:
                 raise HTTPException(status_code=404, detail="UUID not found")
             
             # Get requester using the same session and the UUID
-            requester = dbas.get_requester_by_uuid(session, uuid)
+            requester = dbas.get_requester_by_UUID(session, UUID)
             logger.info(f"Requester: {requester}")
             
             if not requester:
@@ -444,7 +444,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                 logger.info("SEND TO FINAL APPROVER")
                 if action.lower() == "approve":
                     new_status = "PENDING"
-                    dbas.update_data(uuid, "approval", status=new_status)
+                    dbas.update_data(UUID, "approval", status=new_status)
                     
                     # Set final approver email
                     final_approver_email = ldap_svc.get_email_address(ldap_svc.get_connection(), current_user.username)
@@ -458,7 +458,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     )
                 elif action.lower() == "deny":
                     new_status = "DENIED"
-                    dbas.update_data(uuid, "approval", status=new_status)
+                    dbas.update_data(UUID, "approval", status=new_status)
                     email_svc.set_request_status("NEW REQUEST")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
@@ -468,7 +468,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
             elif current_status == "PENDING":
                 if action.lower() == "approve":
                     new_status = "APPROVED" 
-                    dbas.update_data(uuid, "approval", status=new_status)
+                    dbas.update_data(UUID, "approval", status=new_status)
                     # Send email to final approver
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
@@ -493,7 +493,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     )
                 elif action.lower() == "deny":
                     new_status = "DENIED"
-                    dbas.update_data(uuid, "approval", status=new_status)
+                    dbas.update_data(UUID, "approval", status=new_status)
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
@@ -567,12 +567,12 @@ async def get_uuid_by_id_endpoint(ID: str, current_user: User = Depends(get_curr
     logger.info(f"Getting UUID for ID: {ID}")
     
     with next(dbas.get_session()) as session:
-        uuid = dbas.get_uuid_by_id(session, ID)
+        UUID = dbas.get_uuid_by_id(session, ID)
         
-        if not uuid:
+        if not UUID:
             raise HTTPException(status_code=404, detail=f"No UUID found for ID: {ID}")
             
-        return {"uuid": uuid}
+        return {"UUID": UUID}
 
 ##########################################################################
 ##########################################################################
@@ -591,8 +591,8 @@ def process_purchase_data(data):
         try:
             for k, v in data.items():
                 # Handle the UUID field from the frontend
-                if k == "UUID" and "uuid" in local_purchase_cols:
-                    local_purchase_cols["uuid"] = v
+                if k == "UUID" and "UUID" in local_purchase_cols:
+                    local_purchase_cols["UUID"] = v
                 elif k in local_purchase_cols:
                     local_purchase_cols[k] = v
                     
@@ -668,7 +668,7 @@ def process_approval_data(processed_data):
     
     # Define allowed keys that correspond to the Approval model's columns.
     allowed_keys = [
-        'ID', 'reqID', 'requester', 'budgetObjCode',  'fund', 
+        'ID', 'requester', 'budgetObjCode', 'fund', 
         'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location', 
         'newRequest', 'pendingApproval', 'approved', 'phoneext', 'datereq', 'dateneed', 'orderType'
     ]
@@ -677,9 +677,15 @@ def process_approval_data(processed_data):
     for key, value in processed_data.items():
         # Handle the UUID field from the frontend
         if key == "UUID":
-            approval_data["uuid"] = value
+            approval_data["UUID"] = value
         elif key in allowed_keys:
             approval_data[key] = value
+    
+    # Set default values for required fields if not present
+    approval_data['IRQ1_ID'] = processed_data.get('IRQ1_ID', '')  # Only use IRQ1_ID if provided
+    approval_data['newRequest'] = processed_data.get('newRequest', True)
+    approval_data['pendingApproval'] = processed_data.get('pendingApproval', False)
+    approval_data['approved'] = processed_data.get('approved', False)
             
     ##########################################################################
     ## SENDING NOTIFICATION OF NEW REQUEST
@@ -689,14 +695,14 @@ def process_approval_data(processed_data):
     if approval_data['status'] == "NEW REQUEST":
         template_path = "./templates/son_template_lines.docx"
         
-    logger.info("Sending notification email to approver...")
-    logger.info(f"Request status before sending notification: {approval_data['status']}")
-    email_svc.send_notification(
-        template_data=processed_data,
-        template_path=template_path,
-        subject="New Purchase Request",
-        request_status=approval_data['status']
-    )
+        logger.info("Sending notification email to approver...")
+        logger.info(f"Request status before sending notification: {approval_data['status']}")
+        email_svc.send_notification(
+            template_data=processed_data,
+            template_path=template_path,
+            subject="New Purchase Request",
+            request_status=approval_data['status']
+        )
                     
     return approval_data
 
@@ -705,26 +711,21 @@ def process_approval_data(processed_data):
 def purchase_req_commit(processed_data):
     with lock:
         try:
-            table = "purchase_request"
-            # Get a session and use it directly
-            session = next(get_session())
-            try:
-                dbas.insert_data(processed_data, table)
-                session.commit()
+            # Insert purchase request data
+            purchase_request = dbas.insert_data(processed_data, "purchase_requests")
+            
+            # Process approval data
+            approval_data = process_approval_data(processed_data)
+            logger.info(f"newRequest: {processed_data.get('newRequest')}")
+            
+            if processed_data.get('newRequest') == 1:
+                approval_data['status'] = "NEW REQUEST"
+                # Insert approval data
+                dbas.insert_data(approval_data, "approval")
                 
-                approval_data = process_approval_data(processed_data)
-                logger.info(f"newRequest: {processed_data.get('newRequest')}")
-                
-                if processed_data.get('newRequest') == 1:
-                    approval_data['status'] = "NEW REQUEST"
-                    table = "approval"
-                    # Call insert data
-                    dbas.insert_data(approval_data, table)
-                    session.commit()
-            finally:
-                session.close()
         except Exception as e:
             logger.error(f"Exception occurred: {e}")
+            raise
 
 ##########################################################################
 ## MAIN CONTROL FLOW

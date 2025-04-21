@@ -6,7 +6,7 @@
 export type FormValues = {
   UUID: string;
   ID: string;
-  reqID: string;
+  IRQ1_ID: string;
   requester: string;
   phoneext: string;
   datereq: string;

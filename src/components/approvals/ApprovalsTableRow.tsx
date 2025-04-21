@@ -17,42 +17,44 @@ import PendingIcon from '@mui/icons-material/Pending';
 import SuccessIcon from '@mui/icons-material/CheckCircleOutline';
 import { useUUIDStore } from "../../services/UUIDService";
 
-const API_URL_ASSIGN = `${import.meta.env.VITE_API_URL}/api/assignReqID`;
+const API_URL_ASSIGN = `${import.meta.env.VITE_API_URL}/api/assignIRQ1_ID`;
 const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
 
 export default function ApprovalsTableRow({
     approval_data,
+    expandButton,
 }: {
     approval_data: FormValues;
+    expandButton?: React.ReactNode;
 }) {
     const queryClient = useQueryClient();
 
-    // 1) per‑row state for the draft reqID
-    const [draftReqID, setDraftReqID] = useState<string>(
-        approval_data.reqID || ""
+    // 1) per‑row state for the draft IRQ1_ID
+    const [showIRQ1_ID, setIRQ1_ID] = useState<string>(
+        approval_data.IRQ1_ID || ""
     );
 
     // Get UUID for the item
     const { getUUID } = useUUIDStore();
 
     // 2) mutation to assign ReqID
-    const assignReqIDMutation = useMutation({
-        mutationFn: async (newReqID: string) => {
+    const assignIRQ1Mutation = useMutation({
+        mutationFn: async (newIRQ1ID: string) => {
             try {
                 // Get the UUID from the store
-                const uuid = await getUUID(approval_data.ID);
-                console.log("UUID:", uuid);
+                const UUID = await getUUID(approval_data.ID);
+                console.log("UUID:", UUID);
                 
-                if (!uuid) {
+                if (!UUID) {
                     console.error("UUID not found for request ID:", approval_data.ID);
                     throw new Error("UUID not found for this request");
                 }
                 
                 // Log the data being sent for debugging
-                console.log("Sending data to assignReqID:", { 
+                console.log("Sending data to assignIRQ1_ID:", { 
                     ID: approval_data.ID, 
-                    reqID: newReqID, 
-                    uuid: uuid 
+                    IRQ1_ID: newIRQ1ID, 
+                    UUID: UUID 
                 });
                 
                 const res = await fetch(API_URL_ASSIGN, {
@@ -63,8 +65,8 @@ export default function ApprovalsTableRow({
                     },
                     body: JSON.stringify({ 
                         ID: approval_data.ID, 
-                        reqID: newReqID, 
-                        uuid: uuid 
+                        IRQ1_ID: newIRQ1ID, 
+                        UUID: UUID 
                     }),
                 });
                 
@@ -141,36 +143,34 @@ export default function ApprovalsTableRow({
 
     return (
         <TableRow>
+            {expandButton && (
+                <TableCell>
+                    {expandButton}
+                </TableCell>
+            )}
             {/* REQUISITION # */}
             <TableCell sx={{ color: "white" }}>
 
                 <Box sx={{ display: "flex", gap: "5px" }}>
                     <Buttons
                         className="btn btn-maroon"
-                        disabled={!draftReqID || Boolean(approval_data.reqID)}
-                        label={approval_data.reqID ? "Assigned" : "Assign"}
-                        onClick={() => assignReqIDMutation.mutate(draftReqID)}
+                        label={approval_data.IRQ1_ID ? "Assigned" : "Assign"}
+                        onClick={() => assignIRQ1Mutation.mutate(showIRQ1_ID)}
                     />
                     <TextField
-                        id="reqID"
-                        value={draftReqID}
+                        id="IRQ1_ID"
+                        value={showIRQ1_ID}
                         className="form-control"
                         fullWidth
                         variant="outlined"
                         size="small"
-                        inputProps={{
-                            readOnly: Boolean(approval_data.reqID),
-                            style: { 
-                                width: '50px',
-                                color: approval_data.reqID ? 'green' : 'inherit'
-                            }
-                        }}
-                        onChange={(e) => setDraftReqID(e.target.value)}
+                        onChange={(e) => setIRQ1_ID(e.target.value)}
                         sx={{
-                            backgroundColor: approval_data.reqID ? 'rgba(0, 128, 0, 0.1)' : 'white',
+                            backgroundColor: approval_data.IRQ1_ID ? 'rgba(0, 128, 0, 0.1)' : 'white',
+                            width: '100px',
                             '& .MuiOutlinedInput-root': {
                                 '& fieldset': {
-                                    borderColor: approval_data.reqID ? 'green' : 'red',
+                                    borderColor: approval_data.IRQ1_ID ? 'green' : 'red',
                                     borderWidth: '2px',
                                 },
                             },

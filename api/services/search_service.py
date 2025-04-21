@@ -44,7 +44,7 @@ class SearchService:
     # Optimized schema with only essential fields and appropriate field types
     approval_schema = Schema(
         ID=ID(stored=True, unique=True),
-        reqID=ID(stored=True),             
+        IRQ1_ID=ID(stored=True),             
         requester=TEXT(stored=True, analyzer=StemmingAnalyzer()),        
         budgetObjCode=ID(stored=True),    
         fund=ID(stored=True),             
@@ -62,7 +62,7 @@ class SearchService:
     )
     
     searchable_fields = [
-        'ID', 'reqID', 'requester','budgetObjCode', 'fund', 'priceEach','totalPrice',
+        'ID', 'IRQ1_ID', 'requester','budgetObjCode', 'fund', 'priceEach','totalPrice',
         'location', 'status','quantity','createdTime'
     ]
     
@@ -214,10 +214,13 @@ class SearchService:
                 if change_type == "deleted":
                     writer.delete_by_term(self.primary_key, text_type(getattr(model, self.primary_key)))
                 else:
-                    attrs = {
-                        key: getattr(model, key) 
-                        for key in model.__class__.__searchable__
-                    }
+                    attrs = {}
+                    # Only include fields that exist in the schema
+                    for key in model.__class__.__searchable__:
+                        if hasattr(model, key) and key in self.ix.schema:
+                            attrs[key] = getattr(model, key)
+                    
+                    # Ensure the primary key is always included
                     attrs[self.primary_key] = text_type(getattr(model, self.primary_key))
                     writer.add_document(**attrs)
             writer.commit()
