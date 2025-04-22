@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import {
@@ -19,7 +19,7 @@ import { convertBOC } from "../../utils/bocUtils";
 import WarningIcon from "@mui/icons-material/Warning";
 import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
-import { useUUIDStore } from "../../services/UUIDService";
+import { useAssignIRQ1 } from "../../custom_hooks/useAssignIRQ1";
 
 interface ApprovalTableProps {
   onDelete: (ID: string) => void;
@@ -44,14 +44,29 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
   const { data: searchData} = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
   const { data: approvalData } = useQuery({ queryKey: ["approvalData"], queryFn: fetchApprovalData });
   const [draftIRQ1, setDraftIRQ1] = useState<Record<string,string>>({});
+  const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string,string>>({});
 
   // track which groups are expanded
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const toggleRowExpanded = (key: string) =>
     setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
 
-  /******************************************************************************************* */
-  
+  const assignIRQ1Mutation = useAssignIRQ1();
+
+  // Update assignedIRQ1s when approvalData changes
+  useEffect(() => {
+    if (approvalData) {
+      const newAssignedIRQ1s: Record<string,string> = {};
+      approvalData.forEach((row: FormValues) => {
+        if (row.IRQ1_ID) {
+          newAssignedIRQ1s[row.ID] = row.IRQ1_ID;
+          // Also update the draftIRQ1 state with the assigned value
+          setDraftIRQ1(prev => ({ ...prev, [row.ID]: row.IRQ1_ID }));
+        }
+      });
+      setAssignedIRQ1s(newAssignedIRQ1s);
+    }
+  }, [approvalData]);
 
   // handle approve/deny
   const approveDenyMutation = useMutation({
@@ -114,6 +129,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         return [header];
       }
 
+      // build detail rows
       const detailRows: FlatRow[] = items.slice(1).map(item => ({
         ...item,
         id: item.UUID!,
@@ -156,29 +172,38 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
       width: 220,
       renderCell: params => {
         const id = params.row.ID;
-        const val = draftIRQ1[id] || "";
-        const isAssigned = !!params.row.IRQ1_ID;
+        const existingIRQ1 = assignedIRQ1s[id] || "";
+        const currentDraftIRQ1 = draftIRQ1[id] || "";
         return (
           <Box sx={{ display: "flex", gap: 1 }}>
             <Buttons
               className="btn btn-maroon"
-              disabled={!!val}
-              label={val ? "Assigned" : "Assign"}
-              onClick={() => console.log("assign IRQ1:", params.row)}
+              disabled={!!existingIRQ1}
+              label={existingIRQ1 ? "Assigned" : "Assign"}
+              onClick={() => assignIRQ1Mutation.mutate({ ID: id, newIRQ1ID: currentDraftIRQ1 })}
             />
             <TextField
-              value={val}
-              disabled={isAssigned}
+              value={currentDraftIRQ1}
+              disabled={!!existingIRQ1}
               size="small"
               onChange={e => setDraftIRQ1(prev => ({ ...prev, [id]: e.target.value }))}
               sx={{
-                width: "100px",
-                backgroundColor: val ? "rgba(0,128,0,0.2)" : "white",
-                "& .MuiOutlinedInput-root fieldset": {
-                  borderColor: val ? "green" : "red",
-                  borderWidth: 2
-                }
-              }}
+                backgroundColor: existingIRQ1 ? 'rgba(0, 128, 0, 0.2)' : 'white',
+                width: '100px',
+                '& .MuiOutlinedInput-root': {
+                    '& fieldset': {
+                        borderColor: existingIRQ1 ? 'green' : 'red',
+                        borderWidth: '2px',
+                    },
+                    '&.Mui-disabled': {
+                        backgroundColor: 'rgba(0, 128, 0, 0.2)',
+                        '& .MuiOutlinedInput-input': {
+                            color: '#00ff00',
+                            WebkitTextFillColor: '#00ff00',
+                        },
+                    },
+                },
+            }}
             />
           </Box>
         );
@@ -262,9 +287,9 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
             height: "100%"
           }}
         >
-          {params.value === "NEW REQUEST" && <WarningIcon />}
-          {params.value === "PENDING"     && <PendingIcon />}
-          {params.value === "APPROVED"    && <SuccessIcon />}
+          {params.value === "NEW REQUEST" && <WarningIcon htmlColor="black" />}
+          {params.value === "PENDING"     && <PendingIcon htmlColor="black" />}
+          {params.value === "APPROVED"    && <SuccessIcon htmlColor="black" />}
           {params.value}
         </Box>
       )
@@ -281,6 +306,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
             color="success"
             onClick={() => handleApprove(params.row.ID)}
             disabled={params.row.status === "APPROVED"}
+            sx={{ minWidth: "100px" }}
           >
             Approve
           </Button>
@@ -325,23 +351,32 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
           rowHeight={60}
           sx={{
             background: "#2c2c2c",
-            "& .MuiDataGrid-cell":        { color: "white", background: "#2c2c2c" },
-            "& .MuiDataGrid-row":         { background: "#2c2c2c" },
+        
+            // Cells & rows
+            "& .MuiDataGrid-cell":   { color: "white", background: "#2c2c2c" },
+            "& .MuiDataGrid-row":    { background: "#2c2c2c" },
+        
+            // Column headers
             "& .MuiDataGrid-columnHeaders, .MuiDataGrid-columnHeader": {
               background: "linear-gradient(to top, #2c2c2c, #800000) !important",
-              color: "white"
+              color: "white",
             },
             "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
-            "& .MuiDataGrid-footer": { 
-              background: "#2c2c2c", 
-              color: "white !important",
-              "& .MuiTablePagination-root": {
-                color: "white !important",
-                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
-                  color: "white !important"
-                }
-              }
-            }
+        
+            // Footer container
+            "& .MuiDataGrid-footerContainer": {
+              backgroundColor: "#2c2c2c",
+              borderTop: "1px solid rgba(255,255,255,0.2)",
+            },
+        
+            // Pagination root & labels
+            "& .MuiTablePagination-root": {
+              color: "white",
+            },
+            "& .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows": {
+              color: "white",
+            },
+            
           }}
         />
       </Box>
