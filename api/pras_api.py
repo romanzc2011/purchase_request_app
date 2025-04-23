@@ -27,7 +27,7 @@ from services.ipc_service import IPC_Service
 from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
 from services.uuid_service import uuid_service
-from services.pdf_service import PDFService
+from services.pdf_service import make_purchase_request_pdf
 from managers.ipc_manager import ipc_instance
 
 """
@@ -89,7 +89,6 @@ email_svc.set_final_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov
 db_svc = next(get_session())  # Initialize with a session
 ipc_svc = IPC_Service()
 auth_svc = AuthService()
-pdf_svc = PDFService()
 
 # Thread safety
 lock = threading.Lock()
@@ -351,25 +350,23 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
             rendered_filename = f"purchase_request_{shared_id}_{timestamp}.docx"
             rendered_docx_path = os.path.join(rendered_dir, rendered_filename)
             logger.info(f"RENDERED DOCX PATH: {rendered_docx_path}")
+            
+            # Create PDF of purchase request for email
             os.makedirs(rendered_dir, exist_ok=True)
             
-            doc.save(rendered_docx_path)
-            # 2) Tell the service about it
-            email_svc.set_template_path(os.path.abspath(template_path))
-            email_svc.set_rendered_docx_path(os.path.abspath(rendered_docx_path))
+            pdf_filename = f"purchase_request_{shared_id}_{timestamp}.pdf"
+            pdf_path = os.path.join(rendered_dir, pdf_filename)
+            make_purchase_request_pdf(processed_lines, pdf_path)
+            logger.info(f"PDF generated at: {pdf_path}")
             
-            # Send it
+      
+            email_svc.set_rendered_docx_path(pdf_path)   # reuse same field
             email_svc.send_notification(
-                template_path=email_svc.get_template_path(),
-                template_data=context,
+                template_path=None,          # you can skip HTML template altogether
+                template_data=None,
+                subject="Your Purchase Order PDF",
                 request_status="NEW REQUEST"
             )
-            
-            # Log the paths for debugging
-            logger.info(f"Template path: {template_path}")
-            logger.info(f"Rendered directory: {rendered_dir}")
-            logger.info(f"Rendered document path: {rendered_docx_path}")
-
             
             if not os.path.exists(rendered_docx_path):
                 logger.error(f"Rendered document does not exist at path: {rendered_docx_path}")
