@@ -1,6 +1,9 @@
 import pythoncom
 import win32com.client as win32
 import os
+import shutil
+import uuid
+from datetime import datetime
 
 from loguru import logger
 from services.ipc_service import IPC_Service
@@ -88,7 +91,7 @@ class EmailService:
         Args:
             template_path: Path to the HTML template file (optional)
             template_data: Data to be used in the template (optional)
-            subject: Email subject (optional)
+            subject: Email subject (optional)   
             request_status: Status of the request (optional)
             custom_msg: Custom message to send (optional)
         """
@@ -112,9 +115,8 @@ class EmailService:
                     body=self.msg_templates['NEW_REQUEST']['first_approver']['body'].format(
                         first_approver=self.recipients['first_approver']['name']
                     ),
-                    template_path=template_path,
                     template_data=template_data,
-                    cc=self.cc_persons
+                    cc=self.cc_persons,
                 )
                 self._send_email(
                     outlook=outlook,
@@ -123,9 +125,8 @@ class EmailService:
                     body=self.msg_templates['NEW_REQUEST']['requester']['body'].format(
                         requester=self.recipients['requester']['name']
                     ),
-                    template_path=template_path,
                     template_data=template_data,
-                    cc=self.cc_persons
+                    cc=self.cc_persons,
                 )
                 # Send email to final approver
             elif self.request_status == 'PENDING':
@@ -136,9 +137,8 @@ class EmailService:
                     body=self.msg_templates['PENDING']['final_approver']['body'].format(
                         final_approver=self.recipients['final_approver']['name']
                     ),
-                    template_path=template_path,
                     template_data=template_data,
-                    cc=self.cc_persons
+                    cc=self.cc_persons,
                 )
             else:
                 logger.error(f"Unknown request status: {self.request_status}")
@@ -148,6 +148,8 @@ class EmailService:
             logger.error(f"Error sending email: {e}")
             raise
         finally:
+            # Clear the rendered document path after sending
+            logger.info("Cleared rendered document path after sending")
             pythoncom.CoUninitialize()
             
     
@@ -168,65 +170,25 @@ class EmailService:
         mail = outlook.CreateItem(0)
         mail.Subject = subject
         
-        if template_path and template_data:
-            try:
-                # Convert template path to absolute path if it's relative
-                if not os.path.isabs(template_path):
-                    template_path = os.path.join(self.project_root, template_path)
-                
-                # Log the template data for debugging
-                logger.debug(f"Template data: {template_data}")
-                logger.debug(f"Template path: {template_path}")
-                
-                # Check if the template is a Word document (.docx)
-                if template_path.lower().endswith('.docx'):
-                    # Use docxtpl to render the Word template
-                    doc = DocxTemplate(template_path)
-                    doc.render(template_data)
-                    
-                    # Save the rendered document to a temporary file
-                    rendered_docx_path = os.path.join(self.rendered_dir, f"rendered_{os.path.basename(template_path)}")
-                    doc.save(rendered_docx_path)
-                    
-                    # Attach the rendered document to the email
-                    mail.Attachments.Add(rendered_docx_path)
-                    
-                    # Set a simple HTML body that mentions the attachment
-                    template_content = f"""
-                    <html>
-                    <body>
-                        <p>Please find the attached document for your review.</p>
-                        <p>This is an automated message from the Purchase Request System.</p>
-                    </body>
-                    </html>
-                    """
-                else:
-                    # For HTML templates, read as text
-                    try:
-                        with open(template_path, 'r', encoding='utf-8') as file:
-                            template_content = file.read()
-                    except UnicodeDecodeError:
-                        # If UTF-8 fails, try with a different encoding
-                        logger.warning(f"Failed to read template with UTF-8 encoding, trying with latin-1")
-                        with open(template_path, 'r', encoding='latin-1') as file:
-                            template_content = file.read()
-                    
-                    # Replace template variables
-                    for key, value in template_data.items():
-                        template_content = template_content.replace(f"{{{key}}}", str(value))
-                        template_content = template_content.replace(f"{{{{request_id}}}}", str(value))
-                
-                # Set the email body
-                mail.HTMLBody = template_content
-                
-            except Exception as e:
-                logger.error(f"Error processing template: {e}")
-                logger.error("Template data structure:")
-                for key, value in template_data.items():
-                    logger.error(f"{key}: {type(value)} = {value}")
-                raise
-        else:
-            mail.HTMLBody = body
+            # Log the template data for debugging
+        logger.debug(f"Template data: {template_data}")
+        logger.debug(f"Rendered docx path: {self.get_rendered_docx_path()}")
+        logger.debug(f"Template path: {self.get_template_path()}")
+        
+        path = os.path.abspath(self.get_rendered_docx_path())
+        logger.info(f"Attaching file: {path}, exists? {os.path.exists(path)}")
+        mail.Attachments.Add(path)
+        
+        template_content = f"""
+        <html>
+        <body>
+            <p>Please find the attached document for your review.</p>
+            <p>This is an automated message from the Purchase Request System.</p>
+        </body>
+        </html>
+        """
+        # Set the email body
+        mail.HTMLBody = template_content
         
         # Handle multiple recipients
         if isinstance(to_email, list):
@@ -288,6 +250,12 @@ class EmailService:
         
     def set_template_path(self, template_path: str):
         self.template_path = template_path
+        
+    def set_rendered_dir(self, rendered_dir: str):
+        self.rendered_dir = rendered_dir
+        
+    def set_rendered_docx_path(self, rendered_docx_path: str):
+        self.rendered_docx_path = rendered_docx_path
     
     #################################################################################
     ## GETTER METHODS
@@ -310,3 +278,9 @@ class EmailService:
     
     def get_template_path(self):
         return self.template_path
+    
+    def get_rendered_dir(self):
+        return self.rendered_dir
+    
+    def get_rendered_docx_path(self):
+        return self.rendered_docx_path

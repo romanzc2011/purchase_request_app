@@ -18,6 +18,7 @@ import services.db_service as dbas
 import pydantic_schemas as ps
 import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
+from docxtpl import DocxTemplate
 
 from services.auth_service import AuthService
 from services.db_service import get_session
@@ -237,7 +238,6 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     items = data.get("items", [])
     item_count = data.get("itemCount", len(items))
     
-    logger.info(f"ITEM COUNT: {item_count}")
     logger.info(f"ITEMS: {items}")
     logger.info(f"REQUESTER: {requester}")
     logger.info(f"DATA: {data}")
@@ -303,19 +303,81 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     else:
         shared_id = first_item_id
         logger.info(f"Using existing shared ID: {shared_id}")
+        
+    # Configure directory paths
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rendered_dir = os.path.join(project_root, "api", "rendered_templates")
+    template_path = os.path.join(project_root, "api", "templates", "son_template_lines.docx")
     
+    logger.info(f"PROJECT ROOT: {project_root}")
+    logger.info(f"RENDERED DIR: {rendered_dir}")
+    logger.info(f"TEMPLATE PATH: {template_path}")  
+    
+    email_svc.set_template_path(template_path)
+    email_svc.set_rendered_dir(rendered_dir)
+    
+    processed_lines = []
     # Process each item
     for item in items:
-        # Ensure all items share the same ID
         item["ID"] = shared_id
-        # Add the requester to each item
         item["requester"] = requester
         
         # Process the purchase data
         processed_data = process_purchase_data(item)
-        
+
         # Commit the purchase request
         purchase_req_commit(processed_data)
+        processed_lines.append(processed_data)
+    
+     ##########################################################
+    # CREATE EMAIL TEMPLATE HERE
+    # Check if the template is a Word document (.docx)
+    try:
+        if template_path.lower().endswith('.docx'):
+            context = {
+                "ID": shared_id,
+                "requester": requester,
+                "lines": processed_lines,
+            }
+            
+            # Render the template
+            logger.debug(f"Rendering template with context: {context}")
+            
+            doc = DocxTemplate(template_path)
+            doc.render(context)
+            
+            # Generate a unique filename for the rendered document
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            rendered_filename = f"purchase_request_{shared_id}_{timestamp}.docx"
+            rendered_docx_path = os.path.join(rendered_dir, rendered_filename)
+            logger.info(f"RENDERED DOCX PATH: {rendered_docx_path}")
+            os.makedirs(rendered_dir, exist_ok=True)
+            
+            doc.save(rendered_docx_path)
+            # 2) Tell the service about it
+            email_svc.set_template_path(os.path.abspath(template_path))
+            email_svc.set_rendered_docx_path(os.path.abspath(rendered_docx_path))
+            
+            # Send it
+            email_svc.send_notification(
+                template_path=email_svc.get_template_path(),
+                template_data=context,
+                request_status="NEW REQUEST"
+            )
+            
+            # Log the paths for debugging
+            logger.info(f"Template path: {template_path}")
+            logger.info(f"Rendered directory: {rendered_dir}")
+            logger.info(f"Rendered document path: {rendered_docx_path}")
+
+            
+            if not os.path.exists(rendered_docx_path):
+                logger.error(f"Rendered document does not exist at path: {rendered_docx_path}")
+                raise HTTPException(status_code=500, detail="Failed to create rendered document")
+            
+    except Exception as e:
+        logger.error(f"Error rendering template: {e}")
+        raise HTTPException(status_code=500, detail=f"Error rendering template: {e}")
     
     return JSONResponse(content={"message": "Processing started in background"})
     
@@ -457,6 +519,8 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
             current_status = dbas.get_status_by_id(session, ID)
             if not current_status:
                 raise HTTPException(status_code=404, detail="Request not found")
+            
+            
                 
             # Process based on current status
             if current_status == "NEW REQUEST":
@@ -707,24 +771,7 @@ def process_approval_data(processed_data):
     approval_data['newRequest'] = processed_data.get('newRequest', True)
     approval_data['pendingApproval'] = processed_data.get('pendingApproval', False)
     approval_data['approved'] = processed_data.get('approved', False)
-            
-    ##########################################################################
-    ## SENDING NOTIFICATION OF NEW REQUEST
-    # Create email body and send to approver
-    
-    # Get request status to determine correct template
-    if approval_data['status'] == "NEW REQUEST":
-        template_path = "./templates/son_template_lines.docx"
-        
-        logger.info("Sending notification email to approver...")
-        logger.info(f"Request status before sending notification: {approval_data['status']}")
-        email_svc.send_notification(
-            template_data=processed_data,
-            template_path=template_path,
-            subject="New Purchase Request",
-            request_status=approval_data['status']
-        )
-                    
+
     return approval_data
 
 ##########################################################################
@@ -754,23 +801,4 @@ def purchase_req_commit(processed_data):
 if __name__ == "__main__":
     uvicorn.run("pras_api:app", host="localhost", port=5004, reload=True)
 
-@api_router.post("/getUUIDs")
-async def get_uuids_by_ids(data: dict, current_user: User = Depends(get_current_user)):
-    """
-    Get UUIDs for multiple IDs.
-    This endpoint accepts a list of IDs and returns a mapping of IDs to UUIDs.
-    """
-    logger.info(f"Getting UUIDs for multiple IDs")
-    
-    ids = data.get("ids", [])
-    if not ids:
-        raise HTTPException(status_code=400, detail="No IDs provided")
-    
-    result = {}
-    with next(dbas.get_session()) as session:
-        for id in ids:
-            uuid = dbas.get_uuid_by_id(session, id)
-            if uuid:
-                result[id] = uuid
-    
-    return {"uuid_map": result}
+

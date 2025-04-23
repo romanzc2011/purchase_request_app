@@ -30,6 +30,9 @@ interface ApprovalTableProps {
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 const API_URL_APPROVE_DENY  = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
 
+/***********************************************************************************/
+// FETCH APPROVAL DATA
+/***********************************************************************************/
 async function fetchApprovalData() {
   const res = await fetch(API_URL_APPROVAL_DATA, {
     headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
@@ -39,6 +42,9 @@ async function fetchApprovalData() {
   return res.json();
 }
 
+/***********************************************************************************/
+// APPROVAL TABLE
+/***********************************************************************************/ 
 export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: ApprovalTableProps) {
   const queryClient = useQueryClient();
   const { data: searchData} = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
@@ -68,7 +74,9 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
     }
   }, [approvalData]);
 
-  // handle approve/deny
+  /***********************************************************************************/
+  // HANDLE APPROVE/DENY
+  /***********************************************************************************/
   const approveDenyMutation = useMutation({
     mutationFn: async ({ ID, action }: { ID: string, action: "approve" | "deny" }) => {
       const res = await fetch(API_URL_APPROVE_DENY, {
@@ -94,12 +102,12 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
   const handleDeny = (ID: string) => approveDenyMutation.mutate({ ID, action: "deny" });
   const handleDownload = (ID: string) => { /* TODO: download logic */ console.log("download", ID); };
 
-  // basee rows
+  // base rows
   const baseRows = (searchQuery ? searchData : approvalData) || [];
 
   // ensure each has a UUID
-  const rowsWithIds = baseRows.map((r: FormValues, i: number) =>
-    r.UUID ? r : { ...r, UUID: `row-${i}` }
+  const rowsWithIds = baseRows.map((row: FormValues, i: number) =>
+    row.UUID ? row : { ...row, UUID: `row-${i}` }
   );
 
   // group by ID
@@ -164,12 +172,15 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
     }
   };
 
-  // your existing data columns
+  /***********************************************************************************/
+  // IRQ1 COLUMN
+  /***********************************************************************************/
   const dataColumns: GridColDef[] = [
     {
       field: "IRQ1_ID",
       headerName: "IRQ1 #",
       width: 220,
+      sortable: true,
       renderCell: params => {
         const id = params.row.ID;
         const existingIRQ1 = assignedIRQ1s[id] || "";
@@ -178,9 +189,23 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
           <Box sx={{ display: "flex", gap: 1 }}>
             <Buttons
               className="btn btn-maroon"
-              disabled={!!existingIRQ1}
-              label={existingIRQ1 ? "Assigned" : "Assign"}
-              onClick={() => assignIRQ1Mutation.mutate({ ID: id, newIRQ1ID: currentDraftIRQ1 })}
+              disabled={!!assignedIRQ1s[id]}
+              label={assignedIRQ1s[id] ? "Assigned" : "Assign"}
+              onClick={() => {
+                assignIRQ1Mutation.mutate({
+                  ID: id,
+                  newIRQ1ID: currentDraftIRQ1
+                }, {
+                  onSuccess: (data) => {
+                    // Invalidate the query to refresh the data
+                    queryClient.invalidateQueries({ queryKey: ["approvalData"] });
+                    toast.success("IRQ1 assigned successfully");
+                  },
+                  onError: () => {
+                    toast.error("Failed to assign IRQ1");
+                  }
+                });
+              }}
             />
             <TextField
               value={currentDraftIRQ1}
@@ -209,47 +234,106 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         );
       }
     },
-    { field: "ID",               headerName: "ID",                width: 130 },
-    { field: "requester",        headerName: "Requester",         width: 130 },
+    
+    /***********************************************************************************/
+    // ID COLUMN
+    /***********************************************************************************/
+    { field: "ID",
+      headerName: "ID",
+      width: 130,
+      sortable: true,
+    },
+
+    /***********************************************************************************/
+    // REQUESTER COLUMN
+    /***********************************************************************************/
+    { field: "requester",
+      headerName: "Requester",
+      width: 130,
+      sortable: true,
+    },
+
+    /***********************************************************************************/
+    // BUDGET OBJECT CODE COLUMN
+    /***********************************************************************************/
     {
       field: "budgetObjCode",
       headerName: "Budget Object Code",
       width: 150,
       renderCell: params => convertBOC(params.value)
     },
-    { field: "fund",             headerName: "Fund",              width: 130 },
-    { field: "location",         headerName: "Location",          width: 130 },
+
+    /***********************************************************************************/
+    // FUND COLUMN
+    /***********************************************************************************/
+    { field: "fund",
+      headerName: "Fund",
+      width: 130,
+      sortable: true,
+    },
+
+    /***********************************************************************************/
+    // LOCATION COLUMN
+    /***********************************************************************************/
+    { field: "location",
+      headerName: "Location",
+      width: 130,
+      sortable: true,
+    },
+
+    /***********************************************************************************/
+    // QUANTITY COLUMN
+    /***********************************************************************************/
     {
       field: "quantity",
       headerName: "Quantity",
       type: "number",
       align: "center",
-      width: 100
+      width: 100,
+      sortable: true,
     },
+
+    /***********************************************************************************/
+    // PRICE EACH COLUMN
+    /***********************************************************************************/
     {
       field: "priceEach",
       headerName: "Price Each",
       type: "number",
       align: "center",
+      sortable: true,
       width: 120,
       renderCell: params =>
         typeof params.value === "number" ? params.value.toFixed(2) : "0.00"
     },
+
+    /***********************************************************************************/
+    // LINE TOTAL COLUMN
+    /***********************************************************************************/
     {
       field: "totalPrice",
       headerName: "Line Total",
       type: "number",
       align: "center",
       width: 120,
+      sortable: true,
       renderCell: params =>
         typeof params.value === "number" ? params.value.toFixed(2) : "0.00"
     },
+
+    /***********************************************************************************/
+    // ITEM DESCRIPTION COLUMN
+    /***********************************************************************************/
     {
       field: "itemDescription",
       headerName: "Item Description",
       align: "center",
       width: 200
     },
+
+    /***********************************************************************************/
+    // JUSTIFICATION COLUMN
+    /***********************************************************************************/
     {
       field: "justification",
       headerName: "Justification",
@@ -259,11 +343,16 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         <MoreDataButton name="Justification" data={params.value} />
       )
     },
+
+    /***********************************************************************************/
+    // STATUS COLUMN
+    /***********************************************************************************/
     {
       field: "status",
       headerName: "Status",
       align: "center",
       width: 200,
+      sortable: true,
       renderCell: params => (
         <Box
           sx={{
@@ -294,6 +383,10 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         </Box>
       )
     },
+
+    /***********************************************************************************/
+    // ACTIONS COLUMN
+    /***********************************************************************************/
     {
       field: "actions",
       headerName: "Actions",
@@ -306,7 +399,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
             color="success"
             onClick={() => handleApprove(params.row.ID)}
             disabled={params.row.status === "APPROVED"}
-            sx={{ minWidth: "100px" }}
+            sx={{ minWidth: "100px"}}
           >
             Approve
           </Button>
@@ -321,11 +414,6 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
           <Button variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
             <DownloadOutlinedIcon />
           </Button>
-          <Buttons
-            className="btn btn-maroon"
-            label="Delete"
-            onClick={() => onDelete(params.row.ID)}
-          />
         </Box>
       )
     }

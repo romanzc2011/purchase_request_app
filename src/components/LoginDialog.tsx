@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -7,7 +6,8 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
-import { CircularProgress } from "@mui/material";
+import { Box, CircularProgress } from "@mui/material";
+import BKSeal from "../assets/seal_no_border.png";
 
 interface LoginDialogProps {
   open: boolean;
@@ -101,6 +101,7 @@ export default function LoginDialog({
 
   return (
     <Dialog sx={{ background: "#2c2c2c" }} open={open} onClose={onClose}>
+     
       <form onSubmit={handleSubmit}>
         <DialogTitle
           sx={{
@@ -119,57 +120,79 @@ export default function LoginDialog({
           <DialogContentText sx={{ color: "white" }}>
             Please enter your username and password to log in.
           </DialogContentText>
+          
+          <Box sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 3,
+            mt: 2
+          }}>
+            {/* Seal on the left */}
+            <Box sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minWidth: 120,
+            }}>
+              <img
+                src={BKSeal}
+                style={{ height: "140px" }}
+                alt="Seal"
+              />
+            </Box>
+            
+            {/* Form fields on the right */}
+            <Box sx={{ flex: 1 }}>
+              {/* USERNAME INPUT */}
+              <TextField
+                margin="dense"
+                type="text"
+                fullWidth
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                sx={{
+                  input: { color: "white" }, // Input text color
+                  "& .MuiInputLabel-root": { color: "white" }, // Label color
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": {
+                      borderColor: "white", // Default border color
+                    },
+                    "&:hover fieldset": {
+                      borderColor: "gray", // Border color on hover
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: "white", // Border color when focused
+                    },
+                  },
+                }}
+              />
 
-          {/* USERNAME INPUT */}
-          <TextField
-            margin="dense"
-            label="Username"
-            type="text"
-            fullWidth
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            sx={{
-              input: { color: "white" }, // Input text color
-              "& .MuiInputLabel-root": { color: "white" }, // Label color
-              "& .MuiOutlinedInput-root": {
-                "& fieldset": {
-                  borderColor: "white", // Default border color
-                },
-                "&:hover fieldset": {
-                  borderColor: "gray", // Border color on hover
-                },
-                "&.Mui-focused fieldset": {
-                  borderColor: "white", // Border color when focused
-                },
-              },
-            }}
-          />
-
-          {/* PASSWORD INPUT */}
-          <TextField
-            margin="dense"
-            label="Password"
-            type="password"
-            fullWidth
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            sx={{
-              input: { color: "white" }, // Input text color
-              "& .MuiInputLabel-root": { color: "white" }, // Label color
-              "& .MuiOutlinedInput-root": {
-                "& fieldset": {
-                  borderColor: "white", // Default border color
-                },
-                "&:hover fieldset": {
-                  borderColor: "gray", // Border color on hover
-                },
-                "&.Mui-focused fieldset": {
-                  borderColor: "white", // Border color when focused
-                },
-              },
-            }}
-          />
-          {error && <p style={{ color: "red" }}>{error}</p>}
+              {/* PASSWORD INPUT */}
+              <TextField
+                margin="dense"
+                type="password"
+                fullWidth
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                sx={{
+                  input: { color: "white" }, // Input text color
+                  "& .MuiInputLabel-root": { color: "white" }, // Label color
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": {
+                      borderColor: "white", // Default border color
+                    },
+                    "&:hover fieldset": {
+                      borderColor: "gray", // Border color on hover
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: "white", // Border color when focused
+                    },
+                  },
+                }}
+              />
+              {error && <p style={{ color: "red" }}>{error}</p>}
+            </Box>
+          </Box>
         </DialogContent>
         <DialogActions
           sx={{

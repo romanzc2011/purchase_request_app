@@ -55,14 +55,7 @@ export function useAssignIRQ1() {
             return res.json();
         },
         onSuccess: (data, { ID }) => {
-            queryClient.setQueryData<FormValues[]>(["approvalData"],
-                old =>
-                    old?.map(r =>
-                        r.ID === ID
-                        ? { ...r, IRQ1_ID: data.IRQ1_ID }
-                        : r
-                    ) ?? []
-            );
+            queryClient.invalidateQueries({ queryKey: ["approvalData"] });
             toast.success("IRQ1 ID assigned successfully");
         }
     });
