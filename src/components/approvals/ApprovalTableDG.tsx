@@ -20,6 +20,7 @@ import WarningIcon from "@mui/icons-material/Warning";
 import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
 import { useAssignIRQ1 } from "../../custom_hooks/useAssignIRQ1";
+import "./ApprovalTable.css";
 
 interface ApprovalTableProps {
   onDelete: (ID: string) => void;
@@ -28,7 +29,7 @@ interface ApprovalTableProps {
 }
 
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
-const API_URL_APPROVE_DENY  = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
+const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
 
 /***********************************************************************************/
 // FETCH APPROVAL DATA
@@ -44,13 +45,13 @@ async function fetchApprovalData() {
 
 /***********************************************************************************/
 // APPROVAL TABLE
-/***********************************************************************************/ 
+/***********************************************************************************/
 export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: ApprovalTableProps) {
   const queryClient = useQueryClient();
-  const { data: searchData} = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
+  const { data: searchData } = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
   const { data: approvalData } = useQuery({ queryKey: ["approvalData"], queryFn: fetchApprovalData });
-  const [draftIRQ1, setDraftIRQ1] = useState<Record<string,string>>({});
-  const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string,string>>({});
+  const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
+  const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string, string>>({});
 
   // track which groups are expanded
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -62,7 +63,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
   // Update assignedIRQ1s when approvalData changes
   useEffect(() => {
     if (approvalData) {
-      const newAssignedIRQ1s: Record<string,string> = {};
+      const newAssignedIRQ1s: Record<string, string> = {};
       approvalData.forEach((row: FormValues) => {
         if (row.IRQ1_ID) {
           newAssignedIRQ1s[row.ID] = row.IRQ1_ID;
@@ -81,9 +82,9 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
     mutationFn: async ({ ID, action }: { ID: string, action: "approve" | "deny" }) => {
       const res = await fetch(API_URL_APPROVE_DENY, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}` 
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`
         },
         body: JSON.stringify({ ID, action })
       });
@@ -123,14 +124,14 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
     | (FormValues & { id: string; isGroup?: false });
 
   // build flatRows array
-  const flatRows: FlatRow[] = (Object.entries(grouped) as [string,FormValues[]][])
+  const flatRows: FlatRow[] = (Object.entries(grouped) as [string, FormValues[]][])
     .flatMap(([key, items]) => {
       const header: FlatRow = {
         ...items[0],           // <-- copy all data fields from the 1st item
-        id:        `group-${key}`,
-        isGroup:   true,
-        groupKey:  key,
-        rowCount:  items.length
+        id: `group-${key}`,
+        isGroup: true,
+        groupKey: key,
+        rowCount: items.length
       };
 
       if (!expandedRows[key]) {
@@ -188,7 +189,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         return (
           <Box sx={{ display: "flex", gap: 1 }}>
             <Buttons
-              className="btn btn-maroon"
+              className="btn btn-maroon assign-button"
               disabled={!!assignedIRQ1s[id]}
               label={assignedIRQ1s[id] ? "Assigned" : "Assign"}
               onClick={() => {
@@ -216,29 +217,30 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
                 backgroundColor: existingIRQ1 ? 'rgba(0, 128, 0, 0.2)' : 'white',
                 width: '100px',
                 '& .MuiOutlinedInput-root': {
-                    '& fieldset': {
-                        borderColor: existingIRQ1 ? 'green' : 'red',
-                        borderWidth: '2px',
+                  '& fieldset': {
+                    borderColor: existingIRQ1 ? 'green' : 'red',
+                    borderWidth: '2px',
+                  },
+                  '&.Mui-disabled': {
+                    backgroundColor: 'rgba(0, 128, 0, 0.2)',
+                    '& .MuiOutlinedInput-input': {
+                      color: '#00ff00',
+                      WebkitTextFillColor: '#00ff00',
                     },
-                    '&.Mui-disabled': {
-                        backgroundColor: 'rgba(0, 128, 0, 0.2)',
-                        '& .MuiOutlinedInput-input': {
-                            color: '#00ff00',
-                            WebkitTextFillColor: '#00ff00',
-                        },
-                    },
+                  },
                 },
-            }}
+              }}
             />
           </Box>
         );
       }
     },
-    
+
     /***********************************************************************************/
     // ID COLUMN
     /***********************************************************************************/
-    { field: "ID",
+    {
+      field: "ID",
       headerName: "ID",
       width: 130,
       sortable: true,
@@ -247,7 +249,8 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
     /***********************************************************************************/
     // REQUESTER COLUMN
     /***********************************************************************************/
-    { field: "requester",
+    {
+      field: "requester",
       headerName: "Requester",
       width: 130,
       sortable: true,
@@ -266,7 +269,8 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
     /***********************************************************************************/
     // FUND COLUMN
     /***********************************************************************************/
-    { field: "fund",
+    {
+      field: "fund",
       headerName: "Fund",
       width: 130,
       sortable: true,
@@ -275,7 +279,8 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
     /***********************************************************************************/
     // LOCATION COLUMN
     /***********************************************************************************/
-    { field: "location",
+    {
+      field: "location",
       headerName: "Location",
       width: 130,
       sortable: true,
@@ -365,20 +370,20 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
               params.value === "NEW REQUEST"
                 ? "#ff9800"
                 : params.value === "PENDING"
-                ? "#2196f3"
-                : params.value === "APPROVED"
-                ? "#4caf50"
-                : params.value === "DENIED"
-                ? "#f44336"
-                : "#9e9e9e",
+                  ? "#2196f3"
+                  : params.value === "APPROVED"
+                    ? "#4caf50"
+                    : params.value === "DENIED"
+                      ? "#f44336"
+                      : "#9e9e9e",
             fontWeight: "bold",
             width: "100%",
             height: "100%"
           }}
         >
           {params.value === "NEW REQUEST" && <WarningIcon htmlColor="black" />}
-          {params.value === "PENDING"     && <PendingIcon htmlColor="black" />}
-          {params.value === "APPROVED"    && <SuccessIcon htmlColor="black" />}
+          {params.value === "PENDING" && <PendingIcon htmlColor="black" />}
+          {params.value === "APPROVED" && <SuccessIcon htmlColor="black" />}
           {params.value}
         </Box>
       )
@@ -393,13 +398,13 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
       width: 300,
       sortable: false,
       renderCell: params => (
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center", width: "100%", height: "100%"}}>
           <Button
             variant="contained"
             color="success"
             onClick={() => handleApprove(params.row.ID)}
             disabled={params.row.status === "APPROVED"}
-            sx={{ minWidth: "100px"}}
+            sx={{ minWidth: "100px" }}
           >
             Approve
           </Button>
@@ -439,24 +444,26 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
           rowHeight={60}
           sx={{
             background: "#2c2c2c",
-        
+
             // Cells & rows
-            "& .MuiDataGrid-cell":   { color: "white", background: "#2c2c2c" },
-            "& .MuiDataGrid-row":    { background: "#2c2c2c" },
-        
+            "& .MuiDataGrid-cell": { color: "white", background: "#2c2c2c" },
+            "& .MuiDataGrid-row": { background: "#2c2c2c" },
+
             // Column headers
             "& .MuiDataGrid-columnHeaders, .MuiDataGrid-columnHeader": {
               background: "linear-gradient(to top, #2c2c2c, #800000) !important",
               color: "white",
             },
-            "& .MuiDataGrid-columnHeaderTitle": { fontWeight: "bold" },
-        
+            "& .MuiDataGrid-columnHeaderTitle": { 
+              fontWeight: "bold",
+            },
+
             // Footer container
             "& .MuiDataGrid-footerContainer": {
               backgroundColor: "#2c2c2c",
               borderTop: "1px solid rgba(255,255,255,0.2)",
             },
-        
+
             // Pagination root & labels
             "& .MuiTablePagination-root": {
               color: "white",
@@ -464,7 +471,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
             "& .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows": {
               color: "white",
             },
-            
+
           }}
         />
       </Box>

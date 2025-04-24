@@ -260,9 +260,7 @@ function SubmitApprovalTable({
                                         : "0.00"}
                                 </TableCell>
                                 <TableCell sx={{ color: "white" }}>
-                                    {typeof items[0].totalPrice === "number"
-                                        ? items[0].totalPrice.toFixed(2)
-                                        : "0.00"}
+                                    {calculatePrice(items[0]).toFixed(2)}
                                 </TableCell>
                                 <TableCell>
                                     <Button
@@ -346,9 +344,7 @@ function SubmitApprovalTable({
                                                                         : "0.00"}
                                                                 </TableCell>
                                                                 <TableCell sx={{ color: "white" }}>
-                                                                    {typeof item.totalPrice === "number"
-                                                                        ? item.totalPrice.toFixed(2)
-                                                                        : "0.00"}
+                                                                    {calculatePrice(item).toFixed(2)}
                                                                 </TableCell>
                                                             </TableRow>
                                                         ))}

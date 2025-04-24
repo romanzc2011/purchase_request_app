@@ -1,9 +1,9 @@
-
 /* General button styles */
 .btn-maroon {
   background-color: maroon;
   color: white;
   border-color: maroon;
+  font-family: 'Play', sans-serif !important;
 }
 
 /* App Layout */
@@ -56,7 +56,7 @@
 /* Background and Font Styling */
 body {
   background-color: #212528;
-  font-family: "Play", sans-serif;
+  font-family: 'Play', sans-serif;
   color: white;
 }
 
@@ -68,5 +68,9 @@ body {
 /* Documentation Link */
 .read-the-docs {
   color: #888;
+}
+
+* {
+  font-family: 'Play', sans-serif;
 }
 

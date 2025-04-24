@@ -1,11 +1,19 @@
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from datetime import datetime
+
 import os
 
 def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
+    # Register Play font
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    font_path = os.path.join(project_root, "src", "assets", "fonts", "Play-Regular.ttf")
+    font_path_bold = os.path.join(project_root, "src", "assets", "fonts", "Play-Bold.ttf")
+
     img_path = os.path.join(project_root, "src", "assets", "seal_no_border.png")
     logo = Image(img_path, width=95, height=95)
     
@@ -18,22 +26,20 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     normal = styles["Normal"]
     title  = styles["Title"]
     title.fontSize = 14
+    
+    # Register the fonts
+    pdfmetrics.registerFont(TTFont("Play", font_path))
+    pdfmetrics.registerFont(TTFont("Play-Bold", font_path_bold))
+    
+    # Create custom styles with Play font
+    normal.fontName = "Play"
+    title.fontName = "Play-Bold"
+    no_wrap = ParagraphStyle(name="NoWrap", parent=normal, fontSize=8, leading=10, fontName="Play")
+    header_style = ParagraphStyle(name="Header", parent=normal, fontSize=9, leading=10, fontName="Play-Bold")
 
     elements = []
     elements.append(logo)
     elements.append(Spacer(1, 12))  # Add 12 points of space below the logo
-
-    # --- 1) Header block ---
-    elements.append(Paragraph("STATEMENT OF NEED (SON)", title))
-    elements.append(Paragraph(
-        "For IT, Director of IT approval  ________________________________",
-        normal
-    ))
-    elements.append(Spacer(1, 6))
-    elements.append(Paragraph(
-        "Order to be placed by:   IT Staff      Procurement Contracting Officer",
-        normal
-    ))
     elements.append(Spacer(1, 6))
     elements.append(Paragraph("Cybersecurity related – consider funding", normal))
     elements.append(Spacer(1, 12))
@@ -42,14 +48,14 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     info_data = [[
         "Requester:", lines[0]["requester"],
         "CO:",        "",               # fill in as needed
-        "Date:",      "",               # or datetime.now().strftime("%m/%d/%y")
+        "Date:",      datetime.now().strftime("%m/%d/%y"),               # or datetime.now().strftime("%m/%d/%y")
         "RQ1:",       ""
     ]]
     # adjust colWidths to fit your page
     info_table = Table(info_data, colWidths=[60, 100, 30, 80, 40, 80, 30, 80])
     info_table.setStyle(TableStyle([
-        ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
-        ("FONTSIZE",   (0,0), (-1,0),  9),
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#eeeeee")),
+        ("FONTNAME",   (0,0), (-1,0), "Play-Bold"),
         ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
         ("LINEBELOW",  (1,0), (1,0),   1, colors.black),
         ("LINEBELOW",  (3,0), (3,0),   1, colors.black),
@@ -69,16 +75,19 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     # --- 4) Main data table with multi-line headers ---
     # Build your header row exactly as the PDF shows, using "\n" for line breaks:
     header = [
-        "BOC",
-        "Fund",
-        "Location",
-        "Description",
-        "Qty",
-        "Price Each",
-        "Estimated\nTotal Cost",
-        "Statement of Need/\nJustification"
+    Paragraph("BOC", header_style),
+    Paragraph("Fund", header_style),
+    Paragraph("Location", header_style),
+    Paragraph("Description", header_style),
+    Paragraph("Qty", header_style),
+    Paragraph("Price Each", header_style),
+    Paragraph("Estimated<br/>Total Cost", header_style),
+    Paragraph("Statement of Need/<br/>Justification", header_style),
     ]
+    
     data = [header]
+    IT_fund = False
+    
     for line in lines:
         data.append([
             line["budgetObjCode"],
@@ -90,6 +99,12 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
             f"${line['totalPrice']:.2f}",
             line["justification"]
         ])
+        
+        # Determine if fund is 51140E or 51140X
+        if line["fund"] == "51140E" or line["fund"] == "51140X":
+            IT_fund = True
+        else:
+            IT_fund = False 
 
     # Set column widths so everything lines up nicely
     col_widths = [50, 60, 60, 180, 30, 50, 60, 120]
@@ -97,7 +112,7 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     table.setStyle(TableStyle([
         # Header styling
         ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#eeeeee")),
-        ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTNAME",   (0,0), (-1,0), "Play-Bold"),  # Make header bold
         ("FONTSIZE",   (0,0), (-1,0),  8),
         ("ALIGN",      (0,0), (-1,0), "CENTER"),
         # Body styling
@@ -110,6 +125,8 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     ]))
     elements.append(table)
     elements.append(Spacer(1, 12))
+    elements.append(Paragraph("*This statement of need approved with a 10% or $100 allowance, whichever is lower, "
+                              "for any additional cost over the estimated amount", no_wrap))
 
     # --- 5) Footer (TOTAL line, final approval, comments) ---
     elements.append(Paragraph(

@@ -16,6 +16,7 @@ import WarningIcon from '@mui/icons-material/WarningAmber';
 import PendingIcon from '@mui/icons-material/Pending';
 import SuccessIcon from '@mui/icons-material/CheckCircleOutline';
 import { useUUIDStore } from "../../services/UUIDService";
+import "./ApprovalsTableRow.css";
 
 const API_URL_ASSIGN = `${import.meta.env.VITE_API_URL}/api/assignIRQ1_ID`;
 const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;

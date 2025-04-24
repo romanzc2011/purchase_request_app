@@ -1,4 +1,6 @@
 import React from 'react'
+import { Button as MuiButton } from '@mui/material'
+import "../approvals/ApprovalTable.css"
 
 interface ButtonProps {
     label: string;
@@ -10,9 +12,25 @@ interface ButtonProps {
 // Define button component
 const Buttons: React.FC<ButtonProps> = ({ label, className, disabled, onClick }) => {
   return (
-    <button disabled={disabled} className={className || "btn btn-primary me-3"} onClick={ onClick }>
+    <MuiButton 
+      disabled={disabled} 
+      className={className || "assign-button"} 
+      onClick={onClick}
+      variant="contained"
+      sx={{ 
+        fontFamily: "'Play', sans-serif !important",
+        textTransform: 'none',
+        backgroundColor: 'maroon',
+        '&:hover': {
+          backgroundColor: 'darkred'
+        },
+        '& .MuiButtonBase-root': {
+          fontFamily: "'Play', sans-serif !important"
+        }
+      }}
+    >
         {label}
-    </button>
+    </MuiButton>
   );
 };
 
