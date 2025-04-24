@@ -32,4 +32,5 @@ documentation
 *.sw?
 api/indexdir*
 api/web.config
+api/rendered_templates
 
