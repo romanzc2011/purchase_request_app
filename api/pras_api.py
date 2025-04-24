@@ -330,51 +330,27 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     
      ##########################################################
     # CREATE EMAIL TEMPLATE HERE
-    # Check if the template is a Word document (.docx)
     try:
-        if template_path.lower().endswith('.docx'):
-            context = {
-                "ID": shared_id,
-                "requester": requester,
-                "lines": processed_lines,
-            }
-            
-            # Render the template
-            logger.debug(f"Rendering template with context: {context}")
-            
-            doc = DocxTemplate(template_path)
-            doc.render(context)
-            
-            # Generate a unique filename for the rendered document
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            rendered_filename = f"purchase_request_{shared_id}_{timestamp}.docx"
-            rendered_docx_path = os.path.join(rendered_dir, rendered_filename)
-            logger.info(f"RENDERED DOCX PATH: {rendered_docx_path}")
-            
-            # Create PDF of purchase request for email
-            os.makedirs(rendered_dir, exist_ok=True)
-            
-            pdf_filename = f"purchase_request_{shared_id}_{timestamp}.pdf"
-            pdf_path = os.path.join(rendered_dir, pdf_filename)
-            make_purchase_request_pdf(processed_lines, pdf_path)
-            logger.info(f"PDF generated at: {pdf_path}")
-            
-      
-            email_svc.set_rendered_docx_path(pdf_path)   # reuse same field
-            email_svc.send_notification(
-                template_path=None,          # you can skip HTML template altogether
-                template_data=None,
-                subject="Your Purchase Order PDF",
-                request_status="NEW REQUEST"
-            )
-            
-            if not os.path.exists(rendered_docx_path):
-                logger.error(f"Rendered document does not exist at path: {rendered_docx_path}")
-                raise HTTPException(status_code=500, detail="Failed to create rendered document")
+        # Create PDF of purchase request for email
+        os.makedirs(rendered_dir, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        pdf_filename = f"purchase_request_{shared_id}_{timestamp}.pdf"
+        pdf_path = os.path.join(rendered_dir, pdf_filename)
+        make_purchase_request_pdf(processed_lines, pdf_path)
+        logger.info(f"PDF generated at: {pdf_path}")
+  
+        email_svc.set_rendered_docx_path(pdf_path)   # reuse same field
+        email_svc.send_notification(
+            template_path=None,          # you can skip HTML template altogether
+            template_data=None,
+            subject="Your Purchase Order PDF",
+            request_status="NEW REQUEST"
+        )
             
     except Exception as e:
-        logger.error(f"Error rendering template: {e}")
-        raise HTTPException(status_code=500, detail=f"Error rendering template: {e}")
+        logger.error(f"Error generating PDF: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating PDF: {e}")
     
     return JSONResponse(content={"message": "Processing started in background"})
     
