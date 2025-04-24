@@ -33,4 +33,5 @@ documentation
 api/indexdir*
 api/web.config
 api/rendered_templates
+api/pdf_output
 

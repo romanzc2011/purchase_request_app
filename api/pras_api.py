@@ -235,7 +235,6 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     # Extract requester 
     requester = data.get("requester")
     items = data.get("items", [])
-    item_count = data.get("itemCount", len(items))
     
     logger.info(f"ITEMS: {items}")
     logger.info(f"REQUESTER: {requester}")
@@ -306,11 +305,13 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     # Configure directory paths
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     rendered_dir = os.path.join(project_root, "api", "rendered_templates")
+    pdf_output_dir = os.path.join(project_root, "api", "pdf_output")
     template_path = os.path.join(project_root, "api", "templates", "son_template_lines.docx")
     
     logger.info(f"PROJECT ROOT: {project_root}")
     logger.info(f"RENDERED DIR: {rendered_dir}")
     logger.info(f"TEMPLATE PATH: {template_path}")  
+    logger.info(f"PDF OUTPUT DIR: {pdf_output_dir}")
     
     email_svc.set_template_path(template_path)
     email_svc.set_rendered_dir(rendered_dir)
@@ -334,9 +335,8 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         # Create PDF of purchase request for email
         os.makedirs(rendered_dir, exist_ok=True)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        pdf_filename = f"purchase_request_{shared_id}_{timestamp}.pdf"
-        pdf_path = os.path.join(rendered_dir, pdf_filename)
+        pdf_filename = f"statement_of_need.pdf"
+        pdf_path = os.path.join(pdf_output_dir, pdf_filename)
         make_purchase_request_pdf(processed_lines, pdf_path)
         logger.info(f"PDF generated at: {pdf_path}")
   

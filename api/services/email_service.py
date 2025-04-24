@@ -61,29 +61,6 @@ class EmailService:
         }
         self.request_status = None
 
-    # def _convert_to_pdf(self, docx_path):
-    #     """
-    #     Convert a Word document to PDF
-        
-    #     Args:
-    #         docx_path: Path to the Word document
-            
-    #     Returns:
-    #         str: Path to the generated PDF file
-    #     """
-    #     try:
-    #         # Generate PDF path in the same directory as the DOCX
-    #         pdf_path = os.path.splitext(docx_path)[0] + '.pdf'
-            
-    #         # Convert the document
-    #         convert(docx_path, pdf_path)
-    #         logger.info(f"Successfully converted {docx_path} to PDF: {pdf_path}")
-            
-    #         return pdf_path
-    #     except Exception as e:
-    #         logger.error(f"Error converting document to PDF: {e}")
-    #         raise
-
     def send_notification(self, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
         """
         Send notifications based on request status or directly to a recipient
