@@ -12,7 +12,6 @@ import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import MoreDataButton from "./MoreDataButton";
 import { FormValues } from "../../types/formTypes";
 import { fetchSearchData } from "./SearchBar";
 import Buttons from "../purchase_req/Buttons";
@@ -573,39 +572,50 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
   const allColumns = [toggleColumn, ...dataColumns];
 
   return (
-    <Box>
-      <Typography variant="h6" sx={{ mb: 2 }}>Approval Table</Typography>
-      <Box sx={{ height: "calc(100vh - 200px)", width: "100%" }}>
-        <DataGrid
-          rows={flatRows}
-          columns={allColumns}
-          getRowId={(row: any) => row.id}
-          getRowClassName={({ row }: { row: any }) =>
-            (row as FlatRow).isGroup ? "group-header-row" : ""
-          }
-          initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-          pageSizeOptions={[25, 50, 100]}
-          disableRowSelectionOnClick
-          rowHeight={60}
-          sx={{
-            bgcolor: "#2c2c2c",
-            // Cells & rows
-            ...cellRowStyles,
+    <Box sx={{ 
+      width: "100%",
+      height: "100%",
+      display: "flex",
+      flexDirection: "column"
+    }}>
+      <DataGrid
+        rows={flatRows}
+        columns={allColumns}
+        getRowId={(row: any) => row.id}
+        getRowClassName={({ row }: { row: any }) =>
+          (row as FlatRow).isGroup ? "group-header-row" : ""
+        }
+        initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+        pageSizeOptions={[25, 50, 100]}
+        disableRowSelectionOnClick
+        rowHeight={60}
+        sx={{
+          flex: 1,
+          bgcolor: "#2c2c2c",
+          border: 'none',
+          height: '100%',
+          '& .MuiDataGrid-main': {
+            overflow: 'auto'
+          },
+          '& .MuiDataGrid-virtualScroller': {
+            overflow: 'auto !important'
+          },
+          // Cells & rows
+          ...cellRowStyles,
 
-            // Column headers
-            ...headerStyles,
+          // Column headers
+          ...headerStyles,
 
-            // Footer container
-            ...footerStyles,
+          // Footer container
+          ...footerStyles,
 
-            // Pagination labels
-            ...paginationStyles,
+          // Pagination labels
+          ...paginationStyles,
 
-            // any one-off tweaks
-            "& .MuiDataGrid-cellCheckbox": { color: "yellow" },
-          } as DataGridSxProps}
-        />
-      </Box>
+          // any one-off tweaks
+          "& .MuiDataGrid-cellCheckbox": { color: "yellow" },
+        } as DataGridSxProps}
+      />
       <style>{`
         .group-header-row .MuiDataGrid-cell {
           background-color: #3c3c3c !important;
@@ -626,7 +636,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 400,
+          width: 700,
           bgcolor: '#2c2c2c',
           border: '2px solid #800000',
           boxShadow: 24,
@@ -662,7 +672,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 400,
+          width: 700,
           bgcolor: '#2c2c2c',
           border: '2px solid #800000',
           boxShadow: 24,

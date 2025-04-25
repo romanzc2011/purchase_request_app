@@ -3,6 +3,7 @@ import { FormValues } from "../../types/formTypes";
 //import ApprovalsTable from "./ApprovalTable";
 import ApprovalTableDG from "./ApprovalTableDG";
 import SearchBar from "./SearchBar";
+import { Box } from "@mui/material";
 
 /* INTERFACE */
 interface ApprovalTableProps {
@@ -15,20 +16,28 @@ function ApprovalPageMain({onDelete, resetTable }: ApprovalTableProps) {
     const [searchQuery, setSearchQuery] = useState("");
     
     return (
-        <div>
-            <SearchBar setSearchQuery={setSearchQuery} />
-            <ApprovalTableDG
-                onDelete={(ID: string) =>
-                    setDataBuffer(
-                        dataBuffer.filter(
-                            (item) => item.ID !== ID
+        <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            height: '100%'
+        }}>
+            <Box sx={{ mb: 2 }}>
+                <SearchBar setSearchQuery={setSearchQuery} />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+                <ApprovalTableDG
+                    onDelete={(ID: string) =>
+                        setDataBuffer(
+                            dataBuffer.filter(
+                                (item) => item.ID !== ID
+                            )
                         )
-                    )
-                }
-                resetTable={resetTable}
-                searchQuery={searchQuery}
-            />
-        </div>
+                    }
+                    resetTable={resetTable}
+                    searchQuery={searchQuery}
+                />
+            </Box>
+        </Box>
     )
 }
 

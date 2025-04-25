@@ -155,12 +155,25 @@ function AddItemsForm({
     }, [watch]);
 
     return (
-        <Box sx={{ display: 'flex' }}>
+        <Box sx={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            height: '100%',
+            overflow: 'auto'
+        }}>
             {/*************************************************************************************** */}
             {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
               once user has finished adding items and reviewed everything */}
             {/*************************************************************************************** */}
-            <form onSubmit={handleSubmit(handleAddItem, onError)}>
+            <form 
+                onSubmit={handleSubmit(handleAddItem, onError)}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    overflow: 'auto'
+                }}
+            >
                 {/******************************************************************************************* */}
                 {/** REQUESTER ****************************************************************************** */}
                 {/******************************************************************************************* */}

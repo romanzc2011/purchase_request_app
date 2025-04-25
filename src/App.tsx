@@ -4,14 +4,12 @@ import "./App.css";
 import { Routes, Route } from "react-router-dom";
 import AddItemsForm from "./components/purchase_req/AddItemsForm";
 import SubmitApprovalTable from "./components/purchase_req/SumbitToApproval";
-import PurchaseSidenav from "./components/purchase_req/PurchaseSideBar";
-import AlertMessage from "./components/AlertMessage";
+import { Layout } from "./components/layout";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 import ApprovalPageMain from "./components/approvals/ApprovalPageMain";
 import { IFile } from "./types/IFile";
 import LoginDialog from "./components/LoginDialog";
-const baseURL = import.meta.env.VITE_API_URL;
 
 interface AppProps {
     isLoggedIn: boolean;
@@ -24,15 +22,12 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     /* *********************************************************************************** */
     /* SHARED DATA BUFFER */
     const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
     const [loginOpen, setLoginOpen] = useState(!isLoggedIn);
     
     // Default ID for coms that need it
     const defaultId = `TEMP-${Date.now()}`;
-
-    const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
     /* *********************************************************************************** */
     // Reset the Submit Table after submission
@@ -79,34 +74,25 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     }
 
     return (
-        <Box sx={{ display: "flex" }}>
+        <Box sx={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100vh',
+            width: '100%'
+        }}>
             {/* Sidebar Navigation */}
-            <PurchaseSidenav
-                isOpen={sidebarOpen}
-                toggleSidebar={toggleSidebar}
+            {/* Layout component has the sidebar/header/main content */}
+            <Layout
                 ACCESS_GROUP={ACCESS_GROUP}
                 CUE_GROUP={CUE_GROUP}
                 IT_GROUP={IT_GROUP}
-            />
-
-            {/********************************************************************* */}
-            {/* MAIN SECTION */}
-            {/********************************************************************* */}
-            <Box
-                component={"main"}
-                sx={{
-                    padding: 3,
-                    marginLeft: sidebarOpen ? "195px" : "60px", // Adjust dynamically
-                    transition: "margin 0.3s ease", // Smooth transition
-                }}
             >
-                <Toolbar /> {/* Space to offset AppBar */}
                 <Routes>
                     {/* Define Routes */}
                     {/* Password protect the routes, only authorized users can visit Approvals table */}
-                    <Route path="/approvals-table" element={element} />;
+                    <Route path="/approvals" element={element} />;
                     <Route
-                        path="/purchase-request"
+                        path="/create-request"
                         element={
                             <>
                                 {/********************************************************************* */}
@@ -144,7 +130,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                         }
                     />
                 </Routes>
-            </Box>
+            </Layout>
         </Box>
     );
 }

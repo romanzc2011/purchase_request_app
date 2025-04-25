@@ -6,16 +6,6 @@
   font-family: 'Play', sans-serif !important;
 }
 
-/* App Layout */
-
-
-/* Sidebar-specific styles (handled by Material-UI) */
-.sidebar {
-  background-color: #f8f9fa;
-  color: white;
-  transition: width 0.3s ease-in-out;
-}
-
 /* Main Content Area */
 
 /* Logo Styling */
