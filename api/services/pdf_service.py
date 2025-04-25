@@ -36,6 +36,8 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     title.fontName = "Play-Bold"
     no_wrap = ParagraphStyle(name="NoWrap", parent=normal, fontSize=8, leading=10, fontName="Play")
     header_style = ParagraphStyle(name="Header", parent=normal, fontSize=9, leading=10, fontName="Play-Bold")
+    # Add cell style for wrapping text
+    cell_style = ParagraphStyle(name="Cell", parent=normal, fontSize=9, leading=11, fontName="Play")
 
     elements = []
     elements.append(logo)
@@ -90,14 +92,14 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     
     for line in lines:
         data.append([
-            line["budgetObjCode"],
-            line["fund"],
-            line["location"],
-            line["itemDescription"],
-            line["quantity"],
-            f"${line['priceEach']:.2f}",
-            f"${line['totalPrice']:.2f}",
-            line["justification"]
+            Paragraph(str(line["budgetObjCode"]), cell_style),
+            Paragraph(str(line["fund"]), cell_style),
+            Paragraph(str(line["location"]), cell_style),
+            Paragraph(str(line["itemDescription"]), cell_style),
+            Paragraph(str(line["quantity"]), cell_style),
+            Paragraph(f"${line['priceEach']:.2f}", cell_style),
+            Paragraph(f"${line['totalPrice']:.2f}", cell_style),
+            Paragraph(str(line["justification"]), cell_style)
         ])
         
         # Determine if fund is 51140E or 51140X
@@ -122,6 +124,11 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
         ("ALIGN",      (4,1), (6,-1),   "RIGHT"),
         # Add some padding under header
         ("BOTTOMPADDING", (0,0), (-1,0), 6),
+        # Add padding to cells
+        ("LEFTPADDING", (0,0), (-1,-1), 6),
+        ("RIGHTPADDING", (0,0), (-1,-1), 6),
+        ("TOPPADDING", (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
     ]))
     elements.append(table)
     elements.append(Spacer(1, 12))

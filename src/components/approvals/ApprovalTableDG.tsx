@@ -5,7 +5,8 @@ import {
   Box,
   TextField,
   Typography,
-  Button
+  Button,
+  Modal
 } from "@mui/material";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
@@ -20,7 +21,9 @@ import WarningIcon from "@mui/icons-material/Warning";
 import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
 import { useAssignIRQ1 } from "../../custom_hooks/useAssignIRQ1";
+import { SxProps, Theme } from "@mui/material";
 import "./ApprovalTable.css";
+import { setFips } from "crypto";
 
 interface ApprovalTableProps {
   onDelete: (ID: string) => void;
@@ -30,6 +33,61 @@ interface ApprovalTableProps {
 
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
+
+// Define style objects outside of the component
+const cellRowStyles: SxProps<Theme> = {
+  "& .MuiDataGrid-cell": {
+    color: "white",
+    background: "#2c2c2c",
+    fontSize: "0.95rem" // Increased font size for cells
+  },
+  "& .MuiDataGrid-row": {
+    background: "#2c2c2c"
+  },
+  // Exclude Item Description column from font size increase
+  "& .MuiDataGrid-cell[data-field='itemDescription']": {
+    fontSize: "0.875rem !important" // Keep original font size for Item Description
+  },
+  // Shrink font size of requester column
+  "& div[data-field='requester']": {
+    fontSize: "0.85rem !important"
+  }
+};
+
+const headerStyles: SxProps<Theme> = {
+  "& .MuiDataGrid-columnHeaders, .MuiDataGrid-columnHeader": {
+    background: "linear-gradient(to top, #2c2c2c, #800000) !important",
+    color: "white",
+  },
+  "& .MuiDataGrid-columnHeaderTitle": {
+    fontWeight: "bold",
+    fontSize: "1.1rem" // Increased font size for column headers
+  },
+};
+
+const footerStyles: SxProps<Theme> = {
+  "& .MuiDataGrid-footerContainer": {
+    backgroundColor: "#2c2c2c",
+    borderTop: "1px solid rgba(255,255,255,0.2)",
+  },
+};
+
+const paginationStyles: SxProps<Theme> = {
+  "& .MuiTablePagination-root": {
+    color: "white",
+    fontSize: "0.95rem" // Increased font size for pagination
+  },
+  "& .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows": {
+    color: "white",
+    fontSize: "0.95rem" // Increased font size for pagination labels
+  },
+};
+
+// Define a type for the DataGrid sx prop
+type DataGridSxProps = {
+  bgcolor: string;
+  [key: string]: any;
+};
 
 /***********************************************************************************/
 // FETCH APPROVAL DATA
@@ -52,6 +110,14 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
   const { data: approvalData } = useQuery({ queryKey: ["approvalData"], queryFn: fetchApprovalData });
   const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
   const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string, string>>({});
+
+  // ITEM DESCRIPTION MODAL - for when length is too long
+  const [openDesc, setOpenDesc] = useState<boolean>(false);
+  const [fullDesc, setFullDesc] = useState<string>("");
+
+  // JUSTIFICATION MODAL - for when length is too long
+  const [openJust, setOpenJust] = useState<boolean>(false);
+  const [fullJust, setFullJust] = useState<string>("");
 
   // track which groups are expanded
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -98,10 +164,35 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
     }
   });
 
+  /***********************************************************************************/
   // Handle Approval/Deny/Download
   const handleApprove = (ID: string) => approveDenyMutation.mutate({ ID, action: "approve" });
   const handleDeny = (ID: string) => approveDenyMutation.mutate({ ID, action: "deny" });
   const handleDownload = (ID: string) => { /* TODO: download logic */ console.log("download", ID); };
+
+  /***********************************************************************************/
+  // ITEM DESCRIPTION MODAL
+  const handleOpenDesc = (desc: string) => {
+    setFullDesc(desc);
+    setOpenDesc(true);
+  };
+
+  const handleCloseDesc = () => {
+    setOpenDesc(false);
+    setFullDesc("");
+  };
+
+  /***********************************************************************************/
+  // JUSTIFICATION MODAL
+  const handleOpenJust = (just: string) => {
+    setFullJust(just);
+    setOpenJust(true);
+  };
+
+  const handleCloseJust = () => {
+    setOpenJust(false);
+    setFullJust("");
+  };
 
   // base rows
   const baseRows = (searchQuery ? searchData : approvalData) || [];
@@ -186,6 +277,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         const id = params.row.ID;
         const existingIRQ1 = assignedIRQ1s[id] || "";
         const currentDraftIRQ1 = draftIRQ1[id] || "";
+
         return (
           <Box sx={{ display: "flex", gap: 1 }}>
             <Buttons
@@ -333,7 +425,35 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
       field: "itemDescription",
       headerName: "Item Description",
       align: "center",
-      width: 200
+      width: 200,
+      sortable: false,
+      renderCell: (params) => {
+        const desc: string = params.value || "";
+        const truncatedDesc = desc.length > 20
+          ? desc.slice(0, 20) + "..."
+          : desc;
+
+        return (
+          <Button
+            onClick={() => handleOpenDesc(desc)}
+            variant="text"
+            sx={{
+              padding: 0,
+              minWidth: 0,
+              color: "inherit"
+            }}
+          >
+            <Typography variant="body2" sx={{
+              color: "inherit",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis"
+            }}>
+              {truncatedDesc}
+            </Typography>
+          </Button>
+        );
+      }
     },
 
     /***********************************************************************************/
@@ -343,10 +463,35 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
       field: "justification",
       headerName: "Justification",
       align: "center",
-      width: 130,
-      renderCell: params => (
-        <MoreDataButton name="Justification" data={params.value} />
-      )
+      width: 200,
+      sortable: false,
+      renderCell: (params) => {
+        const just: string = params.value || "";
+        const truncatedJust = just.length > 20
+          ? just.slice(0, 20) + "..."
+          : just;
+
+        return (
+          <Button
+            onClick={() => handleOpenJust(just)}
+            variant="text"
+            sx={{
+              padding: 0,
+              minWidth: 0,
+              color: "inherit"
+            }}
+          >
+            <Typography variant="body2" sx={{
+              color: "inherit",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis"
+            }}>
+              {truncatedJust}
+            </Typography>
+          </Button>
+        );
+      }
     },
 
     /***********************************************************************************/
@@ -398,7 +543,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
       width: 300,
       sortable: false,
       renderCell: params => (
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center", width: "100%", height: "100%"}}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
           <Button
             variant="contained"
             color="success"
@@ -434,8 +579,8 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         <DataGrid
           rows={flatRows}
           columns={allColumns}
-          getRowId={row => row.id}
-          getRowClassName={({ row }) =>
+          getRowId={(row: any) => row.id}
+          getRowClassName={({ row }: { row: any }) =>
             (row as FlatRow).isGroup ? "group-header-row" : ""
           }
           initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
@@ -443,44 +588,103 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
           disableRowSelectionOnClick
           rowHeight={60}
           sx={{
-            background: "#2c2c2c",
-
+            bgcolor: "#2c2c2c",
             // Cells & rows
-            "& .MuiDataGrid-cell": { color: "white", background: "#2c2c2c" },
-            "& .MuiDataGrid-row": { background: "#2c2c2c" },
+            ...cellRowStyles,
 
             // Column headers
-            "& .MuiDataGrid-columnHeaders, .MuiDataGrid-columnHeader": {
-              background: "linear-gradient(to top, #2c2c2c, #800000) !important",
-              color: "white",
-            },
-            "& .MuiDataGrid-columnHeaderTitle": { 
-              fontWeight: "bold",
-            },
+            ...headerStyles,
 
             // Footer container
-            "& .MuiDataGrid-footerContainer": {
-              backgroundColor: "#2c2c2c",
-              borderTop: "1px solid rgba(255,255,255,0.2)",
-            },
+            ...footerStyles,
 
-            // Pagination root & labels
-            "& .MuiTablePagination-root": {
-              color: "white",
-            },
-            "& .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows": {
-              color: "white",
-            },
+            // Pagination labels
+            ...paginationStyles,
 
-          }}
+            // any one-off tweaks
+            "& .MuiDataGrid-cellCheckbox": { color: "yellow" },
+          } as DataGridSxProps}
         />
       </Box>
       <style>{`
         .group-header-row .MuiDataGrid-cell {
           background-color: #3c3c3c !important;
           font-weight: bold;
+          font-size: 1.05rem !important; /* Increased font size for group headers */
         }
       `}</style>
+
+      {/* Item Description Modal */}
+      <Modal
+        open={openDesc}
+        onClose={handleCloseDesc}
+        aria-labelledby="item-description-modal"
+        aria-describedby="full-item-description"
+      >
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: '#2c2c2c',
+          border: '2px solid #800000',
+          boxShadow: 24,
+          p: 4,
+          color: 'white',
+          borderRadius: 1
+        }}>
+          <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
+            Item Description
+          </Typography>
+          <Typography id="full-item-description" sx={{ mt: 2, whiteSpace: 'pre-wrap' }}>
+            {fullDesc}
+          </Typography>
+          <Button
+            onClick={handleCloseDesc}
+            variant="contained"
+            sx={{ mt: 3, bgcolor: '#800000', '&:hover': { bgcolor: '#600000' } }}
+          >
+            Close
+          </Button>
+        </Box>
+      </Modal>
+
+      {/* Justification Modal */}
+      <Modal
+        open={openJust}
+        onClose={handleCloseJust}
+        aria-labelledby="justification-modal"
+        aria-describedby="full-justification"
+      >
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: '#2c2c2c',
+          border: '2px solid #800000',
+          boxShadow: 24,
+          p: 4,
+          color: 'white',
+          borderRadius: 1
+        }}>
+          <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
+            Justification
+          </Typography>
+          <Typography id="full-justification" sx={{ mt: 2, whiteSpace: 'pre-wrap' }}>
+            {fullJust}
+          </Typography>
+          <Button
+            onClick={handleCloseJust}
+            variant="contained"
+            sx={{ mt: 3, bgcolor: '#800000', '&:hover': { bgcolor: '#600000' } }}
+          >
+            Close
+          </Button>
+        </Box>
+      </Modal>
     </Box>
   );
 }
