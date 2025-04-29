@@ -111,8 +111,10 @@ def get_session():
 ###################################################################################################   
 ## Get all data from Approval
 def get_all_approval(db_session: Session):
-    results = db_session.query(Approval).all()
-    return results
+    return db_session.query(Approval).all()
+
+def get_approval_by_id(db_session: Session, ID: str):
+    return db_session.query(Approval).filter(Approval.ID == ID).all()
 
 ###################################################################################################
 # Insert data
@@ -372,6 +374,7 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
         else:
             logger.error(f"Object with uuid {uuid} not found in {table}")
             raise ValueError(f"Object with uuid {uuid} not found in {table}")
+        
             
 ###################################################################################################
 # Get uuids for multiple IDs

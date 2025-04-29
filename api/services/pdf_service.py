@@ -4,54 +4,78 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.graphics.shapes import Drawing, Rect
 from datetime import datetime
-
+from settings import settings
+from loguru import logger
+from pathlib import Path
 import os
 
-def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
-    # Register Play font
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    font_path = os.path.join(project_root, "src", "assets", "fonts", "Play-Regular.ttf")
-    font_path_bold = os.path.join(project_root, "src", "assets", "fonts", "Play-Bold.ttf")
+def make_purchase_request_pdf(
+    rows: list[dict],
+    output_path: Path
+) -> Path:
 
-    img_path = os.path.join(project_root, "src", "assets", "seal_no_border.png")
-    logo = Image(img_path, width=95, height=95)
-    
+    # ensure output folder exits
+    output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+    logger.info(f"Writing PDF to: {output_path}")
+        
+    # register fonts
+    project_root = Path(__file__).resolve().parent.parent.parent
+
+    font_path = project_root / "src" / "assets" / "fonts" / "Play-Regular.ttf"
+    font_path_bold = project_root / "src" / "assets" / "fonts" / "Play-Bold.ttf"
+
+    pdfmetrics.registerFont(TTFont("Play", str(font_path)))
+    pdfmetrics.registerFont(TTFont("Play-Bold", str(font_path_bold)))
+
+    # build document
     doc = SimpleDocTemplate(
-        filename, pagesize=LETTER,
-        rightMargin=30, leftMargin=30,
-        topMargin=30, bottomMargin=18
+        str(output_path),
+        pagesize=LETTER,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=72
     )
+    
+    # build document
     styles = getSampleStyleSheet()
     normal = styles["Normal"]
+    normal.fontName = "Play"
+    header_style = ParagraphStyle(
+        name="Header", parent=normal, 
+        fontSize=9, leading=11, fontName="Play-Bold"
+    )
+    cell_style = ParagraphStyle(
+        name="Cell", parent=normal, 
+        fontSize=9, leading=11, fontName="Play"
+    )
     title  = styles["Title"]
     title.fontSize = 14
     
-    # Register the fonts
-    pdfmetrics.registerFont(TTFont("Play", font_path))
-    pdfmetrics.registerFont(TTFont("Play-Bold", font_path_bold))
-    
-    # Create custom styles with Play font
-    normal.fontName = "Play"
-    title.fontName = "Play-Bold"
     no_wrap = ParagraphStyle(name="NoWrap", parent=normal, fontSize=8, leading=10, fontName="Play")
     header_style = ParagraphStyle(name="Header", parent=normal, fontSize=9, leading=10, fontName="Play-Bold")
     # Add cell style for wrapping text
     cell_style = ParagraphStyle(name="Cell", parent=normal, fontSize=9, leading=11, fontName="Play")
+    check_style = ParagraphStyle(name="Check", parent=normal, fontSize=8, leading=10, fontName="Play")
 
     elements = []
+    
+    # load logo
+    img_path = os.path.join(project_root, "src", "assets", "seal_no_border.png")
+    logo = Image(img_path, width=95, height=95)
+    
     elements.append(logo)
     elements.append(Spacer(1, 12))  # Add 12 points of space below the logo
     elements.append(Spacer(1, 6))
-    elements.append(Paragraph("Cybersecurity related – consider funding", normal))
-    elements.append(Spacer(1, 12))
-
+    
     # --- 2) Info row (Requester / CO / Date / RQ1) ---
+    first = rows[0]
     info_data = [[
-        "Requester:", lines[0]["requester"],
-        "CO:",        "",               # fill in as needed
-        "Date:",      datetime.now().strftime("%m/%d/%y"),               # or datetime.now().strftime("%m/%d/%y")
-        "RQ1:",       ""
+        "Requester:", first.get("requester", ""),
+        "Date:", datetime.now().strftime("%m/%d/%y"),
+        "RQ1:", first.get("IRQ1_ID", "")
     ]]
     # adjust colWidths to fit your page
     info_table = Table(info_data, colWidths=[60, 100, 30, 80, 40, 80, 30, 80])
@@ -66,51 +90,36 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     ]))
     elements.append(info_table)
     elements.append(Spacer(1, 12))
-
-    # --- 3) JOFOC paragraph ---
-    elements.append(Paragraph(
-        "Attached is JOFOC (AO370) for other than full and open competition.",
-        normal
-    ))
-    elements.append(Spacer(1, 12))
-
-    # --- 4) Main data table with multi-line headers ---
-    # Build your header row exactly as the PDF shows, using "\n" for line breaks:
+    
+    # header row for table
     header = [
-    Paragraph("BOC", header_style),
-    Paragraph("Fund", header_style),
-    Paragraph("Location", header_style),
-    Paragraph("Description", header_style),
-    Paragraph("Qty", header_style),
-    Paragraph("Price Each", header_style),
-    Paragraph("Estimated<br/>Total Cost", header_style),
-    Paragraph("Statement of Need/<br/>Justification", header_style),
+        Paragraph("BOC", header_style),
+        Paragraph("Fund", header_style),
+        Paragraph("Location", header_style),
+        Paragraph("Description", header_style),
+        Paragraph("Qty", header_style),
+        Paragraph("Price Each", header_style),
+        Paragraph("Total Price", header_style),
+        Paragraph("Justification", header_style),
     ]
+    table_data = [header]  # Add header row to table_data
     
-    data = [header]
-    IT_fund = False
-    
-    for line in lines:
-        data.append([
-            Paragraph(str(line["budgetObjCode"]), cell_style),
-            Paragraph(str(line["fund"]), cell_style),
-            Paragraph(str(line["location"]), cell_style),
-            Paragraph(str(line["itemDescription"]), cell_style),
-            Paragraph(str(line["quantity"]), cell_style),
-            Paragraph(f"${line['priceEach']:.2f}", cell_style),
-            Paragraph(f"${line['totalPrice']:.2f}", cell_style),
-            Paragraph(str(line["justification"]), cell_style)
+    # data rows
+    for row in rows:
+        table_data.append([
+            Paragraph(row.get("budgetObjCode", ""), cell_style),
+            Paragraph(row.get("fund", ""), cell_style),
+            Paragraph(row.get("location", ""), cell_style),
+            Paragraph(row.get("itemDescription", ""), cell_style),
+            Paragraph(str(row.get("quantity", "")), cell_style),
+            Paragraph(f"${row.get('priceEach', 0):.2f}", cell_style),
+            Paragraph(f"${row.get('totalPrice', 0):.2f}", cell_style),
+            Paragraph(row.get("justification", ""), cell_style)
         ])
-        
-        # Determine if fund is 51140E or 51140X
-        if line["fund"] == "51140E" or line["fund"] == "51140X":
-            IT_fund = True
-        else:
-            IT_fund = False 
 
-    # Set column widths so everything lines up nicely
+    # Set column widths so everything data up nicely
     col_widths = [50, 60, 60, 180, 30, 50, 60, 120]
-    table = Table(data, colWidths=col_widths, repeatRows=1)
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
         # Header styling
         ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#eeeeee")),
@@ -134,10 +143,14 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     elements.append(Spacer(1, 12))
     elements.append(Paragraph("*This statement of need approved with a 10% or $100 allowance, whichever is lower, "
                               "for any additional cost over the estimated amount", no_wrap))
+    
+    # Add cybersecurity text at the bottom left
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph("Cybersecurity related – consider funding", normal))
 
     # --- 5) Footer (TOTAL line, final approval, comments) ---
     elements.append(Paragraph(
-        f"TOTAL: {sum(line['totalPrice'] for line in lines):.2f}", normal
+        f"TOTAL: {sum(row['totalPrice'] for row in rows):.2f}", normal
     ))
     elements.append(Spacer(1, 12))
     elements.append(Paragraph(
@@ -146,8 +159,22 @@ def make_purchase_request_pdf(lines, filename="statement_of_need.pdf"):
     ))
     elements.append(Spacer(1, 12))
     elements.append(Paragraph("Comments/Additional Information Requested:", normal))
+    
+    # Cybersecurity option
+    # make a 10×10 pt box with a 1-pt stroke
+    d = Drawing(12, 12)
+    d.add(Rect(0, 0, 10, 10, strokeWidth=1, strokeColor=colors.black, fillColor=None))
+
+    small_text = Paragraph("Cybersecurity related – consider funding", check_style)
+    elements.append(Spacer(1, 6))
+    elements.append(
+        Table(
+        [[d, small_text]],
+        colWidths=[12, 300],  # adjust as you like
+        style=[("VALIGN", (0,0), (-1,-1), "MIDDLE")]
+        )
+    )
 
     doc.build(elements)
-
     
-    
+    return output_path

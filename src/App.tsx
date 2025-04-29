@@ -4,7 +4,7 @@ import "./App.css";
 import { Routes, Route } from "react-router-dom";
 import AddItemsForm from "./components/purchase_req/AddItemsForm";
 import SubmitApprovalTable from "./components/purchase_req/SumbitToApproval";
-import { Layout } from "./components/layout";
+import { Layout } from "./components/app_layout";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
 import ApprovalPageMain from "./components/approvals/ApprovalPageMain";

@@ -1,5 +1,5 @@
-from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException, status, UploadFile, File, Form, APIRouter
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException,  Query, status, UploadFile, File, Form, APIRouter
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -19,6 +19,7 @@ import pydantic_schemas as ps
 import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from docxtpl import DocxTemplate
+from pathlib import Path
 
 from services.auth_service import AuthService
 from services.db_service import get_session
@@ -29,6 +30,7 @@ from services.search_service import SearchService
 from services.uuid_service import uuid_service
 from services.pdf_service import make_purchase_request_pdf
 from managers.ipc_manager import ipc_instance
+from settings import settings
 
 """
 AUTHOR: Roman Campbell
@@ -45,8 +47,12 @@ uvicorn pras_api:app --port 5004
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 
+# ensure settings are loadeed and available
+settings.PDF_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)
+
 # Config variables
 UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
+PDF_OUTPUT_FOLDER = os.path.join(os.getcwd(), os.getenv("PDF_OUTPUT_FOLDER", "pdf_output"))
 LDAP_SERVER = os.getenv("LDAP_SERVER")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 LDAP_SERVICE_USER = os.getenv("LDAP_SERVICE_USER", "ADU\\service_account")
@@ -198,15 +204,49 @@ async def login(credentials: dict):
 ##########################################################################
 ## GET APPROVAL DATA
 @api_router.get("/getApprovalData", response_model=List[ps.ApprovalSchema])
-async def get_approval_data(current_user: User = Depends(get_current_user)):
+async def get_approval_data(
+    ID: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user)):
     session = next(get_session())
+    
     try:
-        approval = dbas.get_all_approval(session)
+        if ID:
+            approval = dbas.get_approval_by_id(session, ID)
+        else:
+            approval = dbas.get_all_approval(session)
         approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approval]
         return approval_data
     finally:
         session.close()
+        
+##########################################################################
+## GET STATEMENT OF NEED FORM
+@api_router.post("/downloadStatementOfNeedForm")
+async def downlaad_statement_of_need_form(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+):
+    ID = payload.get("ID")
+    rows = payload.get("approvalData")
 
+    if not ID or not isinstance(rows, list) or not rows:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    
+    # Build the PDF path
+    pdf_path: Path = settings.PDF_OUTPUT_FOLDER / f"statement_of_need-{ID}.pdf"
+    
+    # Generate PDF
+    make_purchase_request_pdf(rows=rows, output_path=pdf_path)
+    
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="Statement of need form not found")
+    
+    return FileResponse(
+        path=str(pdf_path),
+        media_type="application/pdf",
+        filename=pdf_path.name
+    )
+    
 ##########################################################################
 ## GET SEARCH DATA
 @api_router.get("/getSearchData/search", response_model=List[ps.ApprovalSchema])
