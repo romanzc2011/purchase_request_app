@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { FormValues } from "../../types/formTypes";
-//import ApprovalsTable from "./ApprovalTable";
 import ApprovalTableDG from "./ApprovalTableDG";
 import SearchBar from "./SearchBar";
 import { Box } from "@mui/material";
