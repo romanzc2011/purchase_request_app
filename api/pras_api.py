@@ -343,15 +343,11 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         logger.info(f"Using existing shared ID: {shared_id}")
         
     # Configure directory paths
+    logger.info("Configuring email template");
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     rendered_dir = os.path.join(project_root, "api", "rendered_templates")
     pdf_output_dir = os.path.join(project_root, "api", "pdf_output")
     template_path = os.path.join(project_root, "api", "templates", "son_template_lines.docx")
-    
-    logger.info(f"PROJECT ROOT: {project_root}")
-    logger.info(f"RENDERED DIR: {rendered_dir}")
-    logger.info(f"TEMPLATE PATH: {template_path}")  
-    logger.info(f"PDF OUTPUT DIR: {pdf_output_dir}")
     
     email_svc.set_template_path(template_path)
     email_svc.set_rendered_dir(rendered_dir)
@@ -369,15 +365,17 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         purchase_req_commit(processed_data)
         processed_lines.append(processed_data)
     
-     ##########################################################
+    ##########################################################
     # CREATE EMAIL TEMPLATE HERE
     try:
         # Create PDF of purchase request for email
         os.makedirs(rendered_dir, exist_ok=True)
         
-        pdf_filename = f"statement_of_need.pdf"
+        pdf_filename = f"statement_of_need-{shared_id}.pdf"
         pdf_path = os.path.join(pdf_output_dir, pdf_filename)
-        make_purchase_request_pdf(processed_lines, pdf_path)
+        # Convert string path to Path object
+        pdf_path_obj = Path(pdf_path)
+        make_purchase_request_pdf(processed_lines, pdf_path_obj)
         logger.info(f"PDF generated at: {pdf_path}")
   
         email_svc.set_rendered_docx_path(pdf_path)   # reuse same field
