@@ -235,8 +235,10 @@ async def downlaad_statement_of_need_form(
     # Build the PDF path
     pdf_path: Path = settings.PDF_OUTPUT_FOLDER / f"statement_of_need-{ID}.pdf"
     
+    is_cyber = False
+    
     # Generate PDF
-    make_purchase_request_pdf(rows=rows, output_path=pdf_path)
+    make_purchase_request_pdf(rows=rows, output_path=pdf_path, is_cyber=is_cyber)
     
     if not pdf_path.exists():
         raise HTTPException(status_code=404, detail="Statement of need form not found")
@@ -352,6 +354,8 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     email_svc.set_template_path(template_path)
     email_svc.set_rendered_dir(rendered_dir)
     
+    is_cyber = False
+    
     processed_lines = []
     # Process each item
     for item in items:
@@ -375,7 +379,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         pdf_path = os.path.join(pdf_output_dir, pdf_filename)
         # Convert string path to Path object
         pdf_path_obj = Path(pdf_path)
-        make_purchase_request_pdf(processed_lines, pdf_path_obj)
+        make_purchase_request_pdf(processed_lines, pdf_path_obj, is_cyber)
         logger.info(f"PDF generated at: {pdf_path}")
   
         email_svc.set_rendered_docx_path(pdf_path)   # reuse same field
