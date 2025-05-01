@@ -1,8 +1,6 @@
 /********************************************************/
 /* FORM VALUES */
 /********************************************************/
-
-
 export type FormValues = {
   UUID: string;
   ID: string;
@@ -22,8 +20,8 @@ export type FormValues = {
   justification: string;
   addComments: string;
   learnAndDev: {
-    trainNotAval: string;
-    needsNotMeet: string
+    trainNotAval: boolean;
+    needsNotMeet: boolean;
   };
   quantity: number;
   price: number;
@@ -60,9 +58,6 @@ export const BOCMenuItems = [
 /* LOCATIONS */
 /********************************************************/
 export const locations = [
-  "51140X",
-  "51140E",
-  "092000",
   "ALEX/C",
   "ALEX/J",
   "LAFY/C",

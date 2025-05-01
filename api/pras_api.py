@@ -32,6 +32,7 @@ from services.pdf_service import make_purchase_request_pdf
 from managers.ipc_manager import ipc_instance
 from settings import settings
 
+# TODO: Add dynamic comments in addComments field if Not Available and/Or Does Not Meet (trainNotAval, needsNotMeet)
 """
 AUTHOR: Roman Campbell
 DATE: 01/03/2025
@@ -274,21 +275,14 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     if not data:
         raise HTTPException(status_code=400, detail="Invalid data")
     
-    # Extract requester 
+    logger.debug(f"DATA: {data}")
+    
     requester = data.get("requester")
     items = data.get("items", [])
     
-    logger.info(f"ITEMS: {items}")
-    logger.info(f"REQUESTER: {requester}")
-    logger.info(f"DATA: {data}")
-    
     if not requester:
-        logger.error(f"Requester not found in data: {data}")
+        logger.error(f"Requester not found in ID: {data['ID']}")
         raise HTTPException(status_code=400, detail="Invalid requester")
-    
-    # Log the requester
-    logger.info(f"REQUESTER: {requester}")
-    logger.info(f"DATA: {data}")
     
     # Set the requester in the LDAP service
     ldap_svc.set_requester(requester)
@@ -398,6 +392,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params
+##########################################################################
 @api_router.post("/deleteFile")
 async def delete_file(data: dict, current_user: str = Depends(get_current_user)):
     """
@@ -431,6 +426,7 @@ async def delete_file(data: dict, current_user: str = Depends(get_current_user))
     
 ##########################################################################
 ## HANDLE FILE UPLOAD
+##########################################################################
 @api_router.post("/upload")
 async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
     # Ensure the upload directory exists
@@ -451,6 +447,7 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
+##########################################################################
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     request_id = str(uuid.uuid4())
@@ -468,11 +465,15 @@ async def log_requests(request: Request, call_next):
     return response
 
 #########################################################################
-## ASSIGN REQUISITION ID - IRQ number that is retrieved from JFIMS by Lela
-## This is called from the frontend to assign a requisition ID
-## to the purchase request. It also updates the UUID in the approval table.
+## ASSIGN REQUISITION ID
+##########################################################################
 @api_router.post("/assignIRQ1_ID")
 async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_user)):
+    """
+    This is called from the frontend to assign a requisition ID
+    to the purchase request. It also updates the UUID in the approval table.
+    IRQ number that is retrieved from JFIMS by Lela
+    """
     logger.info(f"Assigning requisition ID: {data.get('IRQ1_ID')}")
     
     # Get the original ID from the request
@@ -498,6 +499,7 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
 ## Approval status is APPROVED, this gets sent to requester
 @api_router.post("/approveDenyRequest")
 async def approve_deny_request(data: dict, current_user: User = Depends(get_current_user)):
+    # TODO: Add CO to the data but checking user's group membership
     try:
         # Check for both "ID" and "id" keys
         ID = data.get("ID")
@@ -693,14 +695,23 @@ def process_purchase_data(data):
                     local_purchase_cols["UUID"] = v
                 elif k in local_purchase_cols:
                     local_purchase_cols[k] = v
-                    
-            if 'learnAndDev' in local_purchase_cols:
-                local_purchase_cols['trainNotAval'] = local_purchase_cols['learnAndDev'].get('trainNotAval', False)
-                local_purchase_cols['needsNotMeet'] = local_purchase_cols['learnAndDev'].get('needsNotMeet', False)
-                del local_purchase_cols['learnAndDev']
+                
+            nested_lnd = data.get('learnAndDev', {})
+            train_not = bool(nested_lnd.get('trainNotAval', False))
+            needs_not = bool(nested_lnd.get('needsNotMeet', False))
+                
+            # Build addComments field if trainNotAval or needsNotMeet is True
+            if train_not or needs_not:
+                comment = "Not Available and/Or Does Not Meet"
+                existing = local_purchase_cols.get('addComments') or ""
+                local_purchase_cols['addComments'] = (
+                    existing + ("\n" if existing else "") + comment
+                )
+                # Add trainNotAval and needsNotMeet to local_purchase_cols
+                local_purchase_cols['trainNotAval'] = train_not
+                local_purchase_cols['needsNotMeet'] = needs_not
                 
             if 'priceEach' in local_purchase_cols and 'quantity' in local_purchase_cols:
-                
                 try:
                     local_purchase_cols['priceEach'] = float(local_purchase_cols['priceEach'])
                     local_purchase_cols['quantity'] = int(local_purchase_cols['quantity'])

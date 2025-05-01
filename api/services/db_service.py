@@ -29,8 +29,8 @@ class PurchaseRequest(Base):
     itemDescription: Mapped[str] = mapped_column(Text)
     justification: Mapped[str] = mapped_column(Text)
     addComments: Mapped[Optional[str]] = mapped_column(Text) 
-    trainNotAval: Mapped[str] = mapped_column(Text, nullable=True)
-    needsNotMeet: Mapped[str] = mapped_column(Text, nullable=True)
+    trainNotAval: Mapped[bool] = mapped_column(Boolean, nullable=True)
+    needsNotMeet: Mapped[bool] = mapped_column(Boolean, nullable=True)
     budgetObjCode: Mapped[str] = mapped_column(String)
     fund: Mapped[str] = mapped_column(String)
     newRequest: Mapped[bool] = mapped_column(Boolean)
@@ -44,7 +44,7 @@ class PurchaseRequest(Base):
     createdTime: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     __searchable__ = ['ID', 'IRQ1_ID', 'requester', 'budgetObjCode', 'fund',
-                     'location', 'quantity', 'priceEach', 'totalPrice', 'status']
+                     'location', 'quantity', 'priceEach', 'totalPrice', 'status', 'trainNotAval', 'needsNotMeet']
 
     # Add relationship to Approval
     approval = relationship("Approval", back_populates="purchase_request", uselist=False, foreign_keys="[Approval.ID]")
@@ -53,7 +53,7 @@ class PurchaseRequest(Base):
 ## approval TABLE
 class Approval(Base):
     __tablename__ =  "approval"
-    __searchable__ = ['ID', 'IRQ1_ID', 'requester', 'budgetObjCode', 'fund', 
+    __searchable__ = ['ID', 'IRQ1_ID', 'CO', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet',
                       'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
                       'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
 
@@ -64,6 +64,7 @@ class Approval(Base):
     ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
     IRQ1_ID: Mapped[str] = mapped_column(String, nullable=True, unique=True)
     requester: Mapped[str] = mapped_column(String, nullable=False)
+    CO: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
     datereq: Mapped[str] = mapped_column(String)      
     dateneed: Mapped[str] = mapped_column(String)      
@@ -72,8 +73,8 @@ class Approval(Base):
     itemDescription: Mapped[str] = mapped_column(Text)
     justification: Mapped[str] = mapped_column(Text)
     addComments: Mapped[Optional[str]] = mapped_column(Text) 
-    trainNotAval: Mapped[str] = mapped_column(Text, nullable=True)
-    needsNotMeet: Mapped[str] = mapped_column(Text, nullable=True)
+    trainNotAval: Mapped[bool] = mapped_column(Boolean, nullable=True)
+    needsNotMeet: Mapped[bool] = mapped_column(Boolean, nullable=True)
     budgetObjCode: Mapped[str] = mapped_column(String)
     fund: Mapped[str] = mapped_column(String)
     priceEach: Mapped[float] = mapped_column(Float)
@@ -148,6 +149,7 @@ def insert_data(data, table):
 
 ###################################################################################################
 # Get status of request from Approval table
+###################################################################################################
 def get_status_by_id(db_session: Session, ID: str):
     logger.info(f"Fetching status for ID: {ID}")
     
@@ -168,6 +170,7 @@ def get_status_by_id(db_session: Session, ID: str):
     
 ###################################################################################################
 # Get requester from Approval table by uuid
+###################################################################################################
 def get_requester_by_UUID(db_session: Session, UUID: str):
     logger.info(f"Fetching requester for UUID: {UUID}")
     
@@ -183,6 +186,7 @@ def get_requester_by_UUID(db_session: Session, UUID: str):
 
 ###################################################################################################
 # uuid cache to improve performance
+###################################################################################################
 _uuid_cache = {}
 
 # Get uuid by ID with caching
@@ -207,12 +211,14 @@ def get_uuid_by_id_cached(db_session: Session, ID: str):
 
 ###################################################################################################
 # Get uuid by ID
+###################################################################################################
 def get_uuid_by_id(db_session: Session, ID: str):
     result = db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
     return result[0] if result else None
 
 ###################################################################################################
 # Update data
+###################################################################################################
 def update_data(ID, table, **kwargs):
     logger.info(f"Updating {table} with ID {ID}, data: {kwargs}")
     
@@ -258,6 +264,7 @@ def update_data(ID, table, **kwargs):
         
 ###################################################################################################
 # Retrieve data from single line
+###################################################################################################
 def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     """
     model_class: SQLAlchemy ORM model (e.g., PurchaseRequest)
@@ -275,6 +282,7 @@ def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     
 ###################################################################################################
 # Get last 4 digits of the ID from the database
+###################################################################################################
 def _get_last_id() -> Optional[str]:
     """
     Return the full most‐recent PurchaseRequest.ID (e.g. "20250414-0007"),
@@ -293,6 +301,7 @@ def _get_last_id() -> Optional[str]:
     
 ###################################################################################################
 # Get next  request ID
+###################################################################################################
 def get_next_request_id() -> str:
     """
     Build the next ID in "YYYYMMDD-XXXX" format:
@@ -332,6 +341,7 @@ def get_next_request_id() -> str:
             
 ###################################################################################################
 # Get status of request from Approval table by uuid
+###################################################################################################
 def get_status_by_uuid(db_session: Session, uuid: str):
     logger.info(f"Fetching status for uuid: {uuid}")
     
@@ -378,6 +388,7 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
             
 ###################################################################################################
 # Get uuids for multiple IDs
+###################################################################################################
 def get_uuids_by_ids(db_session: Session, ids: list):
     """
     Get uuids for multiple IDs.

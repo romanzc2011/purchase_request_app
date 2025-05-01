@@ -65,8 +65,9 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
         first = rows[0] if rows else {}
         items = [
             ("Requester:", first.get("requester","")),
+            ("CO:", first.get("CO","")),
             ("Date:", datetime.now().strftime("%m/%d/%y")),
-            ("Purchase Req ID:", first.get("purchaseReqID","")),
+            ("Purchase Req ID:", first.get("ID","")),
             ("IRQ1:", first.get("IRQ1_ID","")),
         ]
         for label, value in items:
@@ -114,6 +115,7 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
     elements.append(line_table)
     elements.append(Spacer(1, 12))
 
+    #########################################################
     # Footer section
     #########################################################
     total = sum(r.get("totalPrice", 0) for r in rows)
@@ -132,7 +134,7 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
     )
     total_data = [
         ["", Paragraph(f"TOTAL: ${total:.2f}", total_style)],
-        [Paragraph("Comments/Additional Information Requested:", normal), ""],
+        [Paragraph(f"Comments/Additional Information Requested: {rows[0].get('addComments', '')}", normal), ""],
     ]
     total_table = Table(
         total_data,

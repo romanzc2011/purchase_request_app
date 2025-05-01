@@ -22,8 +22,8 @@ class PurchaseRequestSchema(BaseModel):
     itemDescription: str
     justification: str
     addComments: Optional[str] = None
-    trainNotAval: Optional[str] = None
-    needsNotMeet: Optional[str] = None
+    trainNotAval: Optional[bool] = False
+    needsNotMeet: Optional[bool] = False
     budgetObjCode: str
     fund: str
     priceEach: float
@@ -41,11 +41,15 @@ class ApprovalSchema(BaseModel):
     
     ID: str
     IRQ1_ID: Optional[str] = None
+    CO: Optional[str] = None
     requester: str
     budgetObjCode: str
     fund: str
     itemDescription: str
     justification: str
+    addComments: Optional[str] = None
+    trainNotAval: Optional[bool] = False
+    needsNotMeet: Optional[bool] = False
     quantity: int
     totalPrice: float
     priceEach: float

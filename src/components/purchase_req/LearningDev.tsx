@@ -30,7 +30,7 @@ function LearningDev({ register }: LearningDevProps) {
                 <FormControlLabel
                     control={
                         <Checkbox
-                        sx={{ color: "white" }}
+                            sx={{ color: "white" }}
                             {...register("learnAndDev.trainNotAval")}
                             size="small"
                         />
@@ -66,7 +66,7 @@ function LearningDev({ register }: LearningDevProps) {
                     variant="body2"
                     sx={{ fontSize: "0.8rem", mt: 0.5 }}
                 >
-                    Justification is required below or as an attachment.
+                    Justification is required or as an attachment.
                 </Typography>
                 <FormControlLabel
                     control={
