@@ -22,6 +22,8 @@ import Justification from "./Justification";
 import AddComments from "./AddComments";
 import { v4 as uuidv4 } from "uuid";
 import { useUUIDStore } from "../../services/UUIDService";
+import { useQuery } from "@tanstack/react-query";
+import Autocomplete from "@mui/material/Autocomplete";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -73,12 +75,12 @@ function AddItemsForm({
         try {
             // Generate a new UUID for the item
             const uuid = uuidv4();
-            
+
             // Get a new ID from the backend
             const response = await createNewID();
             const newId = response.ID; // Extract the ID from the response object
             console.log("New ID handleAddItem", newId);
-            
+
             // Create a new item with the UUID and ID
             const itemToAdd: FormValues = {
                 ...data,
@@ -87,15 +89,15 @@ function AddItemsForm({
                 ID: newId, // Use the extracted ID
                 status: "NEW REQUEST"
             };
-            
+
             // Store the UUID in the UUID store AFTER we have the ID
             setUUID(newId, uuid);
-            
+
             console.log("Item to add:", itemToAdd);
-            
+
             // Add the item to the data buffer
             setDataBuffer(prev => [...prev, itemToAdd]);
-            
+
             // Reset the form
             reset();
         } catch (error) {
@@ -129,8 +131,8 @@ function AddItemsForm({
             justification: "",
             addComments: "",
             learnAndDev: {
-                trainNotAval: "",
-                needsNotMeet: "",
+                trainNotAval: false,
+                needsNotMeet: false
             },
             budgetObjCode: "",
             fund: "",
@@ -155,7 +157,7 @@ function AddItemsForm({
     }, [watch]);
 
     return (
-        <Box sx={{ 
+        <Box sx={{
             display: 'flex',
             flexDirection: 'column',
             width: '100%',
@@ -166,7 +168,7 @@ function AddItemsForm({
             {/* FORM SECTION -- Adding items only to buffer, actual submit will occur in table
               once user has finished adding items and reviewed everything */}
             {/*************************************************************************************** */}
-            <form 
+            <form
                 onSubmit={handleSubmit(handleAddItem, onError)}
                 style={{
                     width: '100%',

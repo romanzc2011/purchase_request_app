@@ -308,7 +308,7 @@ def get_next_request_id() -> str:
     - If today's date ≠ last ID's date, start at 0001
     - Otherwise increment the last 4‑digit suffix
     """
-    today = datetime.now().strftime("%Y%m%d")
+    first_section = "LAWB"
     last_id = _get_last_id()
     
     if not last_id:
@@ -316,28 +316,21 @@ def get_next_request_id() -> str:
         next_suffix = 1
     else:
         try:
-            parts = last_id.split('-', 1)
-            if len(parts) != 2:
-                logger.warning(f"Invalid ID format: {last_id}, starting with 0001")
-                next_suffix = 1
-            else:
-                last_date, last_suffix = parts
-                if last_date != today:
-                    # New day, start at 0001
-                    next_suffix = 1
-                else:
-                    try:
-                        last_suffix = int(last_suffix)
-                        next_suffix = last_suffix + 1
-                        logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
-                    except ValueError:
-                        logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
-                        next_suffix = 1
+           # Extract numeric suffix from last_id
+           raw_suffix = last_id.replace(first_section, "")
+           last_suffix = int(raw_suffix)
+           next_suffix = last_suffix + 1
+           logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
+        except ValueError:
+            logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
+            next_suffix = 1
         except Exception as e:
             logger.error(f"Error processing last ID: {e}, starting with 0001")
             next_suffix = 1
-    
-    return f"{today}-{next_suffix:04d}"
+            
+    suffix_str = f"{next_suffix:04d}"
+    return first_section + suffix_str
+            
             
 ###################################################################################################
 # Get status of request from Approval table by uuid

@@ -162,12 +162,12 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
         colWidths=[doc.width - 1.5 * inch, 1.5 * inch]
     )
     total_table.setStyle(TableStyle([
-        ("LINEABOVE", (0, 0), (-1, 0), 1, colors.gray),
-        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("LINEABOVE",       (0, 0), (-1, 0), 1, colors.gray),
+        ("ALIGN",           (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING",     (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING",    (0, 0), (-1, -1), 4),
+        ("TOPPADDING",      (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING",   (0, 0), (-1, -1), 2),
     ]))
     elements.append(total_table)
 
