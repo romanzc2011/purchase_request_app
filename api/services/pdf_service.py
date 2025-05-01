@@ -4,7 +4,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_RIGHT
+from reportlab.lib.enums import TA_RIGHT, TA_LEFT
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.graphics.shapes import Drawing, PolyLine
@@ -31,10 +31,23 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
 
     #— styles
     styles = getSampleStyleSheet()
-    normal = styles["Normal"]; normal.fontName = "Play"
+    normal = styles["Normal"]
+    normal.fontName = "Play"
+    bold_style = ParagraphStyle(
+        name="BoldStyle",
+        parent=normal,
+        fontName="Play",
+        fontSize=9
+    )
     header_style = ParagraphStyle("Header", parent=normal, fontSize=9, leading=10, fontName="Play-Bold")
     cell_style = ParagraphStyle("Cell", parent=normal, fontSize=9, leading=11, fontName="Play")
     no_wrap = ParagraphStyle("NoWrap", parent=normal, fontSize=8, leading=10, fontName="Play")
+
+    comment_style = ParagraphStyle(
+        "CommentStyle",
+        parent=bold_style,
+        alignment=TA_LEFT
+    )
 
     #— document setup
     doc = SimpleDocTemplate(
@@ -123,18 +136,26 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
     use_cyber = "Yes" if is_cyber else "No"
     # Cybersecurity line with inline checkmark
     cyber_para = Paragraph(
-        f"Cybersecurity related – consider funding: {use_cyber}", normal
+        f"Cybersecurity related - consider funding: {use_cyber}", 
+        comment_style
     )
     elements.append(cyber_para)
     elements.append(Spacer(1, 6))
 
-    # Build TOTAL + approval lines
+    # Comments paragraph
+    comments_para = Paragraph(
+        f"Comments/Additional Information Requested: {rows[0].get('addComments', '')}", 
+        comment_style
+    )
+    elements.append(comments_para)
+    elements.append(Spacer(1, 6))
+
+    # Build TOTAL line
     total_style = ParagraphStyle(
         "TotalValue", parent=header_style, alignment=TA_RIGHT
     )
     total_data = [
-        ["", Paragraph(f"TOTAL: ${total:.2f}", total_style)],
-        [Paragraph(f"Comments/Additional Information Requested: {rows[0].get('addComments', '')}", normal), ""],
+        ["", Paragraph(f"TOTAL: ${total:.2f}", total_style)]
     ]
     total_table = Table(
         total_data,

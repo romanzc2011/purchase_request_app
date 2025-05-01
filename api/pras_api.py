@@ -702,7 +702,7 @@ def process_purchase_data(data):
                 
             # Build addComments field if trainNotAval or needsNotMeet is True
             if train_not or needs_not:
-                comment = "Not Available and/Or Does Not Meet"
+                comment = "Not available and/Or does not meet employee needs"
                 existing = local_purchase_cols.get('addComments') or ""
                 local_purchase_cols['addComments'] = (
                     existing + ("\n" if existing else "") + comment
@@ -776,7 +776,7 @@ def process_approval_data(processed_data):
     
     # Define allowed keys that correspond to the Approval model's columns.
     allowed_keys = [
-        'ID', 'requester', 'budgetObjCode', 'fund', 
+        'ID', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet', 'addComments',
         'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location', 
         'newRequest', 'pendingApproval', 'approved', 'phoneext', 'datereq', 'dateneed', 'orderType'
     ]
