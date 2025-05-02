@@ -377,7 +377,6 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
         else:
             logger.error(f"Object with uuid {uuid} not found in {table}")
             raise ValueError(f"Object with uuid {uuid} not found in {table}")
-        
             
 ###################################################################################################
 # Get uuids for multiple IDs
@@ -396,5 +395,14 @@ def get_uuids_by_ids(db_session: Session, ids: list):
             result[id] = uuid
     
     return result
+
+###################################################################################################
+# GET USERNAMES
+###################################################################################################
+def get_usernames(db_session: Session, prefix: str):
+    """
+    Get usernames that start with the given prefix. FROM LDAPS NOT APPROVAL TABLE
+    """
+    return db_session.query(Approval.requester).filter(Approval.requester.like(f"{prefix}%")).all()
+
             
-        

@@ -174,6 +174,7 @@ api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
+##########################################################################
 @api_router.post("/login")
 async def login(credentials: dict):
     username = credentials.get("username")
@@ -204,6 +205,7 @@ async def login(credentials: dict):
 
 ##########################################################################
 ## GET APPROVAL DATA
+##########################################################################
 @api_router.get("/getApprovalData", response_model=List[ps.ApprovalSchema])
 async def get_approval_data(
     ID: Optional[str] = Query(None),
@@ -222,6 +224,7 @@ async def get_approval_data(
         
 ##########################################################################
 ## GET STATEMENT OF NEED FORM
+##########################################################################
 @api_router.post("/downloadStatementOfNeedForm")
 async def downlaad_statement_of_need_form(
     payload: dict,
@@ -252,6 +255,7 @@ async def downlaad_statement_of_need_form(
     
 ##########################################################################
 ## GET SEARCH DATA
+##########################################################################
 @api_router.get("/getSearchData/search", response_model=List[ps.ApprovalSchema])
 async def get_search_data(
     query: str = "",
@@ -269,6 +273,7 @@ async def get_search_data(
 
 ##########################################################################
 ## SEND TO approval -- being sent from the purchase req submit
+##########################################################################
 @api_router.post("/sendToPurchaseReq")
 async def set_purchase_request(data: dict, current_user: str = Depends(get_current_user)):
     logger.info(f"Authenticated user: {current_user}")
@@ -497,6 +502,7 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
 ## Approval status is NEW REQUEST, this gets sent to requester and first approver
 ## Approval status is PENDING, this gets sent to final approver, but not requester
 ## Approval status is APPROVED, this gets sent to requester
+##########################################################################
 @api_router.post("/approveDenyRequest")
 async def approve_deny_request(data: dict, current_user: User = Depends(get_current_user)):
     # TODO: Add CO to the data but checking user's group membership
@@ -536,8 +542,6 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
             current_status = dbas.get_status_by_id(session, ID)
             if not current_status:
                 raise HTTPException(status_code=404, detail="Request not found")
-            
-            
                 
             # Process based on current status
             if current_status == "NEW REQUEST":
@@ -644,6 +648,9 @@ async def refresh_token(refresh_token: str):
             detail="Error refreshing token"
         )
         
+##########################################################################
+## CREATE NEW ID
+##########################################################################
 @api_router.post("/createNewID")
 async def create_new_id(request: Request):
     """
@@ -658,6 +665,9 @@ async def create_new_id(request: Request):
         logger.error(f"Error creating new ID: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
+##########################################################################
+## GET UUID BY ID
+##########################################################################
 @api_router.get("/getUUID/{ID}")
 async def get_uuid_by_id_endpoint(ID: str, current_user: User = Depends(get_current_user)):
     """
@@ -673,6 +683,19 @@ async def get_uuid_by_id_endpoint(ID: str, current_user: User = Depends(get_curr
             raise HTTPException(status_code=404, detail=f"No UUID found for ID: {ID}")
             
         return {"UUID": UUID}
+##########################################################################
+## FETCH USERNAMES
+##########################################################################
+@api_router.get("/usernames", response_model=List[str])
+async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to search")):
+    """
+    Return a list of username strings that start with the given prefix `q`.
+    """
+    logger.info(f"Fetching usernames for prefix: {q}")
+    with next(dbas.get_session()) as session:
+        usernames = dbas.get_usernames(session, q)
+        logger.info(f"Found {len(usernames)} usernames")
+        return usernames
 
 ##########################################################################
 ##########################################################################
@@ -826,5 +849,3 @@ def purchase_req_commit(processed_data):
 ##########################################################################
 if __name__ == "__main__":
     uvicorn.run("pras_api:app", host="localhost", port=5004, reload=True)
-
-
