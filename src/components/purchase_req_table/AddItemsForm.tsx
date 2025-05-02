@@ -456,7 +456,7 @@ function AddItemsForm({
 
                 {/** FOR LEARNING OR DEV? ****************************************************************** */}
                 <Grid container>
-                    <LearningDev register={register} />
+                    <LearningDev control={control} />
                 </Grid>
 
                 <hr />

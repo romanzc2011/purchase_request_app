@@ -14,14 +14,14 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { FormValues } from "../../types/formTypes";
 import { fetchSearchData } from "./SearchBar";
-import Buttons from "../purchase_req/Buttons";
+import Buttons from "../purchase_req_table/Buttons";
 import { convertBOC } from "../../utils/bocUtils";
 import WarningIcon from "@mui/icons-material/Warning";
 import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
 import { useAssignIRQ1 } from "../../custom_hooks/useAssignIRQ1";
 import { SxProps, Theme } from "@mui/material";
-import "./ApprovalTable.css";
+import "../../styles/ApprovalTable.css";
 import { setFips } from "crypto";
 
 interface ApprovalTableProps {

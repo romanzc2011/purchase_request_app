@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import "./App.css";
+import "./styles/App.css";
 import { Routes, Route } from "react-router-dom";
-import AddItemsForm from "./components/purchase_req/AddItemsForm";
-import SubmitApprovalTable from "./components/purchase_req/SumbitToApproval";
+import AddItemsForm from "./components/purchase_req_table/AddItemsForm";
+import SubmitApprovalTable from "./components/purchase_req_table/SumbitToApproval";
 import { Layout } from "./components/app_layout";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
-import ApprovalPageMain from "./components/approvals/ApprovalPageMain";
+import ApprovalPageMain from "./components/approval_table/ApprovalPageMain";
 import { IFile } from "./types/IFile";
-import LoginDialog from "./components/LoginDialog";
+import LoginDialog from "./components/features/LoginDialog";
 
 interface AppProps {
     isLoggedIn: boolean;
@@ -25,7 +25,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
     const [loginOpen, setLoginOpen] = useState(!isLoggedIn);
-    
+
     // Default ID for coms that need it
     const defaultId = `TEMP-${Date.now()}`;
 
@@ -74,7 +74,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     }
 
     return (
-        <Box sx={{ 
+        <Box sx={{
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',

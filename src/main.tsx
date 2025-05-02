@@ -8,10 +8,10 @@ import {
     Routes,
 } from "react-router-dom";
 import { createRoot } from "react-dom/client";
-import "./index.css";
+import "./styles/index.css";
 import App from "./App.tsx";
-import LoginDialog from "./components/LoginDialog.tsx";
-import ProtectedRoute from "./components/authentication/ProtectedRoute.tsx";
+import LoginDialog from "./components/features/LoginDialog.tsx";
+import ProtectedRoute from "./routes/ProtectedRoute.tsx";
 
 const queryClient = new QueryClient();
 
