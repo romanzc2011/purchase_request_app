@@ -221,8 +221,9 @@ class LDAPService:
         except Exception as e:
             logger.error(f"Error checking LDAP connection: {e}")
             return False
-    #####################################################################################
+    #########################################################################
     # EMAIL ADDRESS LOOKUP
+    #########################################################################
     def get_email_address(self, connection, username):
         if connection is None:
             logger.error("Cannot get email address: LDAP connection is None")
@@ -245,7 +246,36 @@ class LDAPService:
         except Exception as e:
             logger.error(f"Error retrieving email address: {e}")
             return None
-
+        
+    #########################################################################
+    # USERNAME LOOKUP
+    #########################################################################
+    def fetch_usernames(self, query: str) -> List[str]:
+        if self.connection is None:
+            logger.error("Cannot get username: LDAP connection is None")
+            return []
+        
+        # Perform subtree search
+        try:
+            self.connection.search(
+                search_base='DC=ADU,DC=DCN',
+                search_filter=f'(sAMAccountName={query}*)',
+                search_scope=SUBTREE,
+                attributes=['sAMAccountName'],
+                size_limit=10  # Limit to 10 results
+            )
+            
+            if self.connection.entries:
+                logger.info(f"Found {len(self.connection.entries)} entries for query: {query}")
+                return [entry.sAMAccountName.value for entry in self.connection.entries]
+            else:
+                logger.error(f"No user found for query: {query}")
+                return ["Error"]
+        except Exception as e:
+            logger.error(f"Error getting username: {e}")
+            return ["Error"]
+            
+            
     #####################################################################################
     # SETTERS
     

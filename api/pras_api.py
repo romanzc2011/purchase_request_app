@@ -691,11 +691,13 @@ async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to
     """
     Return a list of username strings that start with the given prefix `q`.
     """
+    connection = ldap_svc.get_connection()
+    if connection is None:
+        logger.error("LDAP connection is None")
+        return []
     logger.info(f"Fetching usernames for prefix: {q}")
-    with next(dbas.get_session()) as session:
-        usernames = dbas.get_usernames(session, q)
-        logger.info(f"Found {len(usernames)} usernames")
-        return usernames
+    return ldap_svc.fetch_usernames(q)
+    
 
 ##########################################################################
 ##########################################################################
