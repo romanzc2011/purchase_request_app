@@ -140,10 +140,17 @@ function AddItemsForm({
             quantity: 0,
         },
         mode: "onChange",
+        reValidateMode: "onChange",
+        shouldFocusError: true,
     });
 
-    const { register, control, handleSubmit, formState, watch, reset } = form;
+    const { register, control, handleSubmit, formState, watch, reset, trigger } = form;
     const { errors, isValid, isSubmitted } = formState;
+
+    // Trigger validation on mount
+    useEffect(() => {
+        trigger();
+    }, [trigger]);
 
     /*************************************************************************************** */
     /* Form submission function */
