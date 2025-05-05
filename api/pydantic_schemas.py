@@ -61,3 +61,4 @@ class ApprovalSchema(BaseModel):
     createdTime: datetime
     approvedTime: Optional[datetime] = None 
     deniedTime: Optional[datetime] = None
+    dateneed: str

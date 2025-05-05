@@ -15,10 +15,26 @@ from pathlib import Path
 
 page_width, page_height = LETTER
 
+"""
+    Generate a purchase request PDF.
+
+    Args:
+        rows (List[Dict[str, Any]]):  
+            List of dictionaries containing purchase request data.  
+        output_path (Path):  
+            Path where the PDF will be saved.  
+        is_cyber (bool):  
+            Whether the request is cybersecurity related.
+
+    Returns:
+        Path:  
+            The path to the generated PDF.
+    """
+
 def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: bool) -> Path:
     # ensure output folder exists
     output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
-    logger.info(f"Writing PDF to: {output_path}")
+    logger.info(f"ROWS: {rows}")
 
     #— fonts & logo setup
     project_root = Path(__file__).resolve().parent.parent.parent
@@ -76,10 +92,12 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
         text_x = 0.2*inch
         text_y = y_logo - img_h - 20
         first = rows[0] if rows else {}
+        logger.info(f"First row data for header: {first}")
+        logger.info(f"Date needed value: {first.get('dateneed')}")
         items = [
             ("Requester:", first.get("requester","")),
             ("CO:", first.get("CO","")),
-            ("Date:", datetime.now().strftime("%m/%d/%y")),
+            ("Date Needed:", first.get("dateneed","").split("T")[0] if first.get("dateneed") else "Not specified"),
             ("Purchase Req ID:", first.get("ID","")),
             ("IRQ1:", first.get("IRQ1_ID","")),
         ]

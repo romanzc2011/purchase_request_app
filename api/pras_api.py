@@ -218,6 +218,7 @@ async def get_approval_data(
         else:
             approval = dbas.get_all_approval(session)
         approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approval]
+        logger.info(f"APPROVAL DATA: {approval_data}")
         return approval_data
     finally:
         session.close()
@@ -226,12 +227,13 @@ async def get_approval_data(
 ## GET STATEMENT OF NEED FORM
 ##########################################################################
 @api_router.post("/downloadStatementOfNeedForm")
-async def downlaad_statement_of_need_form(
+async def download_statement_of_need_form(
     payload: dict,
     current_user: User = Depends(get_current_user),
 ):
     ID = payload.get("ID")
     rows = payload.get("approvalData")
+    logger.debug(f"DATA: {rows}")
 
     if not ID or not isinstance(rows, list) or not rows:
         raise HTTPException(status_code=400, detail="Invalid payload")
@@ -242,6 +244,7 @@ async def downlaad_statement_of_need_form(
     is_cyber = False
     
     # Generate PDF
+    logger.info(f"ROWS: {rows}")
     make_purchase_request_pdf(rows=rows, output_path=pdf_path, is_cyber=is_cyber)
     
     if not pdf_path.exists():
@@ -378,6 +381,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         pdf_path = os.path.join(pdf_output_dir, pdf_filename)
         # Convert string path to Path object
         pdf_path_obj = Path(pdf_path)
+        
         make_purchase_request_pdf(processed_lines, pdf_path_obj, is_cyber)
         logger.info(f"PDF generated at: {pdf_path}")
   
