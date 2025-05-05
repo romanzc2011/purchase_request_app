@@ -19,7 +19,7 @@ import { convertBOC } from "../../utils/bocUtils";
 import WarningIcon from "@mui/icons-material/Warning";
 import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
-import { useAssignIRQ1 } from "../../custom_hooks/useAssignIRQ1";
+import { useAssignIRQ1 } from "../../hooks/useAssignIRQ1";
 import { SxProps, Theme } from "@mui/material";
 import "../../styles/ApprovalTable.css";
 import { setFips } from "crypto";

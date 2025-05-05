@@ -69,4 +69,3 @@ export const locations = [
   "SHVT/C",
   "SHVT/J"
 ];
-
