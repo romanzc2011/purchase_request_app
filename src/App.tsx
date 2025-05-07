@@ -4,10 +4,10 @@ import "./styles/App.css";
 import { Routes, Route } from "react-router-dom";
 import AddItemsForm from "./components/purchase_req_table/AddItemsForm";
 import SubmitApprovalTable from "./components/purchase_req_table/SumbitToApproval";
-import { Layout } from "./components/app_layout";
+import { Layout } from "./components/approval_table/app_layout";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "./types/formTypes";
-import ApprovalPageMain from "./components/approval_table/ApprovalPageMain";
+import ApprovalPageMain from "./components/approval_table/containers/ApprovalPageMain";
 import { IFile } from "./types/IFile";
 import LoginDialog from "./components/features/LoginDialog";
 

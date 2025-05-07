@@ -1,17 +1,26 @@
 from datetime import datetime, timezone
 from loguru import logger
 from sqlalchemy import (create_engine, or_, Column, String, Integer,
-                         Float, Boolean, Text, LargeBinary, ForeignKey, DateTime)
+                         Float, Boolean, Text, LargeBinary, ForeignKey, DateTime, Enum)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 import uuid
+import enum
 
 # Create engine and base
 engine = create_engine('sqlite:///db/purchase_request.db', echo=False)
 Base = declarative_base()
 my_session = sessionmaker(engine)
+
+###################################################################################################
+##  LINE ITEM STATUS ENUMERATION
+class LineItemStatus(enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    denied = "denied"
+    wait = "wait"
 
 ###################################################################################################
 ## PURCHASE REQUEST
@@ -96,6 +105,16 @@ class Approval(Base):
         uselist=False,
         foreign_keys=[ID]
     )
+    
+###################################################################################################
+## review TABLE
+class LineItem(Base):
+    __tablename__ = "son_review"
+    
+    UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False),
+    status: Mapped[LineItemStatus] = mapped_column(Enum(LineItemStatus), nullable=False)
+    
     
 Base.metadata.create_all(engine)
 my_session = sessionmaker(bind=engine)

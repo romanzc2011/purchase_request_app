@@ -6,7 +6,7 @@ import { Box, IconButton, debounce } from "@mui/material";
 import { useQuery, keepPreviousData, useQueryClient, QueryClient } from '@tanstack/react-query';
 import Input from '@mui/material/Input';
 import SearchIcon from "@mui/icons-material/Search";
-import { FormValues } from "../../types/formTypes";
+import { FormValues } from "../../../types/formTypes";
 
 interface SearchBarProps {
     setSearchQuery: (query: string) => void;
@@ -30,7 +30,7 @@ export async function fetchSearchData(query: string, queryColumn?: string) {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
     });
-    if(!response.ok) {
+    if (!response.ok) {
         throw new Error('Response was not ok');
     }
 
@@ -66,14 +66,16 @@ function SearchBar({ setSearchQuery }: SearchBarProps) {
             {/* SEARCH BAR */}
             <Box sx={{ display: 'flex', width: '25%', backgroundColor: '#363B3F', borderRadius: '3px' }}>
                 <Input
-                    sx={{ ml: 2, 
-                        color: "white", 
-                        flex: 1 }} 
-                        placeholder="Search"
-                        onChange={(e) => {
-                            const newValue = e.target.value;
-                            setQuery(newValue);
-                        }} />
+                    sx={{
+                        ml: 2,
+                        color: "white",
+                        flex: 1
+                    }}
+                    placeholder="Search"
+                    onChange={(e) => {
+                        const newValue = e.target.value;
+                        setQuery(newValue);
+                    }} />
                 <IconButton type="button" sx={{ p: 1 }}>
                     <SearchIcon sx={{ color: "white" }} />
                 </IconButton>

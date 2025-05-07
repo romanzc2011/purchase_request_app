@@ -2,7 +2,7 @@ import React from "react";
 import { Controller, useFormContext } from "react-hook-form";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
-import { useUsernames } from "../purchase_req_table/useUsernames";
+import { useUsernames } from "../../purchase_req_table/useUsernames";
 interface RequesterAutocompleteProps {
     name: string;
     label: string;

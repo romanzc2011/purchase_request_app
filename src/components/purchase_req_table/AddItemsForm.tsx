@@ -22,7 +22,7 @@ import Justification from "./Justification";
 import AddComments from "./AddComments";
 import { v4 as uuidv4 } from "uuid";
 import { useUUIDStore } from "../../services/UUIDService";
-import RequesterAutocomplete from "../approval_table/RequesterAutocomplete";
+import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 
 /*************************************************************************************** */
@@ -106,8 +106,29 @@ function AddItemsForm({
             // Add the item to the data buffer
             setDataBuffer(prev => [...prev, itemToAdd]);
 
-            // Reset the form
-            reset();
+            // Reset the form with default values
+            reset({
+                UUID: "",
+                ID: "",
+                IRQ1_ID: "",
+                requester: "",
+                phoneext: "",
+                datereq: formattedToday,
+                dateneed: null,
+                orderType: "",
+                itemDescription: "",
+                justification: "",
+                addComments: "",
+                learnAndDev: {
+                    trainNotAval: false,
+                    needsNotMeet: false
+                },
+                budgetObjCode: "",
+                fund: "",
+                priceEach: 0,
+                location: "",
+                quantity: 0,
+            });
         } catch (error) {
             console.error("Error adding item:", error);
         }

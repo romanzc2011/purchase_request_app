@@ -12,16 +12,18 @@ import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import { FormValues } from "../../types/formTypes";
+import { FormValues } from "../../../types/formTypes";
 import { fetchSearchData } from "./SearchBar";
-import Buttons from "../purchase_req_table/Buttons";
-import { convertBOC } from "../../utils/bocUtils";
+import Buttons from "../../purchase_req_table/Buttons";
+import { convertBOC } from "../../../utils/bocUtils";
 import WarningIcon from "@mui/icons-material/Warning";
 import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
-import { useAssignIRQ1 } from "../../hooks/useAssignIRQ1";
+import { useAssignIRQ1 } from "../../../hooks/useAssignIRQ1";
+import { useCommentModal } from "../../../hooks/useCommentModal";
 import { SxProps, Theme } from "@mui/material";
-import "../../styles/ApprovalTable.css";
+import CommentModal from "../modals/CommentModal";
+import "../../../styles/ApprovalTable.css"
 import { setFips } from "crypto";
 
 interface ApprovalTableProps {
@@ -205,6 +207,36 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
             setAssignedIRQ1s(newAssignedIRQ1s);
         }
     }, [approvalData]);
+
+    // Comment functionality
+    const postCommentMutation = useMutation({
+        mutationFn: async ({ ID, comment }: { ID: string, comment: string }) => {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/add_comment/${ID}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                },
+                body: JSON.stringify({ comment }),
+            });
+            if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["approvalData"] });
+            toast.success("Comment added successfully");
+        },
+        onError: (error) => {
+            console.error("Error adding comment:", error);
+            toast.error("Failed to add comment");
+        }
+    });
+
+    const { isOpen: isCommentModalOpen, modalRowId, open: openCommentModal, close: closeCommentModal, handleSubmit: handleSubmitComment } = useCommentModal(
+        async (rowId, comment) => {
+            await postCommentMutation.mutateAsync({ ID: rowId, comment });
+        }
+    );
 
     /***********************************************************************************/
     // HANDLE APPROVE/DENY
@@ -605,7 +637,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         {
             field: "actions",
             headerName: "Actions",
-            width: 300,
+            width: 400,
             sortable: false,
             renderCell: params => (
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
@@ -625,6 +657,13 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
                         disabled={params.row.status === "DENIED"}
                     >
                         Deny
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => openCommentModal(params.row.ID)}
+                    >
+                        Add Comment
                     </Button>
                     <Button variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
                         <DownloadOutlinedIcon />
@@ -761,6 +800,13 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
                     </Button>
                 </Box>
             </Modal>
+
+            {/* Comment Modal */}
+            <CommentModal
+                open={isCommentModalOpen}
+                onClose={closeCommentModal}
+                onSubmit={handleSubmitComment}
+            />
         </Box>
     );
 }
