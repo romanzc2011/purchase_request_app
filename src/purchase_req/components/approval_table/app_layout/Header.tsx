@@ -5,7 +5,7 @@ import {
     Typography,
     Box,
 } from "@mui/material";
-import BKSeal from "../../../assets/seal_no_border.png";
+import BKSeal from "../../../../assets/seal_no_border.png";
 
 interface HeaderProps {
     isSidebarOpen: boolean;

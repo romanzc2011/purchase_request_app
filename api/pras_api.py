@@ -218,7 +218,6 @@ async def get_approval_data(
         else:
             approval = dbas.get_all_approval(session)
         approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approval]
-        logger.info(f"APPROVAL DATA: {approval_data}")
         return approval_data
     finally:
         session.close()

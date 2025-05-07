@@ -94,6 +94,9 @@ export default function LoginDialog({
         }
     };
 
+    /***********************************************************************/
+    /* HANDLE SUBMIT */
+    /***********************************************************************/
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         handleLogin();

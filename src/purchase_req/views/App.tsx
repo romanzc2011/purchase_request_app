@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
-import "./styles/App.css";
+import "../styles/App.css";
 import { Routes, Route } from "react-router-dom";
 import AddItemsForm from "../components/purchase_req_table/AddItemsForm";
 import SubmitApprovalTable from "../components/purchase_req_table/SumbitToApproval";

@@ -641,6 +641,17 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
             sortable: false,
             renderCell: params => (
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
+
+                    {/* Add Comment Button */}
+                    <Button
+                        sx={{ backgroundColor: "#800000", "&:hover": { backgroundColor: "#600000" } }}
+                        variant="contained"
+                        onClick={() => openCommentModal(params.row.ID)}
+                    >
+                        Add Comment
+                    </Button>
+
+                    {/* Approve Button */}
                     <Button
                         variant="contained"
                         color="success"
@@ -650,6 +661,8 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
                     >
                         Approve
                     </Button>
+
+                    {/* Deny Button */}
                     <Button
                         variant="contained"
                         color="error"
@@ -658,13 +671,8 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
                     >
                         Deny
                     </Button>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={() => openCommentModal(params.row.ID)}
-                    >
-                        Add Comment
-                    </Button>
+
+                    {/* Download Button */}
                     <Button variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
                         <DownloadOutlinedIcon />
                     </Button>
@@ -804,6 +812,7 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
             {/* Comment Modal */}
             <CommentModal
                 open={isCommentModalOpen}
+                commentText={""}
                 onClose={closeCommentModal}
                 onSubmit={handleSubmitComment}
             />
