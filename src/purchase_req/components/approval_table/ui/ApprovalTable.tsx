@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import {
-    Box,
-    TextField,
-    Typography,
-    Button,
-    Modal
-} from "@mui/material";
+import { Box, Typography, Button, Modal, TextField } from "@mui/material";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -16,16 +10,19 @@ import { FormValues } from "../../../types/formTypes";
 import { fetchSearchData } from "./SearchBar";
 import Buttons from "../../purchase_req_table/Buttons";
 import { convertBOC } from "../../../utils/bocUtils";
+import { useCommentMutation } from "../../../api/comments";
 import WarningIcon from "@mui/icons-material/Warning";
 import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
 import { useAssignIRQ1 } from "../../../hooks/useAssignIRQ1";
 import { useCommentModal } from "../../../hooks/useCommentModal";
-import { SxProps, Theme } from "@mui/material";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
-import { setFips } from "crypto";
+import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 
+/***********************************************************************************/
+// PROPS
+/***********************************************************************************/
 interface ApprovalTableProps {
     onDelete: (ID: string) => void;
     resetTable: () => void;
@@ -36,55 +33,6 @@ interface ApprovalTableProps {
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
-
-// Define style objects outside of the component
-const cellRowStyles: SxProps<Theme> = {
-    "& .MuiDataGrid-cell": {
-        color: "white",
-        background: "#2c2c2c",
-        fontSize: "0.95rem" // Increased font size for cells
-    },
-    "& .MuiDataGrid-row": {
-        background: "#2c2c2c"
-    },
-    // Exclude Item Description column from font size increase
-    "& .MuiDataGrid-cell[data-field='itemDescription']": {
-        fontSize: "0.875rem !important" // Keep original font size for Item Description
-    },
-    // Shrink font size of requester column
-    "& div[data-field='requester']": {
-        fontSize: "0.85rem !important"
-    }
-};
-
-const headerStyles: SxProps<Theme> = {
-    "& .MuiDataGrid-columnHeaders, .MuiDataGrid-columnHeader": {
-        background: "linear-gradient(to top, #2c2c2c, #800000) !important",
-        color: "white",
-    },
-    "& .MuiDataGrid-columnHeaderTitle": {
-        fontWeight: "bold",
-        fontSize: "1.1rem" // Increased font size for column headers
-    },
-};
-
-const footerStyles: SxProps<Theme> = {
-    "& .MuiDataGrid-footerContainer": {
-        backgroundColor: "#2c2c2c",
-        borderTop: "1px solid rgba(255,255,255,0.2)",
-    },
-};
-
-const paginationStyles: SxProps<Theme> = {
-    "& .MuiTablePagination-root": {
-        color: "white",
-        fontSize: "0.95rem" // Increased font size for pagination
-    },
-    "& .MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows": {
-        color: "white",
-        fontSize: "0.95rem" // Increased font size for pagination labels
-    },
-};
 
 // Define a type for the DataGrid sx prop
 type DataGridSxProps = {
@@ -168,7 +116,7 @@ async function downloadStatementOfNeedForm(ID: string) {
 /***********************************************************************************/
 // APPROVAL TABLE
 /***********************************************************************************/
-export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: ApprovalTableProps) {
+export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     const queryClient = useQueryClient();
     const { data: searchData } = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
     const { data: approvalData = [] } = useQuery<FormValues[]>({
@@ -207,36 +155,6 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
             setAssignedIRQ1s(newAssignedIRQ1s);
         }
     }, [approvalData]);
-
-    // Comment functionality
-    const postCommentMutation = useMutation({
-        mutationFn: async ({ ID, comment }: { ID: string, comment: string }) => {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/add_comment/${ID}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-                },
-                body: JSON.stringify({ comment }),
-            });
-            if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-            return response.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["approvalData"] });
-            toast.success("Comment added successfully");
-        },
-        onError: (error) => {
-            console.error("Error adding comment:", error);
-            toast.error("Failed to add comment");
-        }
-    });
-
-    const { isOpen: isCommentModalOpen, modalRowId, open: openCommentModal, close: closeCommentModal, handleSubmit: handleSubmitComment } = useCommentModal(
-        async (rowId, comment) => {
-            await postCommentMutation.mutateAsync({ ID: rowId, comment });
-        }
-    );
 
     /***********************************************************************************/
     // HANDLE APPROVE/DENY
@@ -305,6 +223,20 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
         (acc[key] ||= []).push(row);
         return acc;
     }, {});
+
+    /***********************************************************************************/
+    // COMMENT MODAL
+    /***********************************************************************************/
+    const commentMutation = useCommentMutation();
+
+    const {
+        isOpen,
+        commentText,
+        setCommentText,
+        open: openCommentModal,
+        close: closeCommentModal,
+        handleSubmit: handleSubmitComment,
+    } = useCommentModal();
 
     // FlatRow type
     type FlatRow =
@@ -811,10 +743,15 @@ export default function ApprovalTableDG({ onDelete, resetTable, searchQuery }: A
 
             {/* Comment Modal */}
             <CommentModal
-                open={isCommentModalOpen}
-                commentText={""}
+                open={isOpen}
+                commentText={commentText}
                 onClose={closeCommentModal}
-                onSubmit={handleSubmitComment}
+                onSubmit={(comment) => {
+                    console.log("CommentModal onSubmit called with:", comment);
+                    setCommentText(comment);
+                    console.log("After setCommentText, calling handleSubmitComment");
+                    handleSubmitComment();
+                }}
             />
         </Box>
     );

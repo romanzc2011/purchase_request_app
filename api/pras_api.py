@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException,  Query, status, UploadFile, File, Form, APIRouter
+from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException,  Query, status, UploadFile, File, Form, APIRouter, Path
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,14 +15,16 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from werkzeug.utils import secure_filename
 import services.db_service as dbas
+from services.db_service import get_session
+from services.comment_service import add_comment
 import pydantic_schemas as ps
+from pydantic_schemas import CommentPayload
 import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from docxtpl import DocxTemplate
 from pathlib import Path
 
 from services.auth_service import AuthService
-from services.db_service import get_session
 from services.email_service import EmailService
 from services.ipc_service import IPC_Service
 from services.ldap_service import LDAPService, User
@@ -32,7 +34,6 @@ from services.pdf_service import make_purchase_request_pdf
 from managers.ipc_manager import ipc_instance
 from settings import settings
 
-# TODO: Add dynamic comments in addComments field if Not Available and/Or Does Not Meet (trainNotAval, needsNotMeet)
 """
 AUTHOR: Roman Campbell
 DATE: 01/03/2025
@@ -700,7 +701,31 @@ async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to
         return []
     logger.info(f"Fetching usernames for prefix: {q}")
     return ldap_svc.fetch_usernames(q)
+
+##########################################################################
+## POST COMMENT
+##########################################################################
+@api_router.post("/add_comment/{ID}")
+async def add_comment_endpoint(
+    payload: CommentPayload,
+    ID: str = Path(description="The ID of the purchase request"),
+):
+    """
+    Add a comment to an approval record.
     
+    Args:
+        ID: The ID of the approval record
+        payload: The comment payload containing the comment text
+        
+    Returns:
+        dict: Success message or error
+    """
+    logger.info(f"Received comment request for ID {ID} with payload: {payload}")
+    with next(get_session()) as session:
+        success = add_comment(session, ID, payload.comment)
+        if not success:
+            raise HTTPException(status_code=404, detail="Failed to add comment")
+        return {"message": "Comment added successfully"}
 
 ##########################################################################
 ##########################################################################

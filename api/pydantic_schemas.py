@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
+from pydantic import Field
 
 ########################################################
 ## PYDANTIC SCHEMA -- structures data into pydantic, a style that easily converts to json with fastapi
@@ -62,3 +63,13 @@ class ApprovalSchema(BaseModel):
     approvedTime: Optional[datetime] = None 
     deniedTime: Optional[datetime] = None
     dateneed: str
+
+class CommentPayload(BaseModel):
+    comment: str = Field(..., min_length=1, max_length=1000)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "comment": "This is a sample comment"
+            }
+        }
