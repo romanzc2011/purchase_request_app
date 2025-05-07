@@ -19,7 +19,6 @@ import { IFile } from "../../types/IFile";
 import InfoIcon from "@mui/icons-material/Info";
 import Tooltip from "@mui/material/Tooltip";
 import Justification from "./Justification";
-import AddComments from "./AddComments";
 import { v4 as uuidv4 } from "uuid";
 import { useUUIDStore } from "../../services/UUIDService";
 import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
@@ -457,7 +456,6 @@ function AddItemsForm({
                     {/** JUSTIFICATION/ADD COMMENTS ************************************************************* */}
                     {/******************************************************************************************* */}
                     <Justification register={register} errors={errors} />
-                    <AddComments register={register} errors={errors} />
 
                     {/** FOR LEARNING OR DEV? ****************************************************************** */}
                     <Grid container>
