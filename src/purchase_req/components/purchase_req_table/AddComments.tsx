@@ -4,43 +4,38 @@ import { FormValues } from "../../types/formTypes";
 import Grid from "@mui/material/Grid2";
 import { TextField, Typography } from "@mui/material";
 
-interface JustificationProps {
+interface AddCommentsProps {
     register: UseFormRegister<FormValues>;
     errors: FieldErrors<FormValues>;
 }
 
-const Justification: React.FC<JustificationProps> = ({ register, errors }) => {
+const Justification: React.FC<AddCommentsProps> = ({ register, errors }) => {
     return (
         <Grid container spacing={1} mt={4}>
             <Grid size={{ xs: 3 }}>
                 <Typography
                     variant="button"
                     component="label"
-                    htmlFor="justification"
+                    htmlFor="addComments"
                 >
                     <strong style={{ fontSize: "0.9rem" }}>
-                        Purchase Justification:
+                        Addition Comments/Instructions:
                     </strong>{" "}
-                  
+
                 </Typography>
             </Grid>
             <Grid size={{ xs: 4 }}>
                 <TextField
-                    id="justification"
+                    id="addComments"
                     multiline
                     rows={4}
                     fullWidth
                     className="form-control"
                     variant="outlined"
                     size="small"
-                    {...register("justification", {
-                        required: {
-                            value: true,
-                            message: "Purchase justification required.",
-                        },
-                    })}
-                    error={!!errors.justification}
-                    helperText={errors.justification?.message}
+                    {...register("addComments")}
+                    error={!!errors.addComments}
+                    helperText={errors.addComments?.message}
                     sx={{
                         ml: 2,
                         fontSize: "0.8rem",

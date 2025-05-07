@@ -22,10 +22,10 @@ const FundPicker = ({
 }: FundPickerProps) => {
     return (
         <Box sx={{
-          alignItems: "center",
-          gap: 2,
-          width: "300px", // reduced width
-      }}>
+            alignItems: "center",
+            gap: 2,
+            width: "300px", // reduced width
+        }}>
             <Controller
                 name="fund"
                 control={control}

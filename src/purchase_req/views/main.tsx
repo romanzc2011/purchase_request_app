@@ -10,8 +10,8 @@ import {
 import { createRoot } from "react-dom/client";
 import "./styles/index.css";
 import App from "./App.tsx";
-import LoginDialog from "./components/features/LoginDialog.tsx";
-import ProtectedRoute from "./routes/ProtectedRoute.tsx";
+import LoginDialog from "./LoginDialog.tsx";
+import ProtectedRoute from "../../routes/ProtectedRoute.tsx";
 
 const queryClient = new QueryClient();
 

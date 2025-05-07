@@ -54,7 +54,7 @@ function SubmitApprovalTable({
 
     // State for expanded rows
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-    
+
     // Toggle row expansion
     const toggleRowExpanded = (id: string) =>
         setExpandedRows((prev) => ({
@@ -113,34 +113,34 @@ function SubmitApprovalTable({
                     Authorization: `Bearer ${localStorage.getItem("access_token")}`,
                 },
             });
-            
+
             if (!idRequest.ok) {
                 throw new Error(`Failed to get ID: ${idRequest.status}`);
             }
-            
+
             const idData = await idRequest.json();
             const requestId = idData.ID;
-            
+
             // Get the requester from the first item
             const requester = processedData[0]?.requester;
             if (!requester) {
                 throw new Error("Requester is required");
             }
-            
+
             // Process each item in the data buffer
             const processedItems = processedData.map(item => ({
                 ...item,
                 ID: requestId,
                 UUID: item.UUID || uuidv4()
             }));
-            
+
             // Create a single object with the requester and items
             const requestData = {
                 requester: requester,
                 items: processedItems,
                 itemCount: itemCount
             };
-            
+
             // Send the data to the backend
             const response = await fetch(API_URL, {
                 method: "POST",
@@ -150,24 +150,24 @@ function SubmitApprovalTable({
                 },
                 body: JSON.stringify(requestData),
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            console.log("dataBuffer, isArray==", Array.isArray(dataBuffer)," length==", dataBuffer.length)
-            
+            console.log("dataBuffer, isArray==", Array.isArray(dataBuffer), " length==", dataBuffer.length)
+
             const result = await response.json();
             console.log("Submission result:", result);
-            
+
             // Reset the form and data buffer
             setIsSubmitted(true);
             setDataBuffer([]);
-            
+
             // Update the ID if setID is provided
             if (setID) {
                 setID(requestId);
             }
-            
+
         } catch (error) {
             console.error("Error submitting data:", error);
         }
