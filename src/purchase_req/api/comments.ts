@@ -7,8 +7,9 @@ const API_URL_COMMENT = `${import.meta.env.VITE_API_URL}/api/add_comment`;
 // COMMENT API
 // #####################################################################################
 export const addComment = async (ID: string, comment: string) => {
+    const currentDate = new Date().toISOString();
     console.log("Making API call to:", `${API_URL_COMMENT}/${ID}`);
-    console.log("With payload:", { comment: comment.trim() });
+    console.log("With payload:", { comment: comment.trim(), date: currentDate });
     
     const response = await fetch(`${API_URL_COMMENT}/${ID}`, {
         method: "POST",
@@ -16,7 +17,10 @@ export const addComment = async (ID: string, comment: string) => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
         },
-        body: JSON.stringify({ comment: comment.trim() }),
+        body: JSON.stringify({ 
+            comment: comment.trim(),
+            date: currentDate 
+        }),
     });
     
     console.log("Response status:", response.status);

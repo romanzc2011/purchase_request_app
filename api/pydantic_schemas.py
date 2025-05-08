@@ -48,7 +48,6 @@ class ApprovalSchema(BaseModel):
     fund: str
     itemDescription: str
     justification: str
-    addComments: Optional[str] = None
     trainNotAval: Optional[bool] = False
     needsNotMeet: Optional[bool] = False
     quantity: int
@@ -63,6 +62,28 @@ class ApprovalSchema(BaseModel):
     approvedTime: Optional[datetime] = None 
     deniedTime: Optional[datetime] = None
     dateneed: str
+    
+# line item status schema
+class LineItemStatusSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    ID: str
+    IRQ1_ID: Optional[str] = None
+    status: str
+    hold_until: Optional[datetime] = None
+    last_updated: datetime
+    updated_by: str
+    
+# son comments schema
+class SonCommentsSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    ID: str
+    IRQ1_ID: Optional[str] = None
+    comment_text: str
+    created_at: datetime
+    created_by: str
+    son_requester: str
 
 class CommentPayload(BaseModel):
     comment: str = Field(..., min_length=1, max_length=1000)

@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from loguru import logger
+from datetime import datetime
 from .db_service import Approval
 
 def add_comment(db_session: Session, ID: str, comment: str) -> bool:
@@ -20,11 +21,15 @@ def add_comment(db_session: Session, ID: str, comment: str) -> bool:
             logger.error(f"No approval found with ID: {ID}")
             return False
             
+        # Get current date and time
+        current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        formatted_comment = f"[{current_datetime}] {comment}"
+            
         # If there's an existing comment, append the new one
         if approval.addComments:
-            approval.addComments = f"{approval.addComments}\n{comment}"
+            approval.addComments = f"{approval.addComments}\n{formatted_comment}"
         else:
-            approval.addComments = comment
+            approval.addComments = formatted_comment
             
         db_session.commit()
         logger.info(f"Successfully added comment to approval {ID}")

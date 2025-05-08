@@ -5,6 +5,7 @@ from sqlalchemy import (create_engine, or_, Column, String, Integer,
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.inspection import inspect
 from typing import Optional
 import uuid
 import enum
@@ -16,47 +17,49 @@ my_session = sessionmaker(engine)
 
 ###################################################################################################
 ##  LINE ITEM STATUS ENUMERATION
-class LineItemStatus(enum.Enum):
-    pending = "pending"
-    approved = "approved"
-    denied = "denied"
-    wait = "wait"
+class LineItemStatusEnum(enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    DENIED = "denied"
+    ON_HOLD = "on_hold"
 
 ###################################################################################################
 ## PURCHASE REQUEST
 class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
 
-    UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID: Mapped[str] = mapped_column(String, unique=False, nullable=False)
-    requester: Mapped[str] = mapped_column(String, nullable=False)
-    phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq: Mapped[str] = mapped_column(String)      
-    dateneed: Mapped[str] = mapped_column(String)      
-    orderType: Mapped[str] = mapped_column(String)
+    UUID:            Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ID:              Mapped[str] = mapped_column(String, unique=False, nullable=False)
+    requester:       Mapped[str] = mapped_column(String, nullable=False)
+    phoneext:        Mapped[int] = mapped_column(Integer, nullable=False)
+    datereq:         Mapped[str] = mapped_column(String)      
+    dateneed:        Mapped[str] = mapped_column(String)      
+    orderType:       Mapped[str] = mapped_column(String)
     fileAttachments: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
     itemDescription: Mapped[str] = mapped_column(Text)
-    justification: Mapped[str] = mapped_column(Text)
-    addComments: Mapped[Optional[str]] = mapped_column(Text) 
-    trainNotAval: Mapped[bool] = mapped_column(Boolean, nullable=True)
-    needsNotMeet: Mapped[bool] = mapped_column(Boolean, nullable=True)
-    budgetObjCode: Mapped[str] = mapped_column(String)
-    fund: Mapped[str] = mapped_column(String)
-    newRequest: Mapped[bool] = mapped_column(Boolean)
+    justification:   Mapped[str] = mapped_column(Text)
+    addComments:     Mapped[Optional[str]] = mapped_column(Text) 
+    trainNotAval:    Mapped[bool] = mapped_column(Boolean, nullable=True)
+    needsNotMeet:    Mapped[bool] = mapped_column(Boolean, nullable=True)
+    budgetObjCode:   Mapped[str] = mapped_column(String)
+    fund:            Mapped[str] = mapped_column(String)
+    newRequest:      Mapped[bool] = mapped_column(Boolean)
     pendingApproval: Mapped[bool] = mapped_column(Boolean)
-    approved: Mapped[bool] = mapped_column(Boolean)
-    status: Mapped[str] = mapped_column(String, nullable=False)
-    priceEach: Mapped[float] = mapped_column(Float)
-    totalPrice: Mapped[float] = mapped_column(Float)
-    location: Mapped[str] = mapped_column(String)
-    quantity: Mapped[int] = mapped_column(Integer)
-    createdTime: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    approved:        Mapped[bool] = mapped_column(Boolean)
+    status:          Mapped[str] = mapped_column(String, nullable=False)
+    priceEach:       Mapped[float] = mapped_column(Float)
+    totalPrice:      Mapped[float] = mapped_column(Float)
+    location:        Mapped[str] = mapped_column(String)
+    quantity:        Mapped[int] = mapped_column(Integer)
+    createdTime:     Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     __searchable__ = ['ID', 'IRQ1_ID', 'requester', 'budgetObjCode', 'fund',
                      'location', 'quantity', 'priceEach', 'totalPrice', 'status', 'trainNotAval', 'needsNotMeet']
 
-    # Add relationship to Approval
-    approval = relationship("Approval", back_populates="purchase_request", uselist=False, foreign_keys="[Approval.ID]")
+    # Relationships
+    approval = relationship("Approval", back_populates="purchase_request", uselist=False)
+    line_item_status = relationship("LineItemStatus", back_populates="purchase_request", uselist=False)
+    comments = relationship("SonComments", back_populates="purchase_request")
 
 ###################################################################################################
 ## approval TABLE
@@ -66,56 +69,67 @@ class Approval(Base):
                       'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
                       'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
 
-    # Add UUID as primary key
-    UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    
     # Sequential ID for user-facing operations
-    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
-    IRQ1_ID: Mapped[str] = mapped_column(String, nullable=True, unique=True)
-    requester: Mapped[str] = mapped_column(String, nullable=False)
-    CO: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    phoneext: Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq: Mapped[str] = mapped_column(String)      
-    dateneed: Mapped[str] = mapped_column(String)      
-    orderType: Mapped[str] = mapped_column(String)
+    ID:              Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), primary_key=True, nullable=False)
+    IRQ1_ID:         Mapped[str] = mapped_column(String, nullable=True, unique=True)
+    requester:       Mapped[str] = mapped_column(String, nullable=False)
+    CO:              Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    phoneext:        Mapped[int] = mapped_column(Integer, nullable=False)
+    datereq:         Mapped[str] = mapped_column(String)      
+    dateneed:        Mapped[str] = mapped_column(String)      
+    orderType:       Mapped[str] = mapped_column(String)
     fileAttachments: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
     itemDescription: Mapped[str] = mapped_column(Text)
-    justification: Mapped[str] = mapped_column(Text)
-    addComments: Mapped[Optional[str]] = mapped_column(Text) 
-    trainNotAval: Mapped[bool] = mapped_column(Boolean, nullable=True)
-    needsNotMeet: Mapped[bool] = mapped_column(Boolean, nullable=True)
-    budgetObjCode: Mapped[str] = mapped_column(String)
-    fund: Mapped[str] = mapped_column(String)
-    priceEach: Mapped[float] = mapped_column(Float)
-    totalPrice: Mapped[float] = mapped_column(Float)
-    location: Mapped[str] = mapped_column(String)
-    quantity: Mapped[int] = mapped_column(Integer)
-    newRequest: Mapped[bool] = mapped_column(Boolean)
+    justification:   Mapped[str] = mapped_column(Text)
+    addComments:     Mapped[Optional[str]] = mapped_column(Text) 
+    trainNotAval:    Mapped[bool] = mapped_column(Boolean, nullable=True)
+    needsNotMeet:    Mapped[bool] = mapped_column(Boolean, nullable=True)
+    budgetObjCode:   Mapped[str] = mapped_column(String)
+    fund:            Mapped[str] = mapped_column(String)
+    priceEach:       Mapped[float] = mapped_column(Float)
+    totalPrice:      Mapped[float] = mapped_column(Float)
+    location:        Mapped[str] = mapped_column(String)
+    quantity:        Mapped[int] = mapped_column(Integer)
+    newRequest:      Mapped[bool] = mapped_column(Boolean)
+    approved:        Mapped[bool] = mapped_column(Boolean)
     pendingApproval: Mapped[bool] = mapped_column(Boolean)
-    approved: Mapped[bool] = mapped_column(Boolean)
-    status: Mapped[str] = mapped_column(String, nullable=False)
-    createdTime: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
-    approvedTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    deniedTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    
-    # Link back to PurchaseRequest without cascade here.
-    purchase_request = relationship(
-        "PurchaseRequest",
-        back_populates="approval",
-        uselist=False,
-        foreign_keys=[ID]
-    )
-    
+    status:          Mapped[str] = mapped_column(String, nullable=False)
+    createdTime:     Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+
+    # Relationship
+    purchase_request = relationship("PurchaseRequest", back_populates="approval", uselist=False)
+    comments = relationship("SonComments", back_populates="approval")
+
 ###################################################################################################
 ## review TABLE
-class LineItem(Base):
-    __tablename__ = "son_review"
+class LineItemStatus(Base):
+    __tablename__ = "line_item_status"
+    id:                     Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    purchase_request_id:    Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
+    status:                 Mapped[LineItemStatus] = mapped_column(Enum(LineItemStatus), nullable=False)
+    hold_until:             Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_updated:           Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_by:             Mapped[str] = mapped_column(String, nullable=False)
     
-    UUID: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False),
-    status: Mapped[LineItemStatus] = mapped_column(Enum(LineItemStatus), nullable=False)
+    # Relationship
+    purchase_request = relationship("PurchaseRequest", back_populates="line_item_status", uselist=False)
+
+###################################################################################################
+## LINE ITEM COMMENTS TABLE
+class SonComments(Base):
+    __tablename__ = "son_comments"
     
+    id:                  Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    purchase_request_id: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
+    approval_id:         Mapped[str] = mapped_column(String, ForeignKey("approval.ID"), nullable=False)
+    comment_text:        Mapped[str] = mapped_column(Text)
+    created_at:          Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    son_requester:       Mapped[str] = mapped_column(String, nullable=False)
     
+    # Relationships
+    purchase_request = relationship("PurchaseRequest", back_populates="comments")
+    approval = relationship("Approval", back_populates="comments")
+
 Base.metadata.create_all(engine)
 my_session = sessionmaker(bind=engine)
 
@@ -142,29 +156,38 @@ def insert_data(data, table):
     # Get last id if there is one 
     logger.info(f"Inserting data into {table}: {data}")
     
-    if not data or not isinstance(data, dict):
+    if not data:
         raise ValueError("Data must be a non-empty dictionary")
     
+    # Pick the right table
+    match table:
+        case "purchase_requests":
+            model = PurchaseRequest
+        case "approval":
+            model = Approval
+        case "line_item_status":
+            model = LineItemStatus
+        case "son_comments":
+            model = SonComments
+        case _:
+            raise ValueError(f"Unsupported table: {table}")
+        
+    # Strip out keys that are not in model
+    valid_cols = set(inspect(model).columns.keys())
+    filtered_data = {k: v for k, v in data.items() if k in valid_cols}
+    
+    # Construct, add, build
     with next(get_session()) as db:
-        try:
-            if table == "purchase_requests":
-                # Create new PurchaseRequest with uuid
-                obj = PurchaseRequest(**data)
-                db.add(obj)
-            elif table == "approval":
-                # Create new Approval with uuid
-                obj = Approval(**data)
-                db.add(obj)
-            else:
-                raise ValueError(f"Unsupported table: {table}")
-            
-            db.commit()
-            logger.info(f"Successfully inserted data into {table}")
-            return obj
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error inserting data into {table}: {e}")
-            raise
+        obj = model(**filtered_data)
+        db.add(obj)
+        db.commit()
+        logger.info(f"Inserted data into {table}")
+        return obj
+        
+    
+    
+    
+        
 
 ###################################################################################################
 # Get status of request from Approval table

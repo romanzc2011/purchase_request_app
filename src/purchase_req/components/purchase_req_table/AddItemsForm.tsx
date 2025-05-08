@@ -36,6 +36,8 @@ interface AddItemsProps {
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
+// TODO: rerender form when Add Items button is clicked
+
 /*************************************************************************************** */
 /* ADD ITEMS FORM */
 /*************************************************************************************** */

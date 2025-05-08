@@ -22,24 +22,25 @@ export function useCommentModal() {
         setCommentText("");
     }, []);
 
+    // #####################################################################################
     // Handle comment submission
-    const handleSubmit = useCallback(async () => {
-        console.log("handleSubmit called with:", { modalRowId, commentText });
-        if (!modalRowId || !commentText.trim()) {
+    const handleSubmit = useCallback(async (comment: string) => {
+        console.log("handleSubmit called with:", { modalRowId, comment });
+        if (!modalRowId || !comment.trim()) {
             console.log("Early return - missing modalRowId or empty comment");
             return;
         }
 
         try {
-            console.log("Calling addComment with:", { modalRowId, commentText });
-            await addComment(modalRowId, commentText);
+            console.log("Calling addComment with:", { modalRowId, comment });
+            await addComment(modalRowId, comment);
             toast.success("Comment added successfully");
             close();
         } catch (error) {
             console.error("Error adding comment:", error);  
             toast.error("Failed to add comment");
         }
-    }, [modalRowId, commentText, close]);
+    }, [modalRowId, close]);
 
     return {
         isOpen,

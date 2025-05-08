@@ -748,9 +748,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                 onClose={closeCommentModal}
                 onSubmit={(comment) => {
                     console.log("CommentModal onSubmit called with:", comment);
-                    setCommentText(comment);
-                    console.log("After setCommentText, calling handleSubmitComment");
-                    handleSubmitComment();
+                    handleSubmitComment(comment);
                 }}
             />
         </Box>
