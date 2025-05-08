@@ -16,6 +16,7 @@ import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
 import { useAssignIRQ1 } from "../../../hooks/useAssignIRQ1";
 import { useCommentModal } from "../../../hooks/useCommentModal";
+import CommentIcon from '@mui/icons-material/Comment';
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
@@ -576,7 +577,14 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
                     {/* Add Comment Button */}
                     <Button
-                        sx={{ backgroundColor: "#800000", "&:hover": { backgroundColor: "#600000" } }}
+                        startIcon={<CommentIcon fontSize="small" />} // Make icon smaller
+                        size="small" // Make the overall button smaller
+                        sx={{
+                            backgroundColor: "#800000",
+                            "&:hover": { backgroundColor: "#600000" },
+                            padding: "4px 8px", // Reduce padding (default is 6px 16px)
+                            fontSize: "0.75rem", // Make text smaller (default is 0.875rem)
+                        }}
                         variant="contained"
                         onClick={() => openCommentModal(params.row.ID)}
                     >

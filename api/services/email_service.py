@@ -6,7 +6,6 @@ import uuid
 from datetime import datetime
 
 from loguru import logger
-from services.ipc_service import IPC_Service
 from docxtpl import DocxTemplate
 from docx2pdf import convert
 from docx import Document

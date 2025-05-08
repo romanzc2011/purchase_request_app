@@ -2,13 +2,28 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 from pydantic import Field
+import enum
+from enum import Enum
 
 ########################################################
 ## PYDANTIC SCHEMA -- structures data into pydantic, a style that easily converts to json with fastapi
 ########################################################
-# pending_approval means the last person to approve request has not done so.
-# For Approval: Matt: approves first -> Final approver
-# purchase_request schema
+
+########################################################    
+##  LINE ITEM STATUS ENUMERATION
+########################################################
+class ItemStatus(str, Enum):
+    NEW = "NEW REQUEST"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    DENIED = "DENIED"
+    ON_HOLD = "ON HOLD"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+########################################################
+##    PURCHASE REQUEST SCHEMA
+########################################################
 class PurchaseRequestSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
@@ -27,16 +42,16 @@ class PurchaseRequestSchema(BaseModel):
     needsNotMeet: Optional[bool] = False
     budgetObjCode: str
     fund: str
+    status: ItemStatus
     priceEach: float
     totalPrice: float
     location: str
     quantity: int
-    newRequest: bool
-    pendingApproval: bool
-    approved: bool
     createdTime: datetime
 
-# approval schema
+########################################################
+##    APPROVAL SCHEMA
+########################################################
 class ApprovalSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
@@ -44,6 +59,8 @@ class ApprovalSchema(BaseModel):
     IRQ1_ID: Optional[str] = None
     CO: Optional[str] = None
     requester: str
+    dateneed: str
+    datereq: str
     budgetObjCode: str
     fund: str
     itemDescription: str
@@ -54,16 +71,12 @@ class ApprovalSchema(BaseModel):
     totalPrice: float
     priceEach: float
     location: str
-    status: str
-    newRequest: bool
-    pendingApproval: bool
-    approved: bool
+    status: ItemStatus
     createdTime: datetime
-    approvedTime: Optional[datetime] = None 
-    deniedTime: Optional[datetime] = None
-    dateneed: str
     
-# line item status schema
+########################################################
+##    LINE ITEM STATUS SCHEMA
+########################################################
 class LineItemStatusSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
@@ -74,8 +87,10 @@ class LineItemStatusSchema(BaseModel):
     last_updated: datetime
     updated_by: str
     
-# son comments schema
-class SonCommentsSchema(BaseModel):
+########################################################
+##    SON COMMENTS SCHEMA
+########################################################
+class SonCommentSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     ID: str
@@ -85,12 +100,30 @@ class SonCommentsSchema(BaseModel):
     created_by: str
     son_requester: str
 
+########################################################
+##    COMMENT PAYLOAD SCHEMA
+########################################################
 class CommentPayload(BaseModel):
     comment: str = Field(..., min_length=1, max_length=1000)
 
     class Config:
         json_schema_extra = {
-            "example": {
-                "comment": "This is a sample comment"
+             "example": {
+                "ID": "LAWB0001",
+                "requester": "john.doe",
+                "phoneext": 1234,
+                "datereq": "2024-03-20",
+                "dateneed": "2024-03-25",
+                "orderType": "STANDARD",
+                "itemDescription": "Office supplies",
+                "justification": "Need for daily operations",
+                "budgetObjCode": "12345",
+                "fund": "GENERAL",
+                "status": "NEW REQUEST",
+                "priceEach": 29.99,
+                "totalPrice": 299.90,
+                "location": "Building A",
+                "quantity": 10,
+                "createdTime": "2024-03-20T10:00:00Z"
             }
         }

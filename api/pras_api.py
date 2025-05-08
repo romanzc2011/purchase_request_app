@@ -10,6 +10,7 @@ from typing import List, Dict, Optional
 import os, threading, time, uuid, json
 from loguru import logger
 from dotenv import load_dotenv, find_dotenv
+from datetime import datetime
 from multiprocessing.dummy import Pool as ThreadPool
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -26,12 +27,10 @@ from pathlib import Path
 
 from services.auth_service import AuthService
 from services.email_service import EmailService
-from services.ipc_service import IPC_Service
 from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
 from services.uuid_service import uuid_service
 from services.pdf_service import make_purchase_request_pdf
-from managers.ipc_manager import ipc_instance
 from settings import settings
 
 """
@@ -95,7 +94,6 @@ email_svc.set_first_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov
 email_svc.set_final_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov")
 
 db_svc = next(get_session())  # Initialize with a session
-ipc_svc = IPC_Service()
 auth_svc = AuthService()
 
 # Thread safety
@@ -215,10 +213,11 @@ async def get_approval_data(
     
     try:
         if ID:
-            approval = dbas.get_approval_by_id(session, ID)
+            approvals = dbas.get_approval_by_id(session, ID)
         else:
-            approval = dbas.get_all_approval(session)
-        approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approval]
+            approvals = dbas.get_all_approval(session)
+        approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approvals]
+        logger.success(f"Approval data: {approval_data}")
         return approval_data
     finally:
         session.close()
@@ -498,7 +497,7 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
         raise HTTPException(status_code=400, detail="Missing UUID in request")
     
     # Update the database with the requisition ID using the UUID
-    dbas.update_data(uuid, "approval", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
     return {"IRQ1_ID_ASSIGNED": True}
 
 ##########################################################################
@@ -552,7 +551,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                 logger.info("SEND TO FINAL APPROVER")
                 if action.lower() == "approve":
                     new_status = "PENDING"
-                    dbas.update_data(UUID, "approval", status=new_status)
+                    dbas.update_data(UUID, "approvals", status=new_status)
                     
                     # Set final approver email
                     final_approver_email = ldap_svc.get_email_address(ldap_svc.get_connection(), current_user.username)
@@ -566,7 +565,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     )
                 elif action.lower() == "deny":
                     new_status = "DENIED"
-                    dbas.update_data(UUID, "approval", status=new_status)
+                    dbas.update_data(UUID, "approvals", status=new_status)
                     email_svc.set_request_status("NEW REQUEST")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
@@ -576,7 +575,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
             elif current_status == "PENDING":
                 if action.lower() == "approve":
                     new_status = "APPROVED" 
-                    dbas.update_data(UUID, "approval", status=new_status)
+                    dbas.update_data(UUID, "approvals", status=new_status)
                     # Send email to final approver
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
@@ -601,7 +600,7 @@ async def approve_deny_request(data: dict, current_user: User = Depends(get_curr
                     )
                 elif action.lower() == "deny":
                     new_status = "DENIED"
-                    dbas.update_data(UUID, "approval", status=new_status)
+                    dbas.update_data(UUID, "approvals", status=new_status)
                     email_svc.set_request_status("PENDING")
                     email_svc.send_notification(
                         template_path="./templates/denial_notification.html",
@@ -721,6 +720,8 @@ async def add_comment_endpoint(
         dict: Success message or error
     """
     logger.info(f"Received comment request for ID {ID} with payload: {payload}")
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    formatted_comment = f"{current_date} - {payload.comment}"
     with next(get_session()) as session:
         success = add_comment(session, ID, payload.comment)
         if not success:
@@ -787,23 +788,8 @@ def process_purchase_data(data):
     return local_purchase_cols
 
 ##########################################################################
-## UPDATE REQUEST STATUS
-def update_request_status(id, status):
-    # Send a message to EmailService via IPC
-    message_content = {
-        "id": id,
-        "status": status
-    }
-    ipc_instance.send_message(
-        content=message_content,
-        msg_type="REQUEST_STATUS_UPDATE"
-    )
-    logger.info(f"Request status updated: {id} to {status}")
-
-##########################################################################
 ## PROCESS APPROVAL DATA --- send new request to approval
 def process_approval_data(processed_data):
-    print("PROCESSED: ", processed_data)
     logger.info(f"Processing approval data: {processed_data}")
     
     pendingApproval = False
@@ -812,26 +798,13 @@ def process_approval_data(processed_data):
     if not isinstance(processed_data, dict):
         raise ValueError("Data must be a dictionary")
     
-    # Determine approval status via status
-    if processed_data.get('newRequest'):
-        approval_data['status'] = "NEW REQUEST"
-        
-    elif processed_data.get('pendingApproval'):
-        approval_data['status'] = "PENDING"
-        
-    elif (not processed_data.get('newRequest') and
-          not processed_data.get('pendingApproval') and
-          not processed_data.get('approved')):
-        approval_data['status'] = "DENIED"
-        
-    else:
-        approval_data["status"] = "UNKNOWN"
+    logger.info(f"processed_data: {processed_data}")
     
     # Define allowed keys that correspond to the Approval model's columns.
     allowed_keys = [
         'ID', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet', 'addComments',
         'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location', 
-        'newRequest', 'pendingApproval', 'approved', 'phoneext', 'datereq', 'dateneed', 'orderType'
+        'phoneext', 'datereq', 'dateneed', 'orderType'
     ]
     
     # Populate approval_data from processed_data
@@ -846,10 +819,6 @@ def process_approval_data(processed_data):
     # Handle IRQ1_ID - convert empty string to None to avoid unique constraint violation
     irq1_id = processed_data.get('IRQ1_ID', '')
     approval_data['IRQ1_ID'] = None if irq1_id == '' else irq1_id
-    
-    approval_data['newRequest'] = processed_data.get('newRequest', True)
-    approval_data['pendingApproval'] = processed_data.get('pendingApproval', False)
-    approval_data['approved'] = processed_data.get('approved', False)
 
     return approval_data
 
@@ -863,12 +832,14 @@ def purchase_req_commit(processed_data):
             
             # Process approval data
             approval_data = process_approval_data(processed_data)
-            logger.info(f"newRequest: {processed_data.get('newRequest')}")
+            logger.info(f"approval_data: {approval_data}")
             
-            if processed_data.get('newRequest') == 1:
-                approval_data['status'] = "NEW REQUEST"
-                # Insert approval data
-                dbas.insert_data(approval_data, "approval")
+            # Set default status for new approval
+            approval_data['status'] = dbas.ItemStatus.NEW_REQUEST
+            
+            # Insert approval data
+            approval = dbas.insert_data(approval_data, "approvals")
+            logger.info(f"Created approval: {approval}")
                 
         except Exception as e:
             logger.error(f"Exception occurred: {e}")

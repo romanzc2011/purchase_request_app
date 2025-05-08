@@ -8,6 +8,7 @@
 from loguru import logger
 from six import text_type
 import services.db_service as dbas
+from services.db_service import get_session
 from sqlalchemy import event
 from sqlalchemy.orm.session import Session
 from whoosh.filedb.filestore import FileStorage, RamStorage
@@ -45,25 +46,28 @@ class SearchService:
     approval_schema = Schema(
         ID=ID(stored=True, unique=True),
         IRQ1_ID=ID(stored=True),             
+        CO=TEXT(stored=True),        
         requester=TEXT(stored=True, analyzer=StemmingAnalyzer()),        
+        dateneed=TEXT(stored=True),
+        datereq=TEXT(stored=True),
         budgetObjCode=ID(stored=True),    
         fund=ID(stored=True),             
-        quantity=NUMERIC(stored=True, numtype=int, bits=16),  # Reduced bits
+        itemDescription=TEXT(stored=True),
+        justification=TEXT(stored=True),
+        trainNotAval=BOOLEAN(stored=True),
+        needsNotMeet=BOOLEAN(stored=True),
+        quantity=NUMERIC(stored=True, numtype=int, bits=16),
         totalPrice=NUMERIC(stored=True, numtype=float),
         priceEach=NUMERIC(stored=True, numtype=float),
         location=TEXT(stored=True),         
-        newRequest=BOOLEAN(stored=True),
-        approved=BOOLEAN(stored=True),
-        pendingApproval=BOOLEAN(stored=True),
         status=TEXT(stored=True),
-        createdTime=DATETIME(stored=True),
-        approvedTime=DATETIME(stored=True),
-        deniedTime=DATETIME(stored=True)
+        createdTime=DATETIME(stored=True)
     )
     
     searchable_fields = [
-        'ID', 'IRQ1_ID', 'requester','budgetObjCode', 'fund', 'priceEach','totalPrice',
-        'location', 'status','quantity','createdTime'
+        'ID', 'IRQ1_ID', 'CO', 'requester', 'dateneed', 'datereq', 'budgetObjCode', 
+        'fund', 'itemDescription', 'justification', 'trainNotAval', 'needsNotMeet',
+        'quantity', 'totalPrice', 'priceEach', 'location', 'status', 'createdTime'
     ]
     
     def __init__(self, session: Optional[Session] = None, use_ram: bool = False):
@@ -72,6 +76,7 @@ class SearchService:
         self.indexes: Dict[str, Any] = {}
         self._pending_updates: List[Dict] = []
         self.batch_size = 100
+        self.index_dir = "indexdir"
         
         # Use RAM storage for testing/small datasets
         if use_ram:
@@ -105,40 +110,80 @@ class SearchService:
                 schema[field.name] = whoosh.fields.TEXT(analyzer=StemmingAnalyzer())
         return Schema(**schema), primary
 
-    def create_whoosh_index(self):
-        """Create/update Whoosh index using batch processing"""
-        writer = AsyncWriter(self.ix)
-        session = next(dbas.get_session())
-        
+    def create_whoosh_index(self, db=None):
+        """Create a new Whoosh index for purchase requests and their approvals."""
         try:
-            approvals = dbas.get_all_approval(session)
-            batch = []
+            # Create the index directory if it doesn't exist
+            if not os.path.exists(self.index_dir):
+                os.makedirs(self.index_dir)
             
-            for approval in approvals:
-                doc = {field: getattr(approval, field) for field in self.searchable_fields}
-                doc['ID'] = str(doc['ID'])
-                batch.append(doc)
-                
-                if len(batch) >= self.batch_size:
-                    # Process each document individually
-                    for document in batch:
-                        writer.update_document(**document)
-                    batch = []
+            # Create the schema and index
+            schema = Schema(
+                ID=ID(stored=True, unique=True),
+                UUID=ID(stored=True, unique=True),
+                requester=TEXT(stored=True),
+                budgetObjCode=TEXT(stored=True),
+                fund=TEXT(stored=True),
+                trainNotAval=BOOLEAN(stored=True),
+                needsNotMeet=BOOLEAN(stored=True),
+                addComments=TEXT(stored=True),
+                itemDescription=TEXT(stored=True),
+                justification=TEXT(stored=True),
+                quantity=NUMERIC(stored=True),
+                totalPrice=NUMERIC(stored=True),
+                priceEach=NUMERIC(stored=True),
+                location=TEXT(stored=True),
+                phoneext=TEXT(stored=True),
+                datereq=DATETIME(stored=True),
+                dateneed=DATETIME(stored=True),
+                orderType=TEXT(stored=True),
+                status=TEXT(stored=True),
+                IRQ1_ID=TEXT(stored=True)
+            )
             
-            if batch:  # Process remaining documents
-                # Process each document individually
-                for document in batch:
-                    writer.update_document(**document)
+            # Create the index
+            ix = create_in(self.index_dir, schema)
+            
+            # Get all purchase requests and their approvals
+            with next(get_session()) as session:
+                purchase_requests = dbas.get_all_purchase_requests(session)
                 
-            writer.commit()
-            logger.success("Whoosh Index created successfully")
+                if not purchase_requests:
+                    logger.info("No purchase requests found in database")
+                    return
+                
+                # Create a writer for the index
+                writer = ix.writer()
+                
+                # Index each purchase request and its approval
+                for pr in purchase_requests:
+                    # Get the approval for this purchase request
+                    approval = dbas.get_approval_by_id(session, pr.ID)
+                    if not approval:
+                        continue
+                        
+                    # Convert approval to dict and handle enum values
+                    doc = {}
+                    for key, value in approval.__dict__.items():
+                        if key.startswith('_'):
+                            continue
+                        # Handle enum values
+                        if isinstance(value, dbas.ItemStatus):
+                            doc[key] = value.value  # Use the enum's value (string)
+                        else:
+                            doc[key] = value
+                    
+                    # Add the document to the index
+                    writer.add_document(**doc)
+                
+                # Commit the changes
+                writer.commit()
+                
+            logger.info("Search index created successfully")
             
         except Exception as e:
-            writer.cancel()
-            logger.error(f"Error creating index: {e}")
+            logger.error(f"Error creating search index: {e}")
             raise
-        finally:
-            session.close()
 
     def alter_approval_doc(self, id: str, record: Dict):
         """Update a single document asynchronously"""
@@ -218,7 +263,12 @@ class SearchService:
                     # Only include fields that exist in the schema
                     for key in model.__class__.__searchable__:
                         if hasattr(model, key) and key in self.ix.schema:
-                            attrs[key] = getattr(model, key)
+                            value = getattr(model, key)
+                            # Handle enum values
+                            if isinstance(value, dbas.ItemStatus):
+                                attrs[key] = value.value  # Use the enum's value (string)
+                            else:
+                                attrs[key] = value
                     
                     # Ensure the primary key is always included
                     attrs[self.primary_key] = text_type(getattr(model, self.primary_key))
