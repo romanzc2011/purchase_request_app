@@ -384,7 +384,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         processed_data = process_purchase_data(item)
 
         # Commit the purchase request
-        purchase_req_commit(processed_data)
+        purchase_req_commit(processed_data, current_user)
         processed_lines.append(processed_data)
     
     ##########################################################
@@ -836,27 +836,41 @@ def process_approval_data(processed_data):
 
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
-def purchase_req_commit(processed_data):
+def purchase_req_commit(processed_data, current_user: User):
     with lock:
         try:
             logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")
             
-            # Insert purchase request data
+            # 1. First create purchase request
             purchase_request = dbas.insert_data(processed_data, "purchase_requests")
             
-            # Process approval data
+            # 2. Process and create approval data
             approval_data = process_approval_data(processed_data)
             approval_data['status'] = dbas.ItemStatus.NEW
             approval = dbas.insert_data(approval_data, "approvals")
             
-            # Create line item status data
-            line_item_status = {
-                'purchase_request_id': purchase_request['ID'],
+            # 3. Create line item status with required IDs and current user
+            line_item_data = {
+                'purchase_request_id': processed_data['ID'],
                 'approval_id': approval.UUID,
                 'status': dbas.ItemStatus.NEW,
+                'updated_by': current_user.username  # Use the current user's username
             }
-            dbas.insert_data(line_item_status, "line_item_statuses")
+            line_item_status = dbas.insert_data(line_item_data, "line_item_statuses")
+            
+            # 4. Create son comment with required IDs
+            son_comment_data = {
+                'purchase_request_id': processed_data['ID'],
+                'approval_id': approval.UUID,
+                'son_requester': current_user.username  # Use the current user's username
+            }
+            son_comment = dbas.insert_data(son_comment_data, "son_comments")
 
+            logger.info(f"Created purchase request: {purchase_request}")
+            logger.info(f"Created approval: {approval}")
+            logger.info(f"Created line item status: {line_item_status}")
+            logger.info(f"Created son comment: {son_comment}")
+                
         except Exception as e:
             logger.error(f"Exception occurred: {e}")
             raise

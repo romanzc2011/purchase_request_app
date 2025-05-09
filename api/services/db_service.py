@@ -122,6 +122,7 @@ class LineItemStatus(Base):
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"),
                                                                         nullable=False,
                                                                         default=ItemStatus.NEW)
+    created_at:             Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     hold_until:             Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_updated:           Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_by:             Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -183,8 +184,10 @@ def insert_data(data, table):
         case "purchase_requests":
             model = PurchaseRequest
         case "approvals":
+            logger.info(f"Inserting data into approvals id: {data['ID']}")
             model = Approval
         case "line_item_statuses":
+            
             model = LineItemStatus
         case "son_comments":
             model = SonComment
@@ -200,6 +203,7 @@ def insert_data(data, table):
         obj = model(**filtered_data)
         db.add(obj)
         db.commit()
+        db.refresh(obj)
         logger.info(f"Inserted data into {table}")
         return obj
 
