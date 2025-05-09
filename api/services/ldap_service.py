@@ -252,6 +252,8 @@ class LDAPService:
     # USERNAME LOOKUP
     #########################################################################
     def fetch_usernames(self, query: str) -> List[str]:
+        # LDAP structure to search for
+        # OU=LAWB,OU=USCOURTS,DC=ADU,DC=DCN
         if self.connection is None:
             logger.error("Cannot get username: LDAP connection is None")
             return []
@@ -259,7 +261,7 @@ class LDAPService:
         # Perform subtree search
         try:
             self.connection.search(
-                search_base='DC=ADU,DC=DCN',
+                search_base='OU=LAWB,OU=USCOURTS,DC=ADU,DC=DCN',
                 search_filter=f'(sAMAccountName={query}*)',
                 search_scope=SUBTREE,
                 attributes=['sAMAccountName'],
