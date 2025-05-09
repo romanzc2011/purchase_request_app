@@ -840,19 +840,23 @@ def purchase_req_commit(processed_data):
     with lock:
         try:
             logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")
+            
             # Insert purchase request data
-            dbas.insert_data(processed_data, "purchase_requests")
+            purchase_request = dbas.insert_data(processed_data, "purchase_requests")
             
             # Process approval data
             approval_data = process_approval_data(processed_data)
-            
-            # Set default status for new approval
             approval_data['status'] = dbas.ItemStatus.NEW
-            
-            # Insert approval data
             approval = dbas.insert_data(approval_data, "approvals")
-            logger.info(f"Created approval: {approval}")
-                
+            
+            # Create line item status data
+            line_item_status = {
+                'purchase_request_id': purchase_request['ID'],
+                'approval_id': approval.UUID,
+                'status': dbas.ItemStatus.NEW,
+            }
+            dbas.insert_data(line_item_status, "line_item_statuses")
+
         except Exception as e:
             logger.error(f"Exception occurred: {e}")
             raise

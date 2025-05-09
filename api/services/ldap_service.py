@@ -130,13 +130,14 @@ class LDAPService:
                 )
                 
                 if connection.entries:
-                    print(f"entries: {connection.entries}")
+                    logger.info(f"Group DN: {group}")
+                    logger.info(f"Raw entries: {connection.entries}")
+                    logger.info(f"Entry attributes: {connection.entries[0].entry_attributes}")
+                    logger.info(f"Entry JSON: {connection.entries[0].entry_to_json()}")
                     # Extract full DN of all members
                     group_entry = connection.entries[0]
                     members_dn_list = group_entry.member.values
-                    print(group)
-                    
-                    print(members_dn_list)
+                    logger.info(f"Members DN list: {members_dn_list}")
                     
                     match = re.search(r'CN=LAWB_([^,]+)', group)
                     group_name = match.group(1) if match else "Uknown"
@@ -267,6 +268,9 @@ class LDAPService:
             
             if self.connection.entries:
                 logger.info(f"Found {len(self.connection.entries)} entries for query: {query}")
+                logger.info(f"Raw entries: {self.connection.entries}")
+                logger.info(f"Entry attributes: {[entry.entry_attributes for entry in self.connection.entries]}")
+                logger.info(f"Entry JSON: {[entry.entry_to_json() for entry in self.connection.entries]}")
                 return [entry.sAMAccountName.value for entry in self.connection.entries]
             else:
                 logger.error(f"No user found for query: {query}")

@@ -124,7 +124,9 @@ class LineItemStatus(Base):
                                                                         default=ItemStatus.NEW)
     hold_until:             Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_updated:           Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_by:             Mapped[str] = mapped_column(String, nullable=False)
+    updated_by:             Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    updater_username:       Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    updater_email:          Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     # Relationships
     purchase_request = relationship("PurchaseRequest", back_populates="line_item_status")
@@ -138,9 +140,10 @@ class SonComment(Base):
     id:                  Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     purchase_request_id: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
     approval_id:         Mapped[str] = mapped_column(String, ForeignKey("approvals.ID"), nullable=False)
-    comment_text:        Mapped[str] = mapped_column(Text)
-    created_at:          Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    comment_text:        Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at:          Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
     son_requester:       Mapped[str] = mapped_column(String, nullable=False)
+    
     
     # Relationships
     purchase_request = relationship("PurchaseRequest", back_populates="son_comment")

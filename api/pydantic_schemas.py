@@ -85,7 +85,9 @@ class LineItemStatusSchema(BaseModel):
     status: str
     hold_until: Optional[datetime] = None
     last_updated: datetime
-    updated_by: str
+    updated_by: Optional[str] = None
+    updater_username: Optional[str] = None
+    updater_email: Optional[str] = None
     
 ########################################################
 ##    SON COMMENTS SCHEMA
@@ -95,9 +97,9 @@ class SonCommentSchema(BaseModel):
     
     ID: str
     IRQ1_ID: Optional[str] = None
-    comment_text: str
-    created_at: datetime
-    created_by: str
+    comment_text: Optional[str] = None
+    created_at: Optional[datetime] = None
+    created_by: Optional[str] = None
     son_requester: str
 
 ########################################################
