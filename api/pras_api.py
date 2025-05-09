@@ -814,7 +814,7 @@ def process_approval_data(processed_data):
     
     # Define allowed keys that correspond to the Approval model's columns.
     allowed_keys = [
-        'ID', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet', 'addComments',
+        'ID', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet',
         'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location', 
         'phoneext', 'datereq', 'dateneed', 'orderType'
     ]
@@ -839,12 +839,12 @@ def process_approval_data(processed_data):
 def purchase_req_commit(processed_data):
     with lock:
         try:
+            logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")
             # Insert purchase request data
-            purchase_request = dbas.insert_data(processed_data, "purchase_requests")
+            dbas.insert_data(processed_data, "purchase_requests")
             
             # Process approval data
             approval_data = process_approval_data(processed_data)
-            logger.info(f"approval_data: {approval_data}")
             
             # Set default status for new approval
             approval_data['status'] = dbas.ItemStatus.NEW

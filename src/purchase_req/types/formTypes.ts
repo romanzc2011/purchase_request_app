@@ -18,7 +18,6 @@ export type FormValues = {
   }[];
   itemDescription: string;
   justification: string;
-  addComments: string;
   learnAndDev: {
     trainNotAval: boolean;
     needsNotMeet: boolean;
