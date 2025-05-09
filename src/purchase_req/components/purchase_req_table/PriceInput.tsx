@@ -1,11 +1,11 @@
 import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { FormValues } from "../../types/formTypes";
+import { PurchaseItem } from "../../schemas/purchaseSchema";
 import { TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 
 interface PriceInputProps {
-    register: ReturnType<UseFormRegister<FormValues>>;
-    errors: FieldErrors<FormValues>;
+    register: UseFormRegister<PurchaseItem>;
+    errors: FieldErrors<PurchaseItem>;
 }
 
 const PriceInput = ({ register, errors }: PriceInputProps) => {
@@ -29,10 +29,11 @@ const PriceInput = ({ register, errors }: PriceInputProps) => {
                     type="number"
                     variant="outlined"
                     placeholder="Enter Price"
-                    error={!!errors.price}
-                    helperText={errors.price?.message}
+                    error={!!errors.priceEach}
+                    helperText={errors.priceEach?.message}
                     sx={{ backgroundColor: "white" }}
-                    {...register}
+                    inputProps={{ min: 0, step: "0.01" }}
+                    {...register("priceEach", { valueAsNumber: true })}
                 />
             </Grid>
         </Grid>

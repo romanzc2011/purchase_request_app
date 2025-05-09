@@ -1,11 +1,11 @@
 import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { FormValues } from "../../types/formTypes";
+import { PurchaseItem } from "../../schemas/purchaseSchema";
 import { TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 
 interface QuantityInputProps {
-    register: ReturnType<UseFormRegister<FormValues>>;
-    errors: FieldErrors<FormValues>;
+    register: UseFormRegister<PurchaseItem>;
+    errors: FieldErrors<PurchaseItem>;
 }
 
 const QuantityInput = ({ register, errors }: QuantityInputProps) => {
@@ -32,7 +32,8 @@ const QuantityInput = ({ register, errors }: QuantityInputProps) => {
                     error={!!errors.quantity}
                     helperText={errors.quantity?.message}
                     sx={{ backgroundColor: "white" }}
-                    {...register}
+                    inputProps={{ min: 1 }}
+                    {...register("quantity", { valueAsNumber: true })}
                 />
             </Grid>
         </Grid>

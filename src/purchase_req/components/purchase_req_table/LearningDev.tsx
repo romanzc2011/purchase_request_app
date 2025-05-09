@@ -1,11 +1,12 @@
 import { UseFormRegister, Controller, Control } from "react-hook-form";
-import { FormValues } from "../../types/formTypes";
+import { PurchaseItem } from "../../schemas/purchaseSchema";
 import Grid from "@mui/material/Grid2";
 import { Typography, Checkbox, FormControlLabel } from "@mui/material";
 
 interface LearningDevProps {
-    control: Control<FormValues>;
+    control: Control<PurchaseItem>;
 }
+
 export default function LearningDev({ control }: LearningDevProps) {
     return (
         <Grid container spacing={2} mt={4}>

@@ -1,16 +1,16 @@
 import { FieldErrors, FormProvider } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
-import React from "react";
+import React, { useState } from "react";
 import "./LearningDev";
-import { Box } from "@mui/material";
+import { Box, Snackbar, Alert } from "@mui/material";
 import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
 import BudgetCodePicker from "./BudgetCodePicker";
 import { useEffect } from "react";
-import { FormValues } from "../../types/formTypes";
 import { TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import LocationPicker from "./LocationPicker";
+import { PurchaseItem } from "../../schemas/purchaseSchema";
 import FileUpload from "./FileUpload";
 import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
@@ -30,13 +30,11 @@ import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 interface AddItemsProps {
     ID?: string;
     fileInfo: IFile[];
-    setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
+    setDataBuffer: React.Dispatch<React.SetStateAction<PurchaseItem[]>>;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
     setID?: React.Dispatch<React.SetStateAction<string>>;
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
-
-// TODO: rerender form when Add Items button is clicked
 
 /*************************************************************************************** */
 /* ADD ITEMS FORM */
@@ -53,6 +51,21 @@ function AddItemsForm({
     const form = usePurchaseForm();
     const { register, control, handleSubmit, formState, watch, reset, trigger } = form;
     const { errors, isValid, isSubmitted } = formState;
+    const [showSuccess, setShowSuccess] = useState(false);
+
+    // Debug form state
+    useEffect(() => {
+        console.log('Form State:', {
+            isValid,
+            errors,
+            values: watch()
+        });
+    }, [isValid, errors, watch]);
+
+    // Debug success state
+    useEffect(() => {
+        console.log('Success state changed:', showSuccess);
+    }, [showSuccess]);
 
     /*************************************************************************************** */
     /* CREATE NEW ID -- get from backend */
@@ -76,7 +89,7 @@ function AddItemsForm({
     /*************************************************************************************** */
     /* HANDLE ADD ITEM function */
     /*************************************************************************************** */
-    const handleAddItem = async (data: FormValues) => {
+    const handleAddItem = async (data: PurchaseItem) => {
         try {
             // Generate a new UUID for the item
             const uuid = uuidv4();
@@ -87,16 +100,16 @@ function AddItemsForm({
             console.log("New ID handleAddItem", newId);
 
             // If dateneed is null and orderType is set, use today's date
-            const dateneed = data.dateneed ? new Date(data.dateneed) : (data.orderType ? new Date(formattedToday) : null);
+            const dateneed = data.dateneed ? data.dateneed : (data.orderType ? formattedToday : null);
 
             // Create a new item with the UUID and ID
-            const itemToAdd: FormValues = {
+            const itemToAdd: PurchaseItem = {
                 ...data,
                 UUID: uuid,
-                priceEach: data.priceEach, // Keep as string to match FormValues type
-                ID: newId, // Use the extracted ID
+                priceEach: data.priceEach,
+                ID: newId,
                 status: "NEW REQUEST",
-                dateneed: dateneed // Use the processed date
+                dateneed: dateneed
             };
 
             // Store the UUID in the UUID store AFTER we have the ID
@@ -107,11 +120,11 @@ function AddItemsForm({
             // Add the item to the data buffer
             setDataBuffer(prev => [...prev, itemToAdd]);
 
+            // Show success message
+            setShowSuccess(true);
+
             // Reset the form with default values
             reset({
-                UUID: "",
-                ID: "",
-                IRQ1_ID: "",
                 requester: "",
                 phoneext: "",
                 datereq: formattedToday,
@@ -119,7 +132,6 @@ function AddItemsForm({
                 orderType: "",
                 itemDescription: "",
                 justification: "",
-                addComments: "",
                 learnAndDev: {
                     trainNotAval: false,
                     needsNotMeet: false
@@ -130,6 +142,9 @@ function AddItemsForm({
                 location: "",
                 quantity: 0,
             });
+
+            // Force validation after reset
+            trigger();
         } catch (error) {
             console.error("Error adding item:", error);
         }
@@ -138,7 +153,7 @@ function AddItemsForm({
     /*************************************************************************************** */
     /* HANDLE ADD ITEM ERRORS function */
     /*************************************************************************************** */
-    const onError = (errors: FieldErrors<FormValues>) => {
+    const onError = (errors: FieldErrors<PurchaseItem>) => {
         console.log("Form errors", errors);
     };
 
@@ -222,9 +237,7 @@ function AddItemsForm({
                                 fullWidth
                                 variant="outlined"
                                 size="small"
-                                {...register("phoneext", {
-                                    required: "Phone extention is required",
-                                })}
+                                {...register("phoneext")}
                                 error={!!errors.phoneext}
                                 helperText={errors.phoneext?.message}
                             />
@@ -252,12 +265,7 @@ function AddItemsForm({
                                 disabled={true}
                                 style={{ width: "150px" }}
                                 className="form-control"
-                                {...register("datereq", {
-                                    required: {
-                                        value: true,
-                                        message: "Date requested is required.",
-                                    },
-                                })}
+                                {...register("datereq")}
                             ></input>
                             <p className="error">{errors.datereq?.message}</p>
                         </Grid>
@@ -286,15 +294,7 @@ function AddItemsForm({
                                 type="date"
                                 style={{ width: "150px" }}
                                 className="form-control"
-                                {...register("dateneed", {
-                                    validate: (value) => {
-                                        const orderType = watch("orderType");
-                                        if (!value && !orderType) {
-                                            return "'Date Item(s) Needed' OR an option must be selected.";
-                                        }
-                                        return true;
-                                    },
-                                })}
+                                {...register("dateneed")}
                             />
                         </Grid>
 
@@ -313,11 +313,7 @@ function AddItemsForm({
                                     id="quarterlyOrder"
                                     type="radio"
                                     value="quarterlyOrder"
-                                    {...register("orderType", {
-                                        onChange: () => {
-                                            trigger("dateneed");
-                                        }
-                                    })}
+                                    {...register("orderType")}
                                     style={{ marginRight: "5px" }}
                                 />
                                 Inclusion w/quarterly office supply order
@@ -339,11 +335,7 @@ function AddItemsForm({
                                     id="noRush"
                                     type="radio"
                                     value="noRush"
-                                    {...register("orderType", {
-                                        onChange: () => {
-                                            trigger("dateneed");
-                                        }
-                                    })}
+                                    {...register("orderType")}
                                     style={{ marginRight: "5px" }}
                                 />
                                 No Rush
@@ -438,12 +430,7 @@ function AddItemsForm({
                                 className="form-control"
                                 variant="outlined"
                                 size="small"
-                                {...register("itemDescription", {
-                                    required: {
-                                        value: true,
-                                        message: "Item description required.",
-                                    },
-                                })}
+                                {...register("itemDescription")}
                                 error={!!errors.itemDescription}
                                 helperText={errors.itemDescription?.message}
                                 sx={{
@@ -479,11 +466,8 @@ function AddItemsForm({
                                         console.log(budgetObjCode)
                                     }
                                     control={control}
-                                    register={register("budgetObjCode", {
-                                        required: "Budget code is required.",
-                                    })}
+                                    register={register("budgetObjCode")}
                                     errors={errors}
-
                                 />
                             </Grid>
                             <Grid>
@@ -492,9 +476,7 @@ function AddItemsForm({
                                         console.log(fund)
                                     }
                                     control={control}
-                                    register={register("fund", {
-                                        required: "Fund is required.",
-                                    })}
+                                    register={register("fund")}
                                     errors={errors}
                                 />
                             </Grid>
@@ -504,9 +486,7 @@ function AddItemsForm({
                                         console.log(location)
                                     }
                                     control={control}
-                                    register={register("location", {
-                                        required: "Location is required.",
-                                    })}
+                                    register={register("location")}
                                     errors={errors}
                                 />
                             </Grid>
@@ -521,23 +501,13 @@ function AddItemsForm({
                         >
                             <Grid>
                                 <PriceInput
-                                    register={register("priceEach", {
-                                        required: "Price is required.",
-                                        validate: (value) =>
-                                            value >= 0 ||
-                                            "Price cannot be less than $0.",
-                                    })}
+                                    register={register}
                                     errors={errors}
                                 />
                             </Grid>
                             <Grid>
                                 <QuantityInput
-                                    register={register("quantity", {
-                                        required: "Quantity is required.",
-                                        validate: (value) =>
-                                            value > 0 ||
-                                            "Quantity must be greater than 0.",
-                                    })}
+                                    register={register}
                                     errors={errors}
                                 />
                             </Grid>
@@ -558,9 +528,8 @@ function AddItemsForm({
                           SUBMIT button will handle gathering and sending the data to proper supervisors */}
                         <Buttons
                             className="me-3 btn btn-maroon"
-                            disabled={!isValid}
                             label="Add Item"
-                            onClick={handleSubmit(handleAddItem)}
+                            onClick={handleSubmit(handleAddItem, onError)}
                         />
                         <Buttons
                             label="Reset Form"
@@ -577,8 +546,18 @@ function AddItemsForm({
                         }}
                     />
                 </form>
-                <DevTool control={control} />
             </FormProvider>
+            <Snackbar
+                open={showSuccess}
+                autoHideDuration={3000}
+                onClose={() => setShowSuccess(false)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setShowSuccess(false)} severity="success" sx={{ width: '100%' }}>
+                    Item successfully added!
+                </Alert>
+            </Snackbar>
+            <DevTool control={control} />
         </Box>
     );
 }

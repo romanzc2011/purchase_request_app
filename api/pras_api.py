@@ -795,10 +795,6 @@ def process_purchase_data(data):
                     logger.error("Invalid price or quantity:")
                     local_purchase_cols['totalPrice'] = 0
                     
-            local_purchase_cols['newRequest'] = True
-            local_purchase_cols['pendingApproval'] = False
-            local_purchase_cols['approved'] = False
-            
         except Exception as e:
             logger.error(f"Error in process_purchase_data: {e}")
             
@@ -809,7 +805,6 @@ def process_purchase_data(data):
 def process_approval_data(processed_data):
     logger.info(f"Processing approval data: {processed_data}")
     
-    pendingApproval = False
     approval_data = {}
     
     if not isinstance(processed_data, dict):

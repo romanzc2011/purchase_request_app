@@ -1,12 +1,12 @@
 import React from "react";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
-import { FormValues } from "../../types/formTypes";
+import { PurchaseItem } from "../../schemas/purchaseSchema";
 import Grid from "@mui/material/Grid2";
 import { TextField, Typography } from "@mui/material";
 
 interface JustificationProps {
-    register: UseFormRegister<FormValues>;
-    errors: FieldErrors<FormValues>;
+    register: UseFormRegister<PurchaseItem>;
+    errors: FieldErrors<PurchaseItem>;
 }
 
 const Justification: React.FC<JustificationProps> = ({ register, errors }) => {
@@ -21,7 +21,6 @@ const Justification: React.FC<JustificationProps> = ({ register, errors }) => {
                     <strong style={{ fontSize: "0.9rem" }}>
                         Purchase Justification:
                     </strong>{" "}
-
                 </Typography>
             </Grid>
             <Grid size={{ xs: 4 }}>
@@ -33,12 +32,7 @@ const Justification: React.FC<JustificationProps> = ({ register, errors }) => {
                     className="form-control"
                     variant="outlined"
                     size="small"
-                    {...register("justification", {
-                        required: {
-                            value: true,
-                            message: "Purchase justification required.",
-                        },
-                    })}
+                    {...register("justification")}
                     error={!!errors.justification}
                     helperText={errors.justification?.message}
                     sx={{
