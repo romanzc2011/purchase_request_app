@@ -19,7 +19,7 @@ my_session = sessionmaker(engine)
 ###################################################################################################
 ##  LINE ITEM STATUS ENUMERATION
 class ItemStatus(enum.Enum):
-    NEW_REQUEST = "NEW REQUEST"  # This matches what's in your database
+    NEW = "NEW REQUEST"  # This matches what's in your database
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     DENIED = "DENIED"
@@ -47,9 +47,13 @@ class PurchaseRequest(Base):
     needsNotMeet:    Mapped[bool] = mapped_column(Boolean, nullable=True)
     budgetObjCode:   Mapped[str] = mapped_column(String)
     fund:            Mapped[str] = mapped_column(String)
-    status:          Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"),
-                                                        nullable=False,
-                                                        default=ItemStatus.NEW_REQUEST)
+    status:          Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
+                                                                name="item_status",
+                                                                native_enum=False,
+                                                                values_callable=lambda enum: [e.value for e in enum]
+                                                                ),
+                                                                default=ItemStatus.NEW
+                                                            )
     priceEach:       Mapped[float] = mapped_column(Float)
     totalPrice:      Mapped[float] = mapped_column(Float)
     location:        Mapped[str] = mapped_column(String)
@@ -93,9 +97,14 @@ class Approval(Base):
     totalPrice:      Mapped[float] = mapped_column(Float)
     location:        Mapped[str] = mapped_column(String)
     quantity:        Mapped[int] = mapped_column(Integer)
-    status:          Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"),
-                                                        nullable=False,
-                                                        default=ItemStatus.NEW_REQUEST)
+    status:          Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
+                                                                name="item_status",
+                                                                native_enum=False,
+                                                                values_callable=lambda enum: [e.value for e in enum]
+                                                                ),
+                                                                default=ItemStatus.NEW
+                                                            )
+    
     createdTime:     Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     # Relationships
@@ -112,7 +121,7 @@ class LineItemStatus(Base):
     approval_id:            Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"),
                                                                         nullable=False,
-                                                                        default=ItemStatus.NEW_REQUEST)
+                                                                        default=ItemStatus.NEW)
     hold_until:             Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_updated:           Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_by:             Mapped[str] = mapped_column(String, nullable=False)

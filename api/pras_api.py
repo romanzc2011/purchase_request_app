@@ -213,10 +213,15 @@ async def get_approval_data(
     
     try:
         if ID:
-            approvals = dbas.get_approval_by_id(session, ID)
+            approval = dbas.get_approval_by_id(session, ID)
+            if approval:
+                approval_data = [ps.ApprovalSchema.model_validate(approval)]
+            else:
+                approval_data = []
         else:
             approvals = dbas.get_all_approval(session)
-        approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approvals]
+            approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approvals]
+        
         logger.success(f"Approval data: {approval_data}")
         return approval_data
     finally:
@@ -231,29 +236,41 @@ async def download_statement_of_need_form(
     current_user: User = Depends(get_current_user),
 ):
     ID = payload.get("ID")
-    rows = payload.get("approvalData")
-    logger.debug(f"DATA: {rows}")
+    logger.debug(f"ID: {ID}")
 
-    if not ID or not isinstance(rows, list) or not rows:
+    if not ID:
         raise HTTPException(status_code=400, detail="Invalid payload")
     
-    # Build the PDF path
-    pdf_path: Path = settings.PDF_OUTPUT_FOLDER / f"statement_of_need-{ID}.pdf"
+    session = next(get_session())
+    try:
+        # Get all approvals with this ID
+        approvals = session.query(dbas.Approval).filter(dbas.Approval.ID == ID).all()
+        if not approvals:
+            raise HTTPException(status_code=404, detail="No approvals found for this ID")
+        
+        # Convert to list of dicts
+        rows = [ps.ApprovalSchema.model_validate(approval).model_dump() for approval in approvals]
+        logger.debug(f"Approvals data: {rows}")
     
-    is_cyber = False
-    
-    # Generate PDF
-    logger.info(f"ROWS: {rows}")
-    make_purchase_request_pdf(rows=rows, output_path=pdf_path, is_cyber=is_cyber)
-    
-    if not pdf_path.exists():
-        raise HTTPException(status_code=404, detail="Statement of need form not found")
-    
-    return FileResponse(
-        path=str(pdf_path),
-        media_type="application/pdf",
-        filename=pdf_path.name
-    )
+        # Build the PDF path
+        pdf_path: Path = settings.PDF_OUTPUT_FOLDER / f"statement_of_need-{ID}.pdf"
+        
+        is_cyber = False
+        
+        # Generate PDF
+        logger.info(f"ROWS: {rows}")
+        make_purchase_request_pdf(rows=rows, output_path=pdf_path, is_cyber=is_cyber)
+        
+        if not pdf_path.exists():
+            raise HTTPException(status_code=404, detail="Statement of need form not found")
+        
+        return FileResponse(
+            path=str(pdf_path),
+            media_type="application/pdf",
+            filename=pdf_path.name
+        )
+    finally:
+        session.close()
     
 ##########################################################################
 ## GET SEARCH DATA
@@ -835,7 +852,7 @@ def purchase_req_commit(processed_data):
             logger.info(f"approval_data: {approval_data}")
             
             # Set default status for new approval
-            approval_data['status'] = dbas.ItemStatus.NEW_REQUEST
+            approval_data['status'] = dbas.ItemStatus.NEW
             
             # Insert approval data
             approval = dbas.insert_data(approval_data, "approvals")
