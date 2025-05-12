@@ -4,7 +4,7 @@ import ApprovalTable from "../ui/ApprovalTable";
 import SearchBar from "../ui/SearchBar";
 import CommentModal from "../modals/CommentModal";
 import { Box } from "@mui/material";
-
+import { DataRow } from "../../../types/approvalTypes";
 /* INTERFACE */
 interface ApprovalTableProps {
     onDelete: (ID: string) => void;
@@ -12,7 +12,7 @@ interface ApprovalTableProps {
 }
 
 export default function ApprovalPageMain({ onDelete, resetTable }: ApprovalTableProps) {
-    const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
+    const [dataBuffer, setDataBuffer] = useState<DataRow[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
 
     return (

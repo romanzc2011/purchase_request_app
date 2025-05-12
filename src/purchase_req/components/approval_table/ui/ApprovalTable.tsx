@@ -2,24 +2,26 @@ import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
-import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import { DataGrid, DataGridProps, GridColDef, GridRowId, GridRowSelectionModel } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import { FormValues } from "../../../types/formTypes";
 import { fetchSearchData } from "./SearchBar";
 import Buttons from "../../purchase_req_table/Buttons";
 import { convertBOC } from "../../../utils/bocUtils";
 import { useCommentMutation } from "../../../api/comments";
-import WarningIcon from "@mui/icons-material/Warning";
-import PendingIcon from "@mui/icons-material/Pending";
-import SuccessIcon from "@mui/icons-material/CheckCircle";
 import { useAssignIRQ1 } from "../../../hooks/useAssignIRQ1";
 import { useCommentModal } from "../../../hooks/useCommentModal";
 import CommentIcon from '@mui/icons-material/Comment';
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import ScheduleIcon from "@mui/icons-material/Schedule";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
+import { STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approvalTypes";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
+import { ZodCatch } from "zod";
+import { useUUIDStore } from "../../../services/UUIDService";
 
 /***********************************************************************************/
 // PROPS
@@ -29,6 +31,7 @@ interface ApprovalTableProps {
     resetTable: () => void;
     searchQuery: string;
 }
+
 
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
@@ -53,7 +56,9 @@ async function fetchApprovalData(ID?: string) {
             }
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
+        const data = await response.json();
+
+        return data;
     } else {
         const response = await fetch(API_URL_APPROVAL_DATA, {
             headers: {
@@ -61,7 +66,9 @@ async function fetchApprovalData(ID?: string) {
             }
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
+        const data = await response.json();
+
+        return data;
     }
 }
 /***********************************************************************************/
@@ -120,10 +127,11 @@ async function downloadStatementOfNeedForm(ID: string) {
 export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     const queryClient = useQueryClient();
     const { data: searchData } = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
-    const { data: approvalData = [] } = useQuery<FormValues[]>({
+    const { data: approvalData = [] } = useQuery<DataRow[]>({
         queryKey: ["approvalData"],
-        queryFn: () => fetchApprovalData()
+        queryFn: () => fetchApprovalData(),
     });
+
     const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
     const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string, string>>({});
 
@@ -137,16 +145,110 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
     // track which groups are expanded
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-    const toggleRowExpanded = (key: string) =>
-        setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
+    const toggleRow = (key: string) => setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
 
-    const assignIRQ1Mutation = useAssignIRQ1();
+    const assignIRQ1Mutation = useAssignIRQ1(); ZodCatch
+
+    const [rowSelectionModel, setRowSelectionModel] =
+        useState<{ ids: Set<GridRowId>, type: 'include' }>({
+            ids: new Set(),
+            type: 'include',
+        });
+
+    const { getUUID } = useUUIDStore();
+
+    // ####################################################################
+    // ####################################################################
+    // COMMAND TOOLBAR
+    // Handle Approval/Deny/Download
+    // ####################################################################
+    // ####################################################################
+
+    // ####################################################################
+    // HANDLE APPROVE
+    async function handleApproveRow(row: FlatRow) {
+        // Only act on real line items or single-item groups
+        if (!row || (row.isGroup && row.rowCount > 1)) return;
+
+        // Get the UUID for the row
+        const uuid = await getUUID(row.ID);
+        if (!uuid) {
+            console.error("No UUID found for row:", row.ID);
+            return;
+        }
+        approveDenyMutation.mutate({
+            ID: row.ID,
+            UUID: uuid,
+            action: "approve"
+        });
+    }
+    // ###########################################################################
+    // HANDLE DENY
+    const handleDenyRow = (row: FlatRow) => {
+        if (row && (!row.isGroup || (row.isGroup && row.rowCount === 1))) {
+            approveDenyMutation.mutate({
+                ID: row.ID,
+                UUID: row.UUID,
+                action: "deny"
+            });
+        }
+    };
+
+    const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID); console.log("download", ID); };
+    const handleComment = (ID: string) => { console.log("comment", ID); };
+    const handleFollowUp = (ID: string) => { console.log("follow up", ID); };
+
+    // ####################################################################
+    // BULK ACTIONS
+    // ####################################################################
+    // Bulk Approve
+    const handleBulkApprove = async () => {
+        for (const uuid of Array.from(rowSelectionModel.ids)) {
+            const row = flatRows.find(r => r.UUID === uuid);
+            if (row) await handleApproveRow(row);
+        }
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
+    };
+
+    // Bulk Deny
+    const handleBulkDeny = () => {
+        Array.from(rowSelectionModel.ids).forEach(uuid => {
+            const row = flatRows.find(r => r.UUID === uuid);
+            if (row && !row.isGroup) {
+                handleDenyRow(row);
+            }
+        });
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
+    };
+
+    // Bulk Follow Up
+    const handleBulkFollowUp = () => {
+        Array.from(rowSelectionModel.ids).forEach(uuid => {
+            const row = flatRows.find(r => r.UUID === uuid);
+            if (row && !row.isGroup) {
+                handleFollowUp(row.ID);
+            }
+        });
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
+    }
+
+    // Bulk Comment
+    const handleBulkComment = () => {
+        Array.from(rowSelectionModel.ids).forEach(uuid => {
+            const row = flatRows.find(r => r.UUID === uuid);
+            if (row && !row.isGroup) {
+                handleComment(row.ID);
+            }
+        });
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
+    }
+    // ####################################################################
 
     // Update assignedIRQ1s when approvalData changes
     useEffect(() => {
         if (approvalData) {
             const newAssignedIRQ1s: Record<string, string> = {};
-            approvalData.forEach((row: FormValues) => {
+            approvalData.forEach((row: DataRow) => {
                 if (row.IRQ1_ID) {
                     newAssignedIRQ1s[row.ID] = row.IRQ1_ID;
                     // Also update the draftIRQ1 state with the assigned value
@@ -161,14 +263,26 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // HANDLE APPROVE/DENY
     /***********************************************************************************/
     const approveDenyMutation = useMutation({
-        mutationFn: async ({ ID, action }: { ID: string, action: "approve" | "deny" }) => {
+        mutationFn: async ({
+            ID,
+            UUID,
+            action
+        }: {
+            ID: string,
+            UUID: string,
+            action: "approve" | "deny"
+        }) => {
             const res = await fetch(API_URL_APPROVE_DENY, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${localStorage.getItem("access_token")}`
                 },
-                body: JSON.stringify({ ID, action })
+                body: JSON.stringify({
+                    ID: ID,
+                    UUID: UUID,
+                    action: action
+                })
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
@@ -181,10 +295,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     });
 
     /***********************************************************************************/
-    // Handle Approval/Deny/Download
-    const handleApprove = (ID: string) => approveDenyMutation.mutate({ ID, action: "approve" });
-    const handleDeny = (ID: string) => approveDenyMutation.mutate({ ID, action: "deny" });
-    const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID); console.log("download", ID); };
+    // MODALS
+    /***********************************************************************************/
 
     /***********************************************************************************/
     // ITEM DESCRIPTION MODAL
@@ -212,23 +324,57 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
     // base rows
     const baseRows = (searchQuery ? searchData : approvalData) || [];
-
-    // ensure each has a UUID
-    const rowsWithIds = baseRows.map((row: FormValues, i: number) =>
-        row.UUID ? row : { ...row, UUID: `row-${i}` }
-    );
-
-    // group by ID
-    const grouped = rowsWithIds.reduce((acc: Record<string, FormValues[]>, row: FormValues) => {
-        const key = String(row.ID);
-        (acc[key] ||= []).push(row);
-        return acc;
-    }, {});
-
     /***********************************************************************************/
     // COMMENT MODAL
     /***********************************************************************************/
     const commentMutation = useCommentMutation();
+
+    // DataRow with guaranteed UUID
+    const rowsWithUUID: DataRow[] = approvalData.map((r, i) =>
+        r.UUID ? r : { ...r, UUID: `row-${i}` }
+    );
+
+    // Group by ID
+    const grouped: Record<string, DataRow[]> = rowsWithUUID.reduce((acc, row) => {
+        const key = row.ID;
+        acc[key] = acc[key] || [];
+        acc[key].push(row);
+        return acc;
+    }, {} as Record<string, DataRow[]>);
+
+    // Flatten the grouped rows
+    const flatRows: FlatRow[] = Object.entries(grouped).flatMap(([groupKey, items]) => {
+        // First item serves as both the group header and a regular row
+        if (items.length === 1) {
+            return [{
+                ...items[0],
+                isGroup: true as const,
+                groupKey,
+                rowCount: items.length
+            }];
+        }
+        const firstItem = {
+            ...items[0],
+            isGroup: true as const,
+            groupKey,
+            rowCount: items.length
+        };
+
+        // If collapsed, only show the first item
+        if (!expandedRows[groupKey]) {
+            return [firstItem];
+        }
+
+        // If expanded, show all items
+        return [
+            firstItem,
+            ...items.slice(1).map(item => ({
+                ...item,
+                isGroup: false as const,
+                groupKey
+            }))
+        ];
+    });
 
     const {
         isOpen,
@@ -239,35 +385,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         handleSubmit: handleSubmitComment,
     } = useCommentModal();
 
-    // FlatRow type
-    type FlatRow =
-        | { id: string; isGroup: true; groupKey: string; rowCount: number }
-        | (FormValues & { id: string; isGroup?: false });
-
-    // build flatRows array
-    const flatRows: FlatRow[] = (Object.entries(grouped) as [string, FormValues[]][])
-        .flatMap(([key, items]) => {
-            const header: FlatRow = {
-                ...items[0],           // <-- copy all data fields from the 1st item
-                id: `group-${key}`,
-                isGroup: true,
-                groupKey: key,
-                rowCount: items.length
-            };
-
-            if (!expandedRows[key]) {
-                return [header];
-            }
-
-            // build detail rows
-            const detailRows: FlatRow[] = items.slice(1).map(item => ({
-                ...item,
-                id: item.UUID!,
-                isGroup: false
-            }));
-            return [header, ...detailRows];
-        });
-
     // the "toggle" column for group headers
     const toggleColumn: GridColDef = {
         field: "__groupToggle",
@@ -277,11 +394,13 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         filterable: false,
         renderCell: params => {
             const row = params.row as FlatRow;
-            if (!row.isGroup) return null;
+            if (row.isGroup !== true) {
+                return null;
+            }
             return (
                 <Box
                     sx={{ display: "flex", alignItems: "center", cursor: "pointer" }}
-                    onClick={() => toggleRowExpanded(row.groupKey)}
+                    onClick={() => toggleRow(row.groupKey)}
                 >
                     {expandedRows[row.groupKey]
                         ? <KeyboardArrowUpIcon fontSize="small" />
@@ -533,35 +652,29 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             align: "center",
             width: 200,
             sortable: true,
-            renderCell: params => (
-                <Box
-                    sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 1,
-                        color: "black",
-                        backgroundColor:
-                            params.value === "NEW REQUEST"
-                                ? "#ff9800"
-                                : params.value === "PENDING"
-                                    ? "#2196f3"
-                                    : params.value === "APPROVED"
-                                        ? "#4caf50"
-                                        : params.value === "DENIED"
-                                            ? "#f44336"
-                                            : "#9e9e9e",
-                        fontWeight: "bold",
-                        width: "100%",
-                        height: "100%"
-                    }}
-                >
-                    {params.value === "NEW REQUEST" && <WarningIcon htmlColor="black" />}
-                    {params.value === "PENDING" && <PendingIcon htmlColor="black" />}
-                    {params.value === "APPROVED" && <SuccessIcon htmlColor="black" />}
-                    {params.value}
-                </Box>
-            )
+            renderCell: params => {
+                const status = params.value as DataRow["status"];
+                const { bg, Icon } = STATUS_CONFIG[status] || { bg: "#9e9e9e", Icon: React.Fragment };
+                return (
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 1,
+                            backgroundColor: bg,
+                            color: "black",
+                            fontWeight: "bold",
+                            width: "100%",
+                            height: "100%",
+                        }}
+                    >
+                        {/* Render the mapped icon */}
+                        <Icon htmlColor="black" />
+                        {status}
+                    </Box>
+                );
+            }
         },
 
         /***********************************************************************************/
@@ -577,13 +690,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
                     {/* Add Comment Button */}
                     <Button
-                        startIcon={<CommentIcon fontSize="small" />} // Make icon smaller
-                        size="small" // Make the overall button smaller
+                        startIcon={<CommentIcon />} // Make icon smaller
                         sx={{
                             backgroundColor: "#800000",
                             "&:hover": { backgroundColor: "#600000" },
-                            padding: "4px 8px", // Reduce padding (default is 6px 16px)
-                            fontSize: "0.75rem", // Make text smaller (default is 0.875rem)
                         }}
                         variant="contained"
                         onClick={() => openCommentModal(params.row.ID)}
@@ -591,30 +701,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         Add Comment
                     </Button>
 
-                    {/* Approve Button */}
-                    <Button
-                        variant="contained"
-                        color="success"
-                        onClick={() => handleApprove(params.row.ID)}
-                        disabled={params.row.status === "APPROVED"}
-                        sx={{ minWidth: "100px" }}
-                    >
-                        Approve
-                    </Button>
-
-                    {/* Deny Button */}
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={() => handleDeny(params.row.ID)}
-                        disabled={params.row.status === "DENIED"}
-                    >
-                        Deny
-                    </Button>
-
                     {/* Download Button */}
-                    <Button variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
-                        <DownloadOutlinedIcon />
+                    <Button startIcon={<DownloadOutlinedIcon />} variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
+                        Download
                     </Button>
                 </Box>
             )
@@ -631,13 +720,47 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             display: "flex",
             flexDirection: "column"
         }}>
+
+            {/* COMMAND TOOLBAR */}
+            <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                    startIcon={<CheckIcon />}
+                    variant="contained"
+                    color="success"
+                    onClick={handleBulkApprove}
+                >
+                    Approve Selected
+                </Button>
+                <Button
+                    startIcon={<CloseIcon />}
+                    variant="contained" color="error"
+                    onClick={handleBulkDeny}
+                >
+                    Deny Selected
+                </Button>
+                <Button
+                    variant="contained" startIcon={<CommentIcon />}
+                    onClick={handleBulkComment}
+                >
+                    Comment…
+                </Button>
+                <Button
+                    variant="outlined" startIcon={<ScheduleIcon />}
+                    onClick={handleBulkFollowUp}
+                >
+                    Schedule Follow-Up
+                </Button>
+            </Box>
+
             <DataGrid
+                getRowId={row => row.UUID}
                 rows={flatRows}
                 columns={allColumns}
-                getRowId={(row: any) => row.id}
-                getRowClassName={({ row }: { row: any }) =>
-                    (row as FlatRow).isGroup ? "group-header-row" : ""
-                }
+                checkboxSelection
+                rowSelectionModel={rowSelectionModel}
+                onRowSelectionModelChange={(newModel) => {
+                    setRowSelectionModel({ ids: new Set(newModel.ids), type: 'include' });
+                }}
                 initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
                 pageSizeOptions={[25, 50, 100]}
                 disableRowSelectionOnClick

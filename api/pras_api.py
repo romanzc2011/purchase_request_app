@@ -525,9 +525,9 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
 ##########################################################################
 @api_router.post("/approveDenyRequest")
 async def approve_deny_request(data: dict, current_user: User = Depends(get_current_user)):
-    # TODO: Add CO to the data but checking user's group membership
     try:
         # Check for both "ID" and "id" keys
+        UUID = data.get("UUID")
         ID = data.get("ID")
         logger.info(f"Request ID: {ID}")
         action = data.get("action")
