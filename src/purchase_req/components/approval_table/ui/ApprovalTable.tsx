@@ -225,20 +225,24 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     //  determine first if theres more than 1 UUID, then if there is i need to decide if its already flatten then 
     // flatten if not then count but theres 10 items altogether but this is count 1 if everything is collapsed
     const getTotalSelectedItems = () => {
-        // Exclude non group row
         if (rowSelectionModel.type === 'exclude') {
             return flatRows.filter(row => !row.isGroup && !rowSelectionModel.ids.has(row.UUID)).length;
         }
-
         let total = 0;
+        const selectedGroupKeys = new Set<string>();
         Array.from(rowSelectionModel.ids).forEach(uuid => {
             const row = flatRows.find(r => r.UUID === uuid);
-            if (row) {
-                if (row.isGroup) {
-                    total += row.rowCount;
-                } else {
-                    total += 1;
-                }
+            if (row && row.isGroup) {
+                selectedGroupKeys.add(row.groupKey);
+                total += row.rowCount;
+            }
+        });
+
+        // count selected non-group rows that are NOT part of a selected group
+        Array.from(rowSelectionModel.ids).forEach(uuid => {
+            const row = flatRows.find(r => r.UUID === uuid);
+            if (row && !row.isGroup && !selectedGroupKeys.has(row.groupKey)) {
+                total += 1;
             }
         });
         return total;
@@ -435,8 +439,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         for (const row of uniqueRows) {
             await handleApproveRow(row);
         }
+        // Deselect all rows
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
     }
-
     console.log("flatRows", flatRows);
 
     const {
