@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional
 from datetime import datetime
 from pydantic import Field
@@ -101,7 +101,51 @@ class SonCommentSchema(BaseModel):
     created_at: Optional[datetime] = None
     created_by: Optional[str] = None
     son_requester: str
+  
+########################################################
+##    APPROVE/DENY PAYLOAD SCHEMA ( REQUEST )
+########################################################  
+class RequestPayload(BaseModel):
+    ID: str
+    UUID: str
+    fund: str
+    action: str
 
+########################################################
+##    APPROVE/DENY PAYLOAD SCHEMA ( RESPONSE )
+########################################################
+class ResponsePayload(BaseModel):
+    status: str
+    message: str
+    
+########################################################
+##    REQUEST APPROVERS SCHEMA
+# Current list: Ted, Edmund, Roman
+# IN TESTING: Roman only
+########################################################
+class RequestApproversSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    username: str
+    email: EmailStr
+    
+########################################################
+##    FINANCE DEPT MEMBERS SCHEMA
+# Current list: Lauren Lee, Peter, Lela,Roman
+# IN TESTING: Roman only
+########################################################
+class FinanceDeptMembersSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    username: str
+    email: EmailStr
+    
+class ITDeptMembersSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    username: str
+    email: EmailStr
+    
 ########################################################
 ##    COMMENT PAYLOAD SCHEMA
 ########################################################

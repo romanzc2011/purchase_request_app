@@ -126,11 +126,70 @@ async function downloadStatementOfNeedForm(ID: string) {
 /***********************************************************************************/
 export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     const queryClient = useQueryClient();
+    const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
     const { data: searchData } = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
-    const { data: approvalData = [] } = useQuery<DataRow[]>({
+
+    const {
+        data: approvalData = [],
+        isLoading,
+        error,
+    } = useQuery<DataRow[]>({
         queryKey: ["approvalData"],
         queryFn: () => fetchApprovalData(),
     });
+
+    console.log("ApprovalTableDG - isLoading:", isLoading);
+    console.log("ApprovalTableDG - error:", error);
+    console.log("ApprovalTableDG - approvalData:", JSON.parse(JSON.stringify(approvalData)));
+
+    // Build grouped map once per load
+    const rowsWithUUID: DataRow[] = approvalData.map((r, i) =>
+        r.UUID ? r : { ...r, UUID: `row-${i}` }
+    );
+
+    const grouped: Record<string, DataRow[]> = rowsWithUUID.reduce((acc, row) => {
+        (acc[row.ID] ||= []).push(row);
+        return acc;
+    }, {} as Record<string, DataRow[]>);
+
+    const flatRows = React.useMemo<FlatRow[]>(() => {
+        return Object.entries(grouped).flatMap(([groupKey, items]) => {
+            if (items.length === 1) {
+                return [{
+                    ...items[0],
+                    isGroup: true as const,
+                    groupKey,
+                    rowCount: 1,
+                    rowId: items[0].UUID
+                }];
+            }
+
+            const header = {
+                ...items[0],
+                isGroup: true as const,
+                groupKey,
+                rowCount: items.length,
+                rowId: `header-${groupKey}`
+            }
+
+            if (!expandedRows[groupKey]) {
+                return [header];
+            }
+
+            return [
+                header,
+                ...items.slice(1).map((item: DataRow): FlatRow => ({
+                    ...item,
+                    isGroup: false as const,
+                    groupKey
+                }))
+            ];
+        });
+    }, [grouped]);
+
+
+
+    console.log("Flat rows:", flatRows);
 
     const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
     const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string, string>>({});
@@ -144,10 +203,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     const [fullJust, setFullJust] = useState<string>("");
 
     // track which groups are expanded
-    const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
     const toggleRow = (key: string) => setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
 
-    const assignIRQ1Mutation = useAssignIRQ1(); ZodCatch
+    const assignIRQ1Mutation = useAssignIRQ1();
 
     const [rowSelectionModel, setRowSelectionModel] =
         useState<{ ids: Set<GridRowId>, type: 'include' }>({
@@ -165,30 +223,13 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // ####################################################################
 
     // ####################################################################
-    // HANDLE APPROVE
-    async function handleApproveRow(row: FlatRow) {
-        // Only act on real line items or single-item groups
-        if (!row || (row.isGroup && row.rowCount > 1)) return;
-
-        // Get the UUID for the row
-        const uuid = await getUUID(row.ID);
-        if (!uuid) {
-            console.error("No UUID found for row:", row.ID);
-            return;
-        }
-        approveDenyMutation.mutate({
-            ID: row.ID,
-            UUID: uuid,
-            action: "approve"
-        });
-    }
-    // ###########################################################################
     // HANDLE DENY
     const handleDenyRow = (row: FlatRow) => {
         if (row && (!row.isGroup || (row.isGroup && row.rowCount === 1))) {
             approveDenyMutation.mutate({
                 ID: row.ID,
                 UUID: row.UUID,
+                fund: row.fund,
                 action: "deny"
             });
         }
@@ -201,14 +242,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // ####################################################################
     // BULK ACTIONS
     // ####################################################################
-    // Bulk Approve
-    const handleBulkApprove = async () => {
-        for (const uuid of Array.from(rowSelectionModel.ids)) {
-            const row = flatRows.find(r => r.UUID === uuid);
-            if (row) await handleApproveRow(row);
-        }
-        setRowSelectionModel({ ids: new Set(), type: 'include' });
-    };
 
     // Bulk Deny
     const handleBulkDeny = () => {
@@ -248,14 +281,18 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     useEffect(() => {
         if (approvalData) {
             const newAssignedIRQ1s: Record<string, string> = {};
+            const newDraftIRQ1: Record<string, string> = {};
+
             approvalData.forEach((row: DataRow) => {
                 if (row.IRQ1_ID) {
                     newAssignedIRQ1s[row.ID] = row.IRQ1_ID;
-                    // Also update the draftIRQ1 state with the assigned value
-                    setDraftIRQ1(prev => ({ ...prev, [row.ID]: row.IRQ1_ID }));
+                    newDraftIRQ1[row.ID] = row.IRQ1_ID;
                 }
             });
+
+            // Update both states once after processing all data
             setAssignedIRQ1s(newAssignedIRQ1s);
+            setDraftIRQ1(prev => ({ ...prev, ...newDraftIRQ1 }));
         }
     }, [approvalData]);
 
@@ -266,10 +303,12 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         mutationFn: async ({
             ID,
             UUID,
+            fund,
             action
         }: {
             ID: string,
             UUID: string,
+            fund: string,
             action: "approve" | "deny"
         }) => {
             const res = await fetch(API_URL_APPROVE_DENY, {
@@ -281,6 +320,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                 body: JSON.stringify({
                     ID: ID,
                     UUID: UUID,
+                    fund: fund,
                     action: action
                 })
             });
@@ -329,52 +369,45 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     /***********************************************************************************/
     const commentMutation = useCommentMutation();
 
-    // DataRow with guaranteed UUID
-    const rowsWithUUID: DataRow[] = approvalData.map((r, i) =>
-        r.UUID ? r : { ...r, UUID: `row-${i}` }
-    );
-
-    // Group by ID
-    const grouped: Record<string, DataRow[]> = rowsWithUUID.reduce((acc, row) => {
-        const key = row.ID;
-        acc[key] = acc[key] || [];
-        acc[key].push(row);
-        return acc;
-    }, {} as Record<string, DataRow[]>);
-
-    // Flatten the grouped rows
-    const flatRows: FlatRow[] = Object.entries(grouped).flatMap(([groupKey, items]) => {
-        // First item serves as both the group header and a regular row
-        if (items.length === 1) {
-            return [{
-                ...items[0],
-                isGroup: true as const,
-                groupKey,
-                rowCount: items.length
-            }];
+    // Per row approval
+    async function handleApproveRow(row: DataRow) {
+        const uuid = await getUUID(row.ID);
+        if (!uuid) {
+            toast.error("Failed to get UUID");
+            console.error("Failed to get UUID");
+            return;
         }
-        const firstItem = {
-            ...items[0],
-            isGroup: true as const,
-            groupKey,
-            rowCount: items.length
-        };
+        approveDenyMutation.mutate({ ID: row.ID, UUID: uuid, fund: row.fund, action: "approve" });
+    }
+    // Bulk approve
+    const handleBulkApprove = async () => {
+        // collect DataRow objects to approve
+        let toApprove: DataRow[] = [];
 
-        // If collapsed, only show the first item
-        if (!expandedRows[groupKey]) {
-            return [firstItem];
+        for (const uuid of Array.from(rowSelectionModel.ids)) {
+            // find the FlatRow you selected
+            const flat = flatRows.find(r => r.UUID === uuid);
+            if (!flat) continue;
+
+            if (flat.isGroup && grouped[flat.groupKey]) {
+                toApprove.push(...grouped[flat.groupKey]);
+            } else {
+                toApprove.push(flat as DataRow);
+            }
         }
 
-        // If expanded, show all items
-        return [
-            firstItem,
-            ...items.slice(1).map(item => ({
-                ...item,
-                isGroup: false as const,
-                groupKey
-            }))
-        ];
-    });
+        // dedupe by UUID
+        const uniqueRows = Array.from(
+            new Map(toApprove.map(r => [r.UUID, r])).values()
+        );
+
+        // approve each row
+        for (const row of uniqueRows) {
+            await handleApproveRow(row);
+        }
+    }
+
+    console.log("flatRows", flatRows);
 
     const {
         isOpen,

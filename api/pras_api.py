@@ -19,18 +19,20 @@ import services.db_service as dbas
 from services.db_service import get_session
 from services.comment_service import add_comment
 import pydantic_schemas as ps
-from pydantic_schemas import CommentPayload
+from pydantic_schemas import CommentPayload, RequestPayload, ResponsePayload
 import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from docxtpl import DocxTemplate
 from pathlib import Path
 
 from services.auth_service import AuthService
+
 from services.email_service import EmailService
 from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
 from services.uuid_service import uuid_service
 from services.pdf_service import make_purchase_request_pdf
+from services.request_management_service import RequestManagementService
 from settings import settings
 
 """
@@ -401,13 +403,13 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         make_purchase_request_pdf(processed_lines, pdf_path_obj, is_cyber)
         logger.info(f"PDF generated at: {pdf_path}")
   
-        email_svc.set_rendered_docx_path(pdf_path)   # reuse same field
-        email_svc.send_notification(
-            template_path=None,          # you can skip HTML template altogether
-            template_data=None,
-            subject="Your Purchase Order PDF",
-            request_status="NEW REQUEST"
-        )
+        # email_svc.set_rendered_docx_path(pdf_path)   # reuse same field
+        # email_svc.send_notification(
+        #     template_path=None,          # you can skip HTML template altogether
+        #     template_data=None,
+        #     subject="Your Purchase Order PDF",
+        #     request_status="NEW REQUEST"
+        # )
             
     except Exception as e:
         logger.error(f"Error generating PDF: {e}")
@@ -510,6 +512,11 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
     with next(get_session()) as session:
         uuid = uuid_service.get_uuid_by_id(session, original_id)
     
+    # update all tables with the new IRQ1_ID
+    dbas.update_data(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data(uuid, "line_item_statuses", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data(uuid, "son_comments", IRQ1_ID=data.get('IRQ1_ID'))
+    
     if not uuid:
         raise HTTPException(status_code=400, detail="Missing UUID in request")
     
@@ -519,118 +526,23 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
 
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
-## Approval status is NEW REQUEST, this gets sent to requester and first approver
-## Approval status is PENDING, this gets sent to final approver, but not requester
-## Approval status is APPROVED, this gets sent to requester
+# This endpoint will deal with all actions on a purchase request
 ##########################################################################
 @api_router.post("/approveDenyRequest")
-async def approve_deny_request(data: dict, current_user: User = Depends(get_current_user)):
-    try:
-        # Check for both "ID" and "id" keys
-        UUID = data.get("UUID")
-        ID = data.get("ID")
-        logger.info(f"Request ID: {ID}")
-        action = data.get("action")
-        
-        if not ID or not action:
-            raise HTTPException(status_code=400, detail="Missing ID or action")
-        
-        # Use a single session for all database operations
-        with next(get_session()) as session:
-            # Get the UUID using the UUID service
-            UUID = uuid_service.get_uuid_by_id(session, ID)
-            logger.info(f"UUID: {UUID}")
-            
-            if not UUID:
-                raise HTTPException(status_code=404, detail="UUID not found")
-            
-            # Get requester using the same session and the UUID
-            requester = dbas.get_requester_by_UUID(session, UUID)
-            logger.info(f"Requester: {requester}")
-            
-            if not requester:
-                raise HTTPException(status_code=404, detail="Requester not found")
-            
-            # Now get requester email with ldap
-            requester_email = ldap_svc.get_email_address(ldap_svc.get_connection(), requester)
-            logger.info(f"Requester email: {requester_email}")
-            
-            # Set requester email
-            email_svc.set_requester(requester, requester_email)
-            
-            # Get current status
-            current_status = dbas.get_status_by_id(session, ID)
-            if not current_status:
-                raise HTTPException(status_code=404, detail="Request not found")
-                
-            # Process based on current status
-            if current_status == "NEW REQUEST":
-                logger.info("SEND TO FINAL APPROVER")
-                if action.lower() == "approve":
-                    new_status = "PENDING"
-                    dbas.update_data(UUID, "approvals", status=new_status)
-                    
-                    # Set final approver email
-                    final_approver_email = ldap_svc.get_email_address(ldap_svc.get_connection(), current_user.username)
-                    email_svc.set_final_approver(current_user.username, final_approver_email)
-                    
-                    email_svc.set_request_status("PENDING")
-                    email_svc.send_notification(
-                        template_path="./templates/approval_notification.html",
-                        template_data={"ID": ID, "action": "approved"},
-                        subject="Purchase Request Approved"
-                    )
-                elif action.lower() == "deny":
-                    new_status = "DENIED"
-                    dbas.update_data(UUID, "approvals", status=new_status)
-                    email_svc.set_request_status("NEW REQUEST")
-                    email_svc.send_notification(
-                        template_path="./templates/denial_notification.html",
-                        template_data={"ID": ID, "action": "denied"},
-                        subject="Purchase Request Denied"
-                    )
-            elif current_status == "PENDING":
-                if action.lower() == "approve":
-                    new_status = "APPROVED" 
-                    dbas.update_data(UUID, "approvals", status=new_status)
-                    # Send email to final approver
-                    email_svc.set_request_status("PENDING")
-                    email_svc.send_notification(
-                        template_path="./templates/final_approval_notification.html",
-                        template_data={"ID": ID, "action": "approved"},
-                        subject="Purchase Request Final Approval"
-                    )
-                    # Send email to current user (approver)
-                    email_svc.set_request_status("PENDING")
-                    email_svc.send_notification(
-                        template_path="./templates/approval_notification.html",
-                        template_data={"ID": ID, "action": "approved"},
-                        subject="Purchase Request Approved"
-                    )
-                    # Send email to requester
-                    email_svc.set_requester(requester, None)  # We don't have the email, but the service will handle it
-                    email_svc.set_request_status("PENDING")
-                    email_svc.send_notification(
-                        template_path="./templates/approval_notification.html",
-                        template_data={"ID": ID, "action": "approved"},
-                        subject="Purchase Request Approved"
-                    )
-                elif action.lower() == "deny":
-                    new_status = "DENIED"
-                    dbas.update_data(UUID, "approvals", status=new_status)
-                    email_svc.set_request_status("PENDING")
-                    email_svc.send_notification(
-                        template_path="./templates/denial_notification.html",
-                        template_data={"ID": ID, "action": "denied"},
-                        subject="Purchase Request Denied"
-                    )
-            else:
-                raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve' or 'deny'")
-        
-        return {"status": "success", "message": f"Request {action.lower()}ed successfully"}
-    except Exception as e:
-        logger.error(f"Error in approve/deny request: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+async def approve_deny_request(
+    payload: RequestPayload,
+    db: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    # Get amount of items and total price
+    service = RequestManagementService(db)
+    return service.approve_deny_request(
+        request_id=payload.ID,
+        uuid=payload.UUID,
+        fund=payload.fund,
+        action=payload.action,
+        requester=current_user
+    )
 
 ##########################################################################
 ## REFRESH TOKEN

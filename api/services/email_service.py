@@ -9,16 +9,15 @@ from loguru import logger
 from docxtpl import DocxTemplate
 from docx2pdf import convert
 from docx import Document
+from services.db_service import ITDeptMembers
+from services.db_service import RequestApprovers
+from services.db_service import FinanceDeptMembers
+from pydantic_schemas import ItemStatus
 
 """
 AUTHOR: Roman Campbell
 DATE: 01/07/2025
 Used to send purchase request notifications.
-Method of execution, you have NEW REQUESTS, PENDING REQUESTS, and APPROVED REQUESTS.
-For NEW REQUESTS, you will send an email to the first approver and the requester.
-For PENDING REQUESTS, you will send an email to the final approver. This means that we wont send an email
-to final approver until the status is set to PENDING. Will need to grab the status from the database using
-request ID.
 """
 class EmailService:
     """
@@ -38,27 +37,16 @@ class EmailService:
         # Create rendered_templates directory if it doesn't exist
         self.rendered_dir = os.path.join(self.project_root, "rendered_templates")
         os.makedirs(self.rendered_dir, exist_ok=True)
-        logger.info(f"Rendered templates directory: {self.rendered_dir}")
-        
-        self.msg_templates = {
-            'NEW_REQUEST': {
-                'first_approver': {
-                    'subject': 'Purchase Request Notification - First Approver',
-                    'body': '<p>Dear {first_approver},</p><p>You have a new purchase request to review.</p>'
-                },
-                'requester': {
-                    'subject': 'Purchase Request Notification - Requester', 
-                    'body': '<p>Dear {requester},</p><p>Your purchase request has been submitted.</p>'
-                }
-            },
-            'PENDING': {
-                'final_approver': {
-                    'subject': 'Purchase Request Notification - Final Approver',
-                    'body': '<p>Dear {final_approver},</p><p>You have a new purchase request to review.</p>'
-                }
-            }
-        }
+       
         self.request_status = None
+        
+    def get_routing_group(self, group: str):
+        if group == "IT":
+            return ITDeptMembers
+        elif group == "FINANCE":
+            return FinanceDeptMembers
+        else:
+            raise ValueError(f"Invalid routing group: {group}")
 
     def send_notification(self, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
         """

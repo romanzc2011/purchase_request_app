@@ -150,9 +150,38 @@ class SonComment(Base):
     purchase_request = relationship("PurchaseRequest", back_populates="son_comment")
     approval = relationship("Approval", back_populates="son_comment")
 
+###################################################################################################
+## Finance Dept Members
+###################################################################################################
+class FinanceDeptMembers(Base):
+    __tablename__ = "finance_dept_members"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    username: Mapped[str] = mapped_column(String)
+    email: Mapped[str] = mapped_column(String)
+# TESTING: insert into finance_dept_members (id, username, email) values ('roman01', 'romancambell', 'roman_campbell@lawb.uscourts.gov');
+###################################################################################################
+## Request Approvers
+###################################################################################################
+class RequestApprovers(Base):
+    __tablename__ = "request_approvers"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    username: Mapped[str] = mapped_column(String)
+    email: Mapped[str] = mapped_column(String)
+# TESTING: insert into request_approvers (id, username, email) values ('roman01', 'romancambell', 'roman_campbell@lawb.uscourts.gov');
+
+###################################################################################################
+## Request Approvers
+###################################################################################################
+class ITDeptMembers(Base):
+    __tablename__ = "it_dept_members"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    username: Mapped[str] = mapped_column(String)
+    email: Mapped[str] = mapped_column(String)
+
 Base.metadata.create_all(engine)
 my_session = sessionmaker(bind=engine)
 
+# TESTING: insert into it_dept_members (id, username, email) values ('roman01', 'romancambell', 'roman_campbell@lawb.uscourts.gov');
 ###################################################################################################
  ## Create session for functions/queries
 def get_session():
