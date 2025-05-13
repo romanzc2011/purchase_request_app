@@ -2,6 +2,7 @@ import { SxProps, Theme } from "@mui/material";
 
 // Define style objects outside of the component
 export const cellRowStyles: SxProps<Theme> = {
+
     "& .MuiDataGrid-cell": {
         color: "white",
         background: "#2c2c2c",
@@ -63,6 +64,7 @@ export const groupHeaderStyles: SxProps<Theme> = {
         fontWeight: "bold",
         fontSize: "1.05rem !important",
         borderBottom: "2px solid #800000",
-        color: "#fff"
+        color: "#fff",
+        letterSpacing: "0.05px",
     }
 };

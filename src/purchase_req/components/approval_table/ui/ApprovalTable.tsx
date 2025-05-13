@@ -211,13 +211,38 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // track which groups are expanded
     const toggleRow = (key: string) => setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
 
+    // MUTATION TO ASSIGN IRQ1
     const assignIRQ1Mutation = useAssignIRQ1();
 
+    // track which rows are selected
     const [rowSelectionModel, setRowSelectionModel] =
-        useState<{ ids: Set<GridRowId>, type: 'include' }>({
+        useState<{ ids: Set<GridRowId>, type: 'include' | 'exclude' }>({
             ids: new Set(),
             type: 'include',
         });
+
+    // Calculate total items in selected groups
+    //  determine first if theres more than 1 UUID, then if there is i need to decide if its already flatten then 
+    // flatten if not then count but theres 10 items altogether but this is count 1 if everything is collapsed
+    const getTotalSelectedItems = () => {
+        // Exclude non group row
+        if (rowSelectionModel.type === 'exclude') {
+            return flatRows.filter(row => !row.isGroup && !rowSelectionModel.ids.has(row.UUID)).length;
+        }
+
+        let total = 0;
+        Array.from(rowSelectionModel.ids).forEach(uuid => {
+            const row = flatRows.find(r => r.UUID === uuid);
+            if (row) {
+                if (row.isGroup) {
+                    total += row.rowCount;
+                } else {
+                    total += 1;
+                }
+            }
+        });
+        return total;
+    }
 
     const { getUUID } = useUUIDStore();
 
@@ -430,11 +455,26 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         width: 200,
         sortable: false,
         filterable: false,
+        // Span all columns if this is a group header row
+        colSpan: (params): number => {
+            if (!params?.row) return 2;
+            const row = params.row as FlatRow;
+            return row.isGroup ? allColumns.length : 1;
+        },
         renderCell: params => {
             const row = params.row as FlatRow;
+            if (!row.isGroup) return null;
+
+            const isExpanded = expandedRows[row.groupKey];
             return (
                 <Box
-                    sx={{ display: "flex", alignItems: "center", cursor: "pointer", pl: row.rowCount > 1 ? 0 : 3 }}
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        cursor: "pointer",
+                        width: "100%",
+                        pl: 2
+                    }}
                     onClick={() => toggleRow(row.groupKey)}
                 >
                     {row.rowCount > 1 && (
@@ -442,8 +482,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                             ? <KeyboardArrowUpIcon fontSize="small" />
                             : <KeyboardArrowDownIcon fontSize="small" />
                     )}
-                    <Box component="span" sx={{ ml: 1, fontWeight: "bold" }}>
-                        {row.groupKey} {row.rowCount > 1 && `(${row.rowCount})`}
+                    <Box component="span" sx={{ ml: 1, fontWeight: "bold", color: "#FFFFFF" }}>
+                        {`${row.groupKey} (${row.rowCount} items)`}
                     </Box>
                 </Box>
             );
@@ -460,6 +500,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             width: 220,
             sortable: true,
             renderCell: params => {
+                // This will create the "header" row for groups
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
                 const id = params.row.ID;
                 const existingIRQ1 = assignedIRQ1s[id] || "";
                 const currentDraftIRQ1 = draftIRQ1[id] || "";
@@ -522,6 +564,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             headerName: "ID",
             width: 130,
             sortable: true,
+            renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
+                return params.value;
+            }
         },
 
         /***********************************************************************************/
@@ -532,6 +578,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             headerName: "Requester",
             width: 130,
             sortable: true,
+            renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
+                return params.value;
+            }
         },
 
         /***********************************************************************************/
@@ -541,7 +591,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             field: "budgetObjCode",
             headerName: "Budget Object Code",
             width: 150,
-            renderCell: params => convertBOC(params.value)
+            renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
+                return convertBOC(params.value);
+            }
         },
 
         /***********************************************************************************/
@@ -552,6 +605,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             headerName: "Fund",
             width: 130,
             sortable: true,
+            renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
+                return params.value;
+            }
         },
 
         /***********************************************************************************/
@@ -562,6 +619,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             headerName: "Location",
             width: 130,
             sortable: true,
+            renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
+                return params.value;
+            }
         },
 
         /***********************************************************************************/
@@ -574,6 +635,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             align: "center",
             width: 100,
             sortable: true,
+            renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
+                return params.value;
+            }
         },
 
         /***********************************************************************************/
@@ -586,8 +651,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             align: "center",
             sortable: true,
             width: 120,
-            renderCell: params =>
-                typeof params.value === "number" ? params.value.toFixed(2) : "0.00"
+            renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) { return null; }
+                return typeof params.value === "number" ? params.value.toFixed(2) : "0.00";
+            }
         },
 
         /***********************************************************************************/
@@ -600,8 +667,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             align: "center",
             width: 120,
             sortable: true,
-            renderCell: params =>
-                typeof params.value === "number" ? params.value.toFixed(2) : "0.00"
+            renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) { return null; }
+                return typeof params.value === "number" ? params.value.toFixed(2) : "0.00";
+            }
         },
 
         /***********************************************************************************/
@@ -614,6 +683,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             width: 200,
             sortable: false,
             renderCell: (params) => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
                 const desc: string = params.value || "";
                 const truncatedDesc = desc.length > 20
                     ? desc.slice(0, 20) + "..."
@@ -652,6 +722,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             width: 200,
             sortable: false,
             renderCell: (params) => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
                 const just: string = params.value || "";
                 const truncatedJust = just.length > 20
                     ? just.slice(0, 20) + "..."
@@ -690,6 +761,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             width: 200,
             sortable: true,
             renderCell: params => {
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
                 const status = params.value as DataRow["status"];
                 const { bg, Icon } = STATUS_CONFIG[status] || { bg: "#9e9e9e", Icon: React.Fragment };
                 return (
@@ -766,14 +838,15 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     color="success"
                     onClick={handleBulkApprove}
                 >
-                    Approve Selected
+                    Approve Selected ({getTotalSelectedItems()})
                 </Button>
                 <Button
                     startIcon={<CloseIcon />}
-                    variant="contained" color="error"
+                    variant="contained"
+                    color="error"
                     onClick={handleBulkDeny}
                 >
-                    Deny Selected
+                    Deny Selected ({getTotalSelectedItems()})
                 </Button>
                 <Button
                     variant="contained" startIcon={<CommentIcon />}
@@ -793,11 +866,53 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                 getRowId={row => row.UUID}
                 rows={flatRows}
                 columns={allColumns}
+                getRowClassName={(params) => {
+                    const row = params.row as FlatRow;
+                    if (row.isGroup && expandedRows[row.groupKey]) {
+                        return 'expanded-group-row';
+                    }
+                    return '';
+                }}
                 checkboxSelection
                 rowSelectionModel={rowSelectionModel}
                 onRowSelectionModelChange={(newModel) => {
-                    setRowSelectionModel({ ids: new Set(newModel.ids), type: 'include' });
+                    const newSelection = new Set<GridRowId>();
+                    let newType: 'include' | 'exclude' = 'include';
+
+                    // Process each selected UUID
+                    Array.from(newModel.ids).forEach(uuid => {
+                        const row = flatRows.find(r => r.UUID === uuid);
+                        if (row) {
+                            if (row.isGroup) {
+                                // If it's a group, add all items in that group
+                                const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
+                                groupItems.forEach(item => newSelection.add(item.UUID));
+                            } else {
+                                // If it's an individual item, add it directly
+                                newSelection.add(uuid);
+                            }
+                        }
+                    });
+
+                    // If we're deselecting (the new selection is smaller than the current one)
+                    if (newSelection.size < rowSelectionModel.ids.size) {
+                        // Find what was deselected
+                        const deselectedIds = Array.from(rowSelectionModel.ids).filter(id => !newSelection.has(id));
+
+                        // Check if any of deselected items are group headers
+                        deselectedIds.forEach(id => {
+                            const row = flatRows.find(r => r.UUID === id);
+                            if (row?.isGroup) {
+                                const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
+                                groupItems.forEach(item => newSelection.delete(item.UUID));
+                            }
+                        });
+                        setRowSelectionModel({ ids: newSelection, type: 'include' });
+                    } else {
+                        setRowSelectionModel({ ids: newSelection, type: 'include' });
+                    }
                 }}
+
                 initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
                 pageSizeOptions={[25, 50, 100]}
                 disableRowSelectionOnClick
@@ -827,15 +942,21 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
                     // any one-off tweaks
                     "& .MuiDataGrid-cellCheckbox": { color: "yellow" },
+
+                    '& .expanded-group-row': {
+                        background: 'linear-gradient(180deg, #800000 0%, #600000 100%) !important',
+                        '&:hover': {
+                            background: 'linear-gradient(180deg, #600000 0%, #400000 100%) !important',
+                        },
+                        '& .MuiDataGrid-cell': {
+                            background: 'linear-gradient(180deg, #800000 0%, #600000 100%) !important',
+                            borderBottom: '2px solid #FFFFFF',
+                            color: '#FFFFFF',
+                            fontWeight: 'bold',
+                        }
+                    },
                 } as DataGridSxProps}
             />
-            <style>{`
-        .group-header-row .MuiDataGrid-cell {
-          background-color: #3c3c3c !important;
-          font-weight: bold;
-          font-size: 1.05rem !important; /* Increased font size for group headers */
-        }
-      `}</style>
 
             {/* Item Description Modal */}
             <Modal
