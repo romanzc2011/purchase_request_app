@@ -29,7 +29,7 @@ export interface DataRow {
 // #########################################################################################    
 export type FlatRow = 
 | (DataRow & {  isGroup: true; groupKey: string; rowCount: number })
-| (DataRow & {  isGroup: false; groupKey: string });
+| (DataRow & {  isGroup: false; groupKey: string; rowId: string });
 
 
 // #########################################################################################

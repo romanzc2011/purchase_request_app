@@ -57,6 +57,7 @@ class ApprovalSchema(BaseModel):
     
     ID: str
     IRQ1_ID: Optional[str] = None
+    UUID: str
     CO: Optional[str] = None
     requester: str
     dateneed: str
@@ -80,8 +81,8 @@ class ApprovalSchema(BaseModel):
 class LineItemStatusSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    ID: str
-    IRQ1_ID: Optional[str] = None
+    UUID: str
+    approval_uuid: Optional[str] = None
     status: str
     hold_until: Optional[datetime] = None
     last_updated: datetime
@@ -95,11 +96,11 @@ class LineItemStatusSchema(BaseModel):
 class SonCommentSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    ID: str
+    UUID: str
+    approval_uuid: Optional[str] = None
     IRQ1_ID: Optional[str] = None
     comment_text: Optional[str] = None
     created_at: Optional[datetime] = None
-    created_by: Optional[str] = None
     son_requester: str
   
 ########################################################

@@ -147,6 +147,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         r.UUID ? r : { ...r, UUID: `row-${i}` }
     );
 
+    rowsWithUUID.forEach(r => {
+        console.log("ApprovalTableDG - r:", r);
+    });
+
     const grouped: Record<string, DataRow[]> = rowsWithUUID.reduce((acc, row) => {
         (acc[row.ID] ||= []).push(row);
         return acc;
@@ -178,18 +182,15 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
             return [
                 header,
-                ...items.slice(1).map((item: DataRow): FlatRow => ({
+                ...items.map((item: DataRow): FlatRow => ({
                     ...item,
                     isGroup: false as const,
-                    groupKey
+                    groupKey,
+                    rowId: item.UUID
                 }))
             ];
         });
     }, [grouped]);
-
-
-
-    console.log("Flat rows:", flatRows);
 
     const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
     const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string, string>>({});
@@ -236,7 +237,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     };
 
     const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID); console.log("download", ID); };
-    const handleComment = (ID: string) => { console.log("comment", ID); };
+    const handleComment = (UUID: string) => { console.log("comment", UUID); };
     const handleFollowUp = (ID: string) => { console.log("follow up", ID); };
 
     // ####################################################################
@@ -362,7 +363,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         setFullJust("");
     };
 
-    // base rows
     const baseRows = (searchQuery ? searchData : approvalData) || [];
     /***********************************************************************************/
     // COMMENT MODAL

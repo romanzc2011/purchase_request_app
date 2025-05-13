@@ -223,8 +223,8 @@ async def get_approval_data(
         else:
             approvals = dbas.get_all_approval(session)
             approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approvals]
+            logger.info(f"Approval data: {approval_data}")
         
-        logger.success(f"Approval data: {approval_data}")
         return approval_data
     finally:
         session.close()
@@ -723,13 +723,13 @@ def process_approval_data(processed_data):
         raise ValueError("Data must be a dictionary")
     
     logger.info(f"processed_data: {processed_data}")
-    
     # Define allowed keys that correspond to the Approval model's columns.
     allowed_keys = [
+        'UUID', 'purchase_request_uuid',
         'ID', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet',
-        'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location', 
+        'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location',
         'phoneext', 'datereq', 'dateneed', 'orderType'
-    ]
+]
     
     # Populate approval_data from processed_data
     for key, value in processed_data.items():
@@ -759,12 +759,15 @@ def purchase_req_commit(processed_data, current_user: User):
             # 2. Process and create approval data
             approval_data = process_approval_data(processed_data)
             approval_data['status'] = dbas.ItemStatus.NEW
+            approval_data['purchase_request_uuid'] = purchase_request.UUID
             approval = dbas.insert_data(approval_data, "approvals")
             
+            logger.info(f"Approval object: {approval}")
+            logger.info(f"Approval UUID: {getattr(approval, 'UUID', None)}")
             # 3. Create line item status with required IDs and current user
             line_item_data = {
                 'purchase_request_id': processed_data['ID'],
-                'approval_id': approval.UUID,
+                'approval_uuid': approval.UUID,
                 'status': dbas.ItemStatus.NEW,
                 'updated_by': current_user.username  # Use the current user's username
             }
@@ -773,7 +776,7 @@ def purchase_req_commit(processed_data, current_user: User):
             # 4. Create son comment with required IDs
             son_comment_data = {
                 'purchase_request_id': processed_data['ID'],
-                'approval_id': approval.UUID,
+                'approval_uuid': approval.UUID,
                 'son_requester': current_user.username  # Use the current user's username
             }
             son_comment = dbas.insert_data(son_comment_data, "son_comments")

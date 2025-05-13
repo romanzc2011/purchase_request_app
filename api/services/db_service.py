@@ -64,9 +64,7 @@ class PurchaseRequest(Base):
                      'location', 'quantity', 'priceEach', 'totalPrice', 'status', 'trainNotAval', 'needsNotMeet']
 
     # Relationships
-    approval = relationship("Approval", back_populates="purchase_request", uselist=False)
-    line_item_status = relationship("LineItemStatus", back_populates="purchase_request", uselist=False)
-    son_comment = relationship("SonComment", back_populates="purchase_request", cascade="all, delete-orphan")
+    approvals = relationship("Approval", back_populates="purchase_request", cascade="all, delete-orphan")
 
 ###################################################################################################
 ## approval TABLE
@@ -77,48 +75,45 @@ class Approval(Base):
                       'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
 
     # Sequential ID for user-facing operations
-    UUID:            Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID:              Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
-    IRQ1_ID:         Mapped[str] = mapped_column(String, nullable=True, unique=True)
-    requester:       Mapped[str] = mapped_column(String, nullable=False)
-    CO:              Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    phoneext:        Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq:         Mapped[str] = mapped_column(String)      
-    dateneed:        Mapped[str] = mapped_column(String)      
-    orderType:       Mapped[str] = mapped_column(String)
-    fileAttachments: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
-    itemDescription: Mapped[str] = mapped_column(Text)
-    justification:   Mapped[str] = mapped_column(Text)
-    trainNotAval:    Mapped[bool] = mapped_column(Boolean, nullable=True)
-    needsNotMeet:    Mapped[bool] = mapped_column(Boolean, nullable=True)
-    budgetObjCode:   Mapped[str] = mapped_column(String)
-    fund:            Mapped[str] = mapped_column(String)
-    priceEach:       Mapped[float] = mapped_column(Float)
-    totalPrice:      Mapped[float] = mapped_column(Float)
-    location:        Mapped[str] = mapped_column(String)
-    quantity:        Mapped[int] = mapped_column(Integer)
-    status:          Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
+    UUID:                   Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ID:                     Mapped[str] = mapped_column(String, nullable=False)
+    IRQ1_ID:                Mapped[str] = mapped_column(String, nullable=True, unique=True)
+    purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.UUID"), nullable=False)
+    requester:              Mapped[str] = mapped_column(String, nullable=False)
+    CO:                     Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    phoneext:               Mapped[int] = mapped_column(Integer, nullable=False)
+    datereq:                Mapped[str] = mapped_column(String)      
+    dateneed:               Mapped[str] = mapped_column(String)      
+    orderType:              Mapped[str] = mapped_column(String)
+    fileAttachments:        Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
+    itemDescription:        Mapped[str] = mapped_column(Text)
+    justification:          Mapped[str] = mapped_column(Text)
+    trainNotAval:           Mapped[bool] = mapped_column(Boolean, nullable=True)
+    needsNotMeet:           Mapped[bool] = mapped_column(Boolean, nullable=True)
+    budgetObjCode:          Mapped[str] = mapped_column(String)
+    fund:                   Mapped[str] = mapped_column(String)
+    priceEach:              Mapped[float] = mapped_column(Float)
+    totalPrice:             Mapped[float] = mapped_column(Float)
+    location:               Mapped[str] = mapped_column(String)
+    quantity:               Mapped[int] = mapped_column(Integer)
+    createdTime:            Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
                                                                 name="item_status",
                                                                 native_enum=False,
                                                                 values_callable=lambda enum: [e.value for e in enum]
                                                                 ),
                                                                 default=ItemStatus.NEW
                                                             )
-    
-    createdTime:     Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
-
-    # Relationships
-    purchase_request = relationship("PurchaseRequest", back_populates="approval")
-    son_comment = relationship("SonComment", back_populates="approval", cascade="all, delete-orphan")
-    line_item_status = relationship("LineItemStatus", back_populates="approval", cascade="all, delete-orphan")
+    purchase_request = relationship("PurchaseRequest", back_populates="approvals")
+    son_comments = relationship("SonComment", back_populates="approval", cascade="all, delete-orphan")
+    line_item_statuses = relationship("LineItemStatus", back_populates="approval", cascade="all, delete-orphan")
  
 ###################################################################################################
 ## review TABLE
 class LineItemStatus(Base):
     __tablename__ = "line_item_statuses"
-    id:                     Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    purchase_request_id:    Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
-    approval_id:            Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
+    UUID:                   Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    approval_uuid:            Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"),
                                                                         nullable=False,
                                                                         default=ItemStatus.NEW)
@@ -130,25 +125,21 @@ class LineItemStatus(Base):
     updater_email:          Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     # Relationships
-    purchase_request = relationship("PurchaseRequest", back_populates="line_item_status")
-    approval = relationship("Approval", back_populates="line_item_status")
+    approval = relationship("Approval", back_populates="line_item_statuses")
 
 ###################################################################################################
 ## LINE ITEM COMMENTS TABLE
 class SonComment(Base):
     __tablename__ = "son_comments"
     
-    id:                  Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    purchase_request_id: Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.ID"), nullable=False)
-    approval_id:         Mapped[str] = mapped_column(String, ForeignKey("approvals.ID"), nullable=False)
-    comment_text:        Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at:          Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
-    son_requester:       Mapped[str] = mapped_column(String, nullable=False)
-    
+    UUID:           Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    approval_uuid:  Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
+    comment_text:   Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at:     Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+    son_requester:  Mapped[str] = mapped_column(String, nullable=False)
     
     # Relationships
-    purchase_request = relationship("PurchaseRequest", back_populates="son_comment")
-    approval = relationship("Approval", back_populates="son_comment")
+    approval = relationship("Approval", back_populates="son_comments")
 
 ###################################################################################################
 ## Finance Dept Members
