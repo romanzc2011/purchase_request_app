@@ -48,3 +48,21 @@ export const paginationStyles: SxProps<Theme> = {
         fontSize: "0.95rem" // Increased font size for pagination labels
     },
 };
+
+// Header for Groups in Approval Table
+export const groupHeaderStyles: SxProps<Theme> = {
+    "& .MuiDataGrid-columnHeader": {
+        backgroundColor: "#3c3c3c !important",
+        fontWeight: "bold",
+        fontSize: "1.05rem !important", // Increased font size for column headers
+        borderBottom: "2px solid #800000"
+    },
+    // Style for group header rows in the DataGrid body
+    "& .group-header-row .MuiDataGrid-cell": {
+        backgroundColor: "#3c3c3c !important",
+        fontWeight: "bold",
+        fontSize: "1.05rem !important",
+        borderBottom: "2px solid #800000",
+        color: "#fff"
+    }
+};

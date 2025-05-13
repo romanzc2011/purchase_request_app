@@ -161,19 +161,22 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             if (items.length === 1) {
                 return [{
                     ...items[0],
-                    isGroup: true as const,
+                    isGroup: false as const,
                     groupKey,
-                    rowCount: 1,
-                    rowId: items[0].UUID
+                    rowCount: items.length,
+                    rowId: items[0].UUID,
+                    UUID: items[0].UUID
                 }];
             }
 
-            const header = {
+            // For multi-line groups, we need to create a header row
+            const header: FlatRow = {
                 ...items[0],
                 isGroup: true as const,
                 groupKey,
                 rowCount: items.length,
-                rowId: `header-${groupKey}`
+                rowId: `header-${groupKey}`,
+                UUID: `header-${groupKey}`
             }
 
             if (!expandedRows[groupKey]) {
@@ -182,11 +185,13 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
             return [
                 header,
-                ...items.map((item: DataRow): FlatRow => ({
+                ...items.map(item => ({
                     ...item,
                     isGroup: false as const,
                     groupKey,
-                    rowId: item.UUID
+                    rowCount: items.length,
+                    rowId: item.UUID,
+                    UUID: item.UUID
                 }))
             ];
         });
@@ -427,19 +432,18 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         filterable: false,
         renderCell: params => {
             const row = params.row as FlatRow;
-            if (row.isGroup !== true) {
-                return null;
-            }
             return (
                 <Box
-                    sx={{ display: "flex", alignItems: "center", cursor: "pointer" }}
+                    sx={{ display: "flex", alignItems: "center", cursor: "pointer", pl: row.rowCount > 1 ? 0 : 3 }}
                     onClick={() => toggleRow(row.groupKey)}
                 >
-                    {expandedRows[row.groupKey]
-                        ? <KeyboardArrowUpIcon fontSize="small" />
-                        : <KeyboardArrowDownIcon fontSize="small" />}
+                    {row.rowCount > 1 && (
+                        expandedRows[row.groupKey]
+                            ? <KeyboardArrowUpIcon fontSize="small" />
+                            : <KeyboardArrowDownIcon fontSize="small" />
+                    )}
                     <Box component="span" sx={{ ml: 1, fontWeight: "bold" }}>
-                        {row.groupKey} ({row.rowCount})
+                        {row.groupKey} {row.rowCount > 1 && `(${row.rowCount})`}
                     </Box>
                 </Box>
             );
