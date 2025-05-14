@@ -513,9 +513,9 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
         uuid = uuid_service.get_uuid_by_id(session, original_id)
     
     # update all tables with the new IRQ1_ID
-    dbas.update_data_by_uuid(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
-    dbas.update_data_by_uuid(uuid, "line_item_statuses", IRQ1_ID=data.get('IRQ1_ID'))
-    dbas.update_data_by_uuid(uuid, "son_comments", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data_by_uuid(uuid=uuid, table="approvals", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data_by_uuid(uuid=uuid, table="line_item_statuses", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data_by_uuid(uuid=uuid, table="son_comments", IRQ1_ID=data.get('IRQ1_ID'))
     
     if not uuid:
         raise HTTPException(status_code=400, detail="Missing UUID in request")
@@ -656,6 +656,18 @@ async def add_comment_endpoint(
         if not success:
             raise HTTPException(status_code=404, detail="Failed to add comment")
         return {"message": "Comment added successfully"}
+    
+##########################################################################
+## CYBER SECURITY RELATED
+##########################################################################
+@api_router.patch("/cyberSecRelated/{UUID}")
+async def cyber_sec_related(UUID: str, isCyberSecRelated: bool):
+    """
+    Update the isCyberSecRelated field for a purchase request.
+    """
+    with next(get_session()) as session:
+        success = dbas.update_data_by_uuid(session, UUID, isCyberSecRelated=isCyberSecRelated)
+        return {"message": "Cybersec related field updated successfully"}
 
 ##########################################################################
 ##########################################################################
@@ -767,8 +779,7 @@ def purchase_req_commit(processed_data, current_user: User):
             
             # 3. Create line item status with required IDs and current user
             line_item_data = {
-                'purchase_request_id': processed_data['ID'],
-                'approval_uuid': approval.UUID,
+                'UUID': approval.UUID,
                 'status': dbas.ItemStatus.NEW,
                 'updated_by': current_user.username
             }
@@ -776,8 +787,8 @@ def purchase_req_commit(processed_data, current_user: User):
             
             # 4. Create son comment with required IDs
             son_comment_data = {
+                'UUID': approval.UUID,
                 'purchase_request_id': processed_data['ID'],
-                'approval_uuid': approval.UUID,
                 'son_requester': current_user.username
             }
             son_comment = dbas.insert_data(table="son_comments", data=son_comment_data)

@@ -73,7 +73,7 @@ class ApprovalSchema(BaseModel):
     location: str
     status: ItemStatus
     createdTime: datetime
-    is_cybersec_related: Optional[bool] = False
+    isCyberSecRelated: Optional[bool] = False
     
 ########################################################
 ##    LINE ITEM STATUS SCHEMA
@@ -81,8 +81,7 @@ class ApprovalSchema(BaseModel):
 class LineItemStatusSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    UUID: str
-    approval_uuid: Optional[str] = None
+    UUID: Optional[str] = None
     status: str
     hold_until: Optional[datetime] = None
     last_updated: datetime
@@ -96,8 +95,7 @@ class LineItemStatusSchema(BaseModel):
 class SonCommentSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    UUID: str
-    approval_uuid: Optional[str] = None
+    UUID: Optional[str] = None
     comment_text: Optional[str] = None
     created_at: Optional[datetime] = None
     son_requester: str

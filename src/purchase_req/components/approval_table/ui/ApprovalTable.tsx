@@ -42,7 +42,7 @@ interface ApprovalTableProps {
 
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
-const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cybersecRelated`;
+const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
 const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 
@@ -91,7 +91,7 @@ async function fetchCyberSecRelated(UUID: string) {
             "Authorization": `Bearer ${localStorage.getItem("access_token")}`
         },
         body: JSON.stringify({
-            is_cybersec_related: true
+            isCyberSecRelated: true
         })
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);

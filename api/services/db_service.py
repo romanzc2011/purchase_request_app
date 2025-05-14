@@ -97,7 +97,7 @@ class Approval(Base):
     location:               Mapped[str] = mapped_column(String)
     quantity:               Mapped[int] = mapped_column(Integer)
     createdTime:            Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
-    is_cybersec_related:    Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)   
+    isCyberSecRelated:      Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)   
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
                                                                 name="item_status",
                                                                 native_enum=False,
@@ -113,8 +113,7 @@ class Approval(Base):
 ## review TABLE
 class LineItemStatus(Base):
     __tablename__ = "line_item_statuses"
-    UUID:                   Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    approval_uuid:            Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
+    UUID:                   Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True, nullable=False)
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"),
                                                                         nullable=False,
                                                                         default=ItemStatus.NEW)
@@ -133,8 +132,7 @@ class LineItemStatus(Base):
 class SonComment(Base):
     __tablename__ = "son_comments"
     
-    UUID:           Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    approval_uuid:  Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
+    UUID:           Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True, nullable=False)
     comment_text:   Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at:     Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
     son_requester:  Mapped[str] = mapped_column(String, nullable=False)
@@ -314,6 +312,8 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
     
     with next(get_session()) as db:
         # Filters incoming data by UUID for the table
+        #Line Item Statuses needs to use approve_uuid 
+        
         obj = db.query(model).filter(getattr(model, pk_field) == uuid).first()
         logger.info(f"GETATTR test: {getattr(model, pk_field)}")
         if not obj:
@@ -442,35 +442,6 @@ def get_status_by_uuid(db_session: Session, uuid: str):
         logger.warning(f"No status found for uuid: {uuid}")
         return None
 
-###################################################################################################
-# Update data by uuid
-def update_data_by_uuid(uuid: str, table: str, **kwargs):
-    logger.info(f"Updating {table} with uuid {uuid}, data: {kwargs}")
-    
-    if not kwargs or not isinstance(kwargs, dict):
-        raise ValueError("Update data must be a non-empty dictionary")
-    
-    with next(get_session()) as db:
-        if table == "purchase_requests":
-            obj = db.query(PurchaseRequest).filter(PurchaseRequest.uuid == uuid).first()
-        elif table == "approval":
-            obj = db.query(Approval).filter(Approval.uuid == uuid).first()
-        else:
-            raise ValueError(f"Unsupported table: {table}")
-        
-        if obj:
-            for key, value in kwargs.items():
-                if hasattr(obj, key):
-                    setattr(obj, key, value)
-                else:
-                    raise ValueError(f"Invalid field: {key}")
-            
-            db.commit()
-            logger.info(f"Successfully updated {table} with uuid {uuid}")
-        else:
-            logger.error(f"Object with uuid {uuid} not found in {table}")
-            raise ValueError(f"Object with uuid {uuid} not found in {table}")
-            
 ###################################################################################################
 # Get uuids for multiple IDs
 ###################################################################################################
