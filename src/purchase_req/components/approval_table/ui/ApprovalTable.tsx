@@ -23,13 +23,7 @@ import { STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approv
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { ZodCatch } from "zod";
 import { useUUIDStore } from "../../../services/UUIDService";
-
-// TODO:
-// - add a button to the toolbar to toggle all rows to be cybersec related
-// - add a button to the toolbar to toggle all rows to not be cybersec related
-// - add a button to the toolbar to toggle all rows to be approved
-// - add a button to the toolbar to toggle all rows to be denied
-
+import { createHandleCommands } from "../HandleCommands";
 
 /***********************************************************************************/
 // PROPS
@@ -85,7 +79,7 @@ async function fetchApprovalData(ID?: string) {
 /***********************************************************************************/
 async function fetchCyberSecRelated(UUID: string) {
     const response = await fetch(`${API_URL_CYBERSEC_RELATED}/${UUID}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${localStorage.getItem("access_token")}`
@@ -95,6 +89,7 @@ async function fetchCyberSecRelated(UUID: string) {
         })
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    console.log("fetchCyberSecRelated - response:", response);
     const data = await response.json();
     return data;
 }
@@ -301,48 +296,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // HANDLE CYBERSECURITY RELATED
     //####################################################################
     const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID); console.log("download", ID); };
-    const handleComment = (UUID: string) => { console.log("comment", UUID); };
     const handleFollowUp = (ID: string) => { console.log("follow up", ID); };
 
     // ####################################################################
-    // BULK ACTIONS
-    // ####################################################################
-
-    // Bulk Deny
-    const handleBulkDeny = () => {
-        Array.from(rowSelectionModel.ids).forEach(uuid => {
-            const row = flatRows.find(r => r.UUID === uuid);
-            if (row && !row.isGroup) {
-                handleDenyRow(row);
-            }
-        });
-        setRowSelectionModel({ ids: new Set(), type: 'include' });
-    };
-
-    // Bulk Follow Up
-    const handleBulkFollowUp = () => {
-        Array.from(rowSelectionModel.ids).forEach(uuid => {
-            const row = flatRows.find(r => r.UUID === uuid);
-            if (row && !row.isGroup) {
-                handleFollowUp(row.ID);
-            }
-        });
-        setRowSelectionModel({ ids: new Set(), type: 'include' });
-    }
-
-    // Bulk Comment
-    const handleBulkComment = () => {
-        Array.from(rowSelectionModel.ids).forEach(uuid => {
-            const row = flatRows.find(r => r.UUID === uuid);
-            if (row && !row.isGroup) {
-                handleComment(row.ID);
-            }
-        });
-        setRowSelectionModel({ ids: new Set(), type: 'include' });
-    }
-
-    // ####################################################################
-
     // Update assignedIRQ1s when approvalData changes
     useEffect(() => {
         if (approvalData) {
@@ -428,12 +384,49 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         setFullJust("");
     };
 
-    const baseRows = (searchQuery ? searchData : approvalData) || [];
-    /***********************************************************************************/
-    // COMMENT MODAL
-    /***********************************************************************************/
-    const commentMutation = useCommentMutation();
+    //####################################################################
+    // HANDLE COMMENT
+    //#################################################################### 
+    async function handleCommentRow(row: DataRow) {
+        const uuid = await getUUID(row.ID);
+        if (!uuid) {
+            toast.error("Failed to get UUID");
+            console.error("Failed to get UUID");
+            return;
+        }
+        openCommentModal(uuid);
+    }
 
+    const handleBulkComment = async () => {
+        let commentRows: DataRow[] = [];
+
+        for (const uuid of Array.from(rowSelectionModel.ids)) {
+            const flat = flatRows.find(r => r.UUID === uuid);
+            if (!flat) continue;
+
+            if (flat.isGroup && grouped[flat.groupKey]) {
+                commentRows.push(...grouped[flat.groupKey]);
+            } else {
+                commentRows.push(flat as DataRow);
+            }
+        }
+
+        // dedupe by UUID
+        const uniqueRows = Array.from(
+            new Map(commentRows.map(r => [r.UUID, r])).values()
+        );
+
+        for (const row of uniqueRows) {
+            await handleCommentRow(row);
+        }
+
+        // Deselect all rows
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
+    }
+
+    //####################################################################
+    // HANDLE CYBERSECURITY RELATED
+    //####################################################################
     async function handleCyberSecRow(row: DataRow) {
         const uuid = await getUUID(row.ID);
         if (!uuid) {
@@ -872,18 +865,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             renderCell: params => (
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
 
-                    {/* Add Comment Button */}
-                    <Button
-                        startIcon={<CommentIcon />} // Make icon smaller
-                        sx={{
-                            backgroundColor: "#800000",
-                            "&:hover": { backgroundColor: "#600000" },
-                        }}
-                        variant="contained"
-                        onClick={() => openCommentModal(params.row.ID)}
-                    >
-                        Add Comment
-                    </Button>
+
 
                     {/* Download Button */}
                     <Button startIcon={<DownloadOutlinedIcon />} variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
@@ -924,17 +906,23 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     startIcon={<CloseIcon />}
                     variant="contained"
                     color="error"
-                    onClick={handleBulkDeny}
+                //onClick={handleBulkDeny}
                 >
                     Deny Selected ({getTotalSelectedItems()})
                 </Button>
 
                 {/* Comment Selected Button */}
+                {/* Add Comment Button */}
                 <Button
-                    variant="contained" startIcon={<CommentIcon />}
+                    startIcon={<CommentIcon />} // Make icon smaller
+                    sx={{
+                        backgroundColor: "#800000",
+                        "&:hover": { backgroundColor: "#600000" },
+                    }}
+                    variant="contained"
                     onClick={handleBulkComment}
                 >
-                    Comment…
+                    Add Comment ({getTotalSelectedItems()})
                 </Button>
 
                 {/* CyberSec Related Button */}
@@ -950,13 +938,13 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         }
                     }}
                 >
-                    CyberSec Related
+                    CyberSec Related ({getTotalSelectedItems()})
                 </Button>
 
                 {/* Follow Up Selected Button */}
                 <Button
                     variant="outlined" startIcon={<ScheduleIcon />}
-                    onClick={handleBulkFollowUp}
+                //onClick={handleBulkFollowUp}
                 >
                     Schedule Follow-Up
                 </Button>

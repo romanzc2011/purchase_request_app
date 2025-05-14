@@ -56,6 +56,13 @@ export default function CommentModal({
         setComment(commentText ?? "");
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+        }
+    };
+
     return (
         <Modal
             open={open}
@@ -91,6 +98,7 @@ export default function CommentModal({
                         rows={4}
                         value={comment}
                         onChange={(e) => setComment(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         sx={{
                             // style the OutlinedInput root
                             "& .MuiOutlinedInput-root": {

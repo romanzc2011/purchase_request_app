@@ -225,9 +225,12 @@ class LDAPService:
     #########################################################################
     # EMAIL ADDRESS LOOKUP
     #########################################################################
-    def get_email_address(self, connection, username):
-        if connection is None:
-            logger.error("Cannot get email address: LDAP connection is None")
+    def get_email_address(self, connection: Connection, username: str):
+        logger.info(f"Retrieving email address for {username}")
+        
+        # Check if legitimate user
+        if not self.check_legitimate_user(connection, username):
+            logger.error(f"User {username} is not a legitimate user")
             return None
             
         try:

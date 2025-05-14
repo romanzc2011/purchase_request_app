@@ -150,6 +150,9 @@ class IRQ1IDSchema(BaseModel):
     ID: str
     IRQ1_ID: str
     
+class CyberSecRelatedPayload(BaseModel):
+    isCyberSecRelated: bool
+    
 ########################################################
 ##    COMMENT PAYLOAD SCHEMA
 ########################################################

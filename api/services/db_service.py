@@ -315,7 +315,6 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
         #Line Item Statuses needs to use approve_uuid 
         
         obj = db.query(model).filter(getattr(model, pk_field) == uuid).first()
-        logger.info(f"GETATTR test: {getattr(model, pk_field)}")
         if not obj:
             raise ValueError(f"No record found with {pk_field} {uuid} in {table}")
             
@@ -500,3 +499,10 @@ def get_all_purchase_requests(session):
 def get_approval_by_id(session, ID):
     """Get approval by ID"""
     return session.query(Approval).filter(Approval.ID == ID).first()
+
+###################################################################################################
+# Email lookup by username - LDAPS
+###################################################################################################
+def email_lookup_by_username(session, username):
+    """Email lookup by username - LDAPS"""
+    return session.query(Approval.email).filter(Approval.requester == username).first()

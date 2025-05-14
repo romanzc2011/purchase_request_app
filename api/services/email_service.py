@@ -23,6 +23,7 @@ class EmailService:
     """
     A class to manage email notification operations for purchase request workflows
     """
+    # TODO: Add a method to send an email to a single recipient, approvers, finance etc
     def __init__(self, from_sender, subject, cc_persons=None):
         self.from_sender = from_sender
         self.subject = subject
@@ -51,13 +52,6 @@ class EmailService:
     def send_notification(self, template_path=None, template_daata=None, subject=None, request_status=None, custom_msg=None):
         """
         Send notifications based on request status or directly to a recipient
-        aaaaaaaaaaaaaa
-        Args:
-            template_path: Path to the HTML template file (optional)
-            template_data: Data to be used in the template (optional)
-            subject: Email subject (optional)   
-            request_status: Status of the request (optional)
-            custom_msg: Custom message to send (optional)
         """
         try:
             pythoncom.CoInitialize()
@@ -69,6 +63,17 @@ class EmailService:
             
             # Validate required fields
             self._validate_required_fields()
+            
+            # If custom message is provided, send it directly
+            if custom_msg:
+                self._send_email(
+                    outlook=outlook,
+                    to_email=self.recipients['requester']['email'],
+                    subject=subject or self.subject,
+                    body=custom_msg
+                )
+                logger.info("Email notifications sent successfully.")
+                return
             
             # Otherwise use status-based approach
             if self.request_status == 'NEW REQUEST':
@@ -92,7 +97,6 @@ class EmailService:
                     template_data=template_data,
                     cc=self.cc_persons,
                 )
-                # Send email to final approver
             elif self.request_status == 'PENDING':
                 self._send_email(
                     outlook=outlook,
@@ -112,47 +116,55 @@ class EmailService:
             logger.error(f"Error sending email: {e}")
             raise
         finally:
-            # Clear the rendered document path after sending
-            logger.info("Cleared rendered document path after sending")
             pythoncom.CoUninitialize()
             
     
     # Send email
-    def _send_email(self, outlook, to_email, subject, body, cc=None, template_path=None, template_data=None):
+    def _send_email(self, outlook, to_email, subject, body=None, cc=None, template_path=None, template_data=None):
         """
         Helper method to send an email using Outlook
-        
-        Args:
-            outlook: Outlook application instance
-            to_email: Recipient email address(es)
-            subject: Email subject
-            body: Email body content
-            cc: CC recipients (optional)
-            template_path: Path to HTML template file (optional)
-            template_data: Data to be used in template (optional)
         """
         mail = outlook.CreateItem(0)
         mail.Subject = subject
         
-            # Log the template data for debugging
-        logger.debug(f"Template data: {template_data}")
-        logger.debug(f"Rendered docx path: {self.get_rendered_docx_path()}")
-        logger.debug(f"Template path: {self.get_template_path()}")
-        
-        path = os.path.abspath(self.get_rendered_docx_path())
-        logger.info(f"Attaching file: {path}, exists? {os.path.exists(path)}")
-        mail.Attachments.Add(path)
-        
-        template_content = f"""
-        <html>
-        <body>
-            <p>Please find the attached document for your review.</p>
-            <p>This is an automated message from the Purchase Request System.</p>
-        </body>
-        </html>
-        """
-        # Set the email body
-        mail.HTMLBody = template_content
+        # Create a simple HTML template for the body
+        if body:
+            # For new requests, include the PDF attachment
+            if self.request_status == 'NEW REQUEST':
+                path = os.path.abspath(self.get_rendered_docx_path())
+                if os.path.exists(path):
+                    mail.Attachments.Add(path)
+                
+                template_content = f"""
+                <html>
+                <body>
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2 style="color: #333;">New Purchase Request</h2>
+                        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
+                            <p style="margin: 0;">{body}</p>
+                        </div>
+                        <p style="margin-top: 20px;">Please find the complete purchase request details in the attached PDF.</p>
+                        <p style="color: #666; margin-top: 20px;">This is an automated message from the Purchase Request System.</p>
+                    </div>
+                </body>
+                </html>
+                """
+            else:
+                # For other notifications (like comments), use the simple template
+                template_content = f"""
+                <html>
+                <body>
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2 style="color: #333;">{subject}</h2>
+                        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
+                            <p style="margin: 0;">{body}</p>
+                        </div>
+                        <p style="color: #666; margin-top: 20px;">This is an automated message from the Purchase Request System.</p>
+                    </div>
+                </body>
+                </html>
+                """
+            mail.HTMLBody = template_content
         
         # Handle multiple recipients
         if isinstance(to_email, list):

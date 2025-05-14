@@ -6,12 +6,12 @@ const API_URL_COMMENT = `${import.meta.env.VITE_API_URL}/api/add_comment`;
 // #####################################################################################
 // COMMENT API
 // #####################################################################################
-export const addComment = async (ID: string, comment: string) => {
+export const addComment = async (UUID: string, comment: string) => {
     const currentDate = new Date().toISOString();
-    console.log("Making API call to:", `${API_URL_COMMENT}/${ID}`);
+    console.log("Making API call to:", `${API_URL_COMMENT}/${UUID}`);
     console.log("With payload:", { comment: comment.trim(), date: currentDate });
     
-    const response = await fetch(`${API_URL_COMMENT}/${ID}`, {
+    const response = await fetch(`${API_URL_COMMENT}/${UUID}`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -37,7 +37,7 @@ export const addComment = async (ID: string, comment: string) => {
 export const useCommentMutation = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ ID, comment }: { ID: string; comment: string }) => addComment(ID, comment),
+        mutationFn: ({ UUID, comment }: { UUID: string; comment: string }) => addComment(UUID, comment),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["approvalData"] });
             toast.success("Comment added");

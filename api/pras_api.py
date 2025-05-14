@@ -24,6 +24,7 @@ import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from docxtpl import DocxTemplate
 from pathlib import Path
+from pydantic import BaseModel
 
 from services.auth_service import AuthService
 
@@ -32,6 +33,7 @@ from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
 from services.uuid_service import uuid_service
 from services.pdf_service import make_purchase_request_pdf
+from pydantic_schemas import CyberSecRelatedPayload
 from services.request_management_service import RequestManagementService
 from settings import settings
 
@@ -261,6 +263,13 @@ async def download_statement_of_need_form(
         
         # Generate PDF
         logger.info(f"ROWS: {rows}")
+        
+        # Check if any line items are marked as cyber security related
+        for row in rows:
+            if row.get("isCyberSecRelated"):
+                is_cyber = True
+                break
+        
         make_purchase_request_pdf(rows=rows, output_path=pdf_path, is_cyber=is_cyber)
         
         if not pdf_path.exists():
@@ -633,10 +642,10 @@ async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to
 ##########################################################################
 ## POST COMMENT
 ##########################################################################
-@api_router.post("/add_comment/{ID}")
+@api_router.post("/add_comment/{UUID}")
 async def add_comment_endpoint(
     payload: CommentPayload,
-    ID: str = Path(description="The ID of the purchase request"),
+    UUID: str = Path(description="The UUID of the approval record"),
 ):
     """
     Add a comment to an approval record.
@@ -648,25 +657,47 @@ async def add_comment_endpoint(
     Returns:
         dict: Success message or error
     """
-    logger.info(f"Received comment request for ID {ID} with payload: {payload}")
+    logger.info(f"Received comment request for UUID {UUID} with payload: {payload}")
     current_date = datetime.now().strftime("%Y-%m-%d")
-    formatted_comment = f"{current_date} - {payload.comment}"
+    formatted_comment = f"{current_date}: {payload.comment}"
     with next(get_session()) as session:
-        success = add_comment(session, ID, payload.comment)
+        success = dbas.update_data_by_uuid(uuid=UUID, table="son_comments", comment_text=formatted_comment)
         if not success:
             raise HTTPException(status_code=404, detail="Failed to add comment")
-        return {"message": "Comment added successfully"}
+        
+        # Get the ID from approvals table using the UUID
+        approval = session.query(dbas.Approval.ID).filter(dbas.Approval.UUID == UUID).first()
+        if not approval:
+            raise HTTPException(status_code=404, detail="Purchase request not found")
+        purchase_req_id = approval.ID
+    
+    # Get requester and lookup email address
+    requster_email = ldap_svc.get_email_address(ldap_svc.get_connection(), success.son_requester)
+    logger.info(f"Requester email: {requster_email}")
+    
+    # Set the requester in email service
+    email_svc.set_requester(success.son_requester, requster_email)
+    
+    # Send a simple notification
+    email_svc.send_notification(
+        subject="Comment added to purchase request",
+        custom_msg=f"Comment added to purchase request {purchase_req_id}:<br><br>{formatted_comment}"
+    )
+    
+    return {"message": "Comment sent successfully"}
     
 ##########################################################################
 ## CYBER SECURITY RELATED
 ##########################################################################
-@api_router.patch("/cyberSecRelated/{UUID}")
-async def cyber_sec_related(UUID: str, isCyberSecRelated: bool):
+
+@api_router.put("/cyberSecRelated/{UUID}")
+async def cyber_sec_related(UUID: str, payload: CyberSecRelatedPayload):
     """
     Update the isCyberSecRelated field for a purchase request.
     """
+    logger.info(f"Updating isCyberSecRelated for UUID: {UUID} to {payload.isCyberSecRelated}")
     with next(get_session()) as session:
-        success = dbas.update_data_by_uuid(session, UUID, isCyberSecRelated=isCyberSecRelated)
+        success = dbas.update_data_by_uuid(uuid=UUID, table="approvals", isCyberSecRelated=payload.isCyberSecRelated)
         return {"message": "Cybersec related field updated successfully"}
 
 ##########################################################################

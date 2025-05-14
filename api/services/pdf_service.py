@@ -61,8 +61,12 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
 
     comment_style = ParagraphStyle(
         "CommentStyle",
-        parent=bold_style,
-        alignment=TA_LEFT
+        parent=normal,
+        fontName="Play",
+        fontSize=9,
+        alignment=TA_LEFT,
+        allowWidows=1,
+        allowOrphans=1
     )
 
     #— document setup
@@ -155,7 +159,7 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
     use_cyber = "Yes" if is_cyber else "No"
     # Cybersecurity line with inline checkmark
     cyber_para = Paragraph(
-        f"Cybersecurity related - consider funding: {use_cyber}", 
+        f"Cybersecurity related - consider funding: <font name='Play-Bold'>{use_cyber}</font>", 
         comment_style
     )
     elements.append(cyber_para)
