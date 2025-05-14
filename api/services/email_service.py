@@ -48,10 +48,10 @@ class EmailService:
         else:
             raise ValueError(f"Invalid routing group: {group}")
 
-    def send_notification(self, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
+    def send_notification(self, template_path=None, template_daata=None, subject=None, request_status=None, custom_msg=None):
         """
         Send notifications based on request status or directly to a recipient
-        
+        aaaaaaaaaaaaaa
         Args:
             template_path: Path to the HTML template file (optional)
             template_data: Data to be used in the template (optional)

@@ -28,7 +28,6 @@ class PurchaseRequestSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     ID: str
-    IRQ1_ID: Optional[str] = None
     requester: str
     phoneext: int
     datereq: str
@@ -74,6 +73,7 @@ class ApprovalSchema(BaseModel):
     location: str
     status: ItemStatus
     createdTime: datetime
+    is_cybersec_related: Optional[bool] = False
     
 ########################################################
 ##    LINE ITEM STATUS SCHEMA
@@ -98,7 +98,6 @@ class SonCommentSchema(BaseModel):
     
     UUID: str
     approval_uuid: Optional[str] = None
-    IRQ1_ID: Optional[str] = None
     comment_text: Optional[str] = None
     created_at: Optional[datetime] = None
     son_requester: str
@@ -146,6 +145,12 @@ class ITDeptMembersSchema(BaseModel):
     
     username: str
     email: EmailStr
+    
+class IRQ1IDSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    ID: str
+    IRQ1_ID: str
     
 ########################################################
 ##    COMMENT PAYLOAD SCHEMA

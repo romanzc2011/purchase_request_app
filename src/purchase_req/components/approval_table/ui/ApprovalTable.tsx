@@ -14,6 +14,7 @@ import { useAssignIRQ1 } from "../../../hooks/useAssignIRQ1";
 import { useCommentModal } from "../../../hooks/useCommentModal";
 import CommentIcon from '@mui/icons-material/Comment';
 import CheckIcon from "@mui/icons-material/Check";
+import MemoryIcon from '@mui/icons-material/Memory';
 import CloseIcon from "@mui/icons-material/Close";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import CommentModal from "../modals/CommentModal";
@@ -22,6 +23,13 @@ import { STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approv
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { ZodCatch } from "zod";
 import { useUUIDStore } from "../../../services/UUIDService";
+
+// TODO:
+// - add a button to the toolbar to toggle all rows to be cybersec related
+// - add a button to the toolbar to toggle all rows to not be cybersec related
+// - add a button to the toolbar to toggle all rows to be approved
+// - add a button to the toolbar to toggle all rows to be denied
+
 
 /***********************************************************************************/
 // PROPS
@@ -32,9 +40,9 @@ interface ApprovalTableProps {
     searchQuery: string;
 }
 
-
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
+const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cybersecRelated`;
 const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 
@@ -70,6 +78,25 @@ async function fetchApprovalData(ID?: string) {
 
         return data;
     }
+}
+
+/***********************************************************************************/
+// FETCH CYBERSECURITY RELATED
+/***********************************************************************************/
+async function fetchCyberSecRelated(UUID: string) {
+    const response = await fetch(`${API_URL_CYBERSEC_RELATED}/${UUID}`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+        },
+        body: JSON.stringify({
+            is_cybersec_related: true
+        })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    return data;
 }
 /***********************************************************************************/
 // FETCH/DOWNLOAD STATEMENT OF NEED FORM - also send approval data to backend - download form
@@ -270,6 +297,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         }
     };
 
+    //####################################################################
+    // HANDLE CYBERSECURITY RELATED
+    //####################################################################
     const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID); console.log("download", ID); };
     const handleComment = (UUID: string) => { console.log("comment", UUID); };
     const handleFollowUp = (ID: string) => { console.log("follow up", ID); };
@@ -310,6 +340,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         });
         setRowSelectionModel({ ids: new Set(), type: 'include' });
     }
+
     // ####################################################################
 
     // Update assignedIRQ1s when approvalData changes
@@ -403,6 +434,53 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     /***********************************************************************************/
     const commentMutation = useCommentMutation();
 
+    async function handleCyberSecRow(row: DataRow) {
+        const uuid = await getUUID(row.ID);
+        if (!uuid) {
+            toast.error("Failed to get UUID");
+            console.error("Failed to get UUID");
+            return;
+        }
+        try {
+            await fetchCyberSecRelated(uuid);
+            toast.success("Cybersecurity related updated");
+        } catch (error) {
+            console.error("Failed to update cybersecurity related:", error);
+            toast.error("Failed to update cybersecurity related");
+        }
+    }
+
+    const handleBulkCyberSec = async () => {
+        let cyberSecRows: DataRow[] = [];
+
+        for (const uuid of Array.from(rowSelectionModel.ids)) {
+            const flat = flatRows.find(r => r.UUID === uuid);
+            if (!flat) continue;
+
+            if (flat.isGroup && grouped[flat.groupKey]) {
+                cyberSecRows.push(...grouped[flat.groupKey]);
+            } else {
+                cyberSecRows.push(flat as DataRow);
+            }
+        }
+
+        // dedupe by UUID
+        const uniqueRows = Array.from(
+            new Map(cyberSecRows.map(r => [r.UUID, r])).values()
+        );
+
+        for (const row of uniqueRows) {
+            await handleCyberSecRow(row);
+        }
+
+        // Deselect all rows
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
+    }
+
+    //####################################################################
+    // HANDLE APPROVE/DENY
+    //####################################################################
+
     // Per row approval
     async function handleApproveRow(row: DataRow) {
         const uuid = await getUUID(row.ID);
@@ -460,16 +538,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         width: 200,
         sortable: false,
         filterable: false,
-        // Span all columns if this is a group header row
-        colSpan: (params): number => {
-            if (!params?.row) return 2;
-            const row = params.row as FlatRow;
-            return row.isGroup ? allColumns.length : 1;
-        },
         renderCell: params => {
             const row = params.row as FlatRow;
             if (!row.isGroup) return null;
-
             const isExpanded = expandedRows[row.groupKey];
             return (
                 <Box
@@ -505,7 +576,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             width: 220,
             sortable: true,
             renderCell: params => {
-                // This will create the "header" row for groups
                 if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
                 const id = params.row.ID;
                 const existingIRQ1 = assignedIRQ1s[id] || "";
@@ -834,9 +904,12 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             display: "flex",
             flexDirection: "column"
         }}>
-
+            <Box sx={{ mb: 2 }}>
+                COMMAND TOOLBAR
+            </Box>
             {/* COMMAND TOOLBAR */}
             <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {/* Approve Selected Button */}
                 <Button
                     startIcon={<CheckIcon />}
                     variant="contained"
@@ -845,6 +918,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                 >
                     Approve Selected ({getTotalSelectedItems()})
                 </Button>
+
+                {/* Deny Selected Button */}
                 <Button
                     startIcon={<CloseIcon />}
                     variant="contained"
@@ -853,12 +928,32 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                 >
                     Deny Selected ({getTotalSelectedItems()})
                 </Button>
+
+                {/* Comment Selected Button */}
                 <Button
                     variant="contained" startIcon={<CommentIcon />}
                     onClick={handleBulkComment}
                 >
                     Comment…
                 </Button>
+
+                {/* CyberSec Related Button */}
+                <Button
+                    variant="contained"
+                    startIcon={<MemoryIcon sx={{ color: "white" }} />}
+                    onClick={handleBulkCyberSec}
+                    sx={{
+                        backgroundColor: "black",
+                        color: "white",
+                        "&:hover": {
+                            backgroundColor: "#222", // slightly lighter on hover
+                        }
+                    }}
+                >
+                    CyberSec Related
+                </Button>
+
+                {/* Follow Up Selected Button */}
                 <Button
                     variant="outlined" startIcon={<ScheduleIcon />}
                     onClick={handleBulkFollowUp}

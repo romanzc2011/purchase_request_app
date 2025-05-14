@@ -97,6 +97,7 @@ class Approval(Base):
     location:               Mapped[str] = mapped_column(String)
     quantity:               Mapped[int] = mapped_column(Integer)
     createdTime:            Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    is_cybersec_related:    Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)   
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
                                                                 name="item_status",
                                                                 native_enum=False,
@@ -192,9 +193,10 @@ def get_approval_by_id(db_session: Session, ID: str):
 
 ###################################################################################################
 # Insert data
-def insert_data(data, table):
+def insert_data(table=None, data=None):
     # Get last id if there is one 
     logger.info(f"Inserting data into {table}: {data}")
+    table = table.strip().lower() 
     
     if not data:
         raise ValueError("Data must be a non-empty dictionary")
@@ -203,14 +205,20 @@ def insert_data(data, table):
     match table:
         case "purchase_requests":
             model = PurchaseRequest
-        case "approvals":
-            logger.info(f"Inserting data into approvals id: {data['ID']}")
-            model = Approval
-        case "line_item_statuses":
+            pk_field = "UUID"
             
+        case "approvals":
+            model = Approval
+            pk_field = "UUID"
+            
+        case "line_item_statuses":
             model = LineItemStatus
+            pk_field = "UUID"
+            
         case "son_comments":
             model = SonComment
+            pk_field = "UUID"
+            
         case _:
             raise ValueError(f"Unsupported table: {table}")
         
@@ -218,7 +226,6 @@ def insert_data(data, table):
     valid_cols = set(inspect(model).columns.keys())
     filtered_data = {k: v for k, v in data.items() if k in valid_cols}
     
-    # Construct, add, build
     with next(get_session()) as db:
         obj = model(**filtered_data)
         db.add(obj)
@@ -269,6 +276,58 @@ def get_requester_by_UUID(db_session: Session, UUID: str):
 ###################################################################################################
 _uuid_cache = {}
 
+###################################################################################################
+# UPDATE DATA BY UUID
+###################################################################################################
+def update_data_by_uuid(uuid: str, table: str, **kwargs):
+    # Get last id if there is one 
+    logger.info(f"Updating data in {table}: {kwargs}")
+    table = table.strip().lower() 
+    
+    if not kwargs:
+        raise ValueError("Data must be a non-empty dictionary")
+    
+    # Pick the right table
+    match table:
+        case "purchase_requests":
+            model = PurchaseRequest
+            pk_field = "UUID"
+            
+        case "approvals":
+            model = Approval
+            pk_field = "UUID"
+            
+        case "line_item_statuses":
+            model = LineItemStatus
+            pk_field = "UUID"
+            
+        case "son_comments":
+            model = SonComment
+            pk_field = "UUID"
+            
+        case _:
+            raise ValueError(f"Unsupported table: {table}")
+        
+    # Strip out keys (columns) that are not in model
+    valid_cols = set(inspect(model).columns.keys())
+    filtered_data = {k: v for k, v in kwargs.items() if k in valid_cols}
+    
+    with next(get_session()) as db:
+        # Filters incoming data by UUID for the table
+        obj = db.query(model).filter(getattr(model, pk_field) == uuid).first()
+        logger.info(f"GETATTR test: {getattr(model, pk_field)}")
+        if not obj:
+            raise ValueError(f"No record found with {pk_field} {uuid} in {table}")
+            
+        for key, value in filtered_data.items():
+            setattr(obj, key, value)
+            
+        db.commit()
+        db.refresh(obj)
+        logger.info(f"Updated data in {table}")
+        return obj
+
+###################################################################################################
 # Get uuid by ID with caching
 def get_uuid_by_id_cached(db_session: Session, ID: str):
     """
@@ -295,52 +354,6 @@ def get_uuid_by_id_cached(db_session: Session, ID: str):
 def get_uuid_by_id(db_session: Session, ID: str):
     result = db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
     return result[0] if result else None
-
-###################################################################################################
-# Update data
-###################################################################################################
-def update_data(ID, table, **kwargs):
-    logger.info(f"Updating {table} with ID {ID}, data: {kwargs}")
-    
-    if not kwargs or not isinstance(kwargs, dict):
-        raise ValueError("Update data must be a non-empty dictionary")
-    
-    with next(get_session()) as db:
-        if table == "purchase_requests":
-            # Try sequential ID first
-            obj = db.query(PurchaseRequest).filter(PurchaseRequest.ID == ID).first()
-            if not obj:
-                # If not found, try uuid
-                obj = db.query(PurchaseRequest).filter(PurchaseRequest.UUID == ID).first()
-        elif table == "approvals":
-            # Try sequential ID first
-            obj = db.query(Approval).filter(Approval.ID == ID).first()
-            if not obj:
-                # If not found, try uuid
-                obj = db.query(Approval).filter(Approval.UUID == ID).first()
-        else:
-            raise ValueError(f"Unsupported table: {table}")
-        
-        if obj:
-            for key, value in kwargs.items():
-                if hasattr(obj, key):
-                    # Special handling for uuid field
-                    if key == "UUID" and value:
-                        # Check if the uuid already exists in the database
-                        existing = db.query(PurchaseRequest).filter(PurchaseRequest.UUID == value).first()
-                        if existing and existing.UUID != obj.UUID:
-                            logger.warning(f"UUID {value} already exists in the database")
-                            continue
-                    
-                    setattr(obj, key, value)
-                else:
-                    raise ValueError(f"Invalid field: {key}")
-            
-            db.commit()
-            logger.info(f"Successfully updated {table} with ID {ID}")
-        else:
-            logger.error(f"Object with ID {ID} not found in {table}")
-            raise ValueError(f"Object with ID {ID} not found in {table}")
         
 ###################################################################################################
 # Retrieve data from single line

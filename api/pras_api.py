@@ -513,15 +513,15 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
         uuid = uuid_service.get_uuid_by_id(session, original_id)
     
     # update all tables with the new IRQ1_ID
-    dbas.update_data(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
-    dbas.update_data(uuid, "line_item_statuses", IRQ1_ID=data.get('IRQ1_ID'))
-    dbas.update_data(uuid, "son_comments", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data_by_uuid(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data_by_uuid(uuid, "line_item_statuses", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data_by_uuid(uuid, "son_comments", IRQ1_ID=data.get('IRQ1_ID'))
     
     if not uuid:
         raise HTTPException(status_code=400, detail="Missing UUID in request")
     
     # Update the database with the requisition ID using the UUID
-    dbas.update_data(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
+    dbas.update_data_by_uuid(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
     return {"IRQ1_ID_ASSIGNED": True}
 
 ##########################################################################
@@ -754,33 +754,35 @@ def purchase_req_commit(processed_data, current_user: User):
             logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")
             
             # 1. First create purchase request
-            purchase_request = dbas.insert_data(processed_data, "purchase_requests")
+            purchase_request = dbas.insert_data(table="purchase_requests", data=processed_data)
             
             # 2. Process and create approval data
             approval_data = process_approval_data(processed_data)
             approval_data['status'] = dbas.ItemStatus.NEW
             approval_data['purchase_request_uuid'] = purchase_request.UUID
-            approval = dbas.insert_data(approval_data, "approvals")
+            approval = dbas.insert_data(table="approvals", data=approval_data)
             
             logger.info(f"Approval object: {approval}")
             logger.info(f"Approval UUID: {getattr(approval, 'UUID', None)}")
+            
             # 3. Create line item status with required IDs and current user
             line_item_data = {
                 'purchase_request_id': processed_data['ID'],
                 'approval_uuid': approval.UUID,
                 'status': dbas.ItemStatus.NEW,
-                'updated_by': current_user.username  # Use the current user's username
+                'updated_by': current_user.username
             }
-            line_item_status = dbas.insert_data(line_item_data, "line_item_statuses")
+            line_item_status = dbas.insert_data(table="line_item_statuses", data=line_item_data)
             
             # 4. Create son comment with required IDs
             son_comment_data = {
                 'purchase_request_id': processed_data['ID'],
                 'approval_uuid': approval.UUID,
-                'son_requester': current_user.username  # Use the current user's username
+                'son_requester': current_user.username
             }
-            son_comment = dbas.insert_data(son_comment_data, "son_comments")
-
+            son_comment = dbas.insert_data(table="son_comments", data=son_comment_data)
+            
+            # Log the created objects
             logger.info(f"Created purchase request: {purchase_request}")
             logger.info(f"Created approval: {approval}")
             logger.info(f"Created line item status: {line_item_status}")

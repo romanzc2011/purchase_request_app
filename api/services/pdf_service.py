@@ -95,11 +95,11 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
         logger.info(f"First row data for header: {first}")
         logger.info(f"Date needed value: {first.get('dateneed')}")
         items = [
+            ("Purchase Req ID:", first.get("ID","")),
+            ("IRQ1:", first.get("IRQ1_ID","")),
             ("Requester:", first.get("requester","")),
             ("CO:", first.get("CO","")),
             ("Date Needed:", first.get("dateneed","").split("T")[0] if first.get("dateneed") else "Not specified"),
-            ("Purchase Req ID:", first.get("ID","")),
-            ("IRQ1:", first.get("IRQ1_ID","")),
         ]
         for label, value in items:
             canvas.drawString(text_x, text_y, label)
@@ -113,6 +113,7 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
 
     #— build flowables
     elements = []
+    elements.append(Spacer(1, 36))
 
     # line-items table
     headings = ["BOC","Fund","Location","Description","Qty","Price Each","Total Price","Justification"]
