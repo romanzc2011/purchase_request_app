@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from pydantic import Field
 import enum
@@ -99,7 +99,10 @@ class SonCommentSchema(BaseModel):
     comment_text: Optional[str] = None
     created_at: Optional[datetime] = None
     son_requester: str
+    item_description: Optional[str] = None
+    purchase_req_id: Optional[str] = None
   
+
 ########################################################
 ##    APPROVE/DENY PAYLOAD SCHEMA ( REQUEST )
 ########################################################  
@@ -158,7 +161,14 @@ class CyberSecRelatedPayload(BaseModel):
 ########################################################
 class CommentPayload(BaseModel):
     comment: str = Field(..., min_length=1, max_length=1000)
+    
+class CommentItem(BaseModel):
+    uuid: str
+    comment: str
 
+class CommentList(BaseModel):
+    comments: List[CommentItem]
+    
     class Config:
         json_schema_extra = {
              "example": {

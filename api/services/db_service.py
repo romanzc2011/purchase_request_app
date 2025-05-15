@@ -132,10 +132,12 @@ class LineItemStatus(Base):
 class SonComment(Base):
     __tablename__ = "son_comments"
     
-    UUID:           Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True, nullable=False)
-    comment_text:   Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at:     Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
-    son_requester:  Mapped[str] = mapped_column(String, nullable=False)
+    UUID:               Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True, nullable=False)
+    comment_text:       Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at:         Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+    son_requester:      Mapped[str] = mapped_column(String, nullable=False)
+    item_description:   Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    purchase_req_id:    Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     # Relationships
     approval = relationship("Approval", back_populates="son_comments")
@@ -315,6 +317,7 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
         #Line Item Statuses needs to use approve_uuid 
         
         obj = db.query(model).filter(getattr(model, pk_field) == uuid).first()
+        logger.info(f"GETATTR test: {getattr(model, pk_field)}")
         if not obj:
             raise ValueError(f"No record found with {pk_field} {uuid} in {table}")
             
@@ -499,10 +502,3 @@ def get_all_purchase_requests(session):
 def get_approval_by_id(session, ID):
     """Get approval by ID"""
     return session.query(Approval).filter(Approval.ID == ID).first()
-
-###################################################################################################
-# Email lookup by username - LDAPS
-###################################################################################################
-def email_lookup_by_username(session, username):
-    """Email lookup by username - LDAPS"""
-    return session.query(Approval.email).filter(Approval.requester == username).first()

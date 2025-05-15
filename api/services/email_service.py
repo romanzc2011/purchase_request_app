@@ -49,7 +49,7 @@ class EmailService:
         else:
             raise ValueError(f"Invalid routing group: {group}")
 
-    def send_notification(self, template_path=None, template_daata=None, subject=None, request_status=None, custom_msg=None):
+    def send_notification(self, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
         """
         Send notifications based on request status or directly to a recipient
         """
@@ -158,6 +158,9 @@ class EmailService:
                         <h2 style="color: #333;">{subject}</h2>
                         <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
                             <p style="margin: 0;">{body}</p>
+                        </div>
+                        <div style="margin-top: 15px; font-size: 14px; color: #444;">
+                            <strong>Summary:</strong><br>
                         </div>
                         <p style="color: #666; margin-top: 20px;">This is an automated message from the Purchase Request System.</p>
                     </div>

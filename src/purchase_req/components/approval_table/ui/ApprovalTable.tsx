@@ -9,7 +9,6 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { fetchSearchData } from "./SearchBar";
 import Buttons from "../../purchase_req_table/Buttons";
 import { convertBOC } from "../../../utils/bocUtils";
-import { useCommentMutation } from "../../../api/comments";
 import { useAssignIRQ1 } from "../../../hooks/useAssignIRQ1";
 import { useCommentModal } from "../../../hooks/useCommentModal";
 import CommentIcon from '@mui/icons-material/Comment';
@@ -24,6 +23,7 @@ import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../
 import { ZodCatch } from "zod";
 import { useUUIDStore } from "../../../services/UUIDService";
 import { createHandleCommands } from "../HandleCommands";
+import { addComment, addCommentsBulk } from '../../../services/commentService';
 
 /***********************************************************************************/
 // PROPS
@@ -387,7 +387,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     //####################################################################
     // HANDLE COMMENT
     //#################################################################### 
-    async function handleCommentRow(row: DataRow) {
+    async function handleCommentRow(row: DataRow): Promise<void> {
         const uuid = await getUUID(row.ID);
         if (!uuid) {
             toast.error("Failed to get UUID");
@@ -398,12 +398,22 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     }
 
     const handleBulkComment = async () => {
-        let commentRows: DataRow[] = [];
+        // If only one row selected, treat as single comment
+        if (rowSelectionModel.ids.size === 1) {
+            const selectedId = rowSelectionModel.ids.values().next().value;
+            const flat = flatRows.find(r => r.UUID === selectedId);
+            if (flat) {
+                await handleCommentRow(flat as DataRow);  // This uses single comment endpoint
+            }
+            setRowSelectionModel({ ids: new Set(), type: 'include' });
+            return;
+        }
 
+        // For multiple rows, collect unique DataRows
+        let commentRows: DataRow[] = [];
         for (const uuid of Array.from(rowSelectionModel.ids)) {
             const flat = flatRows.find(r => r.UUID === uuid);
             if (!flat) continue;
-
             if (flat.isGroup && grouped[flat.groupKey]) {
                 commentRows.push(...grouped[flat.groupKey]);
             } else {
@@ -411,18 +421,38 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             }
         }
 
-        // dedupe by UUID
+        // Dedupe by UUID
         const uniqueRows = Array.from(
             new Map(commentRows.map(r => [r.UUID, r])).values()
         );
 
+        // Collect comments for each row
+        const comments: { uuid: string, comment: string }[] = [];
+
         for (const row of uniqueRows) {
-            await handleCommentRow(row);
+            const uuid = await getUUID(row.ID);
+            if (!uuid) continue;
+            try {
+                const comment = await openCommentModal(uuid);
+                comments.push({ uuid, comment });
+            } catch (error) {
+                console.error("Failed to get comment:", error);
+                toast.error("Failed to get comment. Please try again.");
+            }
         }
 
-        // Deselect all rows
+        // Only call addCommentsBulk if we have multiple comments
+        if (comments.length > 1) {
+            try {
+                await addCommentsBulk(comments);
+                toast.success("All comments added!");
+            } catch (error) {
+                toast.error("Failed to add some comments.");
+            }
+        }
+
         setRowSelectionModel({ ids: new Set(), type: 'include' });
-    }
+    };
 
     //####################################################################
     // HANDLE CYBERSECURITY RELATED
@@ -520,6 +550,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         commentText,
         setCommentText,
         open: openCommentModal,
+        openBulk: openBulkComment,
         close: closeCommentModal,
         handleSubmit: handleSubmitComment,
     } = useCommentModal();

@@ -136,6 +136,10 @@ export default function CommentModal({
                             type="submit"
                             variant="contained"
                             sx={{ mt: 3, bgcolor: '#800000', '&:hover': { bgcolor: '#600000' } }}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                onSubmit(comment);  // this calls handleSubmit(comment) from the hook
+                            }}
                         >
                             Submit
                         </Button>

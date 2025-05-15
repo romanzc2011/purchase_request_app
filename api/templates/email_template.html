@@ -1,78 +1,18 @@
 <!DOCTYPE html>
 <html>
-  <head>
-   
-  </head>
-  <body>
-    <p>
-      A new purchase request has been submitted and requires your attention.
-      Below are the details of the request:
-    </p>
-    <table>
-        <thead>
-          <tr>
-            <th class="maroon-header">
-              <img src="{logo}" />
-              UNITED STATES BANKRUPTCY COURT
-            </th>
-          </tr>
-          <tr>
-            <th class="maroon-header">Statement of Need</th>
-          </tr>
-        </thead>
-        <colgroup>
-          <col style="width: 30%" />
-          <!-- Adjusts the width of the first column -->
-          <col style="width: 70%" />
-          <!-- Adjusts the width of the second column -->
-        </colgroup>
-        <tr>
-          <th>Field</th>
-          <th>Details</th>
-        </tr>
-        <tr>
-          <td>Requistion ID</td>
-          <td>{reqID}</td>
-        </tr>
-        <tr>
-          <td>Requester</td>
-          <td>{requester}</td>
-        </tr>
-        <tr>
-          <td>Date Requested</td>
-          <td>{datereq}</td>
-        </tr>
-        <tr>
-          <td>Date Needed</td>
-          <td>{dateneed}</td>
-        </tr>
-        <tr>
-          <td>Budget Code</td>
-          <td>{budgetObjCode}</td>
-        </tr>
-        <tr>
-          <td>Fund</td>
-          <td>{fund}</td>
-        </tr>
-        <tr>
-          <td>Location</td>
-          <td>{location}</td>
-        </tr>
-        <tr>
-          <td>Quantity</td>
-          <td>{quantity}</td>
-        </tr>
-        <tr>
-          <td>Price (Per Item)</td>
-          <td>${priceEach}</td>
-        </tr>
-        <tr>
-          <td>Total Price</td>
-          <td>${totalPrice}</td>
-        </tr>
-      </table>
-      <p>Please review the request and take appropriate action.</p>
-      <p><strong>To Approve or Deny This Request:</strong></p>
-      <p>Click here to review the request</a></p>
-    </body>
-  </html>
+<body>
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #333;">{subject}</h2>
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
+            <p style="margin: 0;">{body}</p>
+        </div>
+        <div style="margin-top: 15px; font-size: 14px; color: #444;">
+            <strong>Summary:</strong><br>
+            <b>Budget Object Code:</b> {budget_obj_code}<br>
+            <b>Fund:</b> {fund}<br>
+            <b>Location:</b> {location}
+        </div>
+        <p style="color: #666; margin-top: 20px;">This is an automated message from the Purchase Request System.</p>
+    </div>
+</body>
+</html>

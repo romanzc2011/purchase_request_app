@@ -20,6 +20,7 @@ from services.db_service import get_session
 from services.comment_service import add_comment
 import pydantic_schemas as ps
 from pydantic_schemas import CommentPayload, RequestPayload, ResponsePayload
+from pydantic_schemas import CommentList
 import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from docxtpl import DocxTemplate
@@ -34,6 +35,7 @@ from services.search_service import SearchService
 from services.uuid_service import uuid_service
 from services.pdf_service import make_purchase_request_pdf
 from pydantic_schemas import CyberSecRelatedPayload
+from pydantic_schemas import CommentItem
 from services.request_management_service import RequestManagementService
 from settings import settings
 
@@ -664,14 +666,10 @@ async def add_comment_endpoint(
         success = dbas.update_data_by_uuid(uuid=UUID, table="son_comments", comment_text=formatted_comment)
         if not success:
             raise HTTPException(status_code=404, detail="Failed to add comment")
-        
-        # Get the ID from approvals table using the UUID
-        approval = session.query(dbas.Approval.ID).filter(dbas.Approval.UUID == UUID).first()
-        if not approval:
-            raise HTTPException(status_code=404, detail="Purchase request not found")
-        purchase_req_id = approval.ID
     
     # Get requester and lookup email address
+    # If successfully added to table, email comment to requester
+    
     requster_email = ldap_svc.get_email_address(ldap_svc.get_connection(), success.son_requester)
     logger.info(f"Requester email: {requster_email}")
     
@@ -681,11 +679,56 @@ async def add_comment_endpoint(
     # Send a simple notification
     email_svc.send_notification(
         subject="Comment added to purchase request",
-        custom_msg=f"Comment added to purchase request {purchase_req_id}:<br><br>{formatted_comment}"
+        custom_msg=f"Comment added to purchase request: {formatted_comment}"
     )
     
     return {"message": "Comment sent successfully"}
+
+##########################################################################
+## ADD COMMENTS BULK
+##########################################################################
+@api_router.post("/add_comments_bulk")
+async def add_comments_bulk(payload: CommentList):
+    """
+    Add multiple comments to purchase requests.
+
+    Args:
+        uuids: List of UUIDs of the purchase requests
+        comments: List of comments to add
+        
+    Returns:
+        dict: Success message or error
+    """
+    logger.info(f"Received bulk comment request for UUIDs: {[c.uuid for c in payload.comments]} with comments: {[c.comment for c in payload.comments]}")
     
+    with next(get_session()) as session:
+        for comment in payload.comments:
+            logger.info(f"Comment: {comment}")
+            
+            success = dbas.update_data_by_uuid(uuid=comment.uuid, table="son_comments", comment_text=comment.comment)
+            if not success:
+                raise HTTPException(status_code=404, detail="Failed to add comment")
+            
+            # Get purchase req id from son_comments table
+            purchase_req_id = session.query(dbas.SonComment.purchase_req_id).filter(dbas.SonComment.UUID == comment.uuid).first()
+            logger.info(f"Query result: {purchase_req_id}")
+            logger.info(f"UUID being searched: {comment.uuid}")
+            
+            # Get requester and lookup email address
+            requster_email = ldap_svc.get_email_address(ldap_svc.get_connection(), success.son_requester)
+            logger.info(f"Requester email: {requster_email}")
+
+            # Set the requester in email service
+            email_svc.set_requester(success.son_requester, requster_email)
+            
+            # Send a simple notification
+            email_svc.send_notification(
+                subject="Comment added to purchase request",
+                custom_msg=f"Comment added to purchase request: {comment.comment}"
+            )
+    
+    return {"message": "Comments added successfully"}
+
 ##########################################################################
 ## CYBER SECURITY RELATED
 ##########################################################################
@@ -796,10 +839,10 @@ def purchase_req_commit(processed_data, current_user: User):
         try:
             logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")
             
-            # 1. First create purchase request
+            # First create purchase request
             purchase_request = dbas.insert_data(table="purchase_requests", data=processed_data)
             
-            # 2. Process and create approval data
+            # Process and create approval data
             approval_data = process_approval_data(processed_data)
             approval_data['status'] = dbas.ItemStatus.NEW
             approval_data['purchase_request_uuid'] = purchase_request.UUID
@@ -808,7 +851,7 @@ def purchase_req_commit(processed_data, current_user: User):
             logger.info(f"Approval object: {approval}")
             logger.info(f"Approval UUID: {getattr(approval, 'UUID', None)}")
             
-            # 3. Create line item status with required IDs and current user
+            # Create line item status with required IDs and current user
             line_item_data = {
                 'UUID': approval.UUID,
                 'status': dbas.ItemStatus.NEW,
@@ -816,11 +859,12 @@ def purchase_req_commit(processed_data, current_user: User):
             }
             line_item_status = dbas.insert_data(table="line_item_statuses", data=line_item_data)
             
-            # 4. Create son comment with required IDs
+            # Create son comment with required IDs
             son_comment_data = {
                 'UUID': approval.UUID,
-                'purchase_request_id': processed_data['ID'],
-                'son_requester': current_user.username
+                'purchase_req_id': approval.ID,  # <-- This is the correct key, matches your model
+                'son_requester': current_user.username,
+                'item_description': processed_data['itemDescription'],
             }
             son_comment = dbas.insert_data(table="son_comments", data=son_comment_data)
             
