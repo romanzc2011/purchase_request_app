@@ -162,12 +162,13 @@ class CyberSecRelatedPayload(BaseModel):
 class CommentPayload(BaseModel):
     comment: str = Field(..., min_length=1, max_length=1000)
     
-class CommentItem(BaseModel):
+class CommentEntry(BaseModel):
     uuid: str
     comment: str
-
-class CommentList(BaseModel):
-    comments: List[CommentItem]
+    
+class BulkComments(BaseModel):
+    comments: List[CommentEntry]
+    count: int
     
     class Config:
         json_schema_extra = {

@@ -19,8 +19,7 @@ import services.db_service as dbas
 from services.db_service import get_session
 from services.comment_service import add_comment
 import pydantic_schemas as ps
-from pydantic_schemas import CommentPayload, RequestPayload, ResponsePayload
-from pydantic_schemas import CommentList
+from pydantic_schemas import CommentPayload, RequestPayload
 import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from docxtpl import DocxTemplate
@@ -35,7 +34,7 @@ from services.search_service import SearchService
 from services.uuid_service import uuid_service
 from services.pdf_service import make_purchase_request_pdf
 from pydantic_schemas import CyberSecRelatedPayload
-from pydantic_schemas import CommentItem
+from pydantic_schemas import BulkComments
 from services.request_management_service import RequestManagementService
 from settings import settings
 
@@ -688,7 +687,7 @@ async def add_comment_endpoint(
 ## ADD COMMENTS BULK
 ##########################################################################
 @api_router.post("/add_comments_bulk")
-async def add_comments_bulk(payload: CommentList):
+async def add_comments_bulk(payload: BulkComments):
     """
     Add multiple comments to purchase requests.
 
@@ -700,6 +699,7 @@ async def add_comments_bulk(payload: CommentList):
         dict: Success message or error
     """
     logger.info(f"Received bulk comment request for UUIDs: {[c.uuid for c in payload.comments]} with comments: {[c.comment for c in payload.comments]}")
+    
     
     with next(get_session()) as session:
         for comment in payload.comments:

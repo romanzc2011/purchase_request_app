@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+const API_URL_ITEM_UUIDS = `${import.meta.env.VITE_API_URL}/api/getItemUUIDs`
 const STORAGE_KEY = 'UUID_store';
 
 export const useUUIDStore = () => {
@@ -46,7 +47,6 @@ export const useUUIDStore = () => {
             try {
                 const storedData = JSON.parse(stored);
                 if (storedData[ID]) {
-                    console.log(`Getting UUID for ID ${ID} from localStorage: ${storedData[ID]}`);
                     return storedData[ID];
                 }
             } catch (e) {
@@ -88,6 +88,16 @@ export const useUUIDStore = () => {
             console.error(`Error fetching UUID from backend for ID ${ID}:`, error);
             return null;
         }
+    };
+
+    const getItemUUIDs = async (items: string[]) => {
+        const response = await fetch(`${API_URL_ITEM_UUIDS}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ items }),
+        });
     };
     
     return { UUIDs, setUUID, getUUID };

@@ -23,25 +23,21 @@ export async function addComment(uuid: string, comment: string): Promise<void> {
     }
 } 
 
-export async function addCommentsBulk(comments: { uuid: string, comment: string }[]): Promise<void> {
-    try {
-        console.log('Sending bulk comments:', JSON.stringify(comments, null, 2));
-        const response = await fetch(`${API_URL_ADD_COMMENTS_BULK}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ comments }),
-        });
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error response:', errorText);
-            throw new Error(`Failed to add comments: ${response.statusText}`);
-        }
-    } catch (error) {
-        console.error('Error adding comments:', error);
-        throw error;
+export async function addCommentsBulk(
+    comments: { uuid: string; comment: string }[]
+  ): Promise<void> {
+    const payload = { comments, count: comments.length };
+    const response = await fetch(`${API_URL_ADD_COMMENTS_BULK}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        console.error('Error response:', err);
+        throw new Error(`Failed to add comments: ${response.statusText}`);
     }
 }
 

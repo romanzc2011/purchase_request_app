@@ -23,7 +23,7 @@ import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../
 import { ZodCatch } from "zod";
 import { useUUIDStore } from "../../../services/UUIDService";
 import { createHandleCommands } from "../HandleCommands";
-import { addComment, addCommentsBulk } from '../../../services/commentService';
+import { addCommentsBulk } from "../../../services/CommentService";
 
 /***********************************************************************************/
 // PROPS
@@ -33,6 +33,23 @@ interface ApprovalTableProps {
     resetTable: () => void;
     searchQuery: string;
 }
+
+interface GroupCommentPayload {
+    groupKey: string;
+    comment: string;
+    group_count: number;
+    item_uuids?: string[];
+    item_desc?: string[];
+}
+
+// Global variable to store group comment payload
+let groupCommentPayload: GroupCommentPayload = {
+    groupKey: "",
+    comment: "",
+    group_count: 0,
+    item_uuids: [],
+    item_desc: []
+};
 
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
@@ -89,7 +106,6 @@ async function fetchCyberSecRelated(UUID: string) {
         })
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    console.log("fetchCyberSecRelated - response:", response);
     const data = await response.json();
     return data;
 }
@@ -160,17 +176,12 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         queryFn: () => fetchApprovalData(),
     });
 
-    console.log("ApprovalTableDG - isLoading:", isLoading);
-    console.log("ApprovalTableDG - error:", error);
-    console.log("ApprovalTableDG - approvalData:", JSON.parse(JSON.stringify(approvalData)));
-
     // Build grouped map once per load
     const rowsWithUUID: DataRow[] = approvalData.map((r, i) =>
         r.UUID ? r : { ...r, UUID: `row-${i}` }
     );
 
     rowsWithUUID.forEach(r => {
-        console.log("ApprovalTableDG - r:", r);
     });
 
     const grouped: Record<string, DataRow[]> = rowsWithUUID.reduce((acc, row) => {
@@ -295,7 +306,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     //####################################################################
     // HANDLE CYBERSECURITY RELATED
     //####################################################################
-    const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID); console.log("download", ID); };
+    const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID) };
     const handleFollowUp = (ID: string) => { console.log("follow up", ID); };
 
     // ####################################################################
@@ -384,74 +395,81 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         setFullJust("");
     };
 
+    const {
+        isOpen,
+        commentText,
+        setCommentText,
+        open: openCommentModal,
+        openBulk: openBulkComment,
+        close: closeCommentModal,
+        handleSubmit: handleSubmitComment,
+    } = useCommentModal();
+
     //####################################################################
     // HANDLE COMMENT
+    // TODO: Finish bulk comment functionality
+    /* Handling bulk comments: When comments come in before doing anything else we
+    will determine how many rows have been selected. If multiple rows are selected, once
+    the comments are retrived from modal, we'll send the count to the backend and loop thru the comments */
     //#################################################################### 
-    async function handleCommentRow(row: DataRow): Promise<void> {
-        const uuid = await getUUID(row.ID);
-        if (!uuid) {
-            toast.error("Failed to get UUID");
-            console.error("Failed to get UUID");
-            return;
-        }
-        openCommentModal(uuid);
-    }
 
+
+    // ####################################################################
+    // HANDLE BULK COMMENT -- Comment processing starts here!!!!!!!!
+    // #################################################################### 
     const handleBulkComment = async () => {
-        // If only one row selected, treat as single comment
-        if (rowSelectionModel.ids.size === 1) {
-            const selectedId = rowSelectionModel.ids.values().next().value;
-            const flat = flatRows.find(r => r.UUID === selectedId);
-            if (flat) {
-                await handleCommentRow(flat as DataRow);  // This uses single comment endpoint
-            }
-            setRowSelectionModel({ ids: new Set(), type: 'include' });
-            return;
-        }
+        let item_id: string[] = []; // array of item ids ie LAWB000x
 
-        // For multiple rows, collect unique DataRows
-        let commentRows: DataRow[] = [];
-        for (const uuid of Array.from(rowSelectionModel.ids)) {
-            const flat = flatRows.find(r => r.UUID === uuid);
+        // Build flat list of uuids by always fetching from backend
+        const uuids: string[] = [];
+        for (const uuidKey of rowSelectionModel.ids) {
+            const flat = flatRows.find(r => r.UUID === uuidKey);
             if (!flat) continue;
+
             if (flat.isGroup && grouped[flat.groupKey]) {
-                commentRows.push(...grouped[flat.groupKey]);
+                for (const item of grouped[flat.groupKey]) {
+                    // Always fetch UUID from backend for each item
+                    const item_uuid = await getUUID(item.ID);
+                    item_id.push(item.ID);
+                    if (item_uuid) uuids.push(item_uuid);
+                }
             } else {
-                commentRows.push(flat as DataRow);
+                // Always fetch UUID from backend for single item
+                const item_uuid = await getUUID(flat.ID);
+                if (item_uuid) uuids.push(item_uuid);
             }
+            console.log("item_id", item_id);
+
         }
 
-        // Dedupe by UUID
-        const uniqueRows = Array.from(
-            new Map(commentRows.map(r => [r.UUID, r])).values()
-        );
+        // Get UUIDs from backend
 
-        // Collect comments for each row
-        const comments: { uuid: string, comment: string }[] = [];
 
-        for (const row of uniqueRows) {
-            const uuid = await getUUID(row.ID);
-            if (!uuid) continue;
+        console.log("uuids", uuids);
+        const unique_uuids = Array.from(new Set(uuids));
+        console.log("unique_uuids", unique_uuids);
+        if (!unique_uuids.length) return;
+
+        const comments: { uuid: string; comment: string }[] = [];
+        for (const uuid of unique_uuids) {
             try {
-                const comment = await openCommentModal(uuid);
-                comments.push({ uuid, comment });
-            } catch (error) {
-                console.error("Failed to get comment:", error);
-                toast.error("Failed to get comment. Please try again.");
+                const commentText = await openCommentModal(uuid);
+                comments.push({ uuid, comment: commentText });
+            } catch {
+                toast.error(`Skipped comment for ${uuid}`);
             }
         }
 
-        // Only call addCommentsBulk if we have multiple comments
-        if (comments.length > 1) {
-            try {
-                await addCommentsBulk(comments);
-                toast.success("All comments added!");
-            } catch (error) {
-                toast.error("Failed to add some comments.");
-            }
+        // Send comments in bulk to backend
+        try {
+            await addCommentsBulk(comments);
+            toast.success("Comments added successfully");
+        } catch (error) {
+            console.error("Failed to add comments:", error);
+            toast.error("Failed to add comments. Please try again.");
+        } finally {
+            setRowSelectionModel({ ids: new Set(), type: 'include' });
         }
-
-        setRowSelectionModel({ ids: new Set(), type: 'include' });
     };
 
     //####################################################################
@@ -543,17 +561,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // Deselect all rows
         setRowSelectionModel({ ids: new Set(), type: 'include' });
     }
-    console.log("flatRows", flatRows);
 
-    const {
-        isOpen,
-        commentText,
-        setCommentText,
-        open: openCommentModal,
-        openBulk: openBulkComment,
-        close: closeCommentModal,
-        handleSubmit: handleSubmitComment,
-    } = useCommentModal();
+
 
     // the "toggle" column for group headers
     const toggleColumn: GridColDef = {
@@ -951,7 +960,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         "&:hover": { backgroundColor: "#600000" },
                     }}
                     variant="contained"
-                    onClick={handleBulkComment}
+                    onClick={() => handleBulkComment()}
                 >
                     Add Comment ({getTotalSelectedItems()})
                 </Button>
@@ -996,16 +1005,24 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                 rowSelectionModel={rowSelectionModel}
                 onRowSelectionModelChange={(newModel) => {
                     const newSelection = new Set<GridRowId>();
-                    let newType: 'include' | 'exclude' = 'include';
-
                     // Process each selected UUID
                     Array.from(newModel.ids).forEach(uuid => {
                         const row = flatRows.find(r => r.UUID === uuid);
                         if (row) {
                             if (row.isGroup) {
                                 // If it's a group, add all items in that group
-                                const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
+                                const groupItems = grouped[row.groupKey] || [];
+
                                 groupItems.forEach(item => newSelection.add(item.UUID));
+
+                                // Get data for comment payload
+                                groupCommentPayload.groupKey = row.groupKey;
+                                groupCommentPayload.item_desc = groupItems.map(item => item.itemDescription);
+                                groupCommentPayload.group_count = groupItems.length;
+                                groupCommentPayload.item_uuids = groupItems.map(item => item.UUID);
+
+
+
                             } else {
                                 // If it's an individual item, add it directly
                                 newSelection.add(uuid);
@@ -1022,7 +1039,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         deselectedIds.forEach(id => {
                             const row = flatRows.find(r => r.UUID === id);
                             if (row?.isGroup) {
-                                const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
+                                const groupItems = grouped[row.groupKey] || [];
                                 groupItems.forEach(item => newSelection.delete(item.UUID));
                             }
                         });

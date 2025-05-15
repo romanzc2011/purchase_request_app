@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { addComment, addCommentsBulk } from "../services/commentService";
+import { addComment, addCommentsBulk } from "../services/CommentService";
 import { toast } from "react-toastify";
 
 export function useCommentModal() {
@@ -58,10 +58,11 @@ export function useCommentModal() {
                 toast.success("All comments added successfully");
             } else {
                 // Handle single comment
-                // if (!modalRowId) return;
-                // await addComment(modalRowId, comment);
-                // console.log("Comment added successfully single");
-                // toast.success("Comment added successfully");
+                if (!modalRowId) return;
+                console.log("modalRowId", modalRowId);
+                await addComment(modalRowId, comment);
+                console.log("Comment added successfully single");
+                toast.success("Comment added successfully");
             }
             
             resolver?.(comment);
