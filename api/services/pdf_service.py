@@ -31,7 +31,7 @@ page_width, page_height = LETTER
             The path to the generated PDF.
     """
 
-def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: bool) -> Path:
+def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: bool, comments: list[dict]) -> Path:
     # ensure output folder exists
     output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
     logger.info(f"ROWS: {rows}")
@@ -122,6 +122,9 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
     # line-items table
     headings = ["BOC","Fund","Location","Description","Qty","Price Each","Total Price","Justification"]
     table_data = [[Paragraph(h, header_style) for h in headings]]
+    
+    # Collect all comments
+    all_comments = []
     for r in rows:
         table_data.append([
             Paragraph(r.get("budgetObjCode",""), cell_style),
@@ -133,6 +136,10 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
             Paragraph(f"${r.get('totalPrice',0):.2f}", cell_style),
             Paragraph(r.get("justification",""), cell_style),
         ])
+        # Collect comments for this row if they exist
+        if r.get("addComments"):
+            all_comments.append(f"{r.get('itemDescription', '')}: {r.get('addComments', '')}")
+    
     line_table = Table(table_data, colWidths=[50,60,60,180,30,50,60,120], repeatRows=1)
     line_table.setStyle(TableStyle([
         ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#EEEEEE")),
@@ -165,13 +172,12 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
     elements.append(cyber_para)
     elements.append(Spacer(1, 6))
 
-    # Comments paragraph
-    comments_para = Paragraph(
-        f"Comments/Additional Information Requested: {rows[0].get('addComments', '')}", 
-        comment_style
-    )
-    elements.append(comments_para)
-    elements.append(Spacer(1, 6))
+    # Comments paragraph with all collected comments
+    if all_comments:
+        comments_text = "Comments/Additional Information Requested:\n" + "\n".join(all_comments)
+        comments_para = Paragraph(comments_text, comment_style)
+        elements.append(comments_para)
+        elements.append(Spacer(1, 6))
 
     # Build TOTAL line
     total_style = ParagraphStyle(

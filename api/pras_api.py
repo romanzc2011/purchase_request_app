@@ -252,8 +252,17 @@ async def download_statement_of_need_form(
         if not approvals:
             raise HTTPException(status_code=404, detail="No approvals found for this ID")
         
-        # Convert to list of dicts
-        rows = [ps.ApprovalSchema.model_validate(approval).model_dump() for approval in approvals]
+        # Convert to list of dicts and include comments
+        rows = []
+        for approval in approvals:
+            approval_dict = ps.ApprovalSchema.model_validate(approval).model_dump()
+            # Get comments for this approval
+            comments = session.query(dbas.SonComment).filter(dbas.SonComment.UUID == approval.UUID).all()
+            if comments:
+                comment_texts = [c.comment_text for c in comments if c.comment_text]
+                approval_dict['addComments'] = "\n".join(comment_texts)
+            rows.append(approval_dict)
+        
         logger.debug(f"Approvals data: {rows}")
     
         # Build the PDF path
