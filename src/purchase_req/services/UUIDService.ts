@@ -90,15 +90,5 @@ export const useUUIDStore = () => {
         }
     };
 
-    const getItemUUIDs = async (items: string[]) => {
-        const response = await fetch(`${API_URL_ITEM_UUIDS}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ items }),
-        });
-    };
-    
     return { UUIDs, setUUID, getUUID };
 };

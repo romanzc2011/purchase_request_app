@@ -181,54 +181,38 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         r.UUID ? r : { ...r, UUID: `row-${i}` }
     );
 
-    rowsWithUUID.forEach(r => {
-    });
-
     const grouped: Record<string, DataRow[]> = rowsWithUUID.reduce((acc, row) => {
         (acc[row.ID] ||= []).push(row);
         return acc;
     }, {} as Record<string, DataRow[]>);
 
+    // Flattened rows
     const flatRows = React.useMemo<FlatRow[]>(() => {
         return Object.entries(grouped).flatMap(([groupKey, items]) => {
-            if (items.length === 1) {
-                return [{
-                    ...items[0],
-                    isGroup: false as const,
-                    groupKey,
-                    rowCount: items.length,
-                    rowId: items[0].UUID,
-                    UUID: items[0].UUID
-                }];
-            }
-
-            // For multi-line groups, we need to create a header row
+            // building header
             const header: FlatRow = {
                 ...items[0],
-                isGroup: true as const,
+                isGroup: true,
                 groupKey,
                 rowCount: items.length,
                 rowId: `header-${groupKey}`,
-                UUID: `header-${groupKey}`
-            }
+                UUID: `header-${groupKey}`,
+            };
 
-            if (!expandedRows[groupKey]) {
-                return [header];
-            }
+            // build ever child-with hidden flag
+            const children: FlatRow[] = items.map(item => ({
+                ...item,
+                isGroup: false,
+                groupKey,
+                rowCount: items.length,
+                rowId: item.UUID,
+                UUID: item.UUID,
+                hidden: !expandedRows[groupKey]
+            }));
 
-            return [
-                header,
-                ...items.map(item => ({
-                    ...item,
-                    isGroup: false as const,
-                    groupKey,
-                    rowCount: items.length,
-                    rowId: item.UUID,
-                    UUID: item.UUID
-                }))
-            ];
+            return [header, ...children];
         });
-    }, [grouped]);
+    }, [grouped, expandedRows]);
 
     const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
     const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string, string>>({});
@@ -282,6 +266,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     }
 
     const { getUUID } = useUUIDStore();
+
 
     // ####################################################################
     // ####################################################################
@@ -407,7 +392,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
     //####################################################################
     // HANDLE COMMENT
-    // TODO: Finish bulk comment functionality
     /* Handling bulk comments: When comments come in before doing anything else we
     will determine how many rows have been selected. If multiple rows are selected, once
     the comments are retrived from modal, we'll send the count to the backend and loop thru the comments */
@@ -991,10 +975,14 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             </Box>
 
             <DataGrid
-                getRowId={row => row.UUID}
                 rows={flatRows}
+                getRowId={row => row.UUID}
                 columns={allColumns}
                 getRowClassName={(params) => {
+                    if (params.row.hidden) return 'hidden-row';
+                    if (params.row.isGroup && expandedRows[params.row.groupKey]) return 'expanded-group-row';
+                    return '';
+
                     const row = params.row as FlatRow;
                     if (row.isGroup && expandedRows[row.groupKey]) {
                         return 'expanded-group-row';
@@ -1011,7 +999,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         if (row) {
                             if (row.isGroup) {
                                 // If it's a group, add all items in that group
-                                const groupItems = grouped[row.groupKey] || [];
+                                const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
 
                                 groupItems.forEach(item => newSelection.add(item.UUID));
 
@@ -1021,12 +1009,16 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                                 groupCommentPayload.group_count = groupItems.length;
                                 groupCommentPayload.item_uuids = groupItems.map(item => item.UUID);
 
-
+                                groupCommentPayload.item_desc = groupItems.map(item => item.itemDescription).slice(1);
+                                groupCommentPayload.item_uuids = groupItems.map(item => item.UUID).slice(1);
+                                groupCommentPayload.group_count = groupItems.length - 1;
 
                             } else {
                                 // If it's an individual item, add it directly
                                 newSelection.add(uuid);
                             }
+                            console.log("GROUP COMMENT PAYLOAD", groupCommentPayload);
+
                         }
                     });
 
@@ -1091,6 +1083,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                             fontWeight: 'bold',
                         }
                     },
+                    '& .hidden-row': {
+                        display: 'none',
+                    }
                 } as DataGridSxProps}
             />
 

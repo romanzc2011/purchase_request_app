@@ -3,7 +3,6 @@ import PendingIcon from "@mui/icons-material/Pending";
 import SuccessIcon from "@mui/icons-material/CheckCircle";
 import CloseIcon from "@mui/icons-material/Close";
 
-
 // #########################################################################################
 // DataRow
 // #########################################################################################    
@@ -27,10 +26,26 @@ export interface DataRow {
 // #########################################################################################
 // Flattened rows
 // #########################################################################################    
-export type FlatRow =
-  (DataRow & { isGroup: true;  groupKey: string; rowCount: number; rowId: string })
-| (DataRow & { isGroup: false; groupKey: string; rowCount: number; rowId: string });
+export interface FlatRow extends DataRow {
+    isGroup: boolean;
+    groupKey: string;
+    rowCount: number;
+    rowId: string;
+    UUID: string;
+    hidden?: boolean;
+}
 
+// #########################################################################################
+// Flattened rows
+// #########################################################################################  
+export interface FlatRow extends DataRow {
+    isGroup: boolean;
+    groupKey: string;
+    rowCount: number;
+    rowId: string;
+    UUID: string;
+    hidden?: boolean;
+}
 
 // #########################################################################################
 // Status for rows
