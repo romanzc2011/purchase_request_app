@@ -415,8 +415,14 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
         console.log("🔥 PAYLOAD TO SEND", payloadToSend);
 
+        // Deselect all rows
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
+
         await addComments(payloadToSend);
         toast.success("Comments added successfully");
+
+
+        console.log("i dont make it here")
     };
 
     //####################################################################
@@ -529,7 +535,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         alignItems: "center",
                         cursor: "pointer",
                         width: "100%",
-                        pl: 2
+                        pl: row.rowCount === 1 ? 2 : 0
                     }}
                     onClick={() => toggleRow(row.groupKey)}
                 >
@@ -621,7 +627,11 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             sortable: true,
             renderCell: params => {
                 if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                return params.value;
+                return (
+                    <Box sx={{ pl: params.row.rowCount === 1 ? 2 : 0 }}>
+                        {params.value}
+                    </Box>
+                );
             }
         },
 

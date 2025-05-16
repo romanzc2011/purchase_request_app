@@ -1,8 +1,6 @@
 from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional, List
 from datetime import datetime
-from pydantic import Field, constr
-import enum
 from enum import Enum
 
 ########################################################
@@ -160,16 +158,16 @@ class CyberSecRelatedPayload(BaseModel):
 ##    COMMENT PAYLOAD SCHEMA
 ########################################################
 
-class BulkComments(BaseModel):
-    groupKey: str = Field(..., description="Group key, e.g. LAWB000x")
-    comment: List[constr(strip_whitespace=True, min_length=1, max_length=1000)] = Field(
-        ..., 
-        description="One comment per item_uuid"
-    )
-    group_count: int = Field(..., ge=1, description="Should equal len(item_uuids)")
-    item_uuids: List[str] = Field(..., description="List of UUIDs being commented on")
-    item_desc: List[str] = Field(..., description="Parallel list of item descriptions")
-
+class CommentItem(BaseModel):
+    uuid: str
+    comment: str
+    
+class GroupCommentPayload(BaseModel):
+    groupKey: str
+    group_count: int
+    item_desc: List[str]
+    item_uuids: List[str]
+    comment: List[CommentItem]
     
     class Config:
         json_schema_extra = {
