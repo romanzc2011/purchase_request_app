@@ -1,86 +1,57 @@
-import { useState, useCallback } from "react";
-import { addComment, addCommentsBulk } from "../services/CommentService";
+import { useState, useCallback, useRef } from "react";
+import { GroupCommentPayload, CommentEntry, addComments } from "../services/CommentService";
 import { toast } from "react-toastify";
 
 export function useCommentModal() {
-    const [isOpen, setIsOpen] = useState(false);
-    const [modalRowId, setModalRowId] = useState<string | null>(null);
-    const [commentText, setCommentText] = useState("");
-    const [resolver, setResolver] = useState<((comment: string) => void) | null>(null);
-    const [isBulkMode, setIsBulkMode] = useState(false);
-    const [bulkUuids, setBulkUuids] = useState<string[]>([]);
+  const [isOpen, setIsOpen]         = useState(false);
+  const resolverRef                 = useRef<(value: string) => void>();
 
-    // Open the modal for a single row
-    const open = useCallback((rowId: string) => {
-        setModalRowId(rowId);
-        setCommentText("");
-        setIsOpen(true);
-        setIsBulkMode(false);
-        return new Promise<string>((resolve) => {
-            setResolver(() => resolve);
-        });
-    }, []);
+  // open with whatever payload you have (single or multi)
+  const openCommentModal = useCallback((payload: GroupCommentPayload) => {
+    setIsOpen(true);
+    return new Promise<string>(resolve => {
+      resolverRef.current = resolve;
+    });
+  }, []);
 
-    // Open the modal for bulk comments
-    const openBulk = useCallback((uuids: string[]) => {
-        setBulkUuids(uuids);
-        setCommentText("");
-        setIsOpen(true);
-        setIsBulkMode(true);
-        return new Promise<string>((resolve) => {
-            setResolver(() => resolve);
-        });
-    }, []);
+  const close = useCallback(() => {
+    setIsOpen(false);
+  }, []);
 
-    const close = useCallback(() => {
-        setIsOpen(false);
-        setModalRowId(null);
-        setCommentText("");
-        setResolver(null);
-        setIsBulkMode(false);
-        setBulkUuids([]);
-    }, []);
-
-    const handleSubmit = useCallback(async (comment: string) => {
-        if (!comment.trim()) {
-            console.log("Early return - empty comment");
-            return;
+  // called by your CommentModal’s “Submit” button
+  const handleSubmit = useCallback(
+    (userComment: string) => {
+        console.log("🔥 handleSubmit fired with:", userComment);
+        const trimmed = userComment.trim();
+        if (trimmed && resolverRef.current) {
+            resolverRef.current(trimmed);
         }
+        close();
+    },
+    [close]
+  );
+  
 
-        try {
-            if (isBulkMode) {
-                // Handle bulk comments
-                const comments = bulkUuids.map(uuid => ({
-                    uuid,
-                    comment
-                }));
-                await addCommentsBulk(comments);
-                toast.success("All comments added successfully");
-            } else {
-                // Handle single comment
-                if (!modalRowId) return;
-                console.log("modalRowId", modalRowId);
-                await addComment(modalRowId, comment);
-                console.log("Comment added successfully single");
-                toast.success("Comment added successfully");
-            }
-            
-            resolver?.(comment);
-            close();
-        } catch (error) {
-            console.error("Error adding comment:", error);
-            toast.error("Failed to add comment");
-        }
-    }, [modalRowId, bulkUuids, isBulkMode, resolver, close]);
-
-    return {
-        isOpen,
-        commentText,
-        setCommentText,
-        open,
-        openBulk,
-        close,
-        handleSubmit,
-        isBulkMode
+  // #########################################################################################
+  // Bulk comment - sends everything to backend, even if it's a single comment
+  // #########################################################################################  
+  async function onBulkComment(payload: GroupCommentPayload, comment: string) {
+    const bulkPayload: GroupCommentPayload = {
+        groupKey: payload.groupKey,
+        comment: payload.item_uuids.map(uuid => ({ uuid, comment })),
+        group_count: payload.group_count,
+        item_uuids: payload.item_uuids,
+        item_desc: payload.item_desc,
     };
+    await addComments(bulkPayload);
+    toast.success("Comments added successfully");
+  }
+
+  return {
+    isOpen,
+    openCommentModal,
+    close,
+    handleSubmit,
+    onBulkComment,
+  };
 }

@@ -33,18 +33,16 @@ export interface CommentModalProps {
 
 export default function CommentModal({
     open,
-    commentText,
     onClose,
-    onSubmit }: CommentModalProps) {
+    onSubmit
+}: CommentModalProps) {
 
-    const [comment, setComment] = useState(commentText ?? "");
+    const [comment, setComment] = useState("");
 
     // Reset comment when initialValue or open changes   
     useEffect(() => {
-        if (open) {
-            setComment(commentText ?? "");
-        }
-    }, [open, commentText]);
+        if (open) setComment("");
+    }, [open]);
 
     const handleSubmit = () => {
         onSubmit(comment);
@@ -53,7 +51,7 @@ export default function CommentModal({
 
     const handleCancel = () => {
         onClose();
-        setComment(commentText ?? "");
+        setComment("");
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -88,63 +86,56 @@ export default function CommentModal({
                 <Typography id="comment-modal-title" variant="h6">
                     Add Comment
                 </Typography>
-                <form onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSubmit();
-                }}>
-                    <TextField
-                        fullWidth
-                        multiline
-                        rows={4}
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        sx={{
-                            // style the OutlinedInput root
-                            "& .MuiOutlinedInput-root": {
-                                backgroundColor: "#ffffff",      // make the fill white
-                                "& fieldset": {
-                                    borderColor: "white",          // keep your white border
-                                },
-                                "&:hover fieldset": {
-                                    borderColor: "gray",
-                                },
-                                "&.Mui-focused fieldset": {
-                                    borderColor: "white",
-                                },
-                                // style the actual text slot (works for both <input> and <textarea>)
-                                "& .MuiOutlinedInput-input": {
-                                    color: "black",                // black text on white background
-                                },
+
+                <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    sx={{
+                        // style the OutlinedInput root
+                        "& .MuiOutlinedInput-root": {
+                            backgroundColor: "#ffffff",      // make the fill white
+                            "& fieldset": {
+                                borderColor: "white",          // keep your white border
                             },
-                            // style the label too
-                            "& .MuiInputLabel-root": {
-                                color: "white",
+                            "&:hover fieldset": {
+                                borderColor: "gray",
                             },
-                        }}
-                    />
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                        <Button
-                            type="button"
-                            onClick={handleCancel}
-                            variant="contained"
-                            sx={{ mt: 3, bgcolor: '#800000', '&:hover': { bgcolor: '#600000' } }}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            sx={{ mt: 3, bgcolor: '#800000', '&:hover': { bgcolor: '#600000' } }}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                onSubmit(comment);  // this calls handleSubmit(comment) from the hook
-                            }}
-                        >
-                            Submit
-                        </Button>
-                    </Box>
-                </form>
+                            "&.Mui-focused fieldset": {
+                                borderColor: "white",
+                            },
+                            // style the actual text slot (works for both <input> and <textarea>)
+                            "& .MuiOutlinedInput-input": {
+                                color: "black",                // black text on white background
+                            },
+                        },
+                        // style the label too
+                        "& .MuiInputLabel-root": {
+                            color: "white",
+                        },
+                    }}
+                />
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    <Button
+                        type="button"
+                        onClick={handleCancel}
+                        variant="contained"
+                        sx={{ mt: 3, bgcolor: '#800000', '&:hover': { bgcolor: '#600000' } }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="contained"
+                        sx={{ mt: 3, bgcolor: '#800000', '&:hover': { bgcolor: '#600000' } }}
+                        onClick={handleSubmit}
+                    >
+                        Submit
+                    </Button>
+                </Box>
             </Box>
         </Modal>
     );

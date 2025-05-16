@@ -19,11 +19,10 @@ import ScheduleIcon from "@mui/icons-material/Schedule";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 import { STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approvalTypes";
+import { addComments, GroupCommentPayload, CommentEntry } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { ZodCatch } from "zod";
 import { useUUIDStore } from "../../../services/UUIDService";
-import { createHandleCommands } from "../HandleCommands";
-import { addCommentsBulk } from "../../../services/CommentService";
 
 /***********************************************************************************/
 // PROPS
@@ -34,18 +33,10 @@ interface ApprovalTableProps {
     searchQuery: string;
 }
 
-interface GroupCommentPayload {
-    groupKey: string;
-    comment: string;
-    group_count: number;
-    item_uuids?: string[];
-    item_desc?: string[];
-}
-
 // Global variable to store group comment payload
 let groupCommentPayload: GroupCommentPayload = {
     groupKey: "",
-    comment: "",
+    comment: [],
     group_count: 0,
     item_uuids: [],
     item_desc: []
@@ -166,6 +157,13 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     const queryClient = useQueryClient();
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
     const { data: searchData } = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
+    const [groupCommentPayload, setGroupCommentPayload] = useState<GroupCommentPayload>({
+        groupKey: "",
+        comment: [],
+        group_count: 0,
+        item_uuids: [],
+        item_desc: []
+    });
 
     const {
         data: approvalData = [],
@@ -382,78 +380,43 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
     const {
         isOpen,
-        commentText,
-        setCommentText,
-        open: openCommentModal,
-        openBulk: openBulkComment,
-        close: closeCommentModal,
-        handleSubmit: handleSubmitComment,
+        openCommentModal,
+        close,
+        handleSubmit,
     } = useCommentModal();
 
-    //####################################################################
-    // HANDLE COMMENT
-    /* Handling bulk comments: When comments come in before doing anything else we
-    will determine how many rows have been selected. If multiple rows are selected, once
-    the comments are retrived from modal, we'll send the count to the backend and loop thru the comments */
-    //#################################################################### 
+    const handleCommentClick = async () => {
+        if (!groupCommentPayload) return;
 
+        const { groupKey, item_uuids, item_desc, group_count } = groupCommentPayload;
+        const entries: CommentEntry[] = [];
 
-    // ####################################################################
-    // HANDLE BULK COMMENT -- Comment processing starts here!!!!!!!!
-    // #################################################################### 
-    const handleBulkComment = async () => {
-        let item_id: string[] = []; // array of item ids ie LAWB000x
+        // Loop through this and get the comment for each item
+        for (let i = 0; i < group_count; i++) {
+            const uuid = item_uuids[i];
+            const desc = item_desc[i];
 
-        // Build flat list of uuids by always fetching from backend
-        const uuids: string[] = [];
-        for (const uuidKey of rowSelectionModel.ids) {
-            const flat = flatRows.find(r => r.UUID === uuidKey);
-            if (!flat) continue;
-
-            if (flat.isGroup && grouped[flat.groupKey]) {
-                for (const item of grouped[flat.groupKey]) {
-                    // Always fetch UUID from backend for each item
-                    const item_uuid = await getUUID(item.ID);
-                    item_id.push(item.ID);
-                    if (item_uuid) uuids.push(item_uuid);
-                }
-            } else {
-                // Always fetch UUID from backend for single item
-                const item_uuid = await getUUID(flat.ID);
-                if (item_uuid) uuids.push(item_uuid);
+            const singlePayLoad: GroupCommentPayload = {
+                groupKey,
+                item_uuids: [uuid],
+                item_desc: [desc],
+                group_count: 1,
+                comment: []
             }
-            console.log("item_id", item_id);
 
+            const userComment = await openCommentModal(singlePayLoad);
+            entries.push({ uuid, comment: userComment });
         }
 
-        // Get UUIDs from backend
-
-
-        console.log("uuids", uuids);
-        const unique_uuids = Array.from(new Set(uuids));
-        console.log("unique_uuids", unique_uuids);
-        if (!unique_uuids.length) return;
-
-        const comments: { uuid: string; comment: string }[] = [];
-        for (const uuid of unique_uuids) {
-            try {
-                const commentText = await openCommentModal(uuid);
-                comments.push({ uuid, comment: commentText });
-            } catch {
-                toast.error(`Skipped comment for ${uuid}`);
-            }
+        const payloadToSend = {
+            ...groupCommentPayload,
+            comment: entries
         }
 
-        // Send comments in bulk to backend
-        try {
-            await addCommentsBulk(comments);
-            toast.success("Comments added successfully");
-        } catch (error) {
-            console.error("Failed to add comments:", error);
-            toast.error("Failed to add comments. Please try again.");
-        } finally {
-            setRowSelectionModel({ ids: new Set(), type: 'include' });
-        }
+        console.log("🔥 PAYLOAD TO SEND", payloadToSend);
+
+        await addComments(payloadToSend);
+        toast.success("Comments added successfully");
     };
 
     //####################################################################
@@ -944,7 +907,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         "&:hover": { backgroundColor: "#600000" },
                     }}
                     variant="contained"
-                    onClick={() => handleBulkComment()}
+                    onClick={handleCommentClick}
                 >
                     Add Comment ({getTotalSelectedItems()})
                 </Button>
@@ -1009,16 +972,26 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                                 groupCommentPayload.group_count = groupItems.length;
                                 groupCommentPayload.item_uuids = groupItems.map(item => item.UUID);
 
+                                // Remove the dummy header row
                                 groupCommentPayload.item_desc = groupItems.map(item => item.itemDescription).slice(1);
                                 groupCommentPayload.item_uuids = groupItems.map(item => item.UUID).slice(1);
                                 groupCommentPayload.group_count = groupItems.length - 1;
+
+                                // Create payload for useCommentModal
+                                const payload: GroupCommentPayload = {
+                                    groupKey: groupCommentPayload.groupKey,
+                                    group_count: groupCommentPayload.group_count,
+                                    item_uuids: groupCommentPayload.item_uuids,
+                                    item_desc: groupCommentPayload.item_desc,
+                                    comment: []
+                                }
+                                setGroupCommentPayload(payload);
 
                             } else {
                                 // If it's an individual item, add it directly
                                 newSelection.add(uuid);
                             }
                             console.log("GROUP COMMENT PAYLOAD", groupCommentPayload);
-
                         }
                     });
 
@@ -1164,12 +1137,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             {/* Comment Modal */}
             <CommentModal
                 open={isOpen}
-                commentText={commentText}
-                onClose={closeCommentModal}
-                onSubmit={(comment) => {
-                    console.log("CommentModal onSubmit called with:", comment);
-                    handleSubmitComment(comment);
-                }}
+                onClose={close}
+                onSubmit={handleSubmit}
             />
         </Box>
     );

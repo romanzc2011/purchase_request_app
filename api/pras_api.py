@@ -19,7 +19,7 @@ import services.db_service as dbas
 from services.db_service import get_session
 from services.comment_service import add_comment
 import pydantic_schemas as ps
-from pydantic_schemas import CommentPayload, RequestPayload
+from pydantic_schemas import RequestPayload
 import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from docxtpl import DocxTemplate
@@ -640,54 +640,54 @@ async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to
     logger.info(f"Fetching usernames for prefix: {q}")
     return ldap_svc.fetch_usernames(q)
 
-##########################################################################
-## POST COMMENT
-##########################################################################
-@api_router.post("/add_comment/{UUID}")
-async def add_comment_endpoint(
-    payload: CommentPayload,
-    UUID: str = Path(description="The UUID of the approval record"),
-):
-    """
-    Add a comment to an approval record.
+# ##########################################################################
+# ## POST COMMENT
+# ##########################################################################
+# @api_router.post("/add_comment/{UUID}")
+# async def add_comment_endpoint(
+#     payload: CommentPayload,
+#     UUID: str = Path(description="The UUID of the approval record"),
+# ):
+#     """
+#     Add a comment to an approval record.
     
-    Args:
-        ID: The ID of the approval record
-        payload: The comment payload containing the comment text
+#     Args:
+#         ID: The ID of the approval record
+#         payload: The comment payload containing the comment text
         
-    Returns:
-        dict: Success message or error
-    """
-    logger.info(f"Received comment request for UUID {UUID} with payload: {payload}")
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    formatted_comment = f"{current_date}: {payload.comment}"
-    with next(get_session()) as session:
-        success = dbas.update_data_by_uuid(uuid=UUID, table="son_comments", comment_text=formatted_comment)
-        if not success:
-            raise HTTPException(status_code=404, detail="Failed to add comment")
+#     Returns:
+#         dict: Success message or error
+#     """
+#     logger.info(f"Received comment request for UUID {UUID} with payload: {payload}")
+#     current_date = datetime.now().strftime("%Y-%m-%d")
+#     formatted_comment = f"{current_date}: {payload.comment}"
+#     with next(get_session()) as session:
+#         success = dbas.update_data_by_uuid(uuid=UUID, table="son_comments", comment_text=formatted_comment)
+#         if not success:
+#             raise HTTPException(status_code=404, detail="Failed to add comment")
     
-    # Get requester and lookup email address
-    # If successfully added to table, email comment to requester
+#     # Get requester and lookup email address
+#     # If successfully added to table, email comment to requester
     
-    requster_email = ldap_svc.get_email_address(ldap_svc.get_connection(), success.son_requester)
-    logger.info(f"Requester email: {requster_email}")
+#     requster_email = ldap_svc.get_email_address(ldap_svc.get_connection(), success.son_requester)
+#     logger.info(f"Requester email: {requster_email}")
     
-    # Set the requester in email service
-    email_svc.set_requester(success.son_requester, requster_email)
+#     # Set the requester in email service
+#     email_svc.set_requester(success.son_requester, requster_email)
     
-    # Send a simple notification
-    email_svc.send_notification(
-        subject="Comment added to purchase request",
-        custom_msg=f"Comment added to purchase request: {formatted_comment}"
-    )
+#     # Send a simple notification
+#     email_svc.send_notification(
+#         subject="Comment added to purchase request",
+#         custom_msg=f"Comment added to purchase request: {formatted_comment}"
+#     )
     
-    return {"message": "Comment sent successfully"}
+#     return {"message": "Comment sent successfully"}
 
 ##########################################################################
 ## ADD COMMENTS BULK
 ##########################################################################
-@api_router.post("/add_comments_bulk")
-async def add_comments_bulk(payload: BulkComments):
+@api_router.post("/add_comments")
+async def add_comments(payload: BulkComments):
     """
     Add multiple comments to purchase requests.
 
