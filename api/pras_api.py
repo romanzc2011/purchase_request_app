@@ -654,34 +654,24 @@ async def add_comments(payload: GroupCommentPayload):
     Returns:
         dict: Success message or error
     """
-    logger.info(f"Received bulk comment request for UUIDs: {[c.uuid for c in payload.comment]} with comments: {[c.comment for c in payload.comment]}")
-    
-    
     with next(get_session()) as session:
+        # Get the number of elements in the comment list
+        logger.info(f"PAYLOAD: {payload}")
+        
         for comment in payload.comment:
-            logger.info(f"Comment: {comment}")
-            
             success = dbas.update_data_by_uuid(uuid=comment.uuid, table="son_comments", comment_text=comment.comment)
             if not success:
                 raise HTTPException(status_code=404, detail="Failed to add comment")
             
-            # Get purchase req id from son_comments table
-            purchase_req_id = session.query(dbas.SonComment.purchase_req_id).filter(dbas.SonComment.UUID == comment.uuid).first()
-            logger.info(f"Query result: {purchase_req_id}")
-            logger.info(f"UUID being searched: {comment.uuid}")
-            
             # Get requester and lookup email address
             requster_email = ldap_svc.get_email_address(ldap_svc.get_connection(), success.son_requester)
             logger.info(f"Requester email: {requster_email}")
-
+            
             # Set the requester in email service
             email_svc.set_requester(success.son_requester, requster_email)
             
-            # Send a simple notification
-            email_svc.send_notification(
-                subject="Comment added to purchase request",
-                custom_msg=f"Comment added to purchase request: {comment.comment}"
-            )
+    # Send comment email
+    email_svc.send_comment_email(payload)
     
     return {"message": "Comments added successfully"}
 

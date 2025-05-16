@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Request {{ groupKey }} Updated</title>
+    <style>
+      /* your inline styles or <link> to a stylesheet */
+    </style>
+  </head>
+  <body>
+    <p>Hello {{ requestor_name }},</p>
+
+    <p>
+      Comments have been added to your request
+      <strong>{{ groupKey }}</strong>:
+    </p>
+
+    <table style="border-collapse: collapse; width: 100%;">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">
+            Item
+          </th>
+          <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">
+            Comment
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for desc, ci in items %}
+        <tr>
+          <td style="padding:8px; border-bottom:1px solid #eee;">{{ desc }}</td>
+          <td style="padding:8px; border-bottom:1px solid #eee;">
+            {{ ci.comment }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p>If you have any questions, let me know.</p>
+
+    <p>
+      Best regards,<br />
+      {{ sender_name }}<br />
+      {{ sender_dept }}
+    </p>
+  </body>
+</html>

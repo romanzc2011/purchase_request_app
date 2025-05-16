@@ -1,10 +1,9 @@
 import pythoncom
-import win32com.client as win32
+from win32com.client import Dispatch, constants
 import os
-import shutil
-import uuid
 from datetime import datetime
-
+from jinja2 import Environment, FileSystemLoader
+from typing import List, Tuple
 from loguru import logger
 from docxtpl import DocxTemplate
 from docx2pdf import convert
@@ -12,7 +11,7 @@ from docx import Document
 from services.db_service import ITDeptMembers
 from services.db_service import RequestApprovers
 from services.db_service import FinanceDeptMembers
-from pydantic_schemas import ItemStatus
+from pydantic_schemas import GroupCommentPayload, ItemStatus
 
 """
 AUTHOR: Roman Campbell
@@ -25,6 +24,7 @@ class EmailService:
     """
     # TODO: Add a method to send an email to a single recipient, approvers, finance etc
     def __init__(self, from_sender, subject, cc_persons=None):
+        self.outlook = Dispatch("Outlook.Application")
         self.from_sender = from_sender
         self.subject = subject
         self.cc_persons = cc_persons or []
@@ -41,13 +41,42 @@ class EmailService:
        
         self.request_status = None
         
-    def get_routing_group(self, group: str):
+    def get_routing_group(self):
         if group == "IT":
             return ITDeptMembers
         elif group == "FINANCE":
             return FinanceDeptMembers
         else:
             raise ValueError(f"Invalid routing group: {group}")
+        
+    def  build_comment_email(self, payload: GroupCommentPayload):
+        """
+        Build an email to the requester with the comment
+        """
+        template_dir = os.path.join(self.project_root, "templates")
+        env = Environment(loader=FileSystemLoader(template_dir))
+        template = env.get_template("comment_template.html")
+        
+        # Prepare the data for the template
+        items = list(zip(payload.item_desc, payload.comment))
+        context = {
+            "groupKey": payload.groupKey,
+            "items": items,
+            "requestor_name": self.recipients['requester']['name']
+        }
+        
+        # Render the template
+        html = template.render(**context)
+        return html
+    
+    # Send an email to the requester with the comment
+    def send_comment_email(self, payload: GroupCommentPayload):
+        """
+        Send an email to the requester with the comment
+        """
+        
+        html = self.build_comment_email(payload)
+        self._send_email(outlook=None, to_email=self.recipients['requester']['email'], subject=f"Comments on {payload.groupKey}", body=html)
 
     def send_notification(self, template_path=None, template_data=None, subject=None, request_status=None, custom_msg=None):
         """
@@ -124,66 +153,30 @@ class EmailService:
         """
         Helper method to send an email using Outlook
         """
-        mail = outlook.CreateItem(0)
-        mail.Subject = subject
-        
-        # Create a simple HTML template for the body
-        if body:
-            # For new requests, include the PDF attachment
-            if self.request_status == 'NEW REQUEST':
-                path = os.path.abspath(self.get_rendered_docx_path())
-                if os.path.exists(path):
-                    mail.Attachments.Add(path)
+        try:  
+            pythoncom.CoInitialize()
+            
+            mail = self.outlook.CreateItem(0)  # 0 is the constant for olMailItem
+            mail.Subject = subject
+            
+            # Create a simple HTML template for the body
+            if body:
+                mail.HTMLBody = body
                 
-                template_content = f"""
-                <html>
-                <body>
-                    <div style="font-family: Arial, sans-serif; padding: 20px;">
-                        <h2 style="color: #333;">New Purchase Request</h2>
-                        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
-                            <p style="margin: 0;">{body}</p>
-                        </div>
-                        <p style="margin-top: 20px;">Please find the complete purchase request details in the attached PDF.</p>
-                        <p style="color: #666; margin-top: 20px;">This is an automated message from the Purchase Request System.</p>
-                    </div>
-                </body>
-                </html>
-                """
-            else:
-                # For other notifications (like comments), use the simple template
-                template_content = f"""
-                <html>
-                <body>
-                    <div style="font-family: Arial, sans-serif; padding: 20px;">
-                        <h2 style="color: #333;">{subject}</h2>
-                        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
-                            <p style="margin: 0;">{body}</p>
-                        </div>
-                        <div style="margin-top: 15px; font-size: 14px; color: #444;">
-                            <strong>Summary:</strong><br>
-                        </div>
-                        <p style="color: #666; margin-top: 20px;">This is an automated message from the Purchase Request System.</p>
-                    </div>
-                </body>
-                </html>
-                """
-            mail.HTMLBody = template_content
-        
-        # Handle multiple recipients
-        if isinstance(to_email, list):
-            mail.To = "; ".join(to_email)
-        else:
-            mail.To = to_email
-        
-        # Handle CC recipients
-        if cc:
-            mail.CC = "; ".join(cc)
-        elif self.cc_persons:
-            mail.CC = "; ".join(self.cc_persons)
-        
-        try:
+            recipient = mail.Recipients.Add(to_email)
+            recipient.Type = 1  # 1 is the constant for olTo
+            mail.Recipients.ResolveAll()
+            
+            # Add CC recipients
+            if cc:
+                for email in cc:
+                    cc_recipient = mail.Recipients.Add(email)
+                    cc_recipient.Type = 2  # 2 is the constant for olCC
+                mail.Recipients.ResolveAll()
+                
             mail.Send()
             logger.info(f"Email sent to {to_email} with subject: {subject}")
+            
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {e}")
             raise

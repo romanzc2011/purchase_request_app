@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
 import { DataGrid, DataGridProps, GridColDef, GridRowId, GridRowSelectionModel } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
@@ -18,6 +19,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
+
 import { STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approvalTypes";
 import { addComments, GroupCommentPayload, CommentEntry } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
@@ -420,9 +422,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
         await addComments(payloadToSend);
         toast.success("Comments added successfully");
-
-
-        console.log("i dont make it here")
     };
 
     //####################################################################
