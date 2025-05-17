@@ -417,6 +417,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             comment: entries
         }
 
+        // clean the payload
+        //cleanPayload(payloadToSend);
         console.log("🔥 PAYLOAD TO SEND", payloadToSend);
 
         // Deselect all rows
@@ -980,20 +982,21 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     setRowSelectionModel({ ids: newSelection, type: 'include' });
 
                     // Update comment payload based on selection
-                    const selectedRows = Array.from(newSelection).map(uuid => flatRows.find(r => r.UUID === uuid)).filter(Boolean);
-                    if (selectedRows.length > 0) {
-                        const firstRow = selectedRows[0];
-                        if (!firstRow) return;
+                    const selectedRows = Array.from(newSelection)
+                        .map(uuid => flatRows.find(r => r.UUID === uuid))
+                        .filter((r): r is FlatRow => !!r && !r.isGroup) as FlatRow[];
 
-                        const payload: GroupCommentPayload = {
-                            groupKey: firstRow.groupKey,
-                            group_count: selectedRows.length,
-                            item_uuids: selectedRows.map(r => r?.UUID).filter(Boolean) as string[],
-                            item_desc: selectedRows.map(r => r?.itemDescription).filter(Boolean) as string[],
-                            comment: []
-                        };
-                        setGroupCommentPayload(payload);
-                    }
+                    if (selectedRows.length === 0) return;
+
+                    const payload: GroupCommentPayload = {
+                        groupKey: selectedRows[0].groupKey,
+                        group_count: selectedRows.length,
+                        item_uuids: selectedRows.map(r => r.UUID),
+                        item_desc: selectedRows.map(r => r.itemDescription),
+                        comment: []
+                    };
+
+                    setGroupCommentPayload(payload);
                 }}
 
                 initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
