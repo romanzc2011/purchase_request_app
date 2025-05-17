@@ -21,7 +21,7 @@ import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 
 import { STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approvalTypes";
-import { addComments, GroupCommentPayload, CommentEntry } from "../../../services/CommentService";
+import { addComments, GroupCommentPayload, CommentEntry, cleanPayload } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { ZodCatch } from "zod";
 import { useUUIDStore } from "../../../services/UUIDService";
@@ -267,7 +267,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
     const { getUUID } = useUUIDStore();
 
-
     // ####################################################################
     // ####################################################################
     // COMMAND TOOLBAR
@@ -397,6 +396,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         for (let i = 0; i < group_count; i++) {
             const uuid = item_uuids[i];
             const desc = item_desc[i];
+
+            // Skip if this is a group header
+            if (uuid.startsWith('header-')) continue;
 
             const singlePayLoad: GroupCommentPayload = {
                 groupKey,
@@ -948,17 +950,11 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
             <DataGrid
                 rows={flatRows}
-                getRowId={row => row.UUID}
+                getRowId={r => r.isGroup ? `header-${r.groupKey}` : r.UUID}
                 columns={allColumns}
                 getRowClassName={(params) => {
                     if (params.row.hidden) return 'hidden-row';
                     if (params.row.isGroup && expandedRows[params.row.groupKey]) return 'expanded-group-row';
-                    return '';
-
-                    const row = params.row as FlatRow;
-                    if (row.isGroup && expandedRows[row.groupKey]) {
-                        return 'expanded-group-row';
-                    }
                     return '';
                 }}
                 checkboxSelection
@@ -972,54 +968,31 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                             if (row.isGroup) {
                                 // If it's a group, add all items in that group
                                 const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
-
                                 groupItems.forEach(item => newSelection.add(item.UUID));
-
-                                // Get data for comment payload
-                                groupCommentPayload.groupKey = row.groupKey;
-                                groupCommentPayload.item_desc = groupItems.map(item => item.itemDescription);
-                                groupCommentPayload.group_count = groupItems.length;
-                                groupCommentPayload.item_uuids = groupItems.map(item => item.UUID);
-
-                                // Remove the dummy header row
-                                groupCommentPayload.item_desc = groupItems.map(item => item.itemDescription).slice(1);
-                                groupCommentPayload.item_uuids = groupItems.map(item => item.UUID).slice(1);
-                                groupCommentPayload.group_count = groupItems.length - 1;
-
-                                // Create payload for useCommentModal
-                                const payload: GroupCommentPayload = {
-                                    groupKey: groupCommentPayload.groupKey,
-                                    group_count: groupCommentPayload.group_count,
-                                    item_uuids: groupCommentPayload.item_uuids,
-                                    item_desc: groupCommentPayload.item_desc,
-                                    comment: []
-                                }
-                                setGroupCommentPayload(payload);
-
                             } else {
                                 // If it's an individual item, add it directly
                                 newSelection.add(uuid);
                             }
-                            console.log("GROUP COMMENT PAYLOAD", groupCommentPayload);
                         }
                     });
 
-                    // If we're deselecting (the new selection is smaller than the current one)
-                    if (newSelection.size < rowSelectionModel.ids.size) {
-                        // Find what was deselected
-                        const deselectedIds = Array.from(rowSelectionModel.ids).filter(id => !newSelection.has(id));
+                    // Update the selection model
+                    setRowSelectionModel({ ids: newSelection, type: 'include' });
 
-                        // Check if any of deselected items are group headers
-                        deselectedIds.forEach(id => {
-                            const row = flatRows.find(r => r.UUID === id);
-                            if (row?.isGroup) {
-                                const groupItems = grouped[row.groupKey] || [];
-                                groupItems.forEach(item => newSelection.delete(item.UUID));
-                            }
-                        });
-                        setRowSelectionModel({ ids: newSelection, type: 'include' });
-                    } else {
-                        setRowSelectionModel({ ids: newSelection, type: 'include' });
+                    // Update comment payload based on selection
+                    const selectedRows = Array.from(newSelection).map(uuid => flatRows.find(r => r.UUID === uuid)).filter(Boolean);
+                    if (selectedRows.length > 0) {
+                        const firstRow = selectedRows[0];
+                        if (!firstRow) return;
+
+                        const payload: GroupCommentPayload = {
+                            groupKey: firstRow.groupKey,
+                            group_count: selectedRows.length,
+                            item_uuids: selectedRows.map(r => r?.UUID).filter(Boolean) as string[],
+                            item_desc: selectedRows.map(r => r?.itemDescription).filter(Boolean) as string[],
+                            comment: []
+                        };
+                        setGroupCommentPayload(payload);
                     }
                 }}
 
