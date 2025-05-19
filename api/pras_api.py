@@ -270,12 +270,17 @@ async def download_statement_of_need_form(
                 is_cyber = True
                 break
         # Check if there are any comments in son_comments with this ID
+        comment_arr = []
         with next(get_session()) as session:
             comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == ID).all()
             if comments:
-                logger.info(f"Comments: {comments}")
-        
-        make_purchase_request_pdf(rows=rows, output_path=pdf_path, is_cyber=is_cyber, comments=comments)
+                for comment in comments:
+                    comment_data = ps.SonCommentSchema.model_validate(comment)
+                    comment_arr.append(comment_data.comment_text)
+                    
+        logger.info(f"Comment array: {comment_arr}")
+                    
+        make_purchase_request_pdf(rows=rows, output_path=pdf_path, is_cyber=is_cyber, comments=comment_arr)
         
         if not pdf_path.exists():
             raise HTTPException(status_code=404, detail="Statement of need form not found")

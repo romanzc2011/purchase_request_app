@@ -31,12 +31,10 @@ page_width, page_height = LETTER
             The path to the generated PDF.
     """
 
-def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: bool, comments: list[dict]) -> Path:
+def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: bool, comments: list[str]=None) -> Path:
     # ensure output folder exists
     output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
-    logger.info(f"ROWS: {rows}")
-    logger.info(f"COMMENTS: {comments.comment_text}")
-
+    
     #— fonts & logo setup
     project_root = Path(__file__).resolve().parent.parent.parent
     pdfmetrics.registerFont(TTFont("Play", str(project_root / "src/assets/fonts/Play-Regular.ttf")))
@@ -169,11 +167,11 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
     elements.append(Spacer(1, 6))
 
     # Comments paragraph with all collected comments
-    # if all_comments:
-    #     comments_text = "Comments/Additional Information Requested:\n" + "\n".join(all_comments)
-    #     comments_para = Paragraph(comments_text, comment_style)
-    #     elements.append(comments_para)
-    #     elements.append(Spacer(1, 6))
+    if comments:
+        comments_text = "Comments/Additional Information Requested:<br/>" + "<br/>".join(comments)
+        comments_para = Paragraph(comments_text, comment_style)
+        elements.append(comments_para)
+        elements.append(Spacer(1, 6))
 
     # Build TOTAL line
     total_style = ParagraphStyle(

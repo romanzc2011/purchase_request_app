@@ -963,6 +963,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                 rowSelectionModel={rowSelectionModel}
                 onRowSelectionModelChange={(newModel) => {
                     const newSelection = new Set<GridRowId>();
+                    const prev = rowSelectionModel.ids;
                     // Process each selected UUID
                     Array.from(newModel.ids).forEach(uuid => {
                         const row = flatRows.find(r => r.UUID === uuid);
@@ -979,7 +980,16 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     });
 
                     // Update the selection model
-                    setRowSelectionModel({ ids: newSelection, type: 'include' });
+                    const removed = Array.from(prev).filter(id => !newSelection.has(id));
+                    const updated = new Set(newSelection);
+                    removed.forEach(uuid => {
+                        const row = flatRows.find(r => r.UUID === uuid);
+                        if (row?.isGroup) {
+                            flatRows.filter(r => r.groupKey === row.groupKey && !r.isGroup).forEach(r => updated.delete(r.UUID));
+                        }
+                    });
+
+                    setRowSelectionModel({ ids: updated, type: 'include' });
 
                     // Update comment payload based on selection
                     const selectedRows = Array.from(newSelection)
