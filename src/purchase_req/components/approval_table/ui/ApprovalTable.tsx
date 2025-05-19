@@ -529,7 +529,17 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         filterable: false,
         renderCell: params => {
             const row = params.row as FlatRow;
-            if (!row.isGroup) return null;
+            if (!row.isGroup) {
+                // Render an empty icon placeholder for alignment
+                return (
+                    <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
+                        <Box sx={{ width: 24 /* or whatever your icon's width is */ }} />
+                        <Box component="span" sx={{ ml: 1, fontWeight: "bold", color: "#FFFFFF" }}>
+                            {`${row.groupKey} (${row.rowCount} items)`}
+                        </Box>
+                    </Box>
+                );
+            }
             const isExpanded = expandedRows[row.groupKey];
             return (
                 <Box
@@ -538,15 +548,16 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         alignItems: "center",
                         cursor: "pointer",
                         width: "100%",
-                        pl: row.rowCount === 1 ? 2 : 0
                     }}
                     onClick={() => toggleRow(row.groupKey)}
                 >
-                    {row.rowCount > 1 && (
-                        expandedRows[row.groupKey]
-                            ? <KeyboardArrowUpIcon fontSize="small" />
-                            : <KeyboardArrowDownIcon fontSize="small" />
-                    )}
+                    <Box sx={{ width: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {row.rowCount > 1 && (
+                            isExpanded
+                                ? <KeyboardArrowUpIcon fontSize="small" />
+                                : <KeyboardArrowDownIcon fontSize="small" />
+                        )}
+                    </Box>
                     <Box component="span" sx={{ ml: 1, fontWeight: "bold", color: "#FFFFFF" }}>
                         {`${row.groupKey} (${row.rowCount} items)`}
                     </Box>
@@ -1011,7 +1022,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
                 initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
                 pageSizeOptions={[25, 50, 100]}
-                disableRowSelectionOnClick
                 rowHeight={60}
                 sx={{
                     flex: 1,
@@ -1037,7 +1047,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     ...paginationStyles,
 
                     // any one-off tweaks
-                    "& .MuiDataGrid-cellCheckbox": { color: "yellow" },
 
                     '& .expanded-group-row': {
                         background: 'linear-gradient(180deg, #800000 0%, #600000 100%) !important',

@@ -2,14 +2,30 @@ import { SxProps, Theme } from "@mui/material";
 
 // Define style objects outside of the component
 export const cellRowStyles: SxProps<Theme> = {
-
     "& .MuiDataGrid-cell": {
-        color: "white",
-        background: "#2c2c2c",
-        fontSize: "0.95rem" // Increased font size for cells
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "white !important",
+        fontSize: "0.95rem !important"
+    },
+    '& .MuiDataGrid-cellCheckbox': {
+        minWidth: 48,
+        display: 'flex',
+        alignItems: 'center',
     },
     "& .MuiDataGrid-row": {
-        background: "#2c2c2c"
+        backgroundColor: "#2c2c2c"
+    },
+    "& .MuiDataGrid-row:hover": {
+        backgroundColor: "#444 !important",
+    },
+    "& .MuiDataGrid-row.Mui-selected": {
+        backgroundColor: "#014519 !important",
+        color: "#fff",
+    },
+    "& .MuiDataGrid-row.Mui-selected:hover": {
+        backgroundColor: "#014519 !important",
     },
     // Exclude Item Description column from font size increase
     "& .MuiDataGrid-cell[data-field='itemDescription']": {
