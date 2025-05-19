@@ -35,6 +35,7 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
     # ensure output folder exists
     output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
     logger.info(f"ROWS: {rows}")
+    logger.info(f"COMMENTS: {comments.comment_text}")
 
     #— fonts & logo setup
     project_root = Path(__file__).resolve().parent.parent.parent
