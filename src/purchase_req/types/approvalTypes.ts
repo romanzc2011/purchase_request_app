@@ -4,6 +4,19 @@ import SuccessIcon from "@mui/icons-material/CheckCircle";
 import CloseIcon from "@mui/icons-material/Close";
 
 // #########################################################################################
+// Item status
+// #########################################################################################  
+export enum ItemStatus {
+    NEW_REQUEST = "NEW REQUEST",
+    PENDING = "PENDING",
+    APPROVED = "APPROVED",
+    DENIED = "DENIED",
+    ON_HOLD = "ON HOLD",
+    COMPLETED = "COMPLETED",
+    CANCELLED = "CANCELLED"
+}
+
+// #########################################################################################
 // DataRow
 // #########################################################################################    
 export interface DataRow {
@@ -46,6 +59,31 @@ export interface FlatRow extends DataRow {
     UUID: string;
     hidden?: boolean;
 }
+
+// #########################################################################################
+// Approval data
+// #########################################################################################  
+export interface ApprovalData {
+    ID: string;
+    UUID: string;
+    fund: string;
+    totalPrice: number;
+    status: ItemStatus;
+    action: "APPROVE" | "DENY";
+}
+
+// #########################################################################################
+// Group comment payload
+// #########################################################################################      
+export interface GroupCommentPayload {
+    groupKey: string;   // Group key is the ID in the table, ie LAWB000x
+    comment: CommentEntry[];
+    group_count: number;
+    item_uuids: string[];
+    item_desc: string[];
+}
+
+export interface CommentEntry { uuid: string; comment: string }
 
 // #########################################################################################
 // Status for rows

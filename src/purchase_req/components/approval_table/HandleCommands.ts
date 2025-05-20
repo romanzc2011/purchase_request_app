@@ -145,6 +145,7 @@ export const createHandleCommands = ({
             }
         }
 
+        // Dedupe the rows
         const uniqueRows = Array.from(
             new Map(cyberSecRows.map(r => [r.UUID, r])).values()
         );

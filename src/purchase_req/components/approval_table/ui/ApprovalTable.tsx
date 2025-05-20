@@ -20,11 +20,11 @@ import ScheduleIcon from "@mui/icons-material/Schedule";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 
-import { STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approvalTypes";
-import { addComments, GroupCommentPayload, CommentEntry, cleanPayload } from "../../../services/CommentService";
+import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approvalTypes";
+import { addComments, cleanPayload } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
-import { ZodCatch } from "zod";
 import { useUUIDStore } from "../../../services/UUIDService";
+import { useApprovalService } from "../../../hooks/useApprovalService";
 
 /***********************************************************************************/
 // PROPS
@@ -291,7 +291,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // HANDLE CYBERSECURITY RELATED
     //####################################################################
     const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID) };
-    const handleFollowUp = (ID: string) => { console.log("follow up", ID); };
 
     // ####################################################################
     // Update assignedIRQ1s when approvalData changes
@@ -386,6 +385,11 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         handleSubmit,
     } = useCommentModal();
 
+    const { approveDeny } = useApprovalService();
+
+    /***********************************************************************************/
+    // HANDLE COMMENT
+    /***********************************************************************************/
     const handleCommentClick = async () => {
         if (!groupCommentPayload) return;
 
@@ -518,12 +522,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         setRowSelectionModel({ ids: new Set(), type: 'include' });
     }
 
-
-
     // the "toggle" column for group headers
     const toggleColumn: GridColDef = {
         field: "__groupToggle",
-        headerName: "",
+        headerName: "ID",
         width: 200,
         sortable: false,
         filterable: false,
@@ -626,24 +628,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                                 },
                             }}
                         />
-                    </Box>
-                );
-            }
-        },
-
-        /***********************************************************************************/
-        // ID COLUMN
-        /***********************************************************************************/
-        {
-            field: "ID",
-            headerName: "ID",
-            width: 130,
-            sortable: true,
-            renderCell: params => {
-                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                return (
-                    <Box sx={{ pl: params.row.rowCount === 1 ? 2 : 0 }}>
-                        {params.value}
                     </Box>
                 );
             }

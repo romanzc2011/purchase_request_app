@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
-import { GroupCommentPayload, CommentEntry, addComments } from "../services/CommentService";
+import {addComments } from "../services/CommentService";
+import { GroupCommentPayload } from "../types/approvalTypes";
 import { toast } from "react-toastify";
 
 export function useCommentModal() {
@@ -30,7 +31,6 @@ export function useCommentModal() {
     },
     [close]
   );
-  
 
   // #########################################################################################
   // Bulk comment - sends everything to backend, even if it's a single comment
