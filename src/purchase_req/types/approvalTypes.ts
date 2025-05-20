@@ -33,7 +33,7 @@ export interface DataRow {
     totalPrice      : number;
     itemDescription : string;
     justification   : string;
-    status          : "NEW REQUEST" | "PENDING" | "APPROVED" | "DENIED";
+    status          : ItemStatus;
 }
 
 // #########################################################################################
@@ -65,11 +65,11 @@ export interface FlatRow extends DataRow {
 // #########################################################################################  
 export interface ApprovalData {
     ID: string;
-    UUID: string;
-    fund: string;
-    totalPrice: number;
-    status: ItemStatus;
-    action: "APPROVE" | "DENY";
+    item_uuids: string[];
+    item_funds: string[];
+    totalPrice: number[];
+    status: ItemStatus[];
+    action: string;
 }
 
 // #########################################################################################
@@ -121,6 +121,30 @@ export const STATUS_CONFIG: Record<DataRow["status"], {
         canFollowUp: false
     },
     "DENIED": { 
+        bg: "#f44336", 
+        Icon: CloseIcon,
+        canApprove: false,
+        canDeny: false,
+        canComment: false,
+        canFollowUp: false
+    },
+    "ON HOLD": { 
+        bg: "#ff9800", 
+        Icon: WarningIcon,
+        canApprove: false,
+        canDeny: false,
+        canComment: true,
+        canFollowUp: false
+    },
+    "COMPLETED": { 
+        bg: "#4caf50", 
+        Icon: SuccessIcon,
+        canApprove: false,
+        canDeny: false,
+        canComment: false,
+        canFollowUp: false
+    },
+    "CANCELLED": { 
         bg: "#f44336", 
         Icon: CloseIcon,
         canApprove: false,

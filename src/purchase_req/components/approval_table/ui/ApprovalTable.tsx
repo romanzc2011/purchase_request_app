@@ -20,7 +20,7 @@ import ScheduleIcon from "@mui/icons-material/Schedule";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 
-import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow } from "../../../types/approvalTypes";
+import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow, ApprovalData, ItemStatus } from "../../../types/approvalTypes";
 import { addComments, cleanPayload } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { useUUIDStore } from "../../../services/UUIDService";
@@ -270,22 +270,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // ####################################################################
     // ####################################################################
     // COMMAND TOOLBAR
-    // Handle Approval/Deny/Download
+    // Handle Approval/Deny/Download/Comment
     // ####################################################################
     // ####################################################################
-
-    // ####################################################################
-    // HANDLE DENY
-    const handleDenyRow = (row: FlatRow) => {
-        if (row && (!row.isGroup || (row.isGroup && row.rowCount === 1))) {
-            approveDenyMutation.mutate({
-                ID: row.ID,
-                UUID: row.UUID,
-                fund: row.fund,
-                action: "deny"
-            });
-        }
-    };
 
     //####################################################################
     // HANDLE CYBERSECURITY RELATED
@@ -311,44 +298,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             setDraftIRQ1(prev => ({ ...prev, ...newDraftIRQ1 }));
         }
     }, [approvalData]);
-
-    /***********************************************************************************/
-    // HANDLE APPROVE/DENY
-    /***********************************************************************************/
-    const approveDenyMutation = useMutation({
-        mutationFn: async ({
-            ID,
-            UUID,
-            fund,
-            action
-        }: {
-            ID: string,
-            UUID: string,
-            fund: string,
-            action: "approve" | "deny"
-        }) => {
-            const res = await fetch(API_URL_APPROVE_DENY, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem("access_token")}`
-                },
-                body: JSON.stringify({
-                    ID: ID,
-                    UUID: UUID,
-                    fund: fund,
-                    action: action
-                })
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-        },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["approvalData"] }),
-        onError: (error) => {
-            console.error("Approval action failed:", error);
-            toast.error("Approval action failed. Please try again.");
-        }
-    });
 
     /***********************************************************************************/
     // MODALS
@@ -385,7 +334,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         handleSubmit,
     } = useCommentModal();
 
-    const { approveDeny } = useApprovalService();
+    /***********************************************************************************/
+    // HANDLE APPROVE/DENY
+    /***********************************************************************************/
 
     /***********************************************************************************/
     // HANDLE COMMENT
@@ -481,46 +432,31 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     //####################################################################
     // HANDLE APPROVE/DENY
     //####################################################################
+    const {
+        approvalPayload,
+        processPayload,
+        isLoadingApproval,
+        setIsLoadingApproval,
+        setApprovalPayload,
+        setErrorInApprove
+    } = useApprovalService();
 
-    // Per row approval
-    async function handleApproveRow(row: DataRow) {
-        const uuid = await getUUID(row.ID);
-        if (!uuid) {
-            toast.error("Failed to get UUID");
-            console.error("Failed to get UUID");
-            return;
-        }
-        approveDenyMutation.mutate({ ID: row.ID, UUID: uuid, fund: row.fund, action: "approve" });
-    }
-    // Bulk approve
-    const handleBulkApprove = async () => {
-        // collect DataRow objects to approve
-        let toApprove: DataRow[] = [];
+    // HANDLE APPROVE CLICK
+    async function handleApproveClick() {
+        if (!approvalPayload) return;
 
-        for (const uuid of Array.from(rowSelectionModel.ids)) {
-            // find the FlatRow you selected
-            const flat = flatRows.find(r => r.UUID === uuid);
-            if (!flat) continue;
+        // Skip if this is a group header
+        if (approvalPayload.ID.startsWith('header-')) return;
 
-            if (flat.isGroup && grouped[flat.groupKey]) {
-                toApprove.push(...grouped[flat.groupKey]);
-            } else {
-                toApprove.push(flat as DataRow);
-            }
-        }
-
-        // dedupe by UUID
-        const uniqueRows = Array.from(
-            new Map(toApprove.map(r => [r.UUID, r])).values()
-        );
-
-        // approve each row
-        for (const row of uniqueRows) {
-            await handleApproveRow(row);
-        }
         // Deselect all rows
         setRowSelectionModel({ ids: new Set(), type: 'include' });
+
+        processPayload(approvalPayload);
+
+
     }
+
+
 
     // the "toggle" column for group headers
     const toggleColumn: GridColDef = {
@@ -874,6 +810,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // combine toggle + data columns
     const allColumns = [toggleColumn, ...dataColumns];
 
+    //#####################################################################
+    // COMMAND TOOLBAR BUTTONS
+    //#####################################################################
     return (
         <Box sx={{
             width: "100%",
@@ -891,7 +830,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     startIcon={<CheckIcon />}
                     variant="contained"
                     color="success"
-                    onClick={handleBulkApprove}
+                    onClick={handleApproveClick}
                 >
                     Approve Selected ({getTotalSelectedItems()})
                 </Button>
@@ -993,6 +932,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
                     if (selectedRows.length === 0) return;
 
+                    /* At this point we are unsure which button user will press so we need to prepare data
+                    for all the functions, comments or approvals/deny */
+
+                    // Prepare the payload for comments
                     const payload: GroupCommentPayload = {
                         groupKey: selectedRows[0].groupKey,
                         group_count: selectedRows.length,
@@ -1001,7 +944,22 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         comment: []
                     };
 
+                    // Set the group comment payload
                     setGroupCommentPayload(payload);
+
+                    // Now prepare the payload for approvals/deny
+                    const approvalPayload: ApprovalData = {
+                        ID: selectedRows[0].ID,
+                        item_uuids: selectedRows.map(r => r.UUID),
+                        item_funds: selectedRows.map(r => r.fund),
+                        totalPrice: selectedRows.map(r => r.totalPrice),
+                        status: selectedRows.map(r => r.status),
+                        action: selectedRows[0].status === ItemStatus.APPROVED ? "APPROVE" : "DENY"
+                    };
+
+                    // Process the approval payload in hook
+                    setApprovalPayload(approvalPayload)
+
                 }}
 
                 initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
