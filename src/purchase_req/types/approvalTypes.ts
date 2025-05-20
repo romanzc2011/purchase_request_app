@@ -8,7 +8,7 @@ import CloseIcon from "@mui/icons-material/Close";
 // #########################################################################################  
 export enum ItemStatus {
     NEW_REQUEST = "NEW REQUEST",
-    PENDING = "PENDING",
+    PENDING_APPROVAL = "PENDING APPROVAL",
     APPROVED = "APPROVED",
     DENIED = "DENIED",
     ON_HOLD = "ON HOLD",
@@ -68,7 +68,7 @@ export interface ApprovalData {
     item_uuids: string[];
     item_funds: string[];
     totalPrice: number[];
-    status: ItemStatus[];
+    target_status: ItemStatus[];
     action: string;
 }
 
@@ -104,7 +104,7 @@ export const STATUS_CONFIG: Record<DataRow["status"], {
         canComment: true,
         canFollowUp: false
     },
-    "PENDING": { 
+    "PENDING APPROVAL": { 
         bg: "#2196f3", 
         Icon: PendingIcon,
         canApprove: true,

@@ -328,6 +328,12 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     };
 
     const {
+        approvalPayload,
+        processPayload,
+        setApprovalPayload,
+    } = useApprovalService();
+
+    const {
         isOpen,
         openCommentModal,
         close,
@@ -337,6 +343,59 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     /***********************************************************************************/
     // HANDLE APPROVE/DENY
     /***********************************************************************************/
+
+
+    // HANDLE APPROVE CLICK
+    async function handleApproveClick() {
+        // Filterout header rows
+        const selectedItemUuids = Array.from(rowSelectionModel.ids).filter(
+            id => !String(id).startsWith("header-")
+        );
+
+        if (selectedItemUuids.length === 0) {
+            toast.error("No items selected");
+            return;
+        }
+
+        // From main data source of approvalData, find DataRow objects with UUIDs that
+        // are a NEW REQUEST or PENDING
+        const itemsToProcessForApproval = approvalData.filter(item =>
+            selectedItemUuids.includes(item.UUID) &&
+            (item.status === ItemStatus.NEW_REQUEST || item.status === ItemStatus.PENDING_APPROVAL)
+        );
+
+        if (itemsToProcessForApproval.length === 0) {
+            toast.error("No items selected for approval");
+            return;
+        }
+
+        // Reconstruct the payload for API call
+        // This will tell the backend what action to take
+        const apiPayload: ApprovalData = {
+            ID: itemsToProcessForApproval[0].ID,
+            item_uuids: itemsToProcessForApproval.map(item => item.UUID),
+            item_funds: itemsToProcessForApproval.map(item => item.fund),
+            totalPrice: itemsToProcessForApproval.map(item => item.totalPrice),
+            target_status: itemsToProcessForApproval.map(item => ItemStatus.PENDING_APPROVAL), // Change to this if conditions met in backend
+            action: "APPROVE"
+        }
+
+        console.log("Submitting payload to backend:", apiPayload);
+
+        // Calling the processPayload function to send the payload to the backend
+        try {
+            await processPayload(apiPayload);
+            toast.success("Batch approval successful");
+
+            // Invalidate the query to refresh the data, updates local
+            // state and re-renders the table
+            queryClient.invalidateQueries({ queryKey: ["approvalData"] });
+        } catch (error) {
+            console.error("Batch approval failed:", error);
+            toast.error("Batch approval failed");
+        }
+    }
+
 
     /***********************************************************************************/
     // HANDLE COMMENT
@@ -427,33 +486,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
         // Deselect all rows
         setRowSelectionModel({ ids: new Set(), type: 'include' });
-    }
-
-    //####################################################################
-    // HANDLE APPROVE/DENY
-    //####################################################################
-    const {
-        approvalPayload,
-        processPayload,
-        isLoadingApproval,
-        setIsLoadingApproval,
-        setApprovalPayload,
-        setErrorInApprove
-    } = useApprovalService();
-
-    // HANDLE APPROVE CLICK
-    async function handleApproveClick() {
-        if (!approvalPayload) return;
-
-        // Skip if this is a group header
-        if (approvalPayload.ID.startsWith('header-')) return;
-
-        // Deselect all rows
-        setRowSelectionModel({ ids: new Set(), type: 'include' });
-
-        processPayload(approvalPayload);
-
-
     }
 
 
@@ -953,7 +985,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                         item_uuids: selectedRows.map(r => r.UUID),
                         item_funds: selectedRows.map(r => r.fund),
                         totalPrice: selectedRows.map(r => r.totalPrice),
-                        status: selectedRows.map(r => r.status),
+                        target_status: selectedRows.map(r => r.status),
                         action: selectedRows[0].status === ItemStatus.APPROVED ? "APPROVE" : "DENY"
                     };
 
