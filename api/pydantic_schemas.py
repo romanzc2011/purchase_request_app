@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -11,8 +11,8 @@ from enum import Enum
 ##  LINE ITEM STATUS ENUMERATION
 ########################################################
 class ItemStatus(str, Enum):
-    NEW = "NEW REQUEST"
-    PENDING = "PENDING"
+    NEW_REQUEST = "NEW REQUEST"
+    PENDING_APPROVAL = "PENDING APPROVAL"
     APPROVED = "APPROVED"
     DENIED = "DENIED"
     ON_HOLD = "ON HOLD"
@@ -106,8 +106,10 @@ class SonCommentSchema(BaseModel):
 ########################################################  
 class RequestPayload(BaseModel):
     ID: str
-    UUID: str
-    fund: str
+    UUID: List[str] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
+    item_funds: List[str]
+    totalPrice: List[float]
+    target_status: List[ItemStatus] # Changed to use your ItemStatus enum for better validation
     action: str
 
 ########################################################

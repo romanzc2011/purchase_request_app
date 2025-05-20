@@ -328,9 +328,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     };
 
     const {
-        approvalPayload,
         processPayload,
-        setApprovalPayload,
+        setApprovalPayload
     } = useApprovalService();
 
     const {
@@ -343,7 +342,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     /***********************************************************************************/
     // HANDLE APPROVE/DENY
     /***********************************************************************************/
-
 
     // HANDLE APPROVE CLICK
     async function handleApproveClick() {
@@ -394,6 +392,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             console.error("Batch approval failed:", error);
             toast.error("Batch approval failed");
         }
+        // Deselect all rows
+        setRowSelectionModel({ ids: new Set(), type: 'include' });
     }
 
 

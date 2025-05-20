@@ -553,15 +553,17 @@ async def approve_deny_request(
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
+    logger.success("SUCCESS!!!")
+    logger.info(f"Payload: {payload}")
     # Get amount of items and total price
-    service = RequestManagementService(db)
-    return service.approve_deny_request(
-        request_id=payload.ID,
-        uuid=payload.UUID,
-        fund=payload.fund,
-        action=payload.action,
-        requester=current_user
-    )
+    # service = RequestManagementService(db)
+    # return service.approve_deny_request(
+    #     request_id=payload.ID,
+    #     uuid=payload.UUID,
+    #     fund=payload.fund,
+    #     action=payload.action,
+    #     requester=current_user
+    # )
 
 ##########################################################################
 ## REFRESH TOKEN
