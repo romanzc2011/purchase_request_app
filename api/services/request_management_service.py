@@ -7,7 +7,6 @@ from services.db_service import PurchaseRequest, Approval, LineItemStatus, SonCo
 from services.email_service import EmailService
 from pydantic_schemas import ItemStatus
 from services.ldap_service import LDAPService, User
-from api.services.approval_router import get_routing_group
 class RequestManagementService:
     def __init__(self, db_session: Session):
         self.db_session = db_session

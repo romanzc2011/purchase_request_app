@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 from dataclasses import dataclass
+from loguru import logger
+from pydantic_schemas import ItemStatus
 
 # Approval Router to determine the routing of requests
 
@@ -33,8 +35,40 @@ class Handler:
 class ITHandler(Handler):
     def handle(self, request: ApprovalRequest) -> ApprovalRequest:
         # IT can only approve requests from fund 511***
-        if request.fund.startswith("511"):
-            request.status = "PENDING APPROVAL"
+        if request.fund.startswith("511") and request.status == ItemStatus.NEW_REQUEST:
+            request.status = ItemStatus.PENDING_APPROVAL
+            
+            # Send email to final approvers (Ted and Edmund) and CC finance department
+            pass
+            # Update approval tables status
+            pass
+        
+        
             logger.info(f"IT approved request {request.id}, forward to clerk admin for final approval")
             return super().handle(request)
+        # Send to finance department
         return super().handle(request)
+    
+class FinanceHandler(Handler):
+    def handle(self, request: ApprovalRequest) -> ApprovalRequest:
+        # Finance can approve any request
+        if request.status == ItemStatus.NEW_REQUEST and not request.fund.startswith("511"):
+            request.status = ItemStatus.PENDING_APPROVAL
+            
+            # Send email to final approvers (Ted and Edmund) and CC finance department
+            pass
+            
+            # Update approval tables status
+            pass
+            logger.info(f"Finance approved request {request.id}")
+            return super().handle(request)
+        # Send to clerk admin
+        return super().handle(request)
+    
+class ClerkAdminHandler(Handler):
+    def __init__(self):
+        self._next: Optional[Handler] = FinanceHandler()
+    def handle(self, request: ApprovalRequest) -> ApprovalRequest:
+        # This variable determines if Edmund can approve the request
+        if request.total_price < 250:
+            edmund_can_approve = True

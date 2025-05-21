@@ -140,7 +140,7 @@ class LDAPService:
                     logger.info(f"Members DN list: {members_dn_list}")
                     
                     match = re.search(r'CN=LAWB_([^,]+)', group)
-                    group_name = match.group(1) if match else "Uknown"
+                    group_name = match.group(1) if match else "Unknown"
                     for member_dn in members_dn_list:
                         # Query LDAP for each DN to get their sAMAccountName (username)
                         connection.search(

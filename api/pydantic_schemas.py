@@ -112,6 +112,7 @@ class RequestPayload(BaseModel):
     totalPrice: List[float]
     target_status: List[ItemStatus] # Changed to use your ItemStatus enum for better validation
     action: str
+    co: Optional[str] = None
 
 ########################################################
 ##    APPROVE/DENY PAYLOAD SCHEMA ( RESPONSE )
@@ -119,34 +120,6 @@ class RequestPayload(BaseModel):
 class ResponsePayload(BaseModel):
     status: str
     message: str
-    
-########################################################
-##    REQUEST APPROVERS SCHEMA
-# Current list: Ted, Edmund, Roman
-# IN TESTING: Roman only
-########################################################
-class RequestApproversSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    
-    username: str
-    email: EmailStr
-    
-########################################################
-##    FINANCE DEPT MEMBERS SCHEMA
-# Current list: Lauren Lee, Peter, Lela,Roman
-# IN TESTING: Roman only
-########################################################
-class FinanceDeptMembersSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    
-    username: str
-    email: EmailStr
-    
-class ITDeptMembersSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    
-    username: str
-    email: EmailStr
     
 class IRQ1IDSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)

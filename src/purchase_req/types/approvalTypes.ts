@@ -70,6 +70,7 @@ export interface ApprovalData {
     totalPrice: number[];
     target_status: ItemStatus[];
     action: string;
+    co?: string;
 }
 
 // #########################################################################################

@@ -225,7 +225,6 @@ async def get_approval_data(
         else:
             approvals = dbas.get_all_approval(session)
             approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approvals]
-            logger.info(f"Approval data: {approval_data}")
         
         return approval_data
     finally:
@@ -553,17 +552,22 @@ async def approve_deny_request(
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
+    logger.info(f"TARGET STATUS: {payload.target_status}")
+    final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
+    # Before allowing the user to approve/deny, check if they are in the correct group
+    # were looking for CUE group membership
+    logger.info("Checking user group membership")
+    user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
+    
+    if not user_group["CUE_GROUP"]:
+        logger.error(f"User {current_user.username} is not in the CUE group")
+        raise HTTPException(status_code=403, detail="User not authorized to approve/deny requests")
+    else:
+        logger.info(f"User {current_user.username} is in the CUE group, continuing with approval process")
+    
     logger.success("SUCCESS!!!")
     logger.info(f"Payload: {payload}")
-    # Get amount of items and total price
-    # service = RequestManagementService(db)
-    # return service.approve_deny_request(
-    #     request_id=payload.ID,
-    #     uuid=payload.UUID,
-    #     fund=payload.fund,
-    #     action=payload.action,
-    #     requester=current_user
-    # )
+    
 
 ##########################################################################
 ## REFRESH TOKEN
