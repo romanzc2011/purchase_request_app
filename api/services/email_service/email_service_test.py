@@ -3,11 +3,9 @@ from win32com.client import Dispatch, constants
 import os
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
-from typing import List, Tuple
+from typing import List, Optional
 from loguru import logger
-from docxtpl import DocxTemplate
-from docx2pdf import convert
-from docx import Document
+from dataclasses import dataclass
 from services.db_service import ITDeptMembers
 from services.db_service import RequestApprovers
 from services.db_service import FinanceDeptMembers
@@ -18,6 +16,24 @@ AUTHOR: Roman Campbell
 DATE: 01/07/2025
 Used to send purchase request notifications.
 """
+
+@dataclass
+class EmailMessage:
+    subject: str
+    to: List[str]
+    cc: Optional[List[str]] = None
+    html_body: Optional[str] = None
+    text_body: Optional[str] = None
+    attachments: List[str] = None
+    
+class TemplateRenderer:
+    def __init__(self, template_dir: str):
+        self.env = Environment(loader=FileSystemLoader(template_dir))
+        
+    def render(self, template_name: str, context: dict) -> str:
+        template = self.env.get_template(template_name)
+        return template.render(**context)
+
 class EmailService:
     """
     A class to manage email notification operations for purchase request workflows

@@ -5,7 +5,10 @@ from ldap3 import Server, Connection, Tls, ALL, SUBTREE
 from ldap3.core.exceptions import LDAPExceptionError, LDAPBindError
 from loguru import logger
 from requests_ntlm import HttpNtlmAuth
+from api.services.approval_router import ApprovalRequest
+from pydantic_schemas import ItemStatus
 from typing import Optional, List
+from api.services.approval_router import ApprovalRequest
 import ssl
 import os
 import re
@@ -175,7 +178,7 @@ class LDAPService:
         except Exception as e:
             logger.error(f"ERROR: {e}")
             return {"ACCESS_GROUP": False, "CUE_GROUP": False, "IT_GROUP": False}
-    
+
     #####################################################################################
     # LEGITIMATE USER CHECK
     def check_legitimate_user(self, connection, username):

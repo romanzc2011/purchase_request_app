@@ -16,7 +16,7 @@ class ApprovalRequest:
     uuid: str
     fund: str
     total_price: float
-    status: str = "NEW REQUEST"
+    status: str = ItemStatus.NEW_REQUEST
     metadata: dict = None
     
 class Handler:

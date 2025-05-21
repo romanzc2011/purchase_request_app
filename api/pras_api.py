@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 from services.auth_service import AuthService
 
-from services.email_service import EmailService
+from api.services.email_service.email_service_test import EmailService
 from services.ldap_service import LDAPService, User
 from services.search_service import SearchService
 from services.uuid_service import uuid_service
