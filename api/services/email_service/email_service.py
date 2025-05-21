@@ -1,8 +1,12 @@
+from api.services.email_service.email_service import EmailService
 from api.services.email_service.renderer import TemplateRenderer
-from api.services.email_service.transport import EmailTransport
+from api.services.email_service.transport import EmailTransport, OutlookTransport
 from api.services.ldap_service import LDAPService
 from api.services.email_service.models import EmailMessage
 from typing import List, Optional
+from api.services.email_service.models import GroupCommentPayload
+import os
+from jinja2 import Environment, FileSystemLoader
 
 
 class EmailService:
@@ -16,7 +20,9 @@ class EmailService:
         self.transport = transport
         self.ldap_service = ldap_service
         
-    
+   ###################################################################
+    # Email sending methods
+    ################################################################### 
     def send_template_email(
         self,
         to: List[str],
@@ -62,3 +68,33 @@ class EmailService:
             template_name="new_request_notification.html",
             context=context,
         )
+        
+    def  build_comment_email(self, payload: GroupCommentPayload):
+        """
+        Build an email to the requester with the comment
+        """
+        template_dir = os.path.join(self.project_root, "templates")
+        env = Environment(loader=FileSystemLoader(template_dir))
+        template = env.get_template("comment_template.html")
+        
+        # Prepare the data for the template
+        items = list(zip(payload.item_desc, payload.comment))
+        context = {
+            "groupKey": payload.groupKey,
+            "items": items,
+            "requestor_name": self.recipients['requester']['name']
+        }
+        
+        # Render the template
+        html = template.render(**context)
+        return html
+    
+    # Send an email to the requester with the comment
+    def send_comment_email(self, payload: GroupCommentPayload):
+        """
+        Send an email to the requester with the comment
+        """
+        
+        html = self.build_comment_email(payload)
+        self.send(outlook=None, to_email=self.recipients['requester']['email'], subject=f"Comments on {payload.groupKey}", body=html)
+
