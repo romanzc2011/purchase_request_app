@@ -344,8 +344,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     /***********************************************************************************/
 
     // HANDLE APPROVE CLICK
-    async function handleApproveClick() {
-        // Filterout header rows
+    async function handleApproveClick(): Promise<void> {
+        // Filter out header rows
         const selectedItemUuids = Array.from(rowSelectionModel.ids).filter(
             id => !String(id).startsWith("header-")
         );
@@ -395,7 +395,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // Deselect all rows
         setRowSelectionModel({ ids: new Set(), type: 'include' });
     }
-
 
     /***********************************************************************************/
     // HANDLE COMMENT

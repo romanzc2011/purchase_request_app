@@ -20,6 +20,7 @@ import React, { useEffect, useState } from "react";
 import { v4 as uuidv4 } from 'uuid';
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import { toast } from "react-toastify";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
@@ -115,6 +116,7 @@ function SubmitApprovalTable({
             });
 
             if (!idRequest.ok) {
+                toast.error("Failed to get ID");
                 throw new Error(`Failed to get ID: ${idRequest.status}`);
             }
 
@@ -168,8 +170,10 @@ function SubmitApprovalTable({
                 setID(requestId);
             }
 
+            toast.success("Data submitted successfully");
         } catch (error) {
             console.error("Error submitting data:", error);
+            toast.error("Failed to submit data");
         }
     };
 

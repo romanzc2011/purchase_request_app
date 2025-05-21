@@ -4,7 +4,8 @@ from datetime import datetime
 from enum import Enum
 
 ########################################################
-## PYDANTIC SCHEMA -- structures data into pydantic, a style that easily converts to json with fastapi
+## PYDANTIC SCHEMA -- structures data into pydantic, a style that 
+# easily converts to json with fastapi, allows for sqlalchemy ORM
 ########################################################
 
 ########################################################    
