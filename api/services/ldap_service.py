@@ -9,6 +9,7 @@ from api.services.approval_router import ApprovalRequest
 from api.schemas.pydantic_schemas import ItemStatus
 from typing import Optional, List
 from api.services.approval_router import ApprovalRequest
+from api.services.models import User
 import ssl
 import os
 import re
@@ -38,12 +39,6 @@ user_groups = {
     "CUE_GROUP": False,
     "IT_GROUP": False
 }
-
-@dataclass
-class User:
-    username: str
-    email: str
-    group: List[str]
 
 class LDAPService:
     def __init__(self, server_name, port, using_tls, service_user, service_password, it_group_dns=False, cue_group_dns=False, access_group_dns=False):

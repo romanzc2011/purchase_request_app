@@ -1,6 +1,6 @@
 from loguru import logger
 from sqlalchemy.orm import Session
-import services.db_service as dbas
+import api.services.db_service as dbas
 
 class UUIDService:
     """

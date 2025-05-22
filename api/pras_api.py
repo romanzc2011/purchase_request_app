@@ -1,6 +1,10 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import uvicorn
+import jwt  # PyJWT
+import os, threading, time, uuid, json
+import api.schemas.pydantic_schemas as ps
 
 from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException,  Query, status, UploadFile, File, Form, APIRouter, Path
 from fastapi.responses import JSONResponse, FileResponse
@@ -8,10 +12,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from cachetools import TTLCache, cached
-import uvicorn
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
-import os, threading, time, uuid, json
 from loguru import logger
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
@@ -19,26 +21,27 @@ from multiprocessing.dummy import Pool as ThreadPool
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from werkzeug.utils import secure_filename
-import services.db_service as dbas
-from services.db_service import get_session
-from services.comment_service import add_comment
-import pydantic_schemas as ps
-from pydantic_schemas import RequestPayload, GroupCommentPayload
-import jwt  # PyJWT
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from docxtpl import DocxTemplate
 from pathlib import Path
 from pydantic import BaseModel
 
-from services.auth_service import AuthService
-
-from api.services.email_service.email_service_test import EmailService
-from services.ldap_service import LDAPService, User
-from services.search_service import SearchService
-from services.uuid_service import uuid_service
-from services.pdf_service import make_purchase_request_pdf
-from pydantic_schemas import CyberSecRelatedPayload
-from settings import settings
+import api.services.db_service as dbas
+from api.services.db_service import get_session
+from api.services.comment_service import add_comment
+from api.services.auth_service import AuthService
+from api.services.email_service.email_service import EmailService
+from api.services.ldap_service import LDAPService, User
+from api.services.search_service import SearchService
+from api.services.uuid_service import uuid_service
+from api.services.pdf_service import make_purchase_request_pdf
+from api.schemas.pydantic_schemas import CyberSecRelatedPayload
+from api.schemas.pydantic_schemas import RequestPayload, GroupCommentPayload
+from api.schemas.pydantic_schemas import ApprovalSchema
+from api.services.email_service.renderer import TemplateRenderer
+from api.services.email_service.transport import OutlookTransport
+from api.services.email_service.email_service import EmailService
+from api.settings import settings
 
 """
 AUTHOR: Roman Campbell
@@ -54,6 +57,9 @@ uvicorn pras_api:app --port 5004
 # Load environment variables
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
+
+ 
+# Initialize email service
 
 # ensure settings are loadeed and available
 settings.PDF_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)
@@ -91,15 +97,9 @@ ldap_svc = LDAPService(
     access_group_dns=os.getenv("ACCESS_GROUP_DNS", "False").lower() == "true"
 )
 search_svc = SearchService()
-email_svc = EmailService(
-    from_sender="Purchase Request", 
-    subject="Purchase Request Notification"
-)
-
-# Set the approvers emails
-email_svc.set_first_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov")
-email_svc.set_final_approver("Roman Campbell", "roman_campbell@lawb.uscourts.gov")
-
+renderer = TemplateRenderer(template_dir=os.path.join(os.getcwd(), "api", "services", "email_service", "templates"))
+transport = OutlookTransport()
+ldap_service = ldap_svc
 db_svc = next(get_session())  # Initialize with a session
 auth_svc = AuthService()
 
@@ -212,7 +212,7 @@ async def login(credentials: dict):
 ##########################################################################
 ## GET APPROVAL DATA
 ##########################################################################
-@api_router.get("/getApprovalData", response_model=List[ps.ApprovalSchema])
+@api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
 async def get_approval_data(
     ID: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user)):
@@ -222,12 +222,12 @@ async def get_approval_data(
         if ID:
             approval = dbas.get_approval_by_id(session, ID)
             if approval:
-                approval_data = [ps.ApprovalSchema.model_validate(approval)]
+                approval_data = [ApprovalSchema.model_validate(approval)]
             else:
                 approval_data = []
         else:
             approvals = dbas.get_all_approval(session)
-            approval_data = [ps.ApprovalSchema.model_validate(approval) for approval in approvals]
+            approval_data = [ApprovalSchema.model_validate(approval) for approval in approvals]
         
         return approval_data
     finally:

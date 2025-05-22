@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
@@ -214,9 +214,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         });
     }, [grouped, expandedRows]);
 
-    const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
-    const [assignedIRQ1s, setAssignedIRQ1s] = useState<Record<string, string>>({});
-
     // ITEM DESCRIPTION MODAL - for when length is too long
     const [openDesc, setOpenDesc] = useState<boolean>(false);
     const [fullDesc, setFullDesc] = useState<string>("");
@@ -281,23 +278,16 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
     // ####################################################################
     // Update assignedIRQ1s when approvalData changes
-    useEffect(() => {
-        if (approvalData) {
-            const newAssignedIRQ1s: Record<string, string> = {};
-            const newDraftIRQ1: Record<string, string> = {};
-
-            approvalData.forEach((row: DataRow) => {
-                if (row.IRQ1_ID) {
-                    newAssignedIRQ1s[row.ID] = row.IRQ1_ID;
-                    newDraftIRQ1[row.ID] = row.IRQ1_ID;
-                }
-            });
-
-            // Update both states once after processing all data
-            setAssignedIRQ1s(newAssignedIRQ1s);
-            setDraftIRQ1(prev => ({ ...prev, ...newDraftIRQ1 }));
-        }
+    const assignedIRQ1s = useMemo(() => {
+        const map: Record<string, string> = {};
+        approvalData.forEach(r => {
+            if (r.IRQ1_ID) map[r.ID] = r.IRQ1_ID;
+        });
+        return map;
     }, [approvalData]);
+
+    // User edit live in draftIRQ1
+    const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>(() => ({ ...assignedIRQ1s }));
 
     /***********************************************************************************/
     // MODALS

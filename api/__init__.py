@@ -5,7 +5,6 @@ PRAS API Package
 from api.services.auth_service import AuthService
 from api.services.db_service import get_session
 from api.services.email_service.email_service import EmailService
-from api.services.ipc_service import IPC_Service
 from api.services.ldap_service import LDAPService, User
 from api.services.search_service import SearchService
 
@@ -14,7 +13,6 @@ __all__ = [
     'AuthService',
     'get_session',
     'EmailService',
-    'IPC_Service',
     'LDAPService',
     'SearchService',
     'User'
