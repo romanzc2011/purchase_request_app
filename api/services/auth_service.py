@@ -5,7 +5,7 @@ from loguru import logger
 from typing import Optional
 from fastapi import HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
-from services.ldap_service import LDAPService, User
+from api.services.ldap_service import LDAPService, User
 
 """
 AUTHOR: ROMAN CAMPBELL

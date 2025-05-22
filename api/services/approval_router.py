@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional
 from dataclasses import dataclass
 from loguru import logger
-from pydantic_schemas import ItemStatus
+from api.schemas.pydantic_schemas import ItemStatus
 
 # Approval Router to determine the routing of requests
 
@@ -12,7 +12,7 @@ class ApprovalRequest:
     ApprovalRequest is responsible for determining the routing of requests
     based on the fund and the status of the request.
     """
-    id: str
+    lawb_id: str
     uuid: str
     fund: str
     total_price: float

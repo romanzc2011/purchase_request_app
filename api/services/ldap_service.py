@@ -6,7 +6,7 @@ from ldap3.core.exceptions import LDAPExceptionError, LDAPBindError
 from loguru import logger
 from requests_ntlm import HttpNtlmAuth
 from api.services.approval_router import ApprovalRequest
-from pydantic_schemas import ItemStatus
+from api.schemas.pydantic_schemas import ItemStatus
 from typing import Optional, List
 from api.services.approval_router import ApprovalRequest
 import ssl

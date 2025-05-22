@@ -75,7 +75,7 @@ class ApprovalSchema(BaseModel):
     isCyberSecRelated: Optional[bool] = False
     
 ########################################################
-##    LINE ITEM STATUS SCHEMA
+## LINE ITEM STATUS SCHEMA
 ########################################################
 class LineItemStatusSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)

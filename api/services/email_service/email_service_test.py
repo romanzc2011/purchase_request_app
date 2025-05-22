@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from services.db_service import ITDeptMembers
 from services.db_service import RequestApprovers
 from services.db_service import FinanceDeptMembers
-from pydantic_schemas import GroupCommentPayload, ItemStatus
+from api.schemas.pydantic_schemas import GroupCommentPayload, ItemStatus
 
 """
 AUTHOR: Roman Campbell

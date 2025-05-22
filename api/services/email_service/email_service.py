@@ -1,4 +1,3 @@
-from api.services.email_service.email_service import EmailService
 from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import EmailTransport, OutlookTransport
 from api.services.ldap_service import LDAPService
@@ -49,9 +48,9 @@ class EmailService:
         # Send the email
         self.transport.send(msg)
         
-    def notify_new_request(self, request_id: ID) -> None:
+    def notify_new_request(self, lawb_id: str) -> None:
         # Fetch request details from the database
-        request = self.ldap_service.get_request_by_id(request_id)
+        request = self.ldap_service.get_request_by_id(lawb_id)
         
         # Prepare the email context
         context = {

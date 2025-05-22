@@ -6,8 +6,8 @@
 
 from loguru import logger
 from six import text_type
-import services.db_service as dbas
-from services.db_service import get_session
+import api.services.db_service as dbas
+from api.services.db_service import get_session
 from sqlalchemy import event
 from sqlalchemy.orm.session import Session
 from whoosh.filedb.filestore import RamStorage
