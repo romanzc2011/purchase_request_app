@@ -34,11 +34,16 @@ class EmailService:
     ) -> None:
         # Render the email template
         html_body = self.renderer.render(template_name, context)
+        
 
         # Build the email message
         msg = EmailMessage(
                 subject=subject,
-                sender=self.ldap_service.get_user_email(),
+                sender=self.ldap_service.get_email_address(
+                    self.ldap_service.connection,
+                    self.ldap_service.get_user_email(
+                        self.ldap_service.connection, 
+                        self.ldap_service.get_user_name())),
                 to=to,
                 cc=cc or [],
                 html_body=html_body,

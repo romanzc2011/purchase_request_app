@@ -1,3 +1,14 @@
+"""
+AUTHOR: Roman Campbell
+DATE: 01/03/2025
+NAME: PRAS - (Purchase Request Approval System)
+Will be used to keep track of purchase requests digitally through a central UI.
+This is the backend that will service the UI. When making a purchase request, user will use their AD username for requestor.
+
+TO LAUNCH SERVER:
+uvicorn pras_api:app --port 5004
+"""
+
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -8,6 +19,7 @@ import api.schemas.pydantic_schemas as ps
 
 from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException,  Query, status, UploadFile, File, Form, APIRouter, Path
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
@@ -26,8 +38,10 @@ from docxtpl import DocxTemplate
 from pathlib import Path
 from pydantic import BaseModel
 
+
 import api.services.db_service as dbas
 from api.services.db_service import get_session
+from fastapi.security import OAuth2PasswordRequestForm
 from api.services.comment_service import add_comment
 from api.services.auth_service import AuthService
 from api.services.email_service.email_service import EmailService
@@ -43,35 +57,12 @@ from api.services.email_service.transport import OutlookTransport
 from api.services.email_service.email_service import EmailService
 from api.settings import settings
 
-"""
-AUTHOR: Roman Campbell
-DATE: 01/03/2025
-NAME: PRAS - (Purchase Request Approval System)
-Will be used to keep track of purchase requests digitally through a central UI. This is the backend that will service
-for the UI. When making a purchase request, user will use the their AD username for requestor.
-
-TO LAUNCH SERVER:
-uvicorn pras_api:app --port 5004
-"""
-
 # Load environment variables
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
 
- 
-# Initialize email service
-
 # ensure settings are loadeed and available
 settings.PDF_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)
-
-# Config variables
-UPLOAD_FOLDER = os.path.join(os.getcwd(), os.getenv("UPLOAD_FOLDER", "uploads"))
-PDF_OUTPUT_FOLDER = os.path.join(os.getcwd(), os.getenv("PDF_OUTPUT_FOLDER", "pdf_output"))
-LDAP_SERVER = os.getenv("LDAP_SERVER")
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-LDAP_SERVICE_USER = os.getenv("LDAP_SERVICE_USER", "ADU\\service_account")
-LDAP_SERVICE_PASSWORD = os.getenv("LDAP_SERVICE_PASSWORD", "")
-db_path = os.path.join(os.path.dirname(__file__), "db", "purchase_request.db")
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
@@ -86,28 +77,33 @@ app.add_middleware(
 )
 
 # Initialize service managers
+# Instantiate your services with config from `settings`
 ldap_svc = LDAPService(
-    server_name=LDAP_SERVER,
-    port=int(os.getenv("LDAP_PORT")),
-    using_tls=os.getenv("LDAP_USE_TLS"),
-    service_user=LDAP_SERVICE_USER,
-    service_password=LDAP_SERVICE_PASSWORD,
-    it_group_dns=os.getenv("IT_GROUP_DNS", "False").lower() == "true",
-    cue_group_dns=os.getenv("CUE_GROUP_DNS", "False").lower() == "true",
-    access_group_dns=os.getenv("ACCESS_GROUP_DNS", "False").lower() == "true"
+    server_name=settings.ldap_server,
+    port=settings.ldap_port,
+    using_tls=settings.ldap_use_tls,
+    service_user=settings.ldap_service_user,
+    service_password=settings.ldap_service_password,
+    it_group_dns=settings.it_group_dns,
+    cue_group_dns=settings.cue_group_dns,
+    access_group_dns=settings.access_group_dns
 )
+auth_svc = AuthService(ldap_service=ldap_svc)
+
+# OAuth2 scheme for JWT token extraction
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+
 search_svc = SearchService()
 renderer = TemplateRenderer(template_dir=os.path.join(os.getcwd(), "api", "services", "email_service", "templates"))
 transport = OutlookTransport()
 ldap_service = ldap_svc
 db_svc = next(get_session())  # Initialize with a session
-auth_svc = AuthService()
+email_svc = EmailService(renderer=renderer, transport=transport, ldap_service=ldap_svc)
 
 # Thread safety
 lock = threading.Lock()
 
-# OAuth2 scheme for JWT token extraction
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+
 
 # User caching
 _user_cache = TTLCache(maxsize=1000, ttl=3600)  # user cache
@@ -178,36 +174,31 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
+
+auth_svc = AuthService(ldap_service=ldap_svc)
+
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
 ##########################################################################
 @api_router.post("/login")
-async def login(credentials: dict):
-    username = credentials.get("username")
-    password = credentials.get("password")
-    if not username or not password:
-        raise HTTPException(status_code=400, detail="Missing username or password")
-    
-    adu_user = f"ADU\\{username}"
-    connection = ldap_svc.create_connection(adu_user, password)
-    
-    if connection is None:
-        logger.error(f"LDAP authentication failed for user {username}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    try:
-        user = fetch_user(username)
-        access_token = auth_svc.create_access_token(identity=username)
-        refresh_token = auth_svc.create_access_token(identity=username, expires_delta=timedelta(days=7))
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Expects:
+      POST /api/login
+      Content-Type: application/x-www-form-urlencoded
+
+      username=...&password=...
+    """
+    user = auth_svc.authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
         
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "user": user
-        }
-    except Exception as e:
-        logger.error(f"Error in login: {e}")
-        raise HTTPException(status_code=500, detail="Login error")
+    access_token = auth_svc.create_access_token(user.username)
+    return { "access_token": access_token, "token_type": "Bearer", "user": user.model_dump() }
 
 ##########################################################################
 ## GET APPROVAL DATA
@@ -215,7 +206,7 @@ async def login(credentials: dict):
 @api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
 async def get_approval_data(
     ID: Optional[str] = Query(None),
-    current_user: User = Depends(get_current_user)):
+    current_user: User = Depends(auth_svc.get_current_user)):
     session = next(get_session())
     
     try:
@@ -239,7 +230,7 @@ async def get_approval_data(
 @api_router.post("/downloadStatementOfNeedForm")
 async def download_statement_of_need_form(
     payload: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(auth_svc.get_current_user),
 ):
     ID = payload.get("ID")
     logger.debug(f"ID: {ID}")
@@ -302,7 +293,7 @@ async def download_statement_of_need_form(
 async def get_search_data(
     query: str = "",
     column: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(auth_svc.get_current_user)
 ):
     # If column is provided, use _exact_singleton_search instead
     if column:
@@ -317,7 +308,7 @@ async def get_search_data(
 ## SEND TO approval -- being sent from the purchase req submit
 ##########################################################################
 @api_router.post("/sendToPurchaseReq")
-async def set_purchase_request(data: dict, current_user: str = Depends(get_current_user)):
+async def set_purchase_request(data: dict, current_user: str = Depends(auth_svc.get_current_user)):
     logger.info(f"Authenticated user: {current_user}")
     if not data:
         raise HTTPException(status_code=400, detail="Invalid data")
@@ -339,9 +330,6 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
         raise HTTPException(status_code=400, detail="Invalid requester")
-    
-    # Set the email service requester
-    email_svc.set_requester(requester, requester_email)
     
     ## Verify that requester is a legitimate user in AD via ldap
     # Ensure we have a valid LDAP connection
@@ -368,7 +356,6 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     
     # Get user info - this already includes the email address
     user_info = fetch_user(requester)
-    logger.info(f"USER INFO: {user_info}")
 
     # Process each item in the items array
     items = data.get("items", [])
@@ -388,13 +375,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     # Configure directory paths
     logger.info("Configuring email template");
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    rendered_dir = os.path.join(project_root, "api", "rendered_templates")
     pdf_output_dir = os.path.join(project_root, "api", "pdf_output")
-    template_path = os.path.join(project_root, "api", "templates", "son_template_lines.docx")
-    
-    email_svc.set_template_path(template_path)
-    email_svc.set_rendered_dir(rendered_dir)
-    
     is_cyber = False
     
     processed_lines = []
@@ -414,7 +395,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
     # CREATE EMAIL TEMPLATE HERE
     try:
         # Create PDF of purchase request for email
-        os.makedirs(rendered_dir, exist_ok=True)
+        os.makedirs(pdf_output_dir, exist_ok=True)
         
         pdf_filename = f"statement_of_need-{shared_id}.pdf"
         pdf_path = os.path.join(pdf_output_dir, pdf_filename)
@@ -424,17 +405,37 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
         make_purchase_request_pdf(processed_lines, pdf_path_obj, is_cyber)
         logger.info(f"PDF generated at: {pdf_path}")
   
-        # email_svc.set_rendered_docx_path(pdf_path)   # reuse same field
-        # email_svc.send_notification(
-        #     template_path=None,          # you can skip HTML template altogether
-        #     template_data=None,
-        #     subject="Your Purchase Order PDF",
-        #     request_status="NEW REQUEST"
-        # )
+        # Send email notification to REQUESTOR
+        email_svc.send_template_email(
+            to=[user_info.email],  # Use the email from user_info
+            subject=f"Purchase Request Submitted - {shared_id}",
+            template_name="request_submitted.html",
+            context={
+                "requester": requester,
+                "request_id": shared_id,
+                "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "items": processed_lines
+            },
+            attachments=[pdf_path]  # Attach the generated PDF
+        )
+        
+        # Send email notification to APPROVERS
+        email_svc.send_template_email(
+            to=["roman_campbell@lawb.uscourts.gov"], # TESTING ONLY
+            subject=f"Purchase Request Submitted - {shared_id}",
+            template_name="request_submitted.html",
+            context={
+                "requester": requester,
+                "request_id": shared_id,
+                "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "items": processed_lines
+            },
+            attachments=[pdf_path]  # Attach the generated PDF
+        )
             
     except Exception as e:
-        logger.error(f"Error generating PDF: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating PDF: {e}")
+        logger.error(f"Error generating PDF or sending email: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
     
     return JSONResponse(content={"message": "Processing started in background"})
     
@@ -442,7 +443,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(get_curre
 ## DELETE PURCHASE REQUEST table, condition, params
 ##########################################################################
 @api_router.post("/deleteFile")
-async def delete_file(data: dict, current_user: str = Depends(get_current_user)):
+async def delete_file(data: dict, current_user: str = Depends(auth_svc.get_current_user)):
     """
     Deletes a file given its ID and filename.
     Expects a JSON payload containing "ID" and "filename".
@@ -476,7 +477,7 @@ async def delete_file(data: dict, current_user: str = Depends(get_current_user))
 ## HANDLE FILE UPLOAD
 ##########################################################################
 @api_router.post("/upload")
-async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
+async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: str = Depends(auth_svc.get_current_user)):
     # Ensure the upload directory exists
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -516,7 +517,7 @@ async def log_requests(request: Request, call_next):
 ## ASSIGN REQUISITION ID
 ##########################################################################
 @api_router.post("/assignIRQ1_ID")
-async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_user)):
+async def assign_IRQ1_ID(data: dict, current_user: User = Depends(auth_svc.get_current_user)):
     """
     This is called from the frontend to assign a requisition ID
     to the purchase request. It also updates the UUID in the approval table.
@@ -553,7 +554,7 @@ async def assign_IRQ1_ID(data: dict, current_user: User = Depends(get_current_us
 async def approve_deny_request(
     payload: RequestPayload,
     db: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(auth_svc.get_current_user)
 ):
     logger.info(f"TARGET STATUS: {payload.target_status}")
     final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
@@ -629,7 +630,7 @@ async def create_new_id(request: Request):
 ## GET UUID BY ID
 ##########################################################################
 @api_router.get("/getUUID/{ID}")
-async def get_uuid_by_id_endpoint(ID: str, current_user: User = Depends(get_current_user)):
+async def get_uuid_by_id_endpoint(ID: str, current_user: User = Depends(auth_svc.get_current_user)):
     """
     Get the UUID for a given ID.
     This endpoint can be used by other programs to retrieve the UUID.

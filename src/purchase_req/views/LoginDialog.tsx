@@ -8,6 +8,7 @@ import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { Box, CircularProgress } from "@mui/material";
 import BKSeal from "../../assets/seal_no_border.png";
+import { toast } from "react-toastify";
 
 interface LoginDialogProps {
     open: boolean;
@@ -43,63 +44,43 @@ export default function LoginDialog({
     /***********************************************************************/
     /* HANDLE LOGIN */
     /***********************************************************************/
-    const handleLogin = async () => {
-        if (!validateInput()) return;
+    async function handleLogin(username: string, password: string) {
+        const form = new URLSearchParams();
+        form.append("username", username);
+        form.append("password", password);
 
-        setLoading(true);
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: form.toString(),
+        });
 
-        console.log("api: ", API_URL);
-        try {
-            // PROD
-
-            const response = await fetch(API_URL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-
-                body: JSON.stringify({ username, password }),
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text()
-                console.error("Response Error Body:", errorText);
-
-                throw new Error(`HTTPS error, Status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log("Response from API: ", data);
-
-            // Extract Groups from AD_groups and pass them
-            onLoginSuccess(data.user.group[0], data.user.group[1], data.user.group[2]);
-
-            // Store token in local storage
-            const accessToken = data.access_token;
-
-            if (accessToken) {
-
-                localStorage.setItem("access_token", accessToken);
-            } else {
-
-                console.log("Access token not found in response")
-            }
-        } catch (error) {
-
-            console.error("Error sending login request: ", error);
-            setError("Login failed. Please check your credentials.");
-
-        } finally {
-            setLoading(false);
+        if (!response.ok) {
+            const err = await response.text();
+            toast.error("Login failed: " + err);
+            console.error("Login failed:", err);
+            throw new Error(`Login status ${response.status}`);
         }
-    };
+        const { access_token, token_type, user } = await response.json();
+
+        localStorage.setItem("access_token", access_token);
+        localStorage.setItem("token_type", token_type);
+        localStorage.setItem("user", JSON.stringify(user));
+        onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
+        console.log("Login successful");
+        toast.success("Login successful");
+
+        onClose();
+
+        return access_token;
+    }
 
     /***********************************************************************/
     /* HANDLE SUBMIT */
     /***********************************************************************/
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        handleLogin();
+        handleLogin(username, password);
     };
 
     return (
