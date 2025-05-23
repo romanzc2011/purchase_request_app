@@ -144,6 +144,7 @@ class LDAPService:
         try:
             # Iterate thru the DNS Groups and determine what user is member of
             for group in group_dns:
+                logger.info(f"Checking group: {group}")
                 # Execute search
                 connection.search(
                     search_base=group,
@@ -164,6 +165,7 @@ class LDAPService:
                     
                     match = re.search(r'CN=LAWB_([^,]+)', group)
                     group_name = match.group(1) if match else "Unknown"
+                    logger.info(f"Extracted group name: {group_name}")
                     for member_dn in members_dn_list:
                         # Query LDAP for each DN to get their sAMAccountName (username)
                         connection.search(

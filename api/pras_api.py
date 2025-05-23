@@ -102,8 +102,6 @@ email_svc = EmailService(renderer=renderer, transport=transport, ldap_service=ld
 # Thread safety
 lock = threading.Lock()
 
-
-
 # User caching
 _user_cache = TTLCache(maxsize=1000, ttl=3600)  # user cache
 @cached(_user_cache)
