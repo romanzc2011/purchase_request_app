@@ -47,11 +47,19 @@ class AuthService:
     #####################################################################################
     ## AUTHENTICATE USER
     def authenticate_user(
-        self, username: str, password: str
+        self, form_data: OAuth2PasswordRequestForm = Depends()
     ) -> Optional[LDAPUser]:
         """
         Attempt an LDAP bind. On success, return a rich User object.
         """
+        logger.info("""
+            #####################################################################
+            Authenticating User()
+            #####################################################################""")
+        logger.info(f"AUTHENTICATING USER: {form_data.username}")
+        logger.info(f"PASSWORD: {form_data.password}")
+        username = form_data.username
+        password = form_data.password
         connection = self.ldap_service.create_connection(username, password)
         if not connection:
             return None

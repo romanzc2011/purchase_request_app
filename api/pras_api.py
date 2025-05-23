@@ -8,7 +8,6 @@ This is the backend that will service the UI. When making a purchase request, us
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
-
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -189,7 +188,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
       username=...&password=...
     """
-    user = auth_svc.authenticate_user(form_data.username, form_data.password)
+    logger.info("""
+        #####################################################################
+        Login()
+        #####################################################################""")
+    logger.info(f"FORM DATA: {form_data}")
+    logger.info(f"Username: {form_data.username}")
+    logger.info(f"Password: {form_data.password}")
+    user = auth_svc.authenticate_user(form_data)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -198,7 +204,17 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
         
     access_token = auth_svc.create_access_token(user.username)
-    return { "access_token": access_token, "token_type": "Bearer", "user": user.model_dump() }
+    logger.info(f"User object: {user}")
+    logger.info(f"User attributes: username={user.username}, email={user.email}, group={user.group}")
+    return { 
+        "access_token": access_token, 
+        "token_type": "Bearer", 
+        "user": {
+            "username": user.username,
+            "email": user.email,
+            "group": user.group
+        }
+    }
 
 ##########################################################################
 ## GET APPROVAL DATA

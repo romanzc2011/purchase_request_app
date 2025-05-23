@@ -71,11 +71,29 @@ class LDAPService:
         tls = None
         if self.using_tls:
             tls = self.tls_config()
+        logger.info("""
+            #####################################################################
+            Creating Connection()
+            #####################################################################""")
+        logger.info(f"USERNAME: {username}")
+        logger.info(f"PASSWORD: {password}")
         
-        server = Server(self.server_name, port=self.port, use_ssl=self.using_tls, tls=tls, get_info=ALL)
+        # Remove ldaps:// prefix if present
+        server_name = self.server_name.replace('ldaps://', '').replace('ldap://', '')
+        logger.info(f"Cleaned server name: {server_name}")
         
+        server = Server(server_name, port=self.port, use_ssl=self.using_tls, tls=tls, get_info=ALL)
+        logger.info(f"SERVER: {server}")
         try:
-            connection = Connection(server, user=username, password=password, auto_bind=True)
+            logger.info(f"Attempting connection to {server_name}:{self.port} with SSL={self.using_tls}")
+            # Try with domain prefix if username doesn't have it
+            if not '\\' in username and not '@' in username:
+                user = f"ADU\\{username}"
+            else:
+                user = username
+            logger.info(f"Using user format: {user}")
+            
+            connection = Connection(server, user=user, password=password, auto_bind=True)
             
             if connection.bound:
                 print("\n#####################################################################")
@@ -88,12 +106,17 @@ class LDAPService:
                 return connection
             else:
                 logger.error(f"❌ Failed to bind to LDAP server: {self.server_name}")
+                logger.error(f"Connection status: {connection.result}")
                 self.set_is_authenticated(False)
                 self.set_connection(None)
                 return None
         
         except LDAPExceptionError as e:
-            logger.error("❌ LDAP Server Returned an Error:", str(e))
+            logger.error("❌ LDAP Server Returned an Error:")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error message: {str(e)}")
+            logger.error(f"Server details: {self.server_name}:{self.port}")
+            logger.error(f"Using SSL: {self.using_tls}")
             self.set_is_authenticated(False)
             self.set_connection(None)
             return None

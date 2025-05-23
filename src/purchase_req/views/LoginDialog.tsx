@@ -29,6 +29,7 @@ export default function LoginDialog({
     const baseURL = "http://localhost:5004"
     const API_CALL = "/api/login";
     const API_URL = `${baseURL}${API_CALL}`
+
     /***********************************************************************/
     /* VALIDATE INPUT */
     /***********************************************************************/
