@@ -9,6 +9,27 @@ from enum import Enum
 ########################################################
 
 ########################################################    
+##  TOKEN SCHEMA
+########################################################
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    
+class TokenData(BaseModel):
+    username: str
+    groups: List[str]
+    
+class AuthUser(BaseModel):
+    username: str
+    email: EmailStr
+    groups: List[str]
+    
+class LDAPUser(BaseModel):
+    username: str
+    email: EmailStr
+    group: List[str]
+
+########################################################    
 ##  LINE ITEM STATUS ENUMERATION
 ########################################################
 class ItemStatus(str, Enum):

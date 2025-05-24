@@ -1,7 +1,6 @@
 import { Box } from "@mui/material";
 import { useState } from "react";
 import { Sidebar as ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
-import HomeIcon from "@mui/icons-material/Home";
 import MenuIcon from "@mui/icons-material/Menu";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import Typography from "@mui/material/Typography";
@@ -22,7 +21,7 @@ const Sidebar = ({ isOpen, toggleSidebar, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: S
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [toggled, setToggled] = useState(false);
     const navigate = useNavigate();
-    
+
     return (
         <Box
             sx={{
@@ -88,18 +87,18 @@ const Sidebar = ({ isOpen, toggleSidebar, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: S
                                 >
                                     <MenuIcon />
                                     <IconButton onClick={() => setIsCollapsed(!isCollapsed)} />
-                                        
+
                                 </Box>
                             )}
                         </MenuItem>
 
-                       
+
                         <Box paddingLeft={isCollapsed ? undefined : "10%"}>
                             {/*************************************************************************/}
                             {/* CREATE REQUEST */}
                             {/*************************************************************************/}
                             <MenuItem
-                                
+
                                 icon={<AddCircleOutlineIcon />}
                                 onClick={() => navigate('/create-request')}
                             >
@@ -110,7 +109,7 @@ const Sidebar = ({ isOpen, toggleSidebar, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: S
                             {/* APPROVALS */}
                             {/*************************************************************************/}
                             <MenuItem
-                                disabled={!IT_GROUP || !CUE_GROUP}
+                                disabled={IT_GROUP || CUE_GROUP}
                                 icon={<ApprovalIcon />}
                                 onClick={() => navigate('/approvals')}
                             >

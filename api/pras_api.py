@@ -44,7 +44,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from api.services.comment_service import add_comment
 from api.services.auth_service import AuthService
 from api.services.email_service.email_service import EmailService
-from api.services.ldap_service import LDAPService, User
+from api.services.ldap_service import LDAPService
+from api.schemas.pydantic_schemas import AuthUser
+from api.schemas.pydantic_schemas import LDAPUser
 from api.services.search_service import SearchService
 from api.services.uuid_service import uuid_service
 from api.services.pdf_service import make_purchase_request_pdf
@@ -55,6 +57,9 @@ from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
 from api.services.email_service.email_service import EmailService
 from api.settings import settings
+
+import tracemalloc
+tracemalloc.start()
 
 # Load environment variables
 dotenv_path = find_dotenv()
@@ -105,69 +110,18 @@ lock = threading.Lock()
 # User caching
 _user_cache = TTLCache(maxsize=1000, ttl=3600)  # user cache
 @cached(_user_cache)
-def fetch_user(username: str) -> User:
+def fetch_user(username: str) -> LDAPUser:
     connection = ldap_svc.get_connection()
     if connection is None:
         logger.warning(f"LDAP connection is None for user {username}, using default user object")
-        return User(username=username, email="unknown", group=[])
+        return LDAPUser(username=username, email="unknown", group=[])
         
     groups = ldap_svc.check_user_membership(connection, username)
     email = ldap_svc.get_email_address(connection, username)
     
-    return ldap_svc.build_user_object(username, groups, email)
+    return LDAPUser(username=username, email=email, group=list(groups.keys()))
 
-# Define get_current_user function
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        # Verify JWT token
-        username = auth_svc.verify_jwt_token(token)
-        if not username:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: no username found"
-            )
-            
-        # Get user email from LDAP
-        user_email = ldap_svc.get_email_address(ldap_svc.get_connection(), username)
-        if not user_email:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: user not found in LDAP"
-            )
-            
-        # Get user groups from LDAP
-        user_groups = ldap_svc.get_groups()
-        if not user_groups:
-            logger.warning(f"No groups found for user {username}")
-            user_groups = []
-            
-        user = User(
-            username=username,
-            email=user_email,
-            group=user_groups
-        )
-        return user
-    except ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired"
-        )
-    except PyJWTError as e:
-        logger.error(f"JWT validation error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
-    except HTTPException:
-        # Re-raise HTTP exceptions (including our custom ones)
-        raise
-    except Exception as e:
-        logger.error(f"Error in get_current_user: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error processing authentication"
-        )
-
+##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
@@ -193,26 +147,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     logger.info(f"FORM DATA: {form_data}")
     logger.info(f"Username: {form_data.username}")
     logger.info(f"Password: {form_data.password}")
-    user = auth_svc.authenticate_user(form_data)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-    access_token = auth_svc.create_access_token(user.username)
-    logger.info(f"User object: {user}")
-    logger.info(f"User attributes: username={user.username}, email={user.email}, group={user.group}")
-    return { 
-        "access_token": access_token, 
-        "token_type": "Bearer", 
-        "user": {
-            "username": user.username,
-            "email": user.email,
-            "group": user.group
-        }
-    }
+    
+    return await auth_svc.login(form_data)
 
 ##########################################################################
 ## GET APPROVAL DATA
@@ -220,7 +156,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
 async def get_approval_data(
     ID: Optional[str] = Query(None),
-    current_user: User = Depends(auth_svc.get_current_user)):
+    current_user: AuthUser = Depends(auth_svc.get_current_user)):
+    
+    # Check if user is in IT group or CUE group
+    logger.info(f"CURRENT USER: {current_user}")
     session = next(get_session())
     
     try:
@@ -244,7 +183,7 @@ async def get_approval_data(
 @api_router.post("/downloadStatementOfNeedForm")
 async def download_statement_of_need_form(
     payload: dict,
-    current_user: User = Depends(auth_svc.get_current_user),
+    current_user: AuthUser = Depends(auth_svc.get_current_user),
 ):
     ID = payload.get("ID")
     logger.debug(f"ID: {ID}")
@@ -307,7 +246,7 @@ async def download_statement_of_need_form(
 async def get_search_data(
     query: str = "",
     column: Optional[str] = None,
-    current_user: User = Depends(auth_svc.get_current_user)
+    current_user: AuthUser = Depends(auth_svc.get_current_user)
 ):
     # If column is provided, use _exact_singleton_search instead
     if column:
@@ -531,7 +470,7 @@ async def log_requests(request: Request, call_next):
 ## ASSIGN REQUISITION ID
 ##########################################################################
 @api_router.post("/assignIRQ1_ID")
-async def assign_IRQ1_ID(data: dict, current_user: User = Depends(auth_svc.get_current_user)):
+async def assign_IRQ1_ID(data: dict, current_user: AuthUser = Depends(auth_svc.get_current_user)):
     """
     This is called from the frontend to assign a requisition ID
     to the purchase request. It also updates the UUID in the approval table.
@@ -644,7 +583,7 @@ async def create_new_id(request: Request):
 ## GET UUID BY ID
 ##########################################################################
 @api_router.get("/getUUID/{ID}")
-async def get_uuid_by_id_endpoint(ID: str, current_user: User = Depends(auth_svc.get_current_user)):
+async def get_uuid_by_id_endpoint(ID: str, current_user: AuthUser = Depends(auth_svc.get_current_user)):
     """
     Get the UUID for a given ID.
     This endpoint can be used by other programs to retrieve the UUID.
@@ -814,7 +753,7 @@ def process_approval_data(processed_data):
 
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
-def purchase_req_commit(processed_data, current_user: User):
+def purchase_req_commit(processed_data, current_user: AuthUser):
     with lock:
         try:
             logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")

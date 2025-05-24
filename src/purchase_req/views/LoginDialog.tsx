@@ -62,7 +62,30 @@ export default function LoginDialog({
             console.error("Login failed:", err);
             throw new Error(`Login status ${response.status}`);
         }
-        const { access_token, token_type, user } = await response.json();
+
+        const text = await response.text();
+        if (!text) {
+            throw new Error("No data received from server");
+        }
+
+        console.log("Raw server response:", text);
+
+        let data;
+        try {
+            data = JSON.parse(text);
+            console.log("Parsed response data:", data);
+        } catch (error) {
+            console.error("Invalid JSON data received from server:", error);
+            throw new Error("Invalid JSON data received from server");
+        }
+
+        if (!data || !data.access_token || !data.user) {
+            console.error("Invalid login response:", data);
+            throw new Error("Login response is missing required fields");
+        }
+
+        const { access_token, token_type, user } = data;
+
 
         localStorage.setItem("access_token", access_token);
         localStorage.setItem("token_type", token_type);
@@ -73,15 +96,26 @@ export default function LoginDialog({
 
         onClose();
 
-        return access_token;
+        return data;
     }
 
     /***********************************************************************/
     /* HANDLE SUBMIT */
     /***********************************************************************/
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        handleLogin(username, password);
+
+        if (!validateInput()) return;
+
+        setLoading(true);
+        try {
+            const { access_token, user } = await handleLogin(username, password);
+            localStorage.setItem("access_token", access_token);
+            onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
+        } catch (error) {
+            console.error("Login failed:", error);
+            setLoading(false);
+        }
     };
 
     return (

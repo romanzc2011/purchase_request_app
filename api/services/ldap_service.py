@@ -1,6 +1,4 @@
-from dataclasses import dataclass
 from dotenv import load_dotenv
-from flask import jsonify
 from ldap3 import Server, Connection, Tls, ALL, SUBTREE
 from ldap3.core.exceptions import LDAPExceptionError
 from loguru import logger
@@ -9,7 +7,7 @@ from typing import Optional, List
 import ssl
 import os
 import re
-
+from api.schemas.pydantic_schemas import LDAPUser
 """
 AUTHOR: ROMAN CAMPBELL
 DATE: 01/29/2025
@@ -36,12 +34,6 @@ user_groups = {
     "IT_GROUP": False
 }
 
-@dataclass
-class User:
-    username: str
-    email: str
-    group: List[str]
-
 class LDAPService:
     def __init__(self, server_name, port, using_tls, service_user, service_password, it_group_dns=False, cue_group_dns=False, access_group_dns=False):
         self.server_name = server_name
@@ -61,9 +53,9 @@ class LDAPService:
     #####################################################################################
     # BUILD USER OBJ
     @staticmethod
-    def build_user_object(username: str, groups: dict[str,bool], email: Optional[str]) -> User:
+    def build_user_object(username: str, groups: dict[str,bool], email: Optional[str]) -> LDAPUser:
         group_names = [k for k,v in groups.items() if v]
-        return User(username, email or "unknown", group_names)
+        return LDAPUser(username, email or "unknown", group_names)
     
     #####################################################################################
     # GET CONNECTION of ldap service
@@ -230,7 +222,7 @@ class LDAPService:
             return False
         
         try:
-            # Extract username string if User obj passed
+            # Extract username string if LDAPUser obj passed
             username_str = username.username if hasattr(username, 'username') else str(username)
             
             # Escape special characters in the username
@@ -255,7 +247,7 @@ class LDAPService:
         
         # Check if legitimate user
         if not self.check_legitimate_user(connection, username):
-            logger.error(f"User {username} is not a legitimate user")
+            logger.error(f"LDAPUser {username} is not a legitimate user")
             return None
             
         try:
@@ -270,7 +262,7 @@ class LDAPService:
                 email_address = connection.entries[0].mail.value
                 return email_address
             else:
-                logger.error(f"User {username} not found in LDAP.")
+                logger.error(f"LDAPUser {username} not found in LDAP.")
                 return None
         except Exception as e:
             logger.error(f"Error retrieving email address: {e}")
@@ -308,8 +300,7 @@ class LDAPService:
         except Exception as e:
             logger.error(f"Error getting username: {e}")
             return ["Error"]
-            
-            
+        
     #####################################################################################
     # SETTERS
     
