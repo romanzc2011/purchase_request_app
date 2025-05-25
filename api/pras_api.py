@@ -37,29 +37,27 @@ from docxtpl import DocxTemplate
 from pathlib import Path
 from pydantic import BaseModel
 
-
 import api.services.db_service as dbas
 from api.services.db_service import get_session
 from fastapi.security import OAuth2PasswordRequestForm
-from api.services.comment_service import add_comment
 from api.services.auth_service import AuthService
 from api.services.email_service.email_service import EmailService
 from api.services.ldap_service import LDAPService
-from api.schemas.pydantic_schemas import AuthUser
-from api.schemas.pydantic_schemas import LDAPUser
 from api.services.search_service import SearchService
 from api.services.uuid_service import uuid_service
 from api.services.pdf_service import make_purchase_request_pdf
-from api.schemas.pydantic_schemas import CyberSecRelatedPayload
-from api.schemas.pydantic_schemas import RequestPayload, GroupCommentPayload
-from api.schemas.pydantic_schemas import ApprovalSchema
+
 from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
 from api.services.email_service.email_service import EmailService
+
 from api.settings import settings
 
-import tracemalloc
-tracemalloc.start()
+from api.schemas.pydantic_schemas import PurchaseResponse, PurchaseRequestPayload
+from api.schemas.pydantic_schemas import LDAPUser
+from api.schemas.pydantic_schemas import CyberSecRelatedPayload
+from api.schemas.pydantic_schemas import RequestPayload, GroupCommentPayload
+from api.schemas.pydantic_schemas import ApprovalSchema
 
 # Load environment variables
 dotenv_path = find_dotenv()
@@ -107,20 +105,6 @@ email_svc = EmailService(renderer=renderer, transport=transport, ldap_service=ld
 # Thread safety
 lock = threading.Lock()
 
-# User caching
-_user_cache = TTLCache(maxsize=1000, ttl=3600)  # user cache
-@cached(_user_cache)
-def fetch_user(username: str) -> LDAPUser:
-    connection = ldap_svc.get_connection()
-    if connection is None:
-        logger.warning(f"LDAP connection is None for user {username}, using default user object")
-        return LDAPUser(username=username, email="unknown", group=[])
-        
-    groups = ldap_svc.check_user_membership(connection, username)
-    email = ldap_svc.get_email_address(connection, username)
-    
-    return LDAPUser(username=username, email=email, group=list(groups.keys()))
-
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
@@ -149,14 +133,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     logger.info(f"Password: {form_data.password}")
     
     return await auth_svc.login(form_data)
-
 ##########################################################################
 ## GET APPROVAL DATA
 ##########################################################################
 @api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
 async def get_approval_data(
     ID: Optional[str] = Query(None),
-    current_user: AuthUser = Depends(auth_svc.get_current_user)):
+    current_user: LDAPUser = Depends(auth_svc.get_current_user)):
     
     # Check if user is in IT group or CUE group
     logger.info(f"CURRENT USER: {current_user}")
@@ -183,7 +166,7 @@ async def get_approval_data(
 @api_router.post("/downloadStatementOfNeedForm")
 async def download_statement_of_need_form(
     payload: dict,
-    current_user: AuthUser = Depends(auth_svc.get_current_user),
+    current_user: LDAPUser = Depends(auth_svc.get_current_user),
 ):
     ID = payload.get("ID")
     logger.debug(f"ID: {ID}")
@@ -246,7 +229,7 @@ async def download_statement_of_need_form(
 async def get_search_data(
     query: str = "",
     column: Optional[str] = None,
-    current_user: AuthUser = Depends(auth_svc.get_current_user)
+    current_user: LDAPUser = Depends(auth_svc.get_current_user)
 ):
     # If column is provided, use _exact_singleton_search instead
     if column:
@@ -260,64 +243,50 @@ async def get_search_data(
 ##########################################################################
 ## SEND TO approval -- being sent from the purchase req submit
 ##########################################################################
-@api_router.post("/sendToPurchaseReq")
-async def set_purchase_request(data: dict, current_user: str = Depends(auth_svc.get_current_user)):
+@api_router.post(
+    "/sendToPurchaseReq",
+    response_model=PurchaseResponse,
+    status_code=200
+)
+async def set_purchase_request(
+    payload: PurchaseRequestPayload,
+    current_user: LDAPUser = Depends(auth_svc.get_current_user)
+):
+    ################################################################3
+    ## VALIDATE REQUESTER
+    logger.info(f"LINE - 271: Setting purchase request")
     logger.info(f"Authenticated user: {current_user}")
-    if not data:
-        raise HTTPException(status_code=400, detail="Invalid data")
     
-    logger.debug(f"DATA: {data}")
-    
-    requester = data.get("requester")
-    items = data.get("items", [])
-    
-    if not requester:
-        logger.error(f"Requester not found in ID: {data['ID']}")
-        raise HTTPException(status_code=400, detail="Invalid requester")
-    
-    # Set the requester in the LDAP service
-    ldap_svc.set_requester(requester)
+    # Get requester from payload
+    requester = payload.requester
     
     # Get requester email address
     requester_email = ldap_svc.get_email_address(ldap_svc.get_connection(), requester)
+    logger.info(f"LINE - 285:Requester email: {requester_email}")
+    
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
         raise HTTPException(status_code=400, detail="Invalid requester")
     
-    ## Verify that requester is a legitimate user in AD via ldap
-    # Ensure we have a valid LDAP connection
-    if not ldap_svc.check_ldap_connection(current_user):
-        # Try to establish a new connection using service account
-        conn = ldap_svc.create_connection(LDAP_SERVICE_USER, LDAP_SERVICE_PASSWORD)
-        if conn is None:
-            logger.warning(f"Could not establish LDAP connection for user verification")
-        else:
-            # Check if the requester is a legitimate user
-            is_legitimate = ldap_svc.check_legitimate_user(conn, requester)
-            if not is_legitimate:
-                logger.error(f"Requester {requester} is not a legitimate user in AD")
-                raise HTTPException(status_code=400, detail="Invalid requester")
-    else:
-        # Get LDAP connection
-        conn = ldap_svc.get_connection()
-        
-        # Check if the requester is a legitimate user
-        is_legitimate = ldap_svc.check_legitimate_user(conn, requester)
-        if not is_legitimate:
-            logger.error(f"Requester {requester} is not a legitimate user in AD")
-            raise HTTPException(status_code=400, detail="Invalid requester")
+    logger.info("PROCESSING PAYLOAD...")    
+    if not payload:
+        raise HTTPException(status_code=400, detail="Invalid data")
     
-    # Get user info - this already includes the email address
-    user_info = fetch_user(requester)
-
+    ################################################################3
+    ## VALIDATE/PROCESS PAYLOAD
+    logger.debug(f"DATA: {payload}")
+    
+    requester = payload.requester
+    items = payload.items
+    
     # Process each item in the items array
-    items = data.get("items", [])
     if not items:
         logger.error("No items found in request data")
         raise HTTPException(status_code=400, detail="No items found in request data")
-    
+
     # Get the shared ID from the first item, but ensure it's not a temporary ID
-    first_item_id = items[0].get("ID") if items else None
+    first_item_id = items[0].ID if items else None
+    
     if not first_item_id or first_item_id.startswith("TEMP-"):
         shared_id = dbas.get_next_request_id()
         logger.info(f"Generated new shared ID: {shared_id}")
@@ -334,16 +303,11 @@ async def set_purchase_request(data: dict, current_user: str = Depends(auth_svc.
     processed_lines = []
     # Process each item
     for item in items:
-        item["ID"] = shared_id
-        item["requester"] = requester
-        
-        # Process the purchase data
-        processed_data = process_purchase_data(item)
-
-        # Commit the purchase request
+        item.ID = shared_id
+        item.requester = requester
+        processed_data = process_purchase_data(item.dict())
         purchase_req_commit(processed_data, current_user)
-        processed_lines.append(processed_data)
-    
+        
     ##########################################################
     # CREATE EMAIL TEMPLATE HERE
     try:
@@ -357,10 +321,12 @@ async def set_purchase_request(data: dict, current_user: str = Depends(auth_svc.
         
         make_purchase_request_pdf(processed_lines, pdf_path_obj, is_cyber)
         logger.info(f"PDF generated at: {pdf_path}")
-  
+
+        ######################################################################
         # Send email notification to REQUESTOR
+        ######################################################################
         email_svc.send_template_email(
-            to=[user_info.email],  # Use the email from user_info
+            to=[requester_email],  # Use the email from user_info
             subject=f"Purchase Request Submitted - {shared_id}",
             template_name="request_submitted.html",
             context={
@@ -369,10 +335,13 @@ async def set_purchase_request(data: dict, current_user: str = Depends(auth_svc.
                 "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "items": processed_lines
             },
-            attachments=[pdf_path]  # Attach the generated PDF
+            attachments=[pdf_path],  # Attach the generated PDF
+            current_user=current_user
         )
         
+        ######################################################################
         # Send email notification to APPROVERS
+        ######################################################################
         email_svc.send_template_email(
             to=["roman_campbell@lawb.uscourts.gov"], # TESTING ONLY
             subject=f"Purchase Request Submitted - {shared_id}",
@@ -383,7 +352,8 @@ async def set_purchase_request(data: dict, current_user: str = Depends(auth_svc.
                 "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "items": processed_lines
             },
-            attachments=[pdf_path]  # Attach the generated PDF
+            attachments=[pdf_path],  # Attach the generated PDF
+            current_user=current_user
         )
             
     except Exception as e:
@@ -396,7 +366,7 @@ async def set_purchase_request(data: dict, current_user: str = Depends(auth_svc.
 ## DELETE PURCHASE REQUEST table, condition, params
 ##########################################################################
 @api_router.post("/deleteFile")
-async def delete_file(data: dict, current_user: str = Depends(auth_svc.get_current_user)):
+async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_svc.get_current_user)):
     """
     Deletes a file given its ID and filename.
     Expects a JSON payload containing "ID" and "filename".
@@ -430,7 +400,7 @@ async def delete_file(data: dict, current_user: str = Depends(auth_svc.get_curre
 ## HANDLE FILE UPLOAD
 ##########################################################################
 @api_router.post("/upload")
-async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: str = Depends(auth_svc.get_current_user)):
+async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_svc.get_current_user)):
     # Ensure the upload directory exists
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -470,7 +440,7 @@ async def log_requests(request: Request, call_next):
 ## ASSIGN REQUISITION ID
 ##########################################################################
 @api_router.post("/assignIRQ1_ID")
-async def assign_IRQ1_ID(data: dict, current_user: AuthUser = Depends(auth_svc.get_current_user)):
+async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_svc.get_current_user)):
     """
     This is called from the frontend to assign a requisition ID
     to the purchase request. It also updates the UUID in the approval table.
@@ -507,7 +477,7 @@ async def assign_IRQ1_ID(data: dict, current_user: AuthUser = Depends(auth_svc.g
 async def approve_deny_request(
     payload: RequestPayload,
     db: Session = Depends(get_session),
-    current_user = Depends(auth_svc.get_current_user)
+    current_user: LDAPUser = Depends(auth_svc.get_current_user)
 ):
     logger.info(f"TARGET STATUS: {payload.target_status}")
     final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
@@ -583,7 +553,7 @@ async def create_new_id(request: Request):
 ## GET UUID BY ID
 ##########################################################################
 @api_router.get("/getUUID/{ID}")
-async def get_uuid_by_id_endpoint(ID: str, current_user: AuthUser = Depends(auth_svc.get_current_user)):
+async def get_uuid_by_id_endpoint(ID: str, current_user: LDAPUser = Depends(auth_svc.get_current_user)):
     """
     Get the UUID for a given ID.
     This endpoint can be used by other programs to retrieve the UUID.
@@ -753,11 +723,14 @@ def process_approval_data(processed_data):
 
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
-def purchase_req_commit(processed_data, current_user: AuthUser):
+def purchase_req_commit(processed_data, current_user: LDAPUser):
     with lock:
         try:
             logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")
             
+            if isinstance(processed_data.get('fileAttachments'), list):
+                processed_data['fileAttachments'] = None
+                
             # First create purchase request
             purchase_request = dbas.insert_data(table="purchase_requests", data=processed_data)
             
@@ -781,7 +754,7 @@ def purchase_req_commit(processed_data, current_user: AuthUser):
             # Create son comment with required IDs
             son_comment_data = {
                 'UUID': approval.UUID,
-                'purchase_req_id': approval.ID,  # <-- This is the correct key, matches your model
+                'purchase_req_id': approval.ID,
                 'son_requester': current_user.username,
                 'item_description': processed_data['itemDescription'],
             }

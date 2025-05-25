@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import model_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 
 ########################################################
@@ -19,15 +20,10 @@ class TokenData(BaseModel):
     username: str
     groups: List[str]
     
-class AuthUser(BaseModel):
-    username: str
-    email: EmailStr
-    groups: List[str]
-    
 class LDAPUser(BaseModel):
     username: str
     email: EmailStr
-    group: List[str]
+    groups: List[str]
 
 ########################################################    
 ##  LINE ITEM STATUS ENUMERATION
@@ -67,6 +63,53 @@ class PurchaseRequestSchema(BaseModel):
     location: str
     quantity: int
     createdTime: datetime
+
+from pydantic import BaseModel, Field
+from typing  import List, Optional
+from datetime import date
+
+class FileAttachment(BaseModel):
+    attachment: Optional[bytes] = None  # or Optional[str] if base64-encoded
+    name:       Optional[str]
+    type:       Optional[str]
+    size:       Optional[int]
+
+class LearnAndDev(BaseModel):
+    trainNotAval: bool
+    needsNotMeet: bool
+
+class PurchaseItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    UUID:            str
+    ID:              str
+    IRQ1_ID:         Optional[str] = None
+    requester:       str
+    phoneext:        str
+    datereq:         date
+    dateneed:        Optional[date] = None
+    orderType:       str
+    fileAttachments: Optional[List[FileAttachment]] = None
+    itemDescription: str
+    justification:   str
+    learnAndDev:     LearnAndDev
+    quantity:        int     = Field(..., gt=0)
+    price:           float   = Field(..., ge=0)
+    priceEach:       float   = Field(..., ge=0.01)
+    totalPrice:      float   = Field(..., ge=0)
+    fund:            str
+    location:        str
+    budgetObjCode:   str     = Field(..., min_length=4, max_length=4)
+    status:          ItemStatus  # Using the ItemStatus enum for validation
+
+    
+class PurchaseRequestPayload(BaseModel):
+    requester: str
+    items:     List[PurchaseItem]
+    itemCount: int
+
+class PurchaseResponse(BaseModel):
+    message: str
+    request_id: Optional[str]
 
 ########################################################
 ##    APPROVAL SCHEMA

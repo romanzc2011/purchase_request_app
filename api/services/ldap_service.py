@@ -67,8 +67,6 @@ class LDAPService:
             #####################################################################
             Creating Connection()
             #####################################################################""")
-        logger.info(f"USERNAME: {username}")
-        logger.info(f"PASSWORD: {password}")
         
         # Remove ldaps:// prefix if present
         server_name = self.server_name.replace('ldaps://', '').replace('ldap://', '')
@@ -213,32 +211,7 @@ class LDAPService:
         except Exception as e:
             logger.error(f"Error checking legitimate user: {e}")
             return False
-    
-    #####################################################################################
-    # CHECK FOR LDAP CONNECTION
-    def check_ldap_connection(self, username):
-        if self.connection is None:
-            logger.error("Cannot check LDAP connection: LDAP connection is None")
-            return False
-        
-        try:
-            # Extract username string if LDAPUser obj passed
-            username_str = username.username if hasattr(username, 'username') else str(username)
-            
-            # Escape special characters in the username
-            escaped_username = username_str.replace('*', '\\*').replace('(', '\\(').replace(')', '\\)')
-            self.connection.search(
-                search_base='DC=ADU,DC=DCN',
-                search_filter=f'(sAMAccountName={escaped_username})',
-                search_scope=SUBTREE
-            )
-            if self.connection.entries:
-                return True
-            else:
-                return False
-        except Exception as e:
-            logger.error(f"Error checking LDAP connection: {e}")
-            return False
+
     #########################################################################
     # EMAIL ADDRESS LOOKUP
     #########################################################################
@@ -300,7 +273,19 @@ class LDAPService:
         except Exception as e:
             logger.error(f"Error getting username: {e}")
             return ["Error"]
+    
+    #####################################################################################
+    # FETCH USER
+    #####################################################################################
+    def fetch_user(self, username: str) -> LDAPUser:
+        connection = self.get_connection()
+        if connection is None:
+            logger.warning(f"LDAP connection is None for user {username}, using default user object")
+            return LDAPUser(username=username, email="uknown@unknown.com", groups=[])
         
+        groups = self.check_user_membership(connection, username)
+        email = self.get_email_address(connection, username)
+        return LDAPUser(username=username, email=email, groups=list(groups.keys()))
     #####################################################################################
     # SETTERS
     

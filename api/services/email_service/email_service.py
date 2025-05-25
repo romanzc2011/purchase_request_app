@@ -2,6 +2,7 @@ from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import EmailTransport, OutlookTransport
 from api.services.ldap_service import LDAPService
 from api.services.email_service.models import EmailMessage
+from api.services.ldap_service import LDAPUser
 from typing import List, Optional
 from api.services.email_service.models import GroupCommentPayload
 import os
@@ -28,22 +29,18 @@ class EmailService:
         subject: str,
         template_name: str,
         context: dict,
+        current_user: LDAPUser,
         cc: Optional[List[str]] = None,
         bcc: Optional[List[str]] = None,
         attachments: Optional[List[str]] = None,
     ) -> None:
         # Render the email template
         html_body = self.renderer.render(template_name, context)
-        
 
         # Build the email message
         msg = EmailMessage(
                 subject=subject,
-                sender=self.ldap_service.get_email_address(
-                    self.ldap_service.connection,
-                    self.ldap_service.get_user_email(
-                        self.ldap_service.connection, 
-                        self.ldap_service.get_user_name())),
+                sender = "Purchase Request System",
                 to=to,
                 cc=cc or [],
                 html_body=html_body,
@@ -100,5 +97,5 @@ class EmailService:
         """
         
         html = self.build_comment_email(payload)
-        self.send(outlook=None, to_email=self.recipients['requester']['email'], subject=f"Comments on {payload.groupKey}", body=html)
+        self.send(outlook=None, to_email="roman_campbell@lawb.uscourts.gov", subject=f"Comments on {payload.groupKey}", body=html)
 

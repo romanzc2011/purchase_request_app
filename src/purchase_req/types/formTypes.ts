@@ -1,5 +1,8 @@
 /********************************************************/
 /* FORM VALUES */
+
+import { ItemStatus } from "./approvalTypes";
+
 /********************************************************/
 export type FormValues = {
   UUID: string;
@@ -7,8 +10,8 @@ export type FormValues = {
   IRQ1_ID: string;
   requester: string;
   phoneext: string;
-  datereq: string;
-  dateneed: Date | null;
+  datereq: Date | string;
+  dateneed: Date | string;
   orderType: string;
   fileAttachments: {
     attachment: File | null;
@@ -29,7 +32,7 @@ export type FormValues = {
   fund: string;
   location: string;
   budgetObjCode: string;
-  status: string;
+  status: ItemStatus;
 };
 
 /********************************************************/

@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { toast } from "react-toastify";
+import { ItemStatus } from "../../types/approvalTypes";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
@@ -100,7 +101,7 @@ function SubmitApprovalTable({
         (acc[item.ID] = acc[item.ID] || []).push(item);
         return acc;
     }, {});
-
+    console.log("processedData==", processedData);
     /************************************************************************************ */
     /* SUBMIT DATA --- send to backend to add to database */
     /************************************************************************************ */
@@ -131,9 +132,41 @@ function SubmitApprovalTable({
 
             // Process each item in the data buffer
             const processedItems = processedData.map(item => ({
-                ...item,
                 ID: requestId,
-                UUID: item.UUID || uuidv4()
+                UUID: item.UUID || uuidv4(),
+                IRQ1_ID: item.IRQ1_ID || null,
+                requester: item.requester,
+                phoneext: String(item.phoneext),
+                datereq: item.datereq instanceof Date
+                    ? item.datereq.toISOString().split('T')[0]
+                    : item.datereq || null,
+                dateneed: item.dateneed instanceof Date
+                    ? item.dateneed.toISOString().split('T')[0]
+                    : item.dateneed || null,
+                orderType: item.orderType || "STANDARD", // or your default
+                fileAttachments:
+                    item.fileAttachments && item.fileAttachments.length > 0
+                        ? item.fileAttachments.map(attachment => ({
+                            name: attachment?.name,
+                            type: attachment?.type,
+                            size: attachment?.size,
+                            attachment: null
+                        }))
+                        : null,
+                itemDescription: item.itemDescription,
+                justification: item.justification,
+                learnAndDev: {
+                    trainNotAval: Boolean(item.learnAndDev.trainNotAval),
+                    needsNotMeet: Boolean(item.learnAndDev.needsNotMeet)
+                },
+                quantity: Number(item.quantity),
+                price: Number(item.price) || (Number(item.priceEach) * Number(item.quantity)),
+                priceEach: Number(item.priceEach),
+                totalPrice: Number(item.totalPrice) || (Number(item.priceEach) * Number(item.quantity)),
+                fund: item.fund,
+                location: item.location,
+                budgetObjCode: String(item.budgetObjCode).padStart(4, '0'),
+                status: ItemStatus.NEW_REQUEST
             }));
 
             // Create a single object with the requester and items
