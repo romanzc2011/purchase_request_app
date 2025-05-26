@@ -59,6 +59,9 @@ from api.schemas.pydantic_schemas import CyberSecRelatedPayload
 from api.schemas.pydantic_schemas import RequestPayload, GroupCommentPayload
 from api.schemas.pydantic_schemas import ApprovalSchema
 
+# TODO: Investigate why rendering approval data is taking so long,
+# TODO: There seems to be too much member validation in the approval schema when rendering the Approval Table
+
 # Load environment variables
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
@@ -610,11 +613,12 @@ async def add_comments(payload: GroupCommentPayload):
             requster_email = ldap_svc.get_email_address(ldap_svc.get_connection(), success.son_requester)
             logger.info(f"Requester email: {requster_email}")
             
-            # Set the requester in email service
-            email_svc.set_requester(success.son_requester, requster_email)
-            
+            # Get requester's name from LDAP
+            requester_info = ldap_svc.fetch_user(success.son_requester)
+            requester_name = requester_info.username  # Using username as name since that's what we have
+            logger.info(f"SUCCESS: {success}")
     # Send comment email
-    email_svc.send_comment_email(payload)
+    email_svc.send_comment_email(payload, requster_email, requester_name)
     
     return {"message": "Comments added successfully"}
 
