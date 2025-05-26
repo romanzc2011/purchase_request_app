@@ -194,14 +194,14 @@ class SearchService:
                 else:
                     # Build attrs dict
                     attrs = {}
-                    for f, v in model.__dict__.items():
-                        if f in model.__class__.__searchable__:
-                            if isinstance(v, dbas.ItemStatus):
-                                attrs[f] = v.value
-                            elif isinstance(v, datetime):
-                                attrs[f] = v.strftime('%Y-%m-%d')
-                            else:
-                                attrs[f] = v
+                    for f in model.__class__.__searchable__:
+                        v = getattr(model, f, None)
+                        if isinstance(v, dbas.ItemStatus):
+                            attrs[f] = v.value
+                        elif isinstance(v, datetime):
+                            attrs[f] = v.strftime('%Y-%m-%d')
+                        else:
+                            attrs[f] = v
                     attrs[self.primary_key] = text_type(key)
                     writer.update_document(**attrs)
             writer.commit()

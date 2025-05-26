@@ -174,6 +174,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     } = useQuery<DataRow[]>({
         queryKey: ["approvalData"],
         queryFn: () => fetchApprovalData(),
+        staleTime: 0,
+        gcTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: true,
+        refetchOnMount: true,
     });
 
     // Build grouped map once per load

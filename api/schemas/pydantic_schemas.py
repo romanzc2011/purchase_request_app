@@ -101,7 +101,6 @@ class PurchaseItem(BaseModel):
     budgetObjCode:   str     = Field(..., min_length=4, max_length=4)
     status:          ItemStatus  # Using the ItemStatus enum for validation
 
-    
 class PurchaseRequestPayload(BaseModel):
     requester: str
     items:     List[PurchaseItem]
@@ -193,6 +192,19 @@ class IRQ1IDSchema(BaseModel):
     
 class CyberSecRelatedPayload(BaseModel):
     isCyberSecRelated: bool
+    
+########################################################
+##    EMAIL PAYLOAD SCHEMA
+########################################################
+class EmailPayload(BaseModel):
+    to: List[str]
+    subject: str
+    body: str
+    file_attachments: Optional[List[str]] = None
+    message: Optional[str] = None
+    requester_name: Optional[str] = None
+    approver_name: Optional[str] = None
+    status: ItemStatus
     
 ########################################################
 ##    COMMENT PAYLOAD SCHEMA

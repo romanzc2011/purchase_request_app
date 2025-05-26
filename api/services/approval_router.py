@@ -3,6 +3,7 @@ from typing import Optional
 from dataclasses import dataclass
 from loguru import logger
 from api.schemas.pydantic_schemas import ItemStatus
+from api.services.database_service import DatabaseService as dbas
 
 # Approval Router to determine the routing of requests
 
@@ -38,7 +39,11 @@ class ITHandler(Handler):
         if request.fund.startswith("511") and request.status == ItemStatus.NEW_REQUEST:
             request.status = ItemStatus.PENDING_APPROVAL
             
-            # Send email to final approvers (Ted and Edmund) and CC finance department
+            # Update the Approval Table to Pending Approval
+            dbas.update_data_by_uuid(request.uuid, "approvals", status=ItemStatus.PENDING_APPROVAL)
+            
+            # Send email to final approvers (Ted and Edmund) and CC finance department (Roman for testing)
+            
             pass
             # Update approval tables status
             pass

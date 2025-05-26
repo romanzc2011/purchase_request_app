@@ -1,7 +1,14 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AnyHttpUrl, Field
 
 class Settings(BaseSettings):
+    # -- Application URL
+    app_base_url: str = Field(
+        default="http://localhost:3000",  # Default for development
+        env="VITE_API_URL",
+    )
+    
     # -- Project directories
     BASE_DIR: Path = Path(__file__).resolve().parent
     PDF_OUTPUT_FOLDER: Path = BASE_DIR / "api" / "pdf_output"

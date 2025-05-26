@@ -49,6 +49,7 @@ from api.services.pdf_service import make_purchase_request_pdf
 
 from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
+from api.schemas.pydantic_schemas import EmailPayload
 from api.services.email_service.email_service import EmailService
 
 from api.settings import settings
@@ -484,16 +485,30 @@ async def approve_deny_request(
 ):
     logger.info(f"TARGET STATUS: {payload.target_status}")
     final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
+    
     # Before allowing the user to approve/deny, check if they are in the correct group
     # were looking for CUE group membership
     logger.info("Checking user group membership")
     user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
     
-    if not user_group["CUE_GROUP"]:
-        logger.error(f"User {current_user.username} is not in the CUE group")
-        raise HTTPException(status_code=403, detail="User not authorized to approve/deny requests")
-    else:
-        logger.info(f"User {current_user.username} is in the CUE group, continuing with approval process")
+    # if not user_group["CUE_GROUP"]:
+    #     logger.error(f"User {current_user.username} is not in the CUE group")
+    #     raise HTTPException(status_code=403, detail="User not authorized to approve/deny requests")
+    # else:
+    #     logger.info(f"User {current_user.username} is in the CUE group, continuing with approval process")
+    
+    # PRepare and send email to approvers
+    email_payload = EmailPayload(
+        request_id=payload.request_id,
+        requester_name=payload.requester_name,
+        approver_name=payload.approver_name,
+        status=payload.status,
+        message=payload.message,
+        items=payload.items,
+        link_to_request=payload.link_to_request,
+    )
+    
+    email_svc.send_approval_email(email_payload)
     
     logger.success("SUCCESS!!!")
     logger.info(f"Payload: {payload}")
