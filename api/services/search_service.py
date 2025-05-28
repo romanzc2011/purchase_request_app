@@ -195,6 +195,8 @@ class SearchService:
                     # Build attrs dict
                     attrs = {}
                     for f in model.__class__.__searchable__:
+                        if f not in self.ix.schema.names():
+                            continue  # Skip fields not in schema
                         v = getattr(model, f, None)
                         if isinstance(v, dbas.ItemStatus):
                             attrs[f] = v.value

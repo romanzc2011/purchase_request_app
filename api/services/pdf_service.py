@@ -9,7 +9,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.graphics.shapes import Drawing, PolyLine
 from reportlab.lib.units import inch
-from datetime import datetime
+from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
 
@@ -90,6 +90,7 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
         canvas.setFont("Play-Bold", 16)
         canvas.drawCentredString(page_width/2, page_height - 0.6*inch, "STATEMENT OF NEED")
 
+        
         # header text
         canvas.setFont("Play-Bold", 9)
         text_x = 0.2*inch
@@ -97,12 +98,21 @@ def make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: boo
         first = rows[0] if rows else {}
         logger.info(f"First row data for header: {first}")
         logger.info(f"Date needed value: {first.get('dateneed')}")
+        date_val = first.get("dateneed")
+        
+        if isinstance(date_val, (datetime, date)):
+            date_str = date_val.strftime("%Y-%m-%d")
+        elif isinstance(date_val, str):
+            date_str = date_val.split("T", 1)[0]
+        else:
+            date_str = "Not specified"
+            
         items = [
             ("Purchase Req ID:", first.get("ID","")),
             ("IRQ1:", first.get("IRQ1_ID","")),
             ("Requester:", first.get("requester","")),
             ("CO:", first.get("CO","")),
-            ("Date Needed:", first.get("dateneed","").split("T")[0] if first.get("dateneed") else "Not specified"),
+            ("Date Needed:", date_str),
         ]
         for label, value in items:
             canvas.drawString(text_x, text_y, label)

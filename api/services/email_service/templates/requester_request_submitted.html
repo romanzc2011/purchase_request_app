@@ -46,10 +46,6 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <img src="cid:seal_no_border" alt="LAWB Seal" class="logo">
-        <h2>Purchase Request Submitted</h2>
-    </div>
     
     <div class="content">
         <p>Dear {{ requester }},</p>
@@ -66,7 +62,7 @@
             <p><strong>Description:</strong> {{ item.itemDescription }}</p>
             <p><strong>Quantity:</strong> {{ item.quantity }}</p>
             <p><strong>Price Each:</strong> ${{ item.priceEach }}</p>
-            <p><strong>Total Price:</strong> ${{ item.totalPrice }}</p>
+            <p><strong>Total Price:</strong> ${{ item.total_price }}</p>
         </div>
         {% endfor %}
         

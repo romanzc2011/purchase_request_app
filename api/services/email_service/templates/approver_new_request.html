@@ -31,7 +31,7 @@
             border-top-right-radius: 8px;
         }
         .content h2 {
-            color: #007bff;
+            color: #ffe600;
         }
         .content p {
             margin-bottom: 10px;
@@ -66,10 +66,6 @@
             background-color: #218838;
         }
     </style>
-    <div class="header">
-        <img src="cid:seal_no_border" alt="LAWB Seal" class="logo">
-        <h2>Purchase Request Submitted</h2>
-    </div>
     
 </head>
 <body>
@@ -79,23 +75,24 @@
         </div>
         <div class="content">
             <h2>Action Required: New Purchase Request</h2>
-            <p>Dear {{ approver_name | default('Approver') }},</p>
-            <p>A new purchase request (ID: <strong>{{ request_id }}</strong>) has been submitted and requires your approval.</p>
+            <p>A new purchase request (ID: <strong>{{ ID }}</strong>) has been submitted and requires your approval.</p>
             
             <h3>Request Details:</h3>
-            <p><strong>Requester:</strong> {{ requester_name | default('N/A') }}</p>
-            <p><strong>Submission Date:</strong> {{ submission_date | default('N/A') }}</p>
-            <p><strong>Total Price:</strong> ${{ "%.2f"|format(total_price | default(0)) }}</p>
+            <p><strong>Requester:</strong> {{ requester | default('N/A') }}</p>
+            <p><strong>Submission Date:</strong> {{ datereq | default('N/A') }}</p>
+            <p><strong>Total Price:</strong> ${{ "%.2f"|format(totalPrice | default(0)) }}</p>
             
             {% if items and items|length > 0 %}
             <h3>Items:</h3>
             <ul class="item-list">
                 {% for item in items %}
                 <li>
-                    <strong>{{ item.name | default('Unnamed Item') }}</strong><br>
-                    Quantity: {{ item.quantity | default(1) }}<br>
-                    Price per unit: ${{ "%.2f"|format(item.unit_price | default(0)) }}<br>
-                    Fund: {{ item.fund | default('N/A') }}
+                    <strong>{{ item.itemDescription }}</strong><br>
+                    Quantity:       {{ item.quantity }}<br>
+                    Price per unit: ${{ "%.2f"|format(item.priceEach) }}<br>
+                    Total Price:    ${{ "%.2f"|format(item.totalPrice) }}<br>
+                    Fund:           {{ item.fund }}<br>
+                    Date Needed:    {{ item.dateneed }}
                 </li>
                 {% endfor %}
             </ul>
@@ -108,11 +105,11 @@
             <p>{{ comments | e }}</p>
             {% endif %}
 
-            <p>Please review the details and take appropriate action.</p>
+            <p>Please review the details and take appropriate action. An attachment is included with the request.</p>
             
             {% if approval_link %}
             <p style="text-align: center;">
-                <a href="{{ approval_link }}" class="button">Review Request</a>
+                <a href="{{ link_to_request }}" class="button">Review Request</a>
             </p>
             {% endif %}
 

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from pydantic import model_validator
 from typing import Optional, List
@@ -100,11 +101,25 @@ class PurchaseItem(BaseModel):
     location:        str
     budgetObjCode:   str     = Field(..., min_length=4, max_length=4)
     status:          ItemStatus  # Using the ItemStatus enum for validation
-
-class PurchaseRequestPayload(BaseModel):
+    
+class EmailItemsPayload(BaseModel):
+    ID: str
     requester: str
-    items:     List[PurchaseItem]
-    itemCount: int
+    datereq: date
+    totalPrice: float
+    itemDescription: str
+    quantity: int
+    priceEach: float
+    link_to_request: Optional[str] = None
+    
+class EmailToApproversPayload(BaseModel):
+    to: List[str]
+    subject: str
+    body: str
+    file_attachments: Optional[List[str]] = None
+    ID: str
+    requester: str
+    items: List[EmailItemsPayload]
 
 class PurchaseResponse(BaseModel):
     message: str
@@ -203,9 +218,38 @@ class EmailPayload(BaseModel):
     file_attachments: Optional[List[str]] = None
     message: Optional[str] = None
     requester_name: Optional[str] = None
-    approver_name: Optional[str] = None
+    status: Optional[ItemStatus] = None
+    request_id: Optional[str] = None
+
+@dataclass
+class PurchaseItem:
+    UUID: str
+    ID: str
+    requester: str
+    phoneext: str
+    datereq: date
+    orderType: str
+    itemDescription: str
+    justification: str
+    learnAndDev: LearnAndDev
+    quantity: int
+    price: float
+    priceEach: float
+    totalPrice: float
+    fund: str
+    location: str
+    budgetObjCode: str
     status: ItemStatus
-    
+    IRQ1_ID: Optional[str] = None
+    dateneed: Optional[date] = None
+    fileAttachments: Optional[List[FileAttachment]] = None
+
+@dataclass
+class PurchaseRequestPayload:
+    requester: str
+    items: List[PurchaseItem]
+    itemCount: int
+
 ########################################################
 ##    COMMENT PAYLOAD SCHEMA
 ########################################################
@@ -220,6 +264,29 @@ class GroupCommentPayload(BaseModel):
     item_desc: List[str]
     item_uuids: List[str]
     comment: List[CommentItem]
+    
+@dataclass
+class RequestItems:
+    ID: str
+    UUID: str
+    requester: str
+    dateneed: str
+    datereq: str
+    budgetObjCode: str
+    fund: str
+    itemDescription: str
+    justification: str
+    quantity: int
+    totalPrice: float
+    priceEach: float
+    location: str
+    status: ItemStatus
+    createdTime: datetime
+    IRQ1_ID: Optional[str] = None
+    CO: Optional[str] = None
+    trainNotAval: Optional[bool] = False
+    needsNotMeet: Optional[bool] = False
+    isCyberSecRelated: Optional[bool] = False
     
     class Config:
         json_schema_extra = {

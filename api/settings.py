@@ -5,13 +5,14 @@ from pydantic import AnyHttpUrl, Field
 class Settings(BaseSettings):
     # -- Application URL
     app_base_url: str = Field(
-        default="http://localhost:3000",  # Default for development
+        default="http://localhost:5004",  # Default for development
         env="VITE_API_URL",
     )
     
     # -- Project directories
     BASE_DIR: Path = Path(__file__).resolve().parent
     PDF_OUTPUT_FOLDER: Path = BASE_DIR / "api" / "pdf_output"
+    UPLOAD_FOLDER: Path = BASE_DIR / "api" / "uploads"
 
     # -- LDAP configuration
     ldap_server: str
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
 
     # -- Application settings
     approvals_link: str
-
+    
     model_config = SettingsConfigDict(
         env_file           = ".env",
         env_file_encoding  = "utf-8",

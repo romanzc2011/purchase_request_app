@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from email.message import EmailMessage
-import pythoncom
 from win32com.client import Dispatch
+import pythoncom
 
 class EmailTransport(ABC):
     @abstractmethod

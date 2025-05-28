@@ -8,6 +8,7 @@ This is the backend that will service the UI. When making a purchase request, us
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
+from dataclasses import asdict
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -49,12 +50,12 @@ from api.services.pdf_service import make_purchase_request_pdf
 
 from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
-from api.schemas.pydantic_schemas import EmailPayload
+from api.schemas.pydantic_schemas import EmailItemsPayload, EmailPayload, EmailToApproversPayload, PurchaseRequestPayload
 from api.services.email_service.email_service import EmailService
 
 from api.settings import settings
 
-from api.schemas.pydantic_schemas import PurchaseResponse, PurchaseRequestPayload
+from api.schemas.pydantic_schemas import PurchaseResponse
 from api.schemas.pydantic_schemas import LDAPUser
 from api.schemas.pydantic_schemas import CyberSecRelatedPayload
 from api.schemas.pydantic_schemas import RequestPayload, GroupCommentPayload
@@ -258,21 +259,19 @@ async def set_purchase_request(
 ):
     ################################################################3
     ## VALIDATE REQUESTER
-    logger.info(f"LINE - 271: Setting purchase request")
-    logger.info(f"Authenticated user: {current_user}")
+    
+    logger.info(f"PAYLOAD: {payload}")
     
     # Get requester from payload
     requester = payload.requester
     
     # Get requester email address
     requester_email = ldap_svc.get_email_address(ldap_svc.get_connection(), requester)
-    logger.info(f"LINE - 285:Requester email: {requester_email}")
     
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
         raise HTTPException(status_code=400, detail="Invalid requester")
     
-    logger.info("PROCESSING PAYLOAD...")    
     if not payload:
         raise HTTPException(status_code=400, detail="Invalid data")
     
@@ -309,7 +308,7 @@ async def set_purchase_request(
     for item in items:
         item.ID = shared_id
         item.requester = requester
-        processed_data = process_purchase_data(item.dict())
+        processed_data = process_purchase_data(item)
         purchase_req_commit(processed_data, current_user)
         
     ##########################################################
@@ -329,36 +328,12 @@ async def set_purchase_request(
         ######################################################################
         # Send email notification to REQUESTOR
         ######################################################################
-        email_svc.send_template_email(
-            to=[requester_email],  # Use the email from user_info
-            subject=f"Purchase Request Submitted - {shared_id}",
-            template_name="request_submitted.html",
-            context={
-                "requester": requester,
-                "request_id": shared_id,
-                "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "items": processed_lines
-            },
-            attachments=[pdf_path],  # Attach the generated PDF
-            current_user=current_user
-        )
+        email_svc.send_new_request_to_requester(payload)
         
         ######################################################################
         # Send email notification to APPROVERS
         ######################################################################
-        email_svc.send_template_email(
-            to=["roman_campbell@lawb.uscourts.gov"], # TESTING ONLY
-            subject=f"Purchase Request Submitted - {shared_id}",
-            template_name="request_submitted.html",
-            context={
-                "requester": requester,
-                "request_id": shared_id,
-                "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "items": processed_lines
-            },
-            attachments=[pdf_path],  # Attach the generated PDF
-            current_user=current_user
-        )
+        email_svc.send_new_request_to_approvers(payload)
             
     except Exception as e:
         logger.error(f"Error generating PDF or sending email: {e}")
@@ -406,12 +381,12 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_svc.get_
 @api_router.post("/upload")
 async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_svc.get_current_user)):
     # Ensure the upload directory exists
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    if not os.path.exists(settings.UPLOAD_FOLDER):
+        os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
     try:
         secure_name = secure_filename(file.filename)
         new_filename = f"{ID}_{secure_name}"
-        file_path = os.path.join(UPLOAD_FOLDER, new_filename)
+        file_path = os.path.join(settings.UPLOAD_FOLDER, new_filename)
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
@@ -483,30 +458,34 @@ async def approve_deny_request(
     db: Session = Depends(get_session),
     current_user: LDAPUser = Depends(auth_svc.get_current_user)
 ):
-    logger.info(f"TARGET STATUS: {payload.target_status}")
-    final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
+    try:
+        
+            logger.info(f"TARGET STATUS: {payload.target_status}")
+            final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
+            
+            # Before allowing the user to approve/deny, check if they are in the correct group
+            # were looking for CUE group membership
+            logger.info("Checking user group membership")
+            user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
+            
+            # Prepare and send email to approvers
+            email_payload = EmailPayload(
+                request_id=payload.request_id,
+                requester_name=payload.requester_name,
+                status=payload.status,
+                message=payload.message,
+                items=payload.items,
+                link_to_request=settings.app_base_url,
+            )
+            logger.info(f"Constructed email payload: {email_payload}")
+            email_svc.send_approval_email(email_payload)
+            logger.success("SUCCESS!!!")
+            logger.info(f"Payload: {payload}")
+            
+    except Exception as e:
+        logger.error(f"Error approving/denying request: {e}")
+        raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")
     
-    # Before allowing the user to approve/deny, check if they are in the correct group
-    # were looking for CUE group membership
-    logger.info("Checking user group membership")
-    user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
-    
-    # if not user_group["CUE_GROUP"]:
-    #     logger.error(f"User {current_user.username} is not in the CUE group")
-    #     raise HTTPException(status_code=403, detail="User not authorized to approve/deny requests")
-    # else:
-    #     logger.info(f"User {current_user.username} is in the CUE group, continuing with approval process")
-    
-    # PRepare and send email to approvers
-    email_payload = EmailPayload(
-        request_id=payload.request_id,
-        requester_name=payload.requester_name,
-        approver_name=payload.approver_name,
-        status=payload.status,
-        message=payload.message,
-        items=payload.items,
-        link_to_request=payload.link_to_request,
-    )
     
     email_svc.send_approval_email(email_payload)
     
@@ -663,19 +642,19 @@ app.include_router(api_router)
 ## PROCESS PURCHASE DATA
 def process_purchase_data(data):
     with lock:
-        logger.success(f"priceEach {data['priceEach']}")
+        logger.success(f"priceEach {data.priceEach}")
         local_purchase_cols = {col.name: None for col in dbas.PurchaseRequest.__table__.columns}
         try:
-            for k, v in data.items():
-                # Handle the UUID field from the frontend
-                if k == "UUID" and "UUID" in local_purchase_cols:
-                    local_purchase_cols["UUID"] = v
-                elif k in local_purchase_cols:
+            # Convert dataclass to dict for processing
+            data_dict = asdict(data)
+            
+            for k, v in data_dict.items():
+                if k in local_purchase_cols:
                     local_purchase_cols[k] = v
                 
-            nested_lnd = data.get('learnAndDev', {})
-            train_not = bool(nested_lnd.get('trainNotAval', False))
-            needs_not = bool(nested_lnd.get('needsNotMeet', False))
+            nested_lnd = data.learnAndDev
+            train_not = bool(nested_lnd.trainNotAval)
+            needs_not = bool(nested_lnd.needsNotMeet)
                 
             # Build addComments field if trainNotAval or needsNotMeet is True
             if train_not or needs_not:
