@@ -25,4 +25,3 @@ class EmailMessage:
     bcc: Optional[List[str]] = None
     html_body: Optional[str] = None
     text_body: Optional[str] = None
-    attachments: Optional[List[str]] = None

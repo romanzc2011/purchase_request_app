@@ -58,8 +58,6 @@ class AuthService:
             #####################################################################
             Authenticating User()
             #####################################################################""")
-        logger.info(f"AUTHENTICATING USER: {form_data.username}")
-        logger.info(f"PASSWORD: {form_data.password}")
         username = form_data.username
         password = form_data.password
         connection = self.ldap_service.create_connection(username, password)

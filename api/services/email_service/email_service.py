@@ -206,10 +206,9 @@ class EmailService:
                     "link_to_request": f"{settings.app_base_url}/approvals"
                 }
             ),
-            attachments=[pdf_path]
         )
         
         # Send the email
-        self.transport.send(msg)
+        self.transport.send(msg, [pdf_path])
         
         

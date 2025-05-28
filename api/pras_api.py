@@ -46,7 +46,7 @@ from api.services.email_service.email_service import EmailService
 from api.services.ldap_service import LDAPService
 from api.services.search_service import SearchService
 from api.services.uuid_service import uuid_service
-from api.services.pdf_service import make_purchase_request_pdf
+from api.services.pdf_service import PDFService
 
 from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
@@ -96,6 +96,7 @@ ldap_svc = LDAPService(
     access_group_dns=settings.access_group_dns
 )
 auth_svc = AuthService(ldap_service=ldap_svc)
+pdf_svc = PDFService()
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -133,9 +134,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         #####################################################################
         Login()
         #####################################################################""")
-    logger.info(f"FORM DATA: {form_data}")
-    logger.info(f"Username: {form_data.username}")
-    logger.info(f"Password: {form_data.password}")
     
     return await auth_svc.login(form_data)
 ##########################################################################
@@ -173,59 +171,30 @@ async def download_statement_of_need_form(
     payload: dict,
     current_user: LDAPUser = Depends(auth_svc.get_current_user),
 ):
+    """
+    This endpoint is used to download the statement of need form for a given ID.
+    """
     ID = payload.get("ID")
-    logger.debug(f"ID: {ID}")
-
     if not ID:
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    
-    session = next(get_session())
+        raise HTTPException(status_code=400, detail="ID is required")
+
     try:
-        # Get all approvals with this ID
-        approvals = session.query(dbas.Approval).filter(dbas.Approval.ID == ID).all()
-        if not approvals:
-            raise HTTPException(status_code=404, detail="No approvals found for this ID")
+        output_path = pdf_svc.create_pdf(
+            ID=ID,
+            payload=payload
+        )
         
-        # Convert to list of dicts
-        rows = [ps.ApprovalSchema.model_validate(approval).model_dump() for approval in approvals]
-        logger.debug(f"Approvals data: {rows}")
-    
-        # Build the PDF path
-        pdf_path: Path = settings.PDF_OUTPUT_FOLDER / f"statement_of_need-{ID}.pdf"
-        
-        is_cyber = False
-        
-        # Generate PDF
-        logger.info(f"ROWS: {rows}")
-        
-        # Check if any line items are marked as cyber security related
-        for row in rows:
-            if row.get("isCyberSecRelated"):
-                is_cyber = True
-                break
-        # Check if there are any comments in son_comments with this ID
-        comment_arr = []
-        with next(get_session()) as session:
-            comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == ID).all()
-            if comments:
-                for comment in comments:
-                    comment_data = ps.SonCommentSchema.model_validate(comment)
-                    comment_arr.append(comment_data.comment_text)
-                    
-        logger.info(f"Comment array: {comment_arr}")
-                    
-        make_purchase_request_pdf(rows=rows, output_path=pdf_path, is_cyber=is_cyber, comments=comment_arr)
-        
-        if not pdf_path.exists():
+        if not output_path.exists():
             raise HTTPException(status_code=404, detail="Statement of need form not found")
         
         return FileResponse(
-            path=str(pdf_path),
+            path=str(output_path),
             media_type="application/pdf",
-            filename=pdf_path.name
+            filename=output_path.name
         )
-    finally:
-        session.close()
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     
 ##########################################################################
 ## GET SEARCH DATA
@@ -319,11 +288,17 @@ async def set_purchase_request(
         
         pdf_filename = f"statement_of_need-{shared_id}.pdf"
         pdf_path = os.path.join(pdf_output_dir, pdf_filename)
-        # Convert string path to Path object
-        pdf_path_obj = Path(pdf_path)
+        # Convert string path to Path object and resolve to absolute path
+        pdf_path_obj = Path(pdf_path).resolve()
         
-        make_purchase_request_pdf(processed_lines, pdf_path_obj, is_cyber)
-        logger.info(f"PDF generated at: {pdf_path}")
+        # Generate PDF with the correct parameters
+        output_path = pdf_svc.create_pdf(
+            ID=shared_id,
+            payload=jsonable_encoder(payload)
+        )
+        # Convert output_path to absolute path
+        output_path = Path(output_path).resolve()
+        logger.info(f"PDF generated at: {output_path}")
 
         ######################################################################
         # Send email notification to REQUESTOR
@@ -333,7 +308,7 @@ async def set_purchase_request(
         ######################################################################
         # Send email notification to APPROVERS
         ######################################################################
-        email_svc.send_new_request_to_approvers(payload, pdf_path)
+        email_svc.send_new_request_to_approvers(payload, str(output_path))
             
     except Exception as e:
         logger.error(f"Error generating PDF or sending email: {e}")
