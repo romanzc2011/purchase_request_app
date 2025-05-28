@@ -11,9 +11,10 @@ uvicorn pras_api:app --port 5004
 from dataclasses import asdict
 import sys
 import os
+import asyncio
+import aiofiles
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import uvicorn
-import jwt  # PyJWT
 import os, threading, time, uuid, json
 import api.schemas.pydantic_schemas as ps
 
@@ -24,21 +25,16 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from cachetools import TTLCache, cached
-from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional
+from typing import List, Optional
 from loguru import logger
 from dotenv import load_dotenv, find_dotenv
-from datetime import datetime
-from multiprocessing.dummy import Pool as ThreadPool
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from werkzeug.utils import secure_filename
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
-from docxtpl import DocxTemplate
 from pathlib import Path
-from pydantic import BaseModel
+from datetime import datetime
 
-import api.services.db_service as dbas
 from api.services.db_service import get_session
 from fastapi.security import OAuth2PasswordRequestForm
 from api.services.auth_service import AuthService
@@ -50,7 +46,7 @@ from api.services.pdf_service import PDFService
 
 from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
-from api.schemas.pydantic_schemas import EmailItemsPayload, EmailPayload, EmailToApproversPayload, PurchaseRequestPayload
+from api.schemas.pydantic_schemas import EmailPayload, PurchaseItem, PurchaseRequestPayload
 from api.services.email_service.email_service import EmailService
 
 from api.settings import settings
@@ -60,6 +56,8 @@ from api.schemas.pydantic_schemas import LDAPUser
 from api.schemas.pydantic_schemas import CyberSecRelatedPayload
 from api.schemas.pydantic_schemas import RequestPayload, GroupCommentPayload
 from api.schemas.pydantic_schemas import ApprovalSchema
+
+import api.services.db_service as dbas
 
 # TODO: Investigate why rendering approval data is taking so long,
 # TODO: There seems to be too much member validation in the approval schema when rendering the Approval Table
@@ -95,18 +93,25 @@ ldap_svc = LDAPService(
     cue_group_dns=settings.cue_group_dns,
     access_group_dns=settings.access_group_dns
 )
-auth_svc = AuthService(ldap_service=ldap_svc)
-pdf_svc = PDFService()
 
+# Initialize auth service
+auth_svc = AuthService(ldap_service=ldap_svc)
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
+# Initialize PDF service
+pdf_svc = PDFService()
+
+# Initialize search service
 search_svc = SearchService()
-renderer = TemplateRenderer(template_dir=os.path.join(os.getcwd(), "api", "services", "email_service", "templates"))
+
+# Initialize email service
+renderer = TemplateRenderer(template_dir=str(settings.BASE_DIR / "services" / "email_service" / "templates"))
 transport = OutlookTransport()
+email_svc = EmailService(renderer=renderer, transport=transport, ldap_service=ldap_svc)
+
 ldap_service = ldap_svc
 db_svc = next(get_session())  # Initialize with a session
-email_svc = EmailService(renderer=renderer, transport=transport, ldap_service=ldap_svc)
 
 # Thread safety
 lock = threading.Lock()
@@ -114,9 +119,6 @@ lock = threading.Lock()
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
-
-
-auth_svc = AuthService(ldap_service=ldap_svc)
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
@@ -215,7 +217,54 @@ async def get_search_data(
     return JSONResponse(content=jsonable_encoder(results))
 
 ##########################################################################
-## SEND TO approval -- being sent from the purchase req submit
+## COROUTINE FUNCTIONS
+##########################################################################
+# Save file async via aiofiles
+async def _save_files(ID: str, file: UploadFile) -> str:
+    os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
+    secure_name = secure_filename(file.filename)
+    dest = os.path.join(settings.UPLOAD_FOLDER, f"{ID}_{secure_name}")
+    
+    # Read and write without blocking
+    data = await file.read()
+    async with aiofiles.open(dest, "wb") as out:
+        await out.write(data)
+        
+    return dest
+
+##########################################################################
+# Send new request email on threads
+async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str) -> str:
+    try:
+        # Make sure dir exists
+        pdf_output_dir = settings.PDF_OUTPUT_FOLDER
+        os.makedirs(pdf_output_dir, exist_ok=True)
+        
+        # Create PDF on thread
+        pdf_path = await asyncio.to_thread(
+            pdf_svc.create_pdf,
+            ID=ID,
+            payload=jsonable_encoder(payload)
+        )
+        
+        # Convert to absolute path and verify it exists
+        pdf_path = Path(pdf_path).resolve()
+        if not pdf_path.exists():
+            raise FileNotFoundError(f"PDF file not found at {pdf_path}")
+            
+        logger.info(f"PDF generated at: {pdf_path}")
+        
+        # Send new request email on thread
+        await email_svc.send_new_request_to_requester(payload)
+        await email_svc.send_new_request_to_approvers(payload, str(pdf_path))
+        
+        return str(pdf_path)
+    except Exception as e:
+        logger.error(f"Error in _make_pdf_and_notify: {e}")
+        raise
+
+##########################################################################
+## SEND TO PURCHASE REQUEST -- being sent from the purchase req submit
 ##########################################################################
 @api_router.post(
     "/sendToPurchaseReq",
@@ -223,13 +272,18 @@ async def get_search_data(
     status_code=200
 )
 async def set_purchase_request(
-    payload: PurchaseRequestPayload,
-    current_user: LDAPUser = Depends(auth_svc.get_current_user)
+    payload_json: str = Form(..., description="JSON payload as string"),
+    file: UploadFile = File(None),
+    current_user: LDAPUser = Depends(auth_svc.get_current_user),
 ):
+    try:
+        payload = PurchaseRequestPayload.model_validate_json(payload_json)
+    except Exception as e:
+        logger.error(f"Error validating payload: {e}")
+        raise HTTPException(status_code=422, detail=f"Invalid payload format: {str(e)}")
+
     ################################################################3
     ## VALIDATE REQUESTER
-    
-    logger.info(f"PAYLOAD: {payload}")
     
     # Get requester from payload
     requester = payload.requester
@@ -266,110 +320,33 @@ async def set_purchase_request(
         shared_id = first_item_id
         logger.info(f"Using existing shared ID: {shared_id}")
         
-    # Configure directory paths
-    logger.info("Configuring email template");
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    pdf_output_dir = os.path.join(project_root, "api", "pdf_output")
-    is_cyber = False
-    
-    processed_lines = []
     # Process each item
-    for item in items:
+    for item in payload.items:
         item.ID = shared_id
-        item.requester = requester
+        item.requester = payload.requester
         processed_data = process_purchase_data(item)
         purchase_req_commit(processed_data, current_user)
         
-    ##########################################################
-    # CREATE EMAIL TEMPLATE HERE
-    try:
-        # Create PDF of purchase request for email
-        os.makedirs(pdf_output_dir, exist_ok=True)
+    # Build and launch asyncio tasks
+    tasks: List[asyncio.Task] = []
+    
+    if file:
+        tasks.append(asyncio.create_task(_save_files(shared_id, file)))
+    
+    # always gen pdf and send email
+    tasks.append(asyncio.create_task(_make_pdf_and_notify(payload, shared_id)))
+    
+    # run concurently, wait for all to finish
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Check for any exceptions
+    for r in results:
+        if isinstance(r, Exception):
+            logger.error(f"Error in background task: {r}")
+            raise HTTPException(status_code=500, detail=f"Error in background task: {r}")
+    
+    return JSONResponse({"message": "All work completed"})
         
-        pdf_filename = f"statement_of_need-{shared_id}.pdf"
-        pdf_path = os.path.join(pdf_output_dir, pdf_filename)
-        # Convert string path to Path object and resolve to absolute path
-        pdf_path_obj = Path(pdf_path).resolve()
-        
-        # Generate PDF with the correct parameters
-        output_path = pdf_svc.create_pdf(
-            ID=shared_id,
-            payload=jsonable_encoder(payload)
-        )
-        # Convert output_path to absolute path
-        output_path = Path(output_path).resolve()
-        logger.info(f"PDF generated at: {output_path}")
-
-        ######################################################################
-        # Send email notification to REQUESTOR
-        ######################################################################
-        email_svc.send_new_request_to_requester(payload)
-        
-        ######################################################################
-        # Send email notification to APPROVERS
-        ######################################################################
-        email_svc.send_new_request_to_approvers(payload, str(output_path))
-            
-    except Exception as e:
-        logger.error(f"Error generating PDF or sending email: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {e}")
-    
-    return JSONResponse(content={"message": "Processing started in background"})
-    
-##########################################################################
-## DELETE PURCHASE REQUEST table, condition, params
-##########################################################################
-@api_router.post("/deleteFile")
-async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_svc.get_current_user)):
-    """
-    Deletes a file given its ID and filename.
-    Expects a JSON payload containing "ID" and "filename".
-    """
-    if not data:
-        raise HTTPException(status_code=400, detail="Invalid data")
-    
-    ID = data.get("ID")
-    filename = data.get("filename")
-    if not ID or not filename:
-        raise HTTPException(status_code=400, detail="Missing ID or filename")
-    
-    # Construct the upload filename
-    upload_filename = f"{ID}_{filename}"
-    files = os.listdir(UPLOAD_FOLDER)
-    file_found = False
-    
-    for file in files:
-        if file == upload_filename:
-            logger.info(f"Deleting file: {os.path.join(UPLOAD_FOLDER, upload_filename)}")
-            os.remove(os.path.join(UPLOAD_FOLDER, file))
-            file_found = True
-            break
-
-    if not file_found:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    return {"delete": True}
-    
-##########################################################################
-## HANDLE FILE UPLOAD
-##########################################################################
-@api_router.post("/upload")
-async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_svc.get_current_user)):
-    # Ensure the upload directory exists
-    if not os.path.exists(settings.UPLOAD_FOLDER):
-        os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
-    try:
-        secure_name = secure_filename(file.filename)
-        new_filename = f"{ID}_{secure_name}"
-        file_path = os.path.join(settings.UPLOAD_FOLDER, new_filename)
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-        logger.info(f"File saved: {file_path}")
-        return JSONResponse(content={"message": "File uploaded successfully", "filename": new_filename})
-    except Exception as e:
-        logger.error(f"Error during file upload: {e}")
-        raise HTTPException(status_code=500, detail=f"File upload failed: {e}")
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -434,28 +411,27 @@ async def approve_deny_request(
     current_user: LDAPUser = Depends(auth_svc.get_current_user)
 ):
     try:
+        logger.info(f"TARGET STATUS: {payload.target_status}")
+        final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
         
-            logger.info(f"TARGET STATUS: {payload.target_status}")
-            final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
-            
-            # Before allowing the user to approve/deny, check if they are in the correct group
-            # were looking for CUE group membership
-            logger.info("Checking user group membership")
-            user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
-            
-            # Prepare and send email to approvers
-            email_payload = EmailPayload(
-                request_id=payload.request_id,
-                requester_name=payload.requester_name,
-                status=payload.status,
-                message=payload.message,
-                items=payload.items,
-                link_to_request=settings.app_base_url,
-            )
-            logger.info(f"Constructed email payload: {email_payload}")
-            email_svc.send_approval_email(email_payload)
-            logger.success("SUCCESS!!!")
-            logger.info(f"Payload: {payload}")
+        # Before allowing the user to approve/deny, check if they are in the correct group
+        # were looking for CUE group membership
+        logger.info("Checking user group membership")
+        user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
+        
+        # Prepare and send email to approvers
+        email_payload = EmailPayload(
+            request_id=payload.request_id,
+            requester_name=payload.requester_name,
+            status=payload.status,
+            message=payload.message,
+            items=payload.items,
+            link_to_request=settings.app_base_url,
+        )
+        logger.info(f"Constructed email payload: {email_payload}")
+        email_svc.send_approval_email(email_payload)
+        logger.success("SUCCESS!!!")
+        logger.info(f"Payload: {payload}")
             
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
@@ -615,19 +591,15 @@ app.include_router(api_router)
 
 ##########################################################################
 ## PROCESS PURCHASE DATA
-def process_purchase_data(data):
+def process_purchase_data(item: PurchaseItem) -> dict:
     with lock:
-        logger.success(f"priceEach {data.priceEach}")
         local_purchase_cols = {col.name: None for col in dbas.PurchaseRequest.__table__.columns}
         try:
-            # Convert dataclass to dict for processing
-            data_dict = asdict(data)
-            
-            for k, v in data_dict.items():
+            for k, v in item.model_dump().items():
                 if k in local_purchase_cols:
                     local_purchase_cols[k] = v
                 
-            nested_lnd = data.learnAndDev
+            nested_lnd = item.learnAndDev
             train_not = bool(nested_lnd.trainNotAval)
             needs_not = bool(nested_lnd.needsNotMeet)
                 
@@ -696,6 +668,7 @@ def process_approval_data(processed_data):
 
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
+##########################################################################
 def purchase_req_commit(processed_data, current_user: LDAPUser):
     with lock:
         try:
@@ -742,6 +715,67 @@ def purchase_req_commit(processed_data, current_user: LDAPUser):
         except Exception as e:
             logger.error(f"Exception occurred: {e}")
             raise
+        
+##########################################################################
+## HANDLE FILE UPLOAD
+##########################################################################
+@api_router.post("/upload_file")
+async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_svc.get_current_user)):
+    # Ensure the upload directory exists
+    if not os.path.exists(settings.UPLOAD_FOLDER):
+        os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
+        
+    try:
+        secure_name = secure_filename(file.filename)
+        new_filename = f"{ID}_{secure_name}"
+        file_path = os.path.join(settings.UPLOAD_FOLDER, new_filename)
+        logger.info(f"File path: {file_path}")
+        
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        logger.info(f"File saved: {file_path}")
+        
+        return JSONResponse(content={"message": "File uploaded successfully", "filename": new_filename})
+    
+    except Exception as e:
+        logger.error(f"Error during file upload: {e}")
+        raise HTTPException(status_code=500, detail=f"File upload failed: {e}")
+    
+    
+    
+##########################################################################
+## DELETE PURCHASE REQUEST table, condition, params
+##########################################################################
+async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_svc.get_current_user)):
+    """
+    Deletes a file given its ID and filename.
+    Expects a JSON payload containing "ID" and "filename".
+    """
+    if not data:
+        raise HTTPException(status_code=400, detail="Invalid data")
+    
+    ID = data.get("ID")
+    filename = data.get("filename")
+    if not ID or not filename:
+        raise HTTPException(status_code=400, detail="Missing ID or filename")
+    
+    # Construct the upload filename
+    upload_filename = f"{ID}_{filename}"
+    files = os.listdir(settings.UPLOAD_FOLDER)
+    file_found = False
+    
+    for file in files:
+        if file == upload_filename:
+            logger.info(f"Deleting file: {os.path.join(settings.UPLOAD_FOLDER, upload_filename)}")
+            os.remove(os.path.join(settings.UPLOAD_FOLDER, file))
+            file_found = True
+            break
+
+    if not file_found:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return {"delete": True}
 
 ##########################################################################
 ## MAIN CONTROL FLOW

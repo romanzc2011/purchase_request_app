@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from pydantic.dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from fastapi import File
 from pydantic import model_validator
 from typing import Optional, List
 from datetime import date, datetime
@@ -15,7 +16,6 @@ from enum import Enum
 ########################################################
 class Token(BaseModel):
     access_token: str
-    token_type: str
     
 class TokenData(BaseModel):
     username: str
@@ -65,10 +65,6 @@ class PurchaseRequestSchema(BaseModel):
     quantity: int
     createdTime: datetime
 
-from pydantic import BaseModel, Field
-from typing  import List, Optional
-from datetime import date
-
 class FileAttachment(BaseModel):
     attachment: Optional[bytes] = None  # or Optional[str] if base64-encoded
     name:       Optional[str]
@@ -79,28 +75,30 @@ class LearnAndDev(BaseModel):
     trainNotAval: bool
     needsNotMeet: bool
 
-class PurchaseItem(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    UUID:            str
-    ID:              str
-    IRQ1_ID:         Optional[str] = None
-    requester:       str
-    phoneext:        str
-    datereq:         date
-    dateneed:        Optional[date] = None
-    orderType:       str
-    fileAttachments: Optional[List[FileAttachment]] = None
-    itemDescription: str
-    justification:   str
-    learnAndDev:     LearnAndDev
-    quantity:        int     = Field(..., gt=0)
-    price:           float   = Field(..., ge=0)
-    priceEach:       float   = Field(..., ge=0.01)
-    totalPrice:      float   = Field(..., ge=0)
-    fund:            str
-    location:        str
-    budgetObjCode:   str     = Field(..., min_length=4, max_length=4)
-    status:          ItemStatus  # Using the ItemStatus enum for validation
+
+# @dataclass
+# class PurchaseItem:
+#     model_config = ConfigDict(extra="ignore")
+#     UUID:            str
+#     ID:              str
+#     IRQ1_ID:         Optional[str] = None
+#     requester:       str
+#     phoneext:        str
+#     datereq:         date
+#     dateneed:        Optional[date] = None
+#     orderType:       str
+#     fileAttachments: Optional[List[FileAttachment]] = None
+#     itemDescription: str
+#     justification:   str
+#     learnAndDev:     LearnAndDev
+#     quantity:        int     = Field(..., gt=0)
+#     price:           float   = Field(..., ge=0)
+#     priceEach:       float   = Field(..., ge=0.01)
+#     totalPrice:      float   = Field(..., ge=0)
+#     fund:            str
+#     location:        str
+#     budgetObjCode:   str     = Field(..., min_length=4, max_length=4)
+#     status:          ItemStatus  # Using the ItemStatus enum for validation
     
 class EmailItemsPayload(BaseModel):
     ID: str
@@ -221,8 +219,7 @@ class EmailPayload(BaseModel):
     status: Optional[ItemStatus] = None
     request_id: Optional[str] = None
 
-@dataclass
-class PurchaseItem:
+class PurchaseItem(BaseModel):
     UUID: str
     ID: str
     requester: str
@@ -244,12 +241,11 @@ class PurchaseItem:
     dateneed: Optional[date] = None
     fileAttachments: Optional[List[FileAttachment]] = None
 
-@dataclass
-class PurchaseRequestPayload:
+class PurchaseRequestPayload(BaseModel):
     requester: str
     items: List[PurchaseItem]
     itemCount: int
-
+    
 ########################################################
 ##    COMMENT PAYLOAD SCHEMA
 ########################################################

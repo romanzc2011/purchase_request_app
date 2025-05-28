@@ -50,7 +50,7 @@ class EmailService:
     ##############################################################
     # SEND COMMENT EMAIL
     ##############################################################
-    def send_comment_email(self, payload: GroupCommentPayload, requester_email: str, requester_name: str):
+    async def send_comment_email(self, payload: GroupCommentPayload, requester_email: str, requester_name: str):
         """
         Send an email to the requester with the comment
         
@@ -59,7 +59,7 @@ class EmailService:
             requester_email: The email address of the requester
             requester_name: The name of the requester
         """
-        self.send_template_email(
+        await self.send_template_email(
             to=[requester_email],
             subject=f"Comments on {payload.groupKey}",
             template_name="requester_comment_template.html",
@@ -75,7 +75,7 @@ class EmailService:
     ##############################################################
     # SEND APPROVAL EMAIL
     ##############################################################
-    def send_approval_email(self, payload: EmailPayload):
+    async def send_approval_email(self, payload: EmailPayload):
         logger.info("#############################################")
         logger.info("send_approval_email")
         logger.info("#############################################")
@@ -87,7 +87,6 @@ class EmailService:
         """
         # absolute url to the request
         link_to_request = f"{settings.app_base_url}/approvals"
-        
         
         logger.info(f"Payload: {payload}")
         
@@ -116,9 +115,9 @@ class EmailService:
         )
         
         # Send the email
-        self.transport.send(msg)
+        await self.transport.send(msg)
 
-    def send_new_request_to_requester(self, payload: PurchaseRequestPayload) -> None:
+    async def send_new_request_to_requester(self, payload: PurchaseRequestPayload) -> None:
         """
         Send an email to the requester when they submit a new request
         """
@@ -166,9 +165,9 @@ class EmailService:
         )
         
         # Send the email
-        self.transport.send(msg)
+        await self.transport.send(msg)
 
-    def send_new_request_to_approvers(self, payload: PurchaseRequestPayload, pdf_path: str) -> None:
+    async def send_new_request_to_approvers(self, payload: PurchaseRequestPayload, pdf_path: str) -> None:
         """
         Send an email to approvers when a new request is submitted
         """
@@ -209,6 +208,6 @@ class EmailService:
         )
         
         # Send the email
-        self.transport.send(msg, [pdf_path])
+        await self.transport.send(msg, [pdf_path])
         
         

@@ -144,15 +144,6 @@ function SubmitApprovalTable({
                     ? item.dateneed.toISOString().split('T')[0]
                     : item.dateneed || null,
                 orderType: item.orderType || "STANDARD", // or your default
-                fileAttachments:
-                    item.fileAttachments && item.fileAttachments.length > 0
-                        ? item.fileAttachments.map(attachment => ({
-                            name: attachment?.name,
-                            type: attachment?.type,
-                            size: attachment?.size,
-                            attachment: null
-                        }))
-                        : null,
                 itemDescription: item.itemDescription,
                 justification: item.justification,
                 learnAndDev: {
@@ -176,14 +167,27 @@ function SubmitApprovalTable({
                 itemCount: itemCount
             };
 
+            const formData = new FormData();
+            formData.append("payload_json", JSON.stringify(requestData));
+
+            // Attach file object if it exists
+            processedData.forEach(item => {
+                if (item.fileAttachments?.length) {
+                    item.fileAttachments.forEach(fileObj => {
+                        if (fileObj.attachment instanceof File) {
+                            formData.append("file", fileObj.attachment, fileObj.name);
+                        }
+                    })
+                }
+            });
+
             // Send the data to the backend
             const response = await fetch(API_URL, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: `Bearer ${localStorage.getItem("access_token")}`,
                 },
-                body: JSON.stringify(requestData),
+                body: formData,
             });
 
             if (!response.ok) {

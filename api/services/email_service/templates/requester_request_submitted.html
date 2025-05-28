@@ -53,20 +53,22 @@
         <p>Your purchase request has been successfully submitted. Here are the details of your request:</p>
         
         <h3>Request Details:</h3>
-        <p><strong>Request ID:</strong> <span class="highlight">{{ request_id }}</span></p>
-        <p><strong>Submission Date:</strong> {{ submission_date }}</p>
+        <p><strong>Request ID:</strong> <span class="highlight">{{ ID }}</span></p>
+        <p><strong>Submission Date:</strong> {{ datereq }}</p>
+        <p><strong>Total Price:</strong> ${{ "%.2f"|format(totalPrice) }}</p>
         
         <h3>Items Requested:</h3>
         {% for item in items %}
         <div class="item">
             <p><strong>Description:</strong> {{ item.itemDescription }}</p>
             <p><strong>Quantity:</strong> {{ item.quantity }}</p>
-            <p><strong>Price Each:</strong> ${{ item.priceEach }}</p>
-            <p><strong>Total Price:</strong> ${{ item.total_price }}</p>
+            <p><strong>Price Each:</strong> ${{ "%.2f"|format(item.priceEach) }}</p>
+            <p><strong>Total Price:</strong> ${{ "%.2f"|format(item.totalPrice) }}</p>
         </div>
         {% endfor %}
         
         <p>You can track the status of your request using the Request ID provided above.</p>
+        <p>To view your request, click here: <a href="{{ link_to_request }}">View Request</a></p>
         
         <p>If you have any questions, please contact the IT department.</p>
     </div>
