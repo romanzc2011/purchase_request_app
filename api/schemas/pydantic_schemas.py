@@ -244,6 +244,7 @@ class PurchaseItem(BaseModel):
 class PurchaseRequestPayload(BaseModel):
     requester: str
     items: List[PurchaseItem]
+    fileAttachments: Optional[List[FileAttachment]] = None
     itemCount: int
     
 ########################################################

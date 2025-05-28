@@ -6,6 +6,7 @@ import pythoncom
 import asyncio
 from loguru import logger
 from pathlib import Path
+import win32com.client
 
 class EmailTransport(ABC):
     @abstractmethod
@@ -14,26 +15,36 @@ class EmailTransport(ABC):
     
 class OutlookTransport(EmailTransport):
     def __init__(self):
-        self._outlook = None
-        
-    def _get_outlook(self):
-        if self._outlook is None:
+        self.outlook = None
+
+    def _initialize_outlook(self):
+        """Initialize COM and Outlook application"""
+        try:
+            # Initialize COM for this thread
             pythoncom.CoInitialize()
-            self._outlook = Dispatch("Outlook.Application")
-        return self._outlook
-        
+            
+            # Create Outlook application
+            self.outlook = Dispatch("Outlook.Application")
+            return True
+        except Exception as e:
+            logger.error(f"Error initializing Outlook: {e}")
+            return False
+
+    def _cleanup_outlook(self):
+        """Clean up COM and Outlook resources"""
+        try:
+            if self.outlook:
+                self.outlook.Quit()
+            pythoncom.CoUninitialize()
+        except Exception as e:
+            logger.error(f"Error cleaning up Outlook: {e}")
+
     async def send(self, msg: EmailMessage, attachments: List[str] = None):
         try:
-            # Run the Outlook operations in a thread pool
-            await asyncio.to_thread(self._send_sync, msg, attachments)
-        except Exception as e:
-            logger.error(f"Error sending email: {e}")
-            raise
-            
-    def _send_sync(self, msg: EmailMessage, attachments: List[str] = None):
-        try:
-            outlook = self._get_outlook()
-            mail = outlook.CreateItem(0)
+            if not self._initialize_outlook():
+                raise Exception("Failed to initialize Outlook")
+
+            mail = self.outlook.CreateItem(0)
             mail.Subject = msg.subject
             if msg.html_body:
                 mail.HTMLBody = msg.html_body
@@ -47,15 +58,24 @@ class OutlookTransport(EmailTransport):
             
             if attachments:
                 for attachment in attachments:
-                    # Convert to absolute path and verify it exists
-                    attachment_path = Path(attachment).resolve()
-                    if not attachment_path.exists():
-                        raise FileNotFoundError(f"Attachment file not found: {attachment_path}")
-                    logger.info(f"Adding attachment: {attachment_path}")
-                    mail.Attachments.Add(str(attachment_path))
+                    try:
+                        # Convert to absolute path and verify it exists
+                        attachment_path = Path(attachment).resolve()
+                        if not attachment_path.exists():
+                            logger.error(f"Attachment file not found: {attachment_path}")
+                            continue
+                            
+                        logger.info(f"Adding attachment: {attachment_path}")
+                        mail.Attachments.Add(str(attachment_path))
+                    except Exception as e:
+                        logger.error(f"Error adding attachment {attachment}: {e}")
+                        continue
             
             mail.Recipients.ResolveAll()
             mail.Send()
+            logger.info(f"Email sent successfully to {msg.to}")
         except Exception as e:
             logger.error(f"Error in Outlook automation: {e}")
             raise
+        finally:
+            self._cleanup_outlook()

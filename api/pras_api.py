@@ -221,20 +221,33 @@ async def get_search_data(
 ##########################################################################
 # Save file async via aiofiles
 async def _save_files(ID: str, file: UploadFile) -> str:
-    os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
-    secure_name = secure_filename(file.filename)
-    dest = os.path.join(settings.UPLOAD_FOLDER, f"{ID}_{secure_name}")
-    
-    # Read and write without blocking
-    data = await file.read()
-    async with aiofiles.open(dest, "wb") as out:
-        await out.write(data)
+    try:
+        # Ensure upload directory exists
+        os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
         
-    return dest
+        # Create secure filename
+        secure_name = secure_filename(file.filename)
+        dest = os.path.join(settings.UPLOAD_FOLDER, f"{ID}_{secure_name}")
+        
+        logger.info("###########################################################")
+        logger.info(f"Saving file to: {dest}")
+        logger.info(f"filename: {file.filename}")
+        logger.info("###########################################################")
+        
+        # Read and write without blocking
+        data = await file.read()
+        async with aiofiles.open(dest, "wb") as out:
+            await out.write(data)
+            
+        logger.info(f"File saved successfully to: {dest}")
+        return dest
+    except Exception as e:
+        logger.error(f"Error saving file: {e}")
+        raise
 
 ##########################################################################
 # Send new request email on threads
-async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str) -> str:
+async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str, uploaded_files: List[str] = None) -> str:
     try:
         # Make sure dir exists
         pdf_output_dir = settings.PDF_OUTPUT_FOLDER
@@ -254,9 +267,22 @@ async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str) -> str:
             
         logger.info(f"PDF generated at: {pdf_path}")
         
+        # Convert uploaded files to absolute paths
+        absolute_uploaded_files = []
+        if uploaded_files:
+            for file_path in uploaded_files:
+                try:
+                    abs_path = Path(file_path).resolve()
+                    if abs_path.exists():
+                        absolute_uploaded_files.append(str(abs_path))
+                    else:
+                        logger.error(f"Uploaded file not found: {abs_path}")
+                except Exception as e:
+                    logger.error(f"Error resolving path for {file_path}: {e}")
+        
         # Send new request email on thread
         await email_svc.send_new_request_to_requester(payload)
-        await email_svc.send_new_request_to_approvers(payload, str(pdf_path))
+        await email_svc.send_new_request_to_approvers(payload, str(pdf_path), absolute_uploaded_files)
         
         return str(pdf_path)
     except Exception as e:
@@ -273,11 +299,12 @@ async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str) -> str:
 )
 async def set_purchase_request(
     payload_json: str = Form(..., description="JSON payload as string"),
-    file: UploadFile = File(None),
+    files: List[UploadFile] = File(None, description="Multiple files"),
     current_user: LDAPUser = Depends(auth_svc.get_current_user),
 ):
     try:
         payload = PurchaseRequestPayload.model_validate_json(payload_json)
+        logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
     except Exception as e:
         logger.error(f"Error validating payload: {e}")
         raise HTTPException(status_code=422, detail=f"Invalid payload format: {str(e)}")
@@ -301,6 +328,7 @@ async def set_purchase_request(
     ################################################################3
     ## VALIDATE/PROCESS PAYLOAD
     logger.debug(f"DATA: {payload}")
+    #fileAttachments=[FileAttachment(attachment=None, name='NBIS_questionaire_final.pdf', type='application/pdf', size=160428)])]
     
     requester = payload.requester
     items = payload.items
@@ -329,21 +357,44 @@ async def set_purchase_request(
         
     # Build and launch asyncio tasks
     tasks: List[asyncio.Task] = []
+    uploaded_files: List[str] = []
     
-    if file:
-        tasks.append(asyncio.create_task(_save_files(shared_id, file)))
+    # Create tasks list for files
+    if files:
+        for file in files:
+            logger.info("###########################################################")
+            logger.info(f"Creating file save task for: {file.filename}")
+            logger.info("###########################################################")
+            file_task = asyncio.create_task(_save_files(shared_id, file))
+            tasks.append(file_task)
+            # Get the result of the file save task
+            file_path = await file_task
+            uploaded_files.append(file_path)
     
     # always gen pdf and send email
-    tasks.append(asyncio.create_task(_make_pdf_and_notify(payload, shared_id)))
+    logger.info("###########################################################")
+    logger.info("Creating PDF and email task")
+    logger.info("###########################################################")
+    tasks.append(asyncio.create_task(_make_pdf_and_notify(payload, shared_id, uploaded_files)))
     
-    # run concurently, wait for all to finish
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    if not tasks:
+        logger.error("No tasks were created")
+        raise HTTPException(status_code=500, detail="Failed to create background tasks")
     
-    # Check for any exceptions
-    for r in results:
-        if isinstance(r, Exception):
-            logger.error(f"Error in background task: {r}")
-            raise HTTPException(status_code=500, detail=f"Error in background task: {r}")
+    logger.info(f"Created {len(tasks)} tasks")
+    
+    # run concurrently, wait for all to finish
+    try:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Check for any exceptions
+        for r in results:
+            if isinstance(r, Exception):
+                logger.error(f"Error in background task: {r}")
+                raise HTTPException(status_code=500, detail=f"Error in background task: {r}")
+    except Exception as e:
+        logger.error(f"Error executing tasks: {e}")
+        raise HTTPException(status_code=500, detail=f"Error executing tasks: {e}")
     
     return JSONResponse({"message": "All work completed"})
         

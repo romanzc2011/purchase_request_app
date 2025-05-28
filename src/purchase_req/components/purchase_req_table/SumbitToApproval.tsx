@@ -143,7 +143,7 @@ function SubmitApprovalTable({
                 dateneed: item.dateneed instanceof Date
                     ? item.dateneed.toISOString().split('T')[0]
                     : item.dateneed || null,
-                orderType: item.orderType || "STANDARD", // or your default
+                orderType: item.orderType || "STANDARD",
                 itemDescription: item.itemDescription,
                 justification: item.justification,
                 learnAndDev: {
@@ -157,7 +157,13 @@ function SubmitApprovalTable({
                 fund: item.fund,
                 location: item.location,
                 budgetObjCode: String(item.budgetObjCode).padStart(4, '0'),
-                status: ItemStatus.NEW_REQUEST
+                status: ItemStatus.NEW_REQUEST,
+                fileAttachments: fileInfo.map(file => ({
+                    name: file.name,
+                    file: file.file,
+                    type: file.file?.type || '',
+                    size: file.file?.size || 0
+                }))
             }));
 
             // Create a single object with the requester and items
@@ -170,14 +176,11 @@ function SubmitApprovalTable({
             const formData = new FormData();
             formData.append("payload_json", JSON.stringify(requestData));
 
-            // Attach file object if it exists
-            processedData.forEach(item => {
-                if (item.fileAttachments?.length) {
-                    item.fileAttachments.forEach(fileObj => {
-                        if (fileObj.attachment instanceof File) {
-                            formData.append("file", fileObj.attachment, fileObj.name);
-                        }
-                    })
+            // Attach files from fileInfo
+            fileInfo.forEach(file => {
+                if (file.file && file.status === "ready") {
+                    formData.append("files", file.file);
+                    console.log("Attaching file to formData:", file.name);
                 }
             });
 
@@ -403,7 +406,23 @@ function SubmitApprovalTable({
                 {/* FOOTER WITH FILE UPLOAD & SUBMIT BUTTON */}
                 <tfoot>
                     <TableRow>
-                        <TableCell colSpan={4}>
+                        <TableCell colSpan={9}>
+                            {/* Display current files */}
+                            {fileInfo.length > 0 && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="subtitle2" sx={{ color: "white" }}>
+                                        Attached Files:
+                                    </Typography>
+                                    <ul style={{ color: "white", listStyle: "none", padding: 0 }}>
+                                        {fileInfo.map((file, index) => (
+                                            <li key={index}>
+                                                {file.name} - {file.status}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </Box>
+                            )}
+
                             {/************************************************************************************ */}
                             {/* BUTTONS: SUBMIT/PRINT */}
                             {/************************************************************************************ */}

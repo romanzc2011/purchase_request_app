@@ -167,47 +167,54 @@ class EmailService:
         # Send the email
         await self.transport.send(msg)
 
-    async def send_new_request_to_approvers(self, payload: PurchaseRequestPayload, pdf_path: str) -> None:
-        """
-        Send an email to approvers when a new request is submitted
-        """
-        # For now, hardcode the approver email for testing
-        approver_email = "roman_campbell@lawb.uscourts.gov"  # TESTING ONLY
-        
-        # Prepare email items
-        email_items = []
-        for item in payload.items:
-            email_items.append(EmailItemsPayload(
-                ID=item.ID,
-                requester=item.requester,
-                datereq=item.datereq,
-                totalPrice=item.totalPrice,
-                itemDescription=item.itemDescription,
-                quantity=item.quantity,
-                priceEach=item.priceEach,
-                link_to_request=f"{settings.app_base_url}/approvals"
-            ))
+    async def send_new_request_to_approvers(self, payload: PurchaseRequestPayload, pdf_path: str, upload_paths: List[str] = None) -> None:
+        """Send email to approvers with the new request details and attachments."""
+        try:
+            # Get approver emails from LDAP
+            approver_emails = self.ldap_service.get_approver_emails()
+            if not approver_emails:
+                logger.error("No approver emails found")
+                return
 
-        # Build the email message
-        msg = EmailMessage(
-            subject=f"New Purchase Request - {payload.items[0].ID}",
-            sender="Purchase Request System",
-            to=[approver_email],
-            link_to_request=f"{settings.app_base_url}/approvals",
-            html_body=self.renderer.render(
-                "approver_new_request.html",
-                {
-                    "ID": payload.items[0].ID,
-                    "requester": payload.requester,
-                    "datereq": payload.items[0].datereq,
-                    "totalPrice": sum(item.totalPrice for item in payload.items),
-                    "items": email_items,
-                    "link_to_request": f"{settings.app_base_url}/approvals"
-                }
-            ),
-        )
-        
-        # Send the email
-        await self.transport.send(msg, [pdf_path])
+            # Prepare email context
+            context = {
+                "ID": payload.items[0].ID,
+                "requester": payload.requester,
+                "datereq": payload.items[0].datereq,
+                "items": [
+                    {
+                        "itemDescription": item.itemDescription,
+                        "quantity": item.quantity,
+                        "priceEach": item.priceEach,
+                        "totalPrice": item.totalPrice,
+                        "link_to_request": f"{settings.app_base_url}/approvals/{item.ID}"
+                    }
+                    for item in payload.items
+                ]
+            }
+
+            # Create list of attachments
+            attachments = [pdf_path]  # Always include the PDF
+            if upload_paths:  # Add any uploaded files
+                attachments.extend(upload_paths)
+            
+            logger.info(f"Sending email with attachments: {attachments}")
+
+            # Create email message
+            message = EmailMessage(
+                subject=f"New Purchase Request {payload.items[0].ID} from {payload.requester}",
+                sender="Purchase Request System",
+                to=approver_emails,
+                link_to_request=f"{settings.app_base_url}/approvals",
+                html_body=self.renderer.render("approver_new_request.html", context),
+                attachments=attachments
+            )
+
+            # Send email
+            await self.transport.send(message)
+            logger.info(f"Sent approval email to {len(approver_emails)} approvers")
+        except Exception as e:
+            logger.error(f"Error sending approval email: {e}")
+            raise
         
         

@@ -16,7 +16,8 @@ interface FileUploadProps {
 }
 
 /************************************************************************************ */
-/* FILE UPLOAD */
+/* FILE UPLOAD
+Getting file status from types/IFile.ts */
 /************************************************************************************ */
 function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +35,76 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
                 progress: 0,
             };
 
+            console.log("File selected - Initial status:", newFile.status);
             setFileInfo((prev) => [...prev, newFile]);
+            // Upload file immediately after selection
+            uploadFile(newFile);
+        }
+    }
+
+    /************************************************************************************ */
+    /* UPLOAD FILE */
+    /************************************************************************************ */
+    async function uploadFile(file: IFile) {
+        if (!ID) {
+            console.error("No ID provided for file upload");
+            return;
+        }
+        console.log("Starting upload - Current file status:", file.status);
+        console.log("Current fileInfo state:", fileInfo);
+
+        if (!file.file) {
+            console.error("No file provided for upload");
+            return;
+        }
+
+        // Update file status to uploading
+        setFileInfo((prev) => {
+            const updated = prev.map((f) =>
+                f.name === file.name ? { ...f, status: "uploading" as const } : f
+            );
+            console.log("Status updated to uploading:", updated);
+            return updated;
+        });
+
+        try {
+            const formData = new FormData();
+            formData.append("file", file.file);
+            formData.append("ID", ID);
+
+            // const API_URL = `${import.meta.env.VITE_API_URL}/api/upload_file`;
+            // const accessToken = localStorage.getItem("access_token");
+
+            //  response = await fetch(API_URL, {
+            //     method: "POST",
+            //     headers: {
+            //         Authorization: `Bearer ${accessToken}`,
+            //     },
+            //     body: formData,
+            // });const
+
+            // if (!response.ok) {
+            //     throw new Error(`HTTP error: ${response.status}`);
+            // }
+
+            // Update file status to ready
+            setFileInfo((prev) => {
+                const updated = prev.map((f) =>
+                    f.name === file.name ? { ...f, status: "ready" as const } : f
+                );
+                console.log("Status updated to ready:", updated);
+                return updated;
+            });
+        } catch (error) {
+            console.error("Error uploading file:", error);
+            // Update file status to error
+            setFileInfo((prev) => {
+                const updated = prev.map((f) =>
+                    f.name === file.name ? { ...f, status: "error" as const } : f
+                );
+                console.log("Status updated to error:", updated);
+                return updated;
+            });
         }
     }
 
@@ -64,10 +134,16 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
     /* DELETE FILE -- (only deletes files in frontend list) */
     /***************************************************************/
     function deleteFile({ file, index }: { file: IFile; index: number }) {
-        setFileInfo((prevFiles) => prevFiles.filter((_, i) => i !== index));
+        console.log("Deleting file - Current status:", file.status);
+        setFileInfo((prevFiles) => {
+            const updated = prevFiles.filter((_, i) => i !== index);
+            console.log("File removed from list. Remaining files:", updated);
+            return updated;
+        });
 
         // Check if file has been uploaded, if so, delete it, this is if user changes their mind
-        if (file.status === "success") {
+        if (file.status === "ready") {
+            console.log("File was ready, calling apiDeleteFile");
             apiDeleteFile(ID || "", file.name).catch((error) =>
                 console.error("Error deleting file: ", error)
             );
@@ -134,7 +210,7 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
                                     thickness={5}
                                 />
                             )}
-                            {file.status === "success" && (
+                            {file.status === "ready" && (
                                 <CheckCircleIcon
                                     sx={{ color: "green", fontSize: 16 }}
                                 />

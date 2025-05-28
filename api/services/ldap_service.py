@@ -326,3 +326,49 @@ class LDAPService:
     
     def get_is_authenticated(self):
         return self.is_authenticated
+
+    def get_approver_emails(self) -> List[str]:
+        """
+        Get email addresses of users in the CUE group who are approvers.
+        Returns a list of email addresses.
+        
+        """
+        test_email = "roman_campbell@lawb.uscourts.gov"
+        logger.info(f"TESTING: Returning test email: {test_email}")
+        return [test_email]
+        # try:
+        #     connection = self.get_connection()
+        #     if not connection:
+        #         logger.error("Failed to establish LDAP connection")
+        #         return []
+
+        #     # Search for users in the CUE group
+        #     cue_group_dn = "CN=LAWB_PurchaseRequest_CUE,OU=Groups,OU=LAWB,OU=USCOURTS,DC=ADU,DC=DCN"
+        #     search_filter = f"(&(objectClass=user)(memberOf={cue_group_dn}))"
+        #     search_base = 'DC=ADU,DC=DCN'
+            
+        #     logger.info(f"Searching for approvers with filter: {search_filter}")
+            
+        #     # Search for users
+        #     connection.search(
+        #         search_base=search_base,
+        #         search_filter=search_filter,
+        #         attributes=['mail', 'sAMAccountName']
+        #     )
+            
+        #     # Extract email addresses
+        #     approver_emails = []
+        #     for entry in connection.entries:
+        #         if hasattr(entry, 'mail') and entry.mail.value:
+        #             logger.info(f"Found approver: {entry.sAMAccountName.value} - {entry.mail.value}")
+        #             approver_emails.append(entry.mail.value)
+            
+        #     logger.info(f"Found {len(approver_emails)} approver emails: {approver_emails}")
+        #     return approver_emails
+            
+        # except Exception as e:
+        #     logger.error(f"Error getting approver emails: {e}")
+        #     return []
+        # finally:
+        #     if connection:
+        #         connection.unbind()

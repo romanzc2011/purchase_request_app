@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # -- Application settings
     approvals_link: str
     
+    def model_post_init(self, __context):
+        # Ensure required directories exist
+        self.PDF_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)
+        self.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)
+
     model_config = SettingsConfigDict(
         env_file           = ".env",
         env_file_encoding  = "utf-8",
