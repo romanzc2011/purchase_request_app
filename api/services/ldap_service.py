@@ -280,8 +280,11 @@ class LDAPService:
     def fetch_user(self, username: str) -> LDAPUser:
         connection = self.get_connection()
         if connection is None:
-            logger.warning(f"LDAP connection is None for user {username}, using default user object")
-            return LDAPUser(username=username, email="uknown@unknown.com", groups=[])
+            logger.info(f"Creating new LDAP connection for user {username}")
+            connection = self.create_connection(self.service_user, self.service_password)
+            if connection is None:
+                logger.warning(f"Failed to create LDAP connection for user {username}, using default user object")
+                return LDAPUser(username=username, email="unknown@unknown.com", groups=[])
         
         groups = self.check_user_membership(connection, username)
         email = self.get_email_address(connection, username)

@@ -333,7 +333,7 @@ async def set_purchase_request(
         ######################################################################
         # Send email notification to APPROVERS
         ######################################################################
-        email_svc.send_new_request_to_approvers(payload)
+        email_svc.send_new_request_to_approvers(payload, pdf_path)
             
     except Exception as e:
         logger.error(f"Error generating PDF or sending email: {e}")

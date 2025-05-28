@@ -47,88 +47,6 @@ class EmailService:
         self.transport = transport
         self.ldap_service = ldap_service
         
-   ###################################################################
-    # Email sending methods
-    ################################################################### 
-    # def send_template_email(
-    #     self,
-    #     to: List[str],
-    #     subject: str,
-    #     template_name: str,
-    #     context: dict,
-    #     cc: Optional[List[str]] = None,
-    #     bcc: Optional[List[str]] = None,
-    #     attachments: Optional[List[str]] = None,
-    #     link_to_request: Optional[str] = None,
-    # ) -> None:
-    #     # Render the email template
-    #     html_body = self.renderer.render(template_name, context)
-
-    #     link_to_request = f"{settings.app_base_url}/approvals"
-    #     # Build the email message
-    #     msg = EmailMessage(
-    #             subject=subject,
-    #             sender = "Purchase Request System",
-    #             to=to,
-    #             cc=cc or [],
-    #             html_body=html_body,
-    #             attachments=attachments or [],
-    #             link_to_request=link_to_request
-    #         )
-        
-    #     # Send the email
-    #     self.transport.send(msg)
-        
-    ##############################################################
-    # SEND NEW REQUEST EMAIL - to requester
-    ##############################################################
-    # def send_new_request(self, payload: EmailItemsPayload, current_user: LDAPUser) -> None:
-    #     # This is the email that goes to the requester when they submit a new request
-    #     # Fetch request details from the database
-    #     logger.info("#############################################")
-    #     logger.info("send_new_request")
-    #     logger.info("#############################################")
-        
-    #     # Prepare the email context
-    #     context = {
-    #         'request_id': payload.request_id,
-    #         'requester_name': payload.requester_name,
-    #         'status': payload.status,
-    #     }
-    #     logger.info(f"context: {context}")
-        
-    #     # Send the email
-    #     self.send_template_email(
-    #         to=[payload.to],
-    #         subject=f"New Request Notification - {payload.request_id}",
-    #         template_name="requester_request_submitted.html",
-    #         context=context,
-    #         link_to_request=f"{settings.app_base_url}/approvals",
-    #         current_user=current_user
-    #     )
-        
-        # Render the email template
-        #html_body = self.renderer.render("approver_new_request.html", context)
-        
-        # to = ["roman_campbell@lawb.uscourts.gov"]
-        # subject = f"New Request Notification - {payload.ID}"
-        
-        # # Build the email message
-        # msg = EmailMessage(
-        #     subject=subject,
-        #     sender="Purchase Request System",
-        #     to=to,
-        #     cc=None,  # Add cc if needed in payload
-        #     bcc=None,  # Add bcc if needed in payload
-        #     html_body=html_body,
-        #     attachments=payload.file_attachments,
-        #     link_to_request=link_to_request,
-        #     context=context
-        # )
-        
-        # # Send the email
-        # self.transport.send(msg)
-        
     ##############################################################
     # SEND COMMENT EMAIL
     ##############################################################
@@ -166,29 +84,6 @@ class EmailService:
         
         Args:
             payload: The approval payload containing the approval and item descriptions
-            @dataclass
-        class EmailItemsPayload:
-            ID: str
-            requester: str
-            datereq: date
-            totalPrice: float
-            itemDescription: str
-            quantity: int
-            priceEach: float
-            link_to_request: Optional[str] = None
-            
-        @dataclass
-        class EmailMessage:
-            subject: str
-            sender: str
-            to: List[str]
-            link_to_request: str
-            cc: Optional[List[str]] = None
-            bcc: Optional[List[str]] = None
-            html_body: Optional[str] = None
-            text_body: Optional[str] = None
-            attachments: Optional[List[str]] = None
-            email_items: Optional[EmailItemsPayload] = None
         """
         # absolute url to the request
         link_to_request = f"{settings.app_base_url}/approvals"
@@ -222,17 +117,6 @@ class EmailService:
         
         # Send the email
         self.transport.send(msg)
-        
-    def get_email_items(self, payload: EmailItemsPayload) -> EmailItemsPayload:
-        return(EmailItemsPayload(
-            ID=payload.ID,
-            requester=payload.requester,
-            datereq=payload.datereq,
-            totalPrice=payload.totalPrice,
-            itemDescription=payload.itemDescription,
-            quantity=payload.quantity,
-            priceEach=payload.priceEach,
-        ))
 
     def send_new_request_to_requester(self, payload: PurchaseRequestPayload) -> None:
         """
@@ -271,10 +155,12 @@ class EmailService:
             html_body=self.renderer.render(
                 "requester_request_submitted.html",
                 {
+                    "ID": payload.items[0].ID,
                     "requester": payload.requester,
-                    "request_id": payload.items[0].ID,
-                    "submission_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "items": email_items
+                    "datereq": payload.items[0].datereq,
+                    "totalPrice": sum(item.totalPrice for item in payload.items),
+                    "items": email_items,
+                    "link_to_request": f"{settings.app_base_url}/approvals"
                 }
             )
         )
@@ -282,7 +168,7 @@ class EmailService:
         # Send the email
         self.transport.send(msg)
 
-    def send_new_request_to_approvers(self, payload: PurchaseRequestPayload) -> None:
+    def send_new_request_to_approvers(self, payload: PurchaseRequestPayload, pdf_path: str) -> None:
         """
         Send an email to approvers when a new request is submitted
         """
@@ -319,7 +205,8 @@ class EmailService:
                     "items": email_items,
                     "link_to_request": f"{settings.app_base_url}/approvals"
                 }
-            )
+            ),
+            attachments=[pdf_path]
         )
         
         # Send the email
