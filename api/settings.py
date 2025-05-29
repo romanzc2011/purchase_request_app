@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # -- Application settings
     approvals_link: str
     
+    # -- Email settings
+    smtp_server: str
+    smtp_port: int
+    smtp_email_addr: str
+    smtp_tls: bool
+    
+    
     def model_post_init(self, __context):
         # Ensure required directories exist
         self.PDF_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)

@@ -44,7 +44,7 @@ from api.services.search_service import SearchService
 from api.services.uuid_service import uuid_service
 from api.services.pdf_service import PDFService
 
-from api.services.email_service.renderer import TemplateRenderer
+from api.services.smtp_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
 from api.schemas.pydantic_schemas import EmailPayload, PurchaseItem, PurchaseRequestPayload
 from api.services.email_service.email_service import EmailService

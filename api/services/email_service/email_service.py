@@ -1,7 +1,7 @@
 import asyncio
 import dataclasses
 from datetime import date, datetime
-from api.services.email_service.renderer import TemplateRenderer
+from api.services.smtp_service.renderer import TemplateRenderer
 from api.services.email_service.transport import EmailTransport
 from api.services.ldap_service import LDAPService
 from api.services.email_service.models import EmailMessage
@@ -191,7 +191,6 @@ class EmailService:
                 logger.error("No approver emails found")
                 return
 
-            email_items = []
             for item in payload.items:
                 # Prepare email context
                 context = {

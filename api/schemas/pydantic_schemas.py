@@ -210,14 +210,16 @@ class CyberSecRelatedPayload(BaseModel):
 ##    EMAIL PAYLOAD SCHEMA
 ########################################################
 class EmailPayload(BaseModel):
-    to: List[str]
     subject: str
-    body: str
-    file_attachments: Optional[List[str]] = None
-    message: Optional[str] = None
-    requester_name: Optional[str] = None
-    status: Optional[ItemStatus] = None
-    request_id: Optional[str] = None
+    sender: str
+    to: List[str]
+    link_to_request: str
+    cc: Optional[List[str]] = None
+    bcc: Optional[List[str]] = None
+    html_body: Optional[str] = None
+    text_body: Optional[str] = None
+    attachments: Optional[List[str]] = None
+    email_items: Optional[EmailItemsPayload] = None
 
 class PurchaseItem(BaseModel):
     UUID: str
