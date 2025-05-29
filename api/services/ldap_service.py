@@ -7,7 +7,7 @@ from typing import Optional, List
 import ssl
 import os
 import re
-from api.schemas.pydantic_schemas import LDAPUser
+from api.schemas.misc_schemas import LDAPUser
 """
 AUTHOR: ROMAN CAMPBELL
 DATE: 01/29/2025
