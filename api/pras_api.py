@@ -61,7 +61,8 @@ import api.services.db_service as dbas
 
 # TODO: Investigate why rendering approval data is taking so long,
 # TODO: There seems to be too much member validation in the approval schema when rendering the Approval Table
-
+import tracemalloc
+tracemalloc.start(10)
 # Load environment variables
 dotenv_path = find_dotenv()
 load_dotenv(dotenv_path)
@@ -281,7 +282,14 @@ async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str, uploade
                     logger.error(f"Error resolving path for {file_path}: {e}")
         
         # Send new request email on thread
+        logger.info("#############################################")
+        logger.info("AWAITING EMAIL SEND TO REQUESTER")
+        logger.info("#############################################")
         await email_svc.send_new_request_to_requester(payload)
+        
+        logger.info("#############################################")
+        logger.info("AWAITING EMAIL SEND TO APPROVERS")
+        logger.info("#############################################")
         await email_svc.send_new_request_to_approvers(payload, str(pdf_path), absolute_uploaded_files)
         
         return str(pdf_path)

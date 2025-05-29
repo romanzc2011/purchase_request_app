@@ -12,7 +12,7 @@ class EmailTransport(ABC):
     @abstractmethod
     async def send(self, msg: EmailMessage) -> None:
         pass
-    
+
 class OutlookTransport(EmailTransport):
     def __init__(self):
         self.outlook = None
@@ -39,10 +39,20 @@ class OutlookTransport(EmailTransport):
         except Exception as e:
             logger.error(f"Error cleaning up Outlook: {e}")
 
-    async def send(self, msg: EmailMessage, attachments: List[str] = None):
+    async def send(self, msg: EmailMessage) -> None:
+        """Send email using Outlook automation"""
         try:
-            if not self._initialize_outlook():
-                raise Exception("Failed to initialize Outlook")
+            # Run the COM operations in a thread pool
+            await asyncio.to_thread(self._send_sync, msg)
+        except Exception as e:
+            logger.error(f"Error sending email: {e}")
+            raise
+
+    def _send_sync(self, msg: EmailMessage):
+        """Synchronous method to send email using Outlook"""
+        try:
+            logger.info(">>>> ENTERING OUTLOOK TRANSPORT")
+            self._initialize_outlook()
 
             mail = self.outlook.CreateItem(0)
             mail.Subject = msg.subject
@@ -56,8 +66,8 @@ class OutlookTransport(EmailTransport):
                 r = mail.Recipients.Add(addr)
                 r.Type = 2
             
-            if attachments:
-                for attachment in attachments:
+            if msg.attachments:
+                for attachment in msg.attachments:
                     try:
                         # Convert to absolute path and verify it exists
                         attachment_path = Path(attachment).resolve()

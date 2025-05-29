@@ -1,3 +1,5 @@
+import asyncio
+import dataclasses
 from datetime import date, datetime
 from api.services.email_service.renderer import TemplateRenderer
 from api.services.email_service.transport import EmailTransport
@@ -121,6 +123,10 @@ class EmailService:
         """
         Send an email to the requester when they submit a new request
         """
+        logger.info("#############################################")
+        logger.info("send_new_request_to_requester")
+        logger.info("#############################################")
+        
         # Get requester's email from LDAP
         requester_email = self.ldap_service.get_email_address(
             self.ldap_service.get_connection(), 
@@ -164,57 +170,77 @@ class EmailService:
             )
         )
         
-        # Send the email
-        await self.transport.send(msg)
+        try:
+            # Send the email and await the result
+            await self.transport.send(msg)
+            logger.info(f"Sent confirmation email to requester: {requester_email}")
+        except Exception as e:
+            logger.error(f"Error sending email to requester {requester_email}: {e}")
+            raise
 
     async def send_new_request_to_approvers(self, payload: PurchaseRequestPayload, pdf_path: str, upload_paths: List[str] = None) -> None:
         """Send email to approvers with the new request details and attachments."""
         try:
+            logger.info("#############################################")
+            logger.info("send_new_request_to_approvers")
+            logger.info("#############################################")
             # Get approver emails from LDAP
-            approver_emails = self.ldap_service.get_approver_emails()
+            #approver_emails = self.ldap_service.get_approver_emails()
+            approver_emails = ["roman_campbell@lawb.uscourts.gov"]
             if not approver_emails:
                 logger.error("No approver emails found")
                 return
 
-            # Prepare email context
-            context = {
-                "ID": payload.items[0].ID,
-                "requester": payload.requester,
-                "datereq": payload.items[0].datereq,
-                "items": [
-                    {
-                        "itemDescription": item.itemDescription,
-                        "quantity": item.quantity,
-                        "priceEach": item.priceEach,
-                        "totalPrice": item.totalPrice,
-                        "link_to_request": f"{settings.app_base_url}/approvals/{item.ID}"
-                    }
-                    for item in payload.items
-                ]
-            }
+            email_items = []
+            for item in payload.items:
+                # Prepare email context
+                context = {
+                    "ID": item.ID,
+                    "requester": item.requester,
+                    "datereq": item.datereq,
+                    "items": [
+                        {
+                            "itemDescription": item.itemDescription,
+                            "quantity": item.quantity,
+                            "priceEach": item.priceEach,
+                            "totalPrice": item.totalPrice,
+                            "link_to_request": f"{settings.app_base_url}/approvals/{item.ID}"
+                        }
+                    ]
+                }
 
-            # Create list of attachments
-            attachments = [pdf_path]  # Always include the PDF
-            if upload_paths:  # Add any uploaded files
-                attachments.extend(upload_paths)
-            
-            logger.info(f"Sending email with attachments: {attachments}")
+                # Create list of attachments
+                attachments = [pdf_path]  # Always include the PDF
+                if upload_paths:  # Add any uploaded files
+                    attachments.extend(upload_paths)
+                
+                logger.info(f"Sending email with attachments: {attachments}")
 
-            # Create email message
-            message = EmailMessage(
-                subject=f"New Purchase Request {payload.items[0].ID} from {payload.requester}",
-                sender="Purchase Request System",
-                to=approver_emails,
-                link_to_request=f"{settings.app_base_url}/approvals",
-                html_body=self.renderer.render("approver_new_request.html", context),
-                attachments=attachments
-            )
+                # Create email message
+                message = EmailMessage(
+                    subject=f"New Purchase Request {item.ID} from {item.requester}",
+                    sender="Purchase Request System",
+                    to=approver_emails,
+                    link_to_request=f"{settings.app_base_url}/approvals",
+                    html_body=self.renderer.render("approver_new_request.html", context),
+                    attachments=attachments
+                )
 
-            # Send email
-            await self.transport.send(message)
-            logger.info(f"Sent approval email to {len(approver_emails)} approvers")
+                # Send email to each approver
+                for addr in approver_emails:
+                    try:
+                        # Create a copy of the message for each recipient
+                        individual_message = dataclasses.replace(message, to=[addr])
+                        # Send email and await the result
+                        await self.transport.send(individual_message)
+                        logger.info(f"Sent email to approver: {addr}")
+                    except Exception as e:
+                        logger.error(f"Error sending email to {addr}: {e}")
+                        continue
+
+                logger.info(f"Completed sending emails to {len(approver_emails)} approvers")
         except Exception as e:
-            logger.error(f"Error sending approval email: {e}")
+            logger.error(f"Error in send_new_request_to_approvers: {e}")
             raise
         
         
