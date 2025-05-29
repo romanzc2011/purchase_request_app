@@ -1,8 +1,5 @@
-import asyncio
-from email.mime.application import MIMEApplication
 import mimetypes
 import aiosmtplib
-import sys
 
 from api.services.smtp_service.smtp_client import AsyncSMTPClient
 from loguru import logger
@@ -10,13 +7,15 @@ from api.settings import settings
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.message import EmailMessage
-from typing import List, Optional
+from typing import List, Tuple
 from pathlib import Path
+from email.mime.application import MIMEApplication
 
 from api.services.ldap_service import LDAPService
 from api.services.email_service.models import GroupCommentPayload
-from api.schemas.pydantic_schemas import EmailPayload, PurchaseRequestPayload
+from api.schemas.email_schemas import EmailPayload, LineItemsPayload, PurchaseRequestPayload
 from api.services.smtp_service.renderer import TemplateRenderer
+from api.services.smtp_service.builders import build_email_payload
     
 class SMTP_Service:
     def __init__(
@@ -120,4 +119,25 @@ class SMTP_Service:
             timeout=10,
         ) as smtp:
             await smtp.send_message(msg)
+            
+        #-------------------------------------------------------------------------------
+        # Email Wrappers
+        async def send_approver_email(self, payload: EmailPayload):
+            """
+            Send email to approvers
+            """
+            await self._send_mail_async(
+                payload,
+                use_approver_template=True,
+                use_requester_template=False
+            )   
         
+        async def send_requester_email(self, payload: EmailPayload):
+            """
+            Send email to requester
+            """
+            await self._send_mail_async(
+                payload,
+                use_approver_template=False,
+                use_requester_template=True
+            )

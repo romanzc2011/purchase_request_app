@@ -1,6 +1,6 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AnyHttpUrl, Field
+from pydantic import Field
 
 class Settings(BaseSettings):
     # -- Application URL
@@ -8,6 +8,7 @@ class Settings(BaseSettings):
         default="http://localhost:5004",  # Default for development
         env="VITE_API_URL",
     )
+    link_to_request: str = app_base_url + "/approval"
     
     # -- Project directories
     BASE_DIR: Path = Path(__file__).resolve().parent

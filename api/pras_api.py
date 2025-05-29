@@ -14,6 +14,7 @@ import os
 import asyncio
 import aiofiles
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from api.services.smtp_service.builders import build_email_payload
 import uvicorn
 import os, threading, time, uuid, json
 import api.schemas.pydantic_schemas as ps
@@ -47,7 +48,7 @@ from api.services.pdf_service import PDFService
 from api.services.smtp_service.smtp_service import SMTP_Service
 from api.services.smtp_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
-from api.schemas.pydantic_schemas import EmailPayload, PurchaseItem, PurchaseRequestPayload
+from api.schemas.pydantic_schemas import EmailPayload, PurchaseItem, PurchaseRequestPayload, LineItemsPayload
 from api.services.email_service.email_service import EmailService
 
 from api.settings import settings
@@ -116,7 +117,7 @@ api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 ##########################################################################
 @app.on_event("startup")
 async def initialize_services():
-    global renderer, ldap_service, smtp_service, auth_svc
+    global renderer, ldap_svc, smtp_service, auth_svc
     renderer = TemplateRenderer(template_dir=str(settings.BASE_DIR / "services" / "email_service" / "templates"))
     
     ldap_svc = LDAPService(
@@ -130,7 +131,6 @@ async def initialize_services():
         access_group_dns=settings.access_group_dns
     )
     
-    ldap_service = ldap_svc
     auth_svc = AuthService(ldap_service=ldap_svc)
     smtp_service = SMTP_Service(renderer=renderer, ldap_service=ldap_svc)
 
@@ -319,13 +319,14 @@ async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str, uploade
     status_code=200
 )
 async def set_purchase_request(
-    payload_json: str = Form(..., description="JSON payload as string"),
-    files: List[UploadFile] = File(None, description="Multiple files"),
-    current_user: LDAPUser = Depends(auth_svc.get_current_user),
+    payload_json:   str = Form(..., description="JSON payload as string"),
+    files:          Optional[List[UploadFile]] = File(None, description="Multiple files"),
+    current_user:   LDAPUser = Depends(auth_svc.get_current_user),
 ):
     try:
-        payload = PurchaseRequestPayload.model_validate_json(payload_json)
+        payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
         logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
+        
     except Exception as e:
         logger.error(f"Error validating payload: {e}")
         raise HTTPException(status_code=422, detail=f"Invalid payload format: {str(e)}")
@@ -479,43 +480,30 @@ async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_svc.g
 @api_router.post("/approveDenyRequest")
 async def approve_deny_request(
     payload: RequestPayload,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_session),
     current_user: LDAPUser = Depends(auth_svc.get_current_user)
 ):
     try:
-        logger.info(f"TARGET STATUS: {payload.target_status}")
         final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
         
         # Before allowing the user to approve/deny, check if they are in the correct group
         # were looking for CUE group membership
-        logger.info("Checking user group membership")
-        user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
+        #user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
+      
+        # Build list of line items for email payload
+        items, email_payload = build_email_payload(payload)
         
-        # Prepare and send email to approvers
-        email_payload = EmailPayload(
-            request_id=payload.request_id,
-            requester_name=payload.requester_name,
-            status=payload.status,
-            message=payload.message,
-            items=payload.items,
-            link_to_request=settings.app_base_url,
+        # Queue email
+        background_tasks.add_task(
+            smtp_service.send_approver_email,
+            email_payload
         )
-        logger.info(f"Constructed email payload: {email_payload}")
-        email_svc.send_approval_email(email_payload)
-        logger.success("SUCCESS!!!")
-        logger.info(f"Payload: {payload}")
-            
+   
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
         raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")
     
-    
-    email_svc.send_approval_email(email_payload)
-    
-    logger.success("SUCCESS!!!")
-    logger.info(f"Payload: {payload}")
-    
-
 ##########################################################################
 ## REFRESH TOKEN
 @api_router.post("/refresh")
