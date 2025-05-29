@@ -19,6 +19,7 @@ import os, threading, time, uuid, json
 import api.schemas.pydantic_schemas as ps
 
 from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException,  Query, status, UploadFile, File, Form, APIRouter, Path
+from fastapi import BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.encoders import jsonable_encoder
@@ -43,7 +44,7 @@ from api.services.ldap_service import LDAPService
 from api.services.search_service import SearchService
 from api.services.uuid_service import uuid_service
 from api.services.pdf_service import PDFService
-
+from api.services.smtp_service.smtp_service import SMTP_Service
 from api.services.smtp_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
 from api.schemas.pydantic_schemas import EmailPayload, PurchaseItem, PurchaseRequestPayload
@@ -82,21 +83,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize service managers
-# Instantiate your services with config from `settings`
-ldap_svc = LDAPService(
-    server_name=settings.ldap_server,
-    port=settings.ldap_port,
-    using_tls=settings.ldap_use_tls,
-    service_user=settings.ldap_service_user,
-    service_password=settings.ldap_service_password,
-    it_group_dns=settings.it_group_dns,
-    cue_group_dns=settings.cue_group_dns,
-    access_group_dns=settings.access_group_dns
-)
+# Startup services
+smtp_service: SMTP_Service
+renderer: TemplateRenderer
+ldap_service: LDAPService
+auth_svc: AuthService
 
-# Initialize auth service
-auth_svc = AuthService(ldap_service=ldap_svc)
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
@@ -107,11 +99,9 @@ pdf_svc = PDFService()
 search_svc = SearchService()
 
 # Initialize email service
-renderer = TemplateRenderer(template_dir=str(settings.BASE_DIR / "services" / "email_service" / "templates"))
-transport = OutlookTransport()
-email_svc = EmailService(renderer=renderer, transport=transport, ldap_service=ldap_svc)
+# transport = OutlookTransport()
+# email_svc = EmailService(renderer=renderer, transport=transport, ldap_service=ldap_svc)
 
-ldap_service = ldap_svc
 db_svc = next(get_session())  # Initialize with a session
 
 # Thread safety
@@ -120,6 +110,29 @@ lock = threading.Lock()
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
+
+##########################################################################
+## INITIALIZE SERVICES STARTUP
+##########################################################################
+@app.on_event("startup")
+async def initialize_services():
+    global renderer, ldap_service, smtp_service, auth_svc
+    renderer = TemplateRenderer(template_dir=str(settings.BASE_DIR / "services" / "email_service" / "templates"))
+    
+    ldap_svc = LDAPService(
+        server_name=settings.ldap_server,
+        port=settings.ldap_port,
+        using_tls=settings.ldap_use_tls,
+        service_user=settings.ldap_service_user,
+        service_password=settings.ldap_service_password,
+        it_group_dns=settings.it_group_dns,
+        cue_group_dns=settings.cue_group_dns,
+        access_group_dns=settings.access_group_dns
+    )
+    
+    ldap_service = ldap_svc
+    auth_svc = AuthService(ldap_service=ldap_svc)
+    smtp_service = SMTP_Service(renderer=renderer, ldap_service=ldap_svc)
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs

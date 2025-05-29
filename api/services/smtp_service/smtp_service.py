@@ -4,8 +4,8 @@ import mimetypes
 import aiosmtplib
 import sys
 
+from api.services.smtp_service.smtp_client import AsyncSMTPClient
 from loguru import logger
-
 from api.settings import settings
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -33,7 +33,7 @@ class SMTP_Service:
     #-------------------------------------------------------------------------------
     # SEND EMAIL - async
     #-------------------------------------------------------------------------------
-    async def send_mail_async(
+    async def _send_mail_async(
         self, 
         payload: EmailPayload, 
         use_approver_template: bool = False,
@@ -112,7 +112,12 @@ class SMTP_Service:
             ssl=False,
         )
         
-        await smtp.connect()
-        await smtp.send_message(msg)
-        await smtp.quit()
+        async with AsyncSMTPClient(
+            hostname=self.smtp_server,
+            port=self.smtp_port,
+            starttls=False,
+            ssl=False,
+            timeout=10,
+        ) as smtp:
+            await smtp.send_message(msg)
         
