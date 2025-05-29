@@ -39,16 +39,23 @@ class PurchaseItem(BaseModel):
     status: ItemStatus
     dateneed: Optional[date] = None
     fileAttachments: Optional[List[bytes]] = None
+    createdTime: Optional[datetime] = None
+    
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST PAYLOAD SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestPayload(BaseModel):
     requester: str
-    items: List[PurchaseItem]
+    ID: str
     IRQ1_ID: Optional[str] = None
     CO: Optional[str] = None
+    items: List[PurchaseItem]
     fileAttachments: Optional[List[bytes]] = None
     itemCount: int
+    
+class PurchaseResponse(BaseModel):
+    message: str
+    request_id: Optional[str]
     
 

@@ -8,7 +8,7 @@ class Settings(BaseSettings):
         default="http://localhost:5004",  # Default for development
         env="VITE_API_URL",
     )
-    link_to_request: str = app_base_url + "/approval"
+    link_to_request: str = f"{app_base_url}/approval"
     
     # -- Project directories
     BASE_DIR: Path = Path(__file__).resolve().parent
@@ -40,7 +40,6 @@ class Settings(BaseSettings):
     smtp_port: int
     smtp_email_addr: str
     smtp_tls: bool
-    
     
     def model_post_init(self, __context):
         # Ensure required directories exist

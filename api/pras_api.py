@@ -50,6 +50,7 @@ from api.services.smtp_service.renderer import TemplateRenderer
 from api.services.email_service.transport import OutlookTransport
 from api.schemas.pydantic_schemas import EmailPayload, PurchaseItem, PurchaseRequestPayload, LineItemsPayload
 from api.services.email_service.email_service import EmailService
+from api.services.notification_service import notify_requester, notify_approvers
 
 from api.settings import settings
 
@@ -260,8 +261,11 @@ async def _save_files(ID: str, file: UploadFile) -> str:
         raise
 
 ##########################################################################
-# Send new request email on threads
-async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str, uploaded_files: List[str] = None) -> str:
+# Generate PDF
+async def generate_pdf(
+    payload: PurchaseRequestPayload, 
+    ID: str, 
+    uploaded_files: List[str] = None) -> str:
     try:
         # Make sure dir exists
         pdf_output_dir = settings.PDF_OUTPUT_FOLDER
@@ -294,17 +298,6 @@ async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str, uploade
                 except Exception as e:
                     logger.error(f"Error resolving path for {file_path}: {e}")
         
-        # Send new request email on thread
-        logger.info("#############################################")
-        logger.info("AWAITING EMAIL SEND TO REQUESTER")
-        logger.info("#############################################")
-        await email_svc.send_new_request_to_requester(payload)
-        
-        logger.info("#############################################")
-        logger.info("AWAITING EMAIL SEND TO APPROVERS")
-        logger.info("#############################################")
-        await email_svc.send_new_request_to_approvers(payload, str(pdf_path), absolute_uploaded_files)
-        
         return str(pdf_path)
     except Exception as e:
         logger.error(f"Error in _make_pdf_and_notify: {e}")
@@ -319,9 +312,10 @@ async def _make_pdf_and_notify(payload: PurchaseRequestPayload, ID: str, uploade
     status_code=200
 )
 async def set_purchase_request(
-    payload_json:   str = Form(..., description="JSON payload as string"),
-    files:          Optional[List[UploadFile]] = File(None, description="Multiple files"),
-    current_user:   LDAPUser = Depends(auth_svc.get_current_user),
+    background_tasks:   BackgroundTasks,
+    payload_json:       str = Form(..., description="JSON payload as string"),
+    files:              Optional[List[UploadFile]] = File(None, description="Multiple files"),
+    current_user:       LDAPUser = Depends(auth_svc.get_current_user),
 ):
     try:
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
@@ -333,11 +327,7 @@ async def set_purchase_request(
 
     ################################################################3
     ## VALIDATE REQUESTER
-    
-    # Get requester from payload
     requester = payload.requester
-    
-    # Get requester email address
     requester_email = ldap_svc.get_email_address(ldap_svc.get_connection(), requester)
     
     if not requester_email: 
@@ -376,50 +366,27 @@ async def set_purchase_request(
         item.requester = payload.requester
         processed_data = process_purchase_data(item)
         purchase_req_commit(processed_data, current_user)
-        
-    # Build and launch asyncio tasks
-    tasks: List[asyncio.Task] = []
-    uploaded_files: List[str] = []
+    
+    # Update the payload with the shared ID
+    payload.ID = shared_id
     
     # Create tasks list for files
+    uploaded_files = []
     if files:
         for file in files:
-            logger.info("###########################################################")
-            logger.info(f"Creating file save task for: {file.filename}")
-            logger.info("###########################################################")
-            file_task = asyncio.create_task(_save_files(shared_id, file))
-            tasks.append(file_task)
-            # Get the result of the file save task
-            file_path = await file_task
-            uploaded_files.append(file_path)
+            logger.info(f"Saving uploaded file: {file.filename}")
+            uploaded_files.append(await _save_files(shared_id, file))
     
-    # always gen pdf and send email
-    logger.info("###########################################################")
-    logger.info("Creating PDF and email task")
-    logger.info("###########################################################")
-    tasks.append(asyncio.create_task(_make_pdf_and_notify(payload, shared_id, uploaded_files)))
+    # Generate PDF
+    logger.info("Generating PDF document")
+    pdf_path: str = await generate_pdf(payload, shared_id, uploaded_files)
     
-    if not tasks:
-        logger.error("No tasks were created")
-        raise HTTPException(status_code=500, detail="Failed to create background tasks")
-    
-    logger.info(f"Created {len(tasks)} tasks")
-    
-    # run concurrently, wait for all to finish
-    try:
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Check for any exceptions
-        for r in results:
-            if isinstance(r, Exception):
-                logger.error(f"Error in background task: {r}")
-                raise HTTPException(status_code=500, detail=f"Error in background task: {r}")
-    except Exception as e:
-        logger.error(f"Error executing tasks: {e}")
-        raise HTTPException(status_code=500, detail=f"Error executing tasks: {e}")
+    # Notify requester and approvers
+    logger.info("Notifying requester and approvers")
+    background_tasks.add_task(notify_approvers, payload, pdf_path, uploaded_files)
+    background_tasks.add_task(notify_requester, payload, pdf_path, uploaded_files)
     
     return JSONResponse({"message": "All work completed"})
-        
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
