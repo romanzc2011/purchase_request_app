@@ -15,7 +15,8 @@ from loguru import logger
 from pathlib import Path
 from api.settings import settings
 from api.services.db_service import get_session
-from api.schemas.pydantic_schemas import ApprovalSchema, SonCommentSchema
+from api.schemas.approval_schemas import ApprovalSchema
+from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
 
 

@@ -1,9 +1,7 @@
-
-
-########################################################
-##    APPROVAL SCHEMA
-########################################################
-
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional, List
+from datetime import datetime
+from api.schemas.purchase_schemas import ItemStatus
     
 ########################################################
 ## LINE ITEM STATUS SCHEMA
@@ -19,18 +17,7 @@ class LineItemStatusSchema(BaseModel):
     updater_username: Optional[str] = None
     updater_email: Optional[str] = None
     
-########################################################
-##    SON COMMENTS SCHEMA
-########################################################
-class SonCommentSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    
-    UUID: Optional[str] = None
-    comment_text: Optional[str] = None
-    created_at: Optional[datetime] = None
-    son_requester: str
-    item_description: Optional[str] = None
-    purchase_req_id: Optional[str] = None
+
   
 
 ########################################################

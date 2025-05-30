@@ -12,7 +12,7 @@ import uuid
 import enum
 
 # Create engine and base
-engine = create_engine('sqlite:///db/pras.db', echo=False)  # PRAS = Purchase Request Approval System
+engine = create_engine('sqlite:///api/db/pras.db', echo=False)  # PRAS = Purchase Request Approval System
 Base = declarative_base()
 my_session = sessionmaker(engine)
 

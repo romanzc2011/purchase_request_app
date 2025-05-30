@@ -39,7 +39,8 @@ class Settings(BaseSettings):
     smtp_server: str
     smtp_port: int
     smtp_email_addr: str
-    smtp_tls: bool
+    smtp_tls: bool = False
+    
     
     def model_post_init(self, __context):
         # Ensure required directories exist

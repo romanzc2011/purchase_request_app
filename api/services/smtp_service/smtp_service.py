@@ -12,9 +12,10 @@ from pathlib import Path
 from email.mime.application import MIMEApplication
 
 from api.services.ldap_service import LDAPService
-from api.services.email_service.models import GroupCommentPayload
-from api.schemas.email_schemas import EmailPayload, LineItemsPayload, PurchaseRequestPayload
+from api.schemas.comment_schemas import GroupCommentPayload
+from api.schemas.email_schemas import EmailPayload, LineItemsPayload
 from api.services.smtp_service.renderer import TemplateRenderer
+from api.schemas.purchase_schemas import PurchaseItem, PurchaseRequestPayload
 from api.services.smtp_service.builders import build_email_payload
     
 class SMTP_Service:

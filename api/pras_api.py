@@ -8,57 +8,27 @@ This is the backend that will service the UI. When making a purchase request, us
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
-from dataclasses import asdict
-import sys
-import os
-import asyncio
-import aiofiles
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from api.services.smtp_service.builders import build_email_payload
-import uvicorn
-import os, threading, time, uuid, json
-import api.schemas.pydantic_schemas as ps
+# PRAS Miscellaneous Dependencies
+from api.dependencies.misc_dependencies import *
 
-from fastapi import FastAPI, APIRouter, Request, Depends, HTTPException,  Query, status, UploadFile, File, Form, APIRouter, Path
-from fastapi import BackgroundTasks
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.encoders import jsonable_encoder
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
-from cachetools import TTLCache, cached
-from typing import List, Optional
-from loguru import logger
-from dotenv import load_dotenv, find_dotenv
-from sqlalchemy.orm import Session
-from typing import Optional, List
-from werkzeug.utils import secure_filename
-from jwt.exceptions import ExpiredSignatureError, PyJWTError
-from pathlib import Path
-from datetime import datetime
+# FastAPI Dependencies
+from api.dependencies.fastapi_dependencies import *
 
+# PRAS Dependencies
+from api.dependencies.pras_dependencies import smtp_service
+from api.dependencies.pras_dependencies import ldap_service
+from api.dependencies.pras_dependencies import auth_service
+from api.dependencies.pras_dependencies import pdf_service
+from api.dependencies.pras_dependencies import search_service
+from api.dependencies.pras_dependencies import uuid_service
+
+# Schemas
+from api.dependencies.pras_schemas import *
+
+# Singleton Services
 from api.services.db_service import get_session
-from fastapi.security import OAuth2PasswordRequestForm
-from api.services.auth_service import AuthService
-from api.services.email_service.email_service import EmailService
-from api.services.ldap_service import LDAPService
-from api.services.search_service import SearchService
-from api.services.uuid_service import uuid_service
-from api.services.pdf_service import PDFService
-from api.services.smtp_service.smtp_service import SMTP_Service
-from api.services.smtp_service.renderer import TemplateRenderer
-from api.services.email_service.transport import OutlookTransport
-from api.schemas.pydantic_schemas import EmailPayload, PurchaseItem, PurchaseRequestPayload, LineItemsPayload
-from api.services.email_service.email_service import EmailService
+from api.services.smtp_service.builders import build_email_payload
 from api.services.notification_service import notify_requester, notify_approvers
-
-from api.settings import settings
-
-from api.schemas.pydantic_schemas import PurchaseResponse
-from api.schemas.pydantic_schemas import LDAPUser
-from api.schemas.pydantic_schemas import CyberSecRelatedPayload
-from api.schemas.pydantic_schemas import RequestPayload, GroupCommentPayload
-from api.schemas.pydantic_schemas import ApprovalSchema
 
 import api.services.db_service as dbas
 
@@ -66,12 +36,6 @@ import api.services.db_service as dbas
 # TODO: There seems to be too much member validation in the approval schema when rendering the Approval Table
 import tracemalloc
 tracemalloc.start(10)
-# Load environment variables
-dotenv_path = find_dotenv()
-load_dotenv(dotenv_path)
-
-# ensure settings are loadeed and available
-settings.PDF_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
@@ -85,24 +49,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Startup services
-smtp_service: SMTP_Service
-renderer: TemplateRenderer
-ldap_service: LDAPService
-auth_svc: AuthService
-
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
-# Initialize PDF service
-pdf_svc = PDFService()
-
-# Initialize search service
-search_svc = SearchService()
-
-# Initialize email service
-# transport = OutlookTransport()
-# email_svc = EmailService(renderer=renderer, transport=transport, ldap_service=ldap_svc)
 
 db_svc = next(get_session())  # Initialize with a session
 
@@ -112,28 +61,6 @@ lock = threading.Lock()
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
-
-##########################################################################
-## INITIALIZE SERVICES STARTUP
-##########################################################################
-@app.on_event("startup")
-async def initialize_services():
-    global renderer, ldap_svc, smtp_service, auth_svc
-    renderer = TemplateRenderer(template_dir=str(settings.BASE_DIR / "services" / "email_service" / "templates"))
-    
-    ldap_svc = LDAPService(
-        server_name=settings.ldap_server,
-        port=settings.ldap_port,
-        using_tls=settings.ldap_use_tls,
-        service_user=settings.ldap_service_user,
-        service_password=settings.ldap_service_password,
-        it_group_dns=settings.it_group_dns,
-        cue_group_dns=settings.cue_group_dns,
-        access_group_dns=settings.access_group_dns
-    )
-    
-    auth_svc = AuthService(ldap_service=ldap_svc)
-    smtp_service = SMTP_Service(renderer=renderer, ldap_service=ldap_svc)
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
@@ -152,14 +79,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         Login()
         #####################################################################""")
     
-    return await auth_svc.login(form_data)
+    return await auth_service.login(form_data)
 ##########################################################################
 ## GET APPROVAL DATA
 ##########################################################################
 @api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
 async def get_approval_data(
     ID: Optional[str] = Query(None),
-    current_user: LDAPUser = Depends(auth_svc.get_current_user)):
+    current_user: LDAPUser = Depends(auth_service.get_current_user)):
     
     # Check if user is in IT group or CUE group
     logger.info(f"CURRENT USER: {current_user}")
@@ -186,7 +113,7 @@ async def get_approval_data(
 @api_router.post("/downloadStatementOfNeedForm")
 async def download_statement_of_need_form(
     payload: dict,
-    current_user: LDAPUser = Depends(auth_svc.get_current_user),
+    current_user: LDAPUser = Depends(auth_service.get_current_user),
 ):
     """
     This endpoint is used to download the statement of need form for a given ID.
@@ -216,11 +143,11 @@ async def download_statement_of_need_form(
 ##########################################################################
 ## GET SEARCH DATA
 ##########################################################################
-@api_router.get("/getSearchData/search", response_model=List[ps.ApprovalSchema])
+@api_router.get("/getSearchData/search", response_model=List[ApprovalSchema])
 async def get_search_data(
     query: str = "",
     column: Optional[str] = None,
-    current_user: LDAPUser = Depends(auth_svc.get_current_user)
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     # If column is provided, use _exact_singleton_search instead
     if column:
@@ -315,7 +242,7 @@ async def set_purchase_request(
     background_tasks:   BackgroundTasks,
     payload_json:       str = Form(..., description="JSON payload as string"),
     files:              Optional[List[UploadFile]] = File(None, description="Multiple files"),
-    current_user:       LDAPUser = Depends(auth_svc.get_current_user),
+    current_user:       LDAPUser = Depends(auth_service.get_current_user),
 ):
     try:
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
@@ -411,7 +338,7 @@ async def log_requests(request: Request, call_next):
 ## ASSIGN REQUISITION ID
 ##########################################################################
 @api_router.post("/assignIRQ1_ID")
-async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_svc.get_current_user)):
+async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_service.get_current_user)):
     """
     This is called from the frontend to assign a requisition ID
     to the purchase request. It also updates the UUID in the approval table.
@@ -449,7 +376,7 @@ async def approve_deny_request(
     payload: RequestPayload,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_session),
-    current_user: LDAPUser = Depends(auth_svc.get_current_user)
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     try:
         final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
@@ -477,7 +404,7 @@ async def approve_deny_request(
 async def refresh_token(refresh_token: str):
     try:
         # Verify the refresh token
-        username = auth_svc.verify_jwt_token(refresh_token)
+        username = auth_service.verify_jwt_token(refresh_token)
         if not username:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -485,7 +412,7 @@ async def refresh_token(refresh_token: str):
             )
             
         # Create new access token
-        new_access_token = auth_svc.create_access_token(identity=username)
+        new_access_token = auth_service.create_access_token(identity=username)
         
         return {
             "access_token": new_access_token
@@ -528,7 +455,7 @@ async def create_new_id(request: Request):
 ## GET UUID BY ID
 ##########################################################################
 @api_router.get("/getUUID/{ID}")
-async def get_uuid_by_id_endpoint(ID: str, current_user: LDAPUser = Depends(auth_svc.get_current_user)):
+async def get_uuid_by_id_endpoint(ID: str, current_user: LDAPUser = Depends(auth_service.get_current_user)):
     """
     Get the UUID for a given ID.
     This endpoint can be used by other programs to retrieve the UUID.
@@ -747,7 +674,7 @@ def purchase_req_commit(processed_data, current_user: LDAPUser):
 ## HANDLE FILE UPLOAD
 ##########################################################################
 @api_router.post("/upload_file")
-async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_svc.get_current_user)):
+async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_service.get_current_user)):
     # Ensure the upload directory exists
     if not os.path.exists(settings.UPLOAD_FOLDER):
         os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
@@ -774,7 +701,7 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params
 ##########################################################################
-async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_svc.get_current_user)):
+async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.get_current_user)):
     """
     Deletes a file given its ID and filename.
     Expects a JSON payload containing "ID" and "filename".

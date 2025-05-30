@@ -5,11 +5,11 @@ from jwt.exceptions import InvalidTokenError
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from loguru import logger
+from pydantic import BaseModel
 
 from api.services.ldap_service import LDAPService
 from api.settings import settings 
-from api.schemas.pydantic_schemas import TokenData
-from api.schemas.pydantic_schemas import LDAPUser
+from api.schemas.auth_schemas import LDAPUser
 """
 AUTHOR: ROMAN CAMPBELL
 DATE: 04/10/2025

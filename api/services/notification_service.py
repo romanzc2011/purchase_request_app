@@ -1,8 +1,8 @@
 from typing import List
 from api.schemas.purchase_schemas import PurchaseRequestPayload
-from api.services.smtp_service.smtp_service import SMTP_Service
+from api.dependencies.pras_dependencies import smtp_service
+from api.dependencies.pras_dependencies import ldap_service
 from api.services.smtp_service.builders import build_email_payload
-from pras_api import smtp_service, ldap_service, settings
 
 #-------------------------------------------------------------------------------
 # Notify requester
