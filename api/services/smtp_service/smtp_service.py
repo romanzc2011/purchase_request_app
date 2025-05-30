@@ -121,24 +121,24 @@ class SMTP_Service:
         ) as smtp:
             await smtp.send_message(msg)
             
-        #-------------------------------------------------------------------------------
-        # Email Wrappers
-        async def send_approver_email(self, payload: EmailPayload):
-            """
-            Send email to approvers
-            """
-            await self._send_mail_async(
-                payload,
-                use_approver_template=True,
-                use_requester_template=False
-            )   
-        
-        async def send_requester_email(self, payload: EmailPayload):
-            """
-            Send email to requester
-            """
-            await self._send_mail_async(
-                payload,
-                use_approver_template=False,
-                use_requester_template=True
-            )
+#-------------------------------------------------------------------------------
+# Email Wrappers
+async def send_approver_email(self, payload: EmailPayload):
+    """
+    Send email to approvers
+    """
+    await self._send_mail_async(
+        payload,
+        use_approver_template=True,
+        use_requester_template=False
+    )   
+
+async def send_requester_email(self, payload: EmailPayload):
+    """
+    Send email to requester
+    """
+    await self._send_mail_async(
+        payload,
+        use_approver_template=False,
+        use_requester_template=True
+    )

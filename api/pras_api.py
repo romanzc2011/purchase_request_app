@@ -8,11 +8,28 @@ This is the backend that will service the UI. When making a purchase request, us
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
+
+from fastapi import (
+    FastAPI,
+    APIRouter,
+    Depends,
+    BackgroundTasks,
+    Form,
+    File,
+    UploadFile,
+    HTTPException,
+    Request,
+    Query,
+)
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import (
+    OAuth2PasswordBearer,
+    OAuth2PasswordRequestForm,
+)
 # PRAS Miscellaneous Dependencies
 from api.dependencies.misc_dependencies import *
-
-# FastAPI Dependencies
-from api.dependencies.fastapi_dependencies import *
 
 # PRAS Dependencies
 from api.dependencies.pras_dependencies import smtp_service
@@ -21,6 +38,7 @@ from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import uuid_service
+from api.dependencies.pras_dependencies import settings
 
 # Schemas
 from api.dependencies.pras_schemas import *
@@ -123,7 +141,7 @@ async def download_statement_of_need_form(
         raise HTTPException(status_code=400, detail="ID is required")
 
     try:
-        output_path = pdf_svc.create_pdf(
+        output_path = pdf_service.create_pdf(
             ID=ID,
             payload=payload
         )
@@ -151,10 +169,10 @@ async def get_search_data(
 ):
     # If column is provided, use _exact_singleton_search instead
     if column:
-        results = search_svc._exact_singleton_search(column, query, db=None)
+        results = search_service._exact_singleton_search(column, query, db=None)
     else:
         # Otherwise use the standard execute_search method
-        results = search_svc.execute_search(query, db=None)
+        results = search_service.execute_search(query, db=None)
     
     return JSONResponse(content=jsonable_encoder(results))
 
@@ -192,7 +210,7 @@ async def _save_files(ID: str, file: UploadFile) -> str:
 async def generate_pdf(
     payload: PurchaseRequestPayload, 
     ID: str, 
-    uploaded_files: List[str] = None) -> str:
+    uploaded_files: Optional[List[str]] = None) -> str:
     try:
         # Make sure dir exists
         pdf_output_dir = settings.PDF_OUTPUT_FOLDER
@@ -200,7 +218,7 @@ async def generate_pdf(
         
         # Create PDF on thread
         pdf_path = await asyncio.to_thread(
-            pdf_svc.create_pdf,
+            pdf_service.create_pdf,
             ID=ID,
             payload=jsonable_encoder(payload)
         )
@@ -211,23 +229,9 @@ async def generate_pdf(
             raise FileNotFoundError(f"PDF file not found at {pdf_path}")
             
         logger.info(f"PDF generated at: {pdf_path}")
-        
-        # Convert uploaded files to absolute paths
-        absolute_uploaded_files = []
-        if uploaded_files:
-            for file_path in uploaded_files:
-                try:
-                    abs_path = Path(file_path).resolve()
-                    if abs_path.exists():
-                        absolute_uploaded_files.append(str(abs_path))
-                    else:
-                        logger.error(f"Uploaded file not found: {abs_path}")
-                except Exception as e:
-                    logger.error(f"Error resolving path for {file_path}: {e}")
-        
         return str(pdf_path)
     except Exception as e:
-        logger.error(f"Error in _make_pdf_and_notify: {e}")
+        logger.error(f"Error in generate_pdf: {e}")
         raise
 
 ##########################################################################
@@ -255,7 +259,7 @@ async def set_purchase_request(
     ################################################################3
     ## VALIDATE REQUESTER
     requester = payload.requester
-    requester_email = ldap_svc.get_email_address(ldap_svc.get_connection(), requester)
+    requester_email = ldap_service.get_email_address(ldap_service.get_connection(), requester)
     
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
@@ -383,7 +387,7 @@ async def approve_deny_request(
         
         # Before allowing the user to approve/deny, check if they are in the correct group
         # were looking for CUE group membership
-        #user_group = ldap_svc.check_user_membership(ldap_svc.get_connection(), current_user.username)
+        #user_group = ldap_service.check_user_membership(ldap_service.get_connection(), current_user.username)
       
         # Build list of line items for email payload
         items, email_payload = build_email_payload(payload)
@@ -477,12 +481,12 @@ async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to
     """
     Return a list of username strings that start with the given prefix `q`.
     """
-    connection = ldap_svc.get_connection()
+    connection = ldap_service.get_connection()
     if connection is None:
         logger.error("LDAP connection is None")
         return []
     logger.info(f"Fetching usernames for prefix: {q}")
-    return ldap_svc.fetch_usernames(q)
+    return ldap_service.fetch_usernames(q)
 
 ##########################################################################
 ## ADD COMMENTS BULK
@@ -509,11 +513,11 @@ async def add_comments(payload: GroupCommentPayload):
                 raise HTTPException(status_code=404, detail="Failed to add comment")
             
             # Get requester and lookup email address
-            requster_email = ldap_svc.get_email_address(ldap_svc.get_connection(), success.son_requester)
+            requster_email = ldap_service.get_email_address(ldap_service.get_connection(), success.son_requester)
             logger.info(f"Requester email: {requster_email}")
             
             # Get requester's name from LDAP
-            requester_info = ldap_svc.fetch_user(success.son_requester)
+            requester_info = ldap_service.fetch_user(success.son_requester)
             requester_name = requester_info.username  # Using username as name since that's what we have
             logger.info(f"SUCCESS: {success}")
     # Send comment email

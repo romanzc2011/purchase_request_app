@@ -47,7 +47,7 @@ class PurchaseItem(BaseModel):
 # --------------------------------------------------------------
 class PurchaseRequestPayload(BaseModel):
     requester: str
-    ID: str
+    ID: Optional[str] = None
     IRQ1_ID: Optional[str] = None
     CO: Optional[str] = None
     items: List[PurchaseItem]
