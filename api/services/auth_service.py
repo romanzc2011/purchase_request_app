@@ -1,11 +1,16 @@
+from asyncio import Server
 import os, jwt
+from urllib.parse import urlparse
+from tkinter import ALL
+from sqlite3 import Connection
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Annotated
+from typing import Optional
 from jwt.exceptions import InvalidTokenError
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from loguru import logger
-from pydantic import BaseModel
+from ldap3.core.exceptions import LDAPBindError
+from ldap3 import Server, Connection, ALL, SUBTREE, Tls
 
 from api.services.ldap_service import LDAPService
 from api.settings import settings 
@@ -20,11 +25,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 class AuthService:
     def __init__(self, ldap_service: LDAPService):
         self.ldap_service = ldap_service
-        self.JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+        self.JWT_SECRET_KEY = settings.jwt_secret_key
         self.ALGORITHM = "HS256"
     
-    def get_user(self, username: str) -> LDAPUser:
-        return self.ldap_service.fetch_usernames(username)
+    async def get_user(self, username: str) -> LDAPUser:
+        return await self.ldap_service.fetch_usernames(username)
     
     #####################################################################################
     ## CREATE ACCESS TOKEN
@@ -49,45 +54,41 @@ class AuthService:
         
     #####################################################################################
     ## AUTHENTICATE USER
-    def authenticate_user(
-        self, form_data: OAuth2PasswordRequestForm) -> Optional[LDAPUser]:
-        """
-        Attempt an LDAP bind. On success, return a rich User object.
-        """
-        logger.info("""
-            #####################################################################
-            Authenticating User()
-            #####################################################################""")
+    async def authenticate_user(
+        self,
+        form_data: OAuth2PasswordRequestForm
+    ) -> Optional[LDAPUser]:
+        logger.info("🔑 Authenticating User()")
         username = form_data.username
         password = form_data.password
-        connection = self.ldap_service.create_connection(username, password)
-        if not connection:
+        logger.info(f"Username: {username}")
+        # Verify users creds by binding
+        parsed = urlparse(settings.ldap_server)
+        host = parsed.hostname or parsed.path
+        port = parsed.port or settings.ldap_port
+
+        if not '\\' in username and not '@' in username:
+            username = f"ADU\\{username}"
+            
+        try:
+            user_conn = Connection(
+                Server(host, port, use_ssl=True, get_info=ALL),
+                user=username,
+                password=password,
+                auto_bind=True,
+                receive_timeout=10,
+            )
+            user_conn.unbind()
+        except LDAPBindError:
+            logger.error(f"Failed to bind user: {username}")
             return None
         
-        email = self.ldap_service.get_email_address(connection, username)
-        groups = self.ldap_service.check_user_membership(connection, username)
-        return LDAPUser(username=username, email=email, groups=list(groups.keys()))
-    
-    #####################################################################################
-    ## Login
-    async def login(
-        self,
-        form_data: OAuth2PasswordRequestForm = Depends()
-    ) -> dict:
-        user = self.authenticate_user(form_data)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        token = self.create_access_token(user)      
-        return {
-            "access_token": token,
-            "token_type": "Bearer",
-            "user": user.model_dump(),
-        }
+        # Now authenticated, lookup email and groups
+        email = await self.ldap_service.get_email_address(username)
+        groups = await self.ldap_service.check_user_membership(username)
         
+        return LDAPUser(username=username, email=email, groups=[g for g, ok in groups.items() if ok])
+
     #####################################################################################
     ## Get Current LDAPUser
     async def get_current_user(
@@ -110,20 +111,9 @@ class AuthService:
         except InvalidTokenError:
             raise credentials_exception
         
-        user = self.ldap_service.fetch_user(username)
+        user = await self.ldap_service.fetch_user(username)
         if user is None:
             raise credentials_exception
         
         logger.info(f"CURRENT USER VALIDATED: {user}")
         return user
-    
-    #####################################################################################
-    ## GET CURRENT ACTIVE USER
-    async def get_current_active_user(
-        self,
-        current_user: Annotated[LDAPUser, Depends(lambda:self.get_current_user)]
-    ) -> LDAPUser:
-        if not current_user.is_active:
-            raise HTTPException(status_code=400, detail="Inactive user")
-        return current_user
-

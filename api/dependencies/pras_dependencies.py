@@ -1,4 +1,5 @@
 # Dependencies for PRAS
+import os
 
 from api.settings                           import settings
 from api.services.smtp_service.renderer     import TemplateRenderer
@@ -11,19 +12,19 @@ from api.services.search_service            import SearchService
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
-    template_dir=str(settings.BASE_DIR / "api" / "services" / "smtp_service" / "templates")
+    template_dir=str(settings.BASE_DIR / "services" / "smtp_service" / "templates")
 )
 
 # —————————————— LDAP Service ————————————————————
 ldap_service = LDAPService(
-    server_name      = settings.ldap_server,
-    port             = settings.ldap_port,
-    using_tls        = settings.ldap_use_tls,
-    service_user     = settings.ldap_service_user,
-    service_password = settings.ldap_service_password,
-    it_group_dns     = settings.it_group_dns,
-    cue_group_dns    = settings.cue_group_dns,
-    access_group_dns = settings.access_group_dns,
+    ldap_url       = settings.ldap_server,           # e.g. "ldaps://adu.dcn"
+    bind_dn        = settings.ldap_service_user,     # e.g. "ADU\\svc_account"
+    bind_password  = settings.ldap_service_password, # service account password
+    group_dns      = [
+        settings.it_group_dns,
+        settings.cue_group_dns,
+        settings.access_group_dns,
+    ],
 )
 
 # —————————————— SMTP Service ————————————————————
@@ -41,23 +42,5 @@ uuid_service = UUIDService()
 # —————————————— Search Service ————————————————————
 search_service = SearchService()
 
-# —————————————— LDAP Service ————————————————————
-ldap_service = LDAPService(
-    server_name      = settings.ldap_server,
-    port             = settings.ldap_port,
-    using_tls        = settings.ldap_use_tls,
-    service_user     = settings.ldap_service_user,
-    service_password = settings.ldap_service_password,
-    it_group_dns     = settings.it_group_dns,
-    cue_group_dns    = settings.cue_group_dns,
-    access_group_dns = settings.access_group_dns,
-)
-
 # —————————————— Auth Service ————————————————————
 auth_service = AuthService(ldap_service=ldap_service)
-
-# —————————————— SMTP Service ————————————————————
-smtp_service = SMTP_Service(
-    renderer      = renderer,
-    ldap_service  = ldap_service,
-)

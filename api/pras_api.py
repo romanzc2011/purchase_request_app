@@ -20,6 +20,7 @@ from fastapi import (
     HTTPException,
     Request,
     Query,
+    status
 )
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
@@ -92,12 +93,29 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
       username=...&password=...
     """
-    logger.info("""
-        #####################################################################
-        Login()
-        #####################################################################""")
+    logger.info("☑️ Login()")
     
-    return await auth_service.login(form_data)
+    # 1. Authenticate user and fetch LDAPUser
+    user = await auth_service.authenticate_user(form_data)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    # 2. Create JWT token
+    token = auth_service.create_access_token(user)
+    
+    # 3. Return token and user details
+    return {
+        "access_token": token,
+        "token_type": "Bearer",
+        "user": user.model_dump(),
+    }
+    
+    
+    
 ##########################################################################
 ## GET APPROVAL DATA
 ##########################################################################
@@ -237,17 +255,21 @@ async def generate_pdf(
 ##########################################################################
 ## SEND TO PURCHASE REQUEST -- being sent from the purchase req submit
 ##########################################################################
-@api_router.post(
-    "/sendToPurchaseReq",
-    response_model=PurchaseResponse,
-    status_code=200
-)
+@api_router.post("/sendToPurchaseReq", response_model=PurchaseResponse)
 async def set_purchase_request(
-    background_tasks:   BackgroundTasks,
-    payload_json:       str = Form(..., description="JSON payload as string"),
-    files:              Optional[List[UploadFile]] = File(None, description="Multiple files"),
-    current_user:       LDAPUser = Depends(auth_service.get_current_user),
+    background_tasks: BackgroundTasks,
+    payload_json: str = Form(..., description="JSON payload as string"),
+    files: Optional[List[UploadFile]] = File(None, description="Multiple files"),
+    current_user: LDAPUser = Depends(auth_service.get_current_user),
 ):
+    logger.info(f"Type of current_user: {type(current_user)}")
+
+    """
+    This endpoint:
+      - Parses the incoming payload
+      - Ensures the user is active via the LDAPUser we got from the token
+      - Commits the request, tagging line items with current_user.username
+    """
     try:
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
         logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
@@ -259,7 +281,7 @@ async def set_purchase_request(
     ################################################################3
     ## VALIDATE REQUESTER
     requester = payload.requester
-    requester_email = ldap_service.get_email_address(ldap_service.get_connection(), requester)
+    requester_email = ldap_service.get_email_address(requester)
     
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
@@ -481,12 +503,7 @@ async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to
     """
     Return a list of username strings that start with the given prefix `q`.
     """
-    connection = ldap_service.get_connection()
-    if connection is None:
-        logger.error("LDAP connection is None")
-        return []
-    logger.info(f"Fetching usernames for prefix: {q}")
-    return ldap_service.fetch_usernames(q)
+    return await ldap_service.fetch_usernames(q)
 
 ##########################################################################
 ## ADD COMMENTS BULK
@@ -627,7 +644,7 @@ def process_approval_data(processed_data):
 ##########################################################################
 ## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
 ##########################################################################
-def purchase_req_commit(processed_data, current_user: LDAPUser):
+def purchase_req_commit(processed_data: dict, current_user: LDAPUser):
     with lock:
         try:
             logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")

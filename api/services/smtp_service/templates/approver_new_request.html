@@ -1,125 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Purchase Request for Your Approval</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-        }
-        .container {
-            width: 80%;
-            max-width: 600px;
-            margin: 20px auto;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            background-color: #007bff;
-            color: #fff;
-            padding: 10px;
-            text-align: center;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-        }
-        .content h2 {
-            color: #ffe600;
-        }
-        .content p {
-            margin-bottom: 10px;
-        }
-        .item-list {
-            list-style: none;
-            padding: 0;
-        }
-        .item-list li {
-            background-color: #f9f9f9;
-            border: 1px solid #eee;
-            padding: 10px;
-            margin-bottom: 5px;
-            border-radius: 4px;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 0.9em;
-            color: #777;
-        }
-        .button {
-            display: inline-block;
-            background-color: #28a745;
-            color: #fff;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-top: 15px;
-        }
-        .button:hover {
-            background-color: #218838;
-        }
-    </style>
-    
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>New Purchase Request for Your Approval</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0; padding: 0;
+      background-color: #f4f4f4;
+    }
+    .container {
+      width: 80%; max-width: 600px;
+      margin: 20px auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      background-color: #007bff;
+      color: #fff;
+      padding: 15px;
+      text-align: center;
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
+    }
+    .content h2 {
+      color: #ffe600;
+      margin-top: 0;
+    }
+    .item-list {
+      list-style: none;
+      padding: 0;
+    }
+    .item-list li {
+      background-color: #f9f9f9;
+      border: 1px solid #eee;
+      padding: 10px;
+      margin-bottom: 8px;
+      border-radius: 4px;
+    }
+    .button {
+      display: inline-block;
+      background-color: #28a745;
+      color: #fff;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-top: 15px;
+    }
+    .button:hover {
+      background-color: #218838;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 25px;
+      font-size: 0.9em;
+      color: #777;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Purchase Request Approval</h1>
-        </div>
-        <div class="content">
-            <h2>Action Required: New Purchase Request</h2>
-            <p>A new purchase request (ID: <strong>{{ ID }}</strong>) has been submitted and requires your approval.</p>
-            
-            <h3>Request Details:</h3>
-            <p><strong>Requester:</strong> {{ requester | default('N/A') }}</p>
-            <p><strong>Submission Date:</strong> {{ datereq | default('N/A') }}</p>
-            <p><strong>Total Price:</strong> ${{ "%.2f"|format(totalPrice | default(0)) }}</p>
-            
-            {% if items and items|length > 0 %}
-            <h3>Items:</h3>
-            <ul class="item-list">
-                {% for item in items %}
-                <li>
-                    <strong>{{ item.itemDescription }}</strong><br>
-                    Quantity:       {{ item.quantity }}<br>
-                    Price per unit: ${{ "%.2f"|format(item.priceEach) }}<br>
-                    Total Price:    ${{ "%.2f"|format(item.totalPrice) }}<br>
-                    Fund:           {{ item.fund }}<br>
-                    Date Needed:    {{ item.dateneed }}
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p>No specific items listed or item details are available.</p>
-            {% endif %}
-
-            {% if comments %}
-            <h3>Comments/Justification:</h3>
-            <p>{{ comments | e }}</p>
-            {% endif %}
-
-            <p>Please review the details and take appropriate action. An attachment is included with the request.</p>
-            
-            {% if approval_link %}
-            <p style="text-align: center;">
-                <a href="{{ link_to_request }}" class="button">Review Request</a>
-            </p>
-            {% endif %}
-
-            <p>If you have any questions, please contact the requester or the purchasing department.</p>
-            <p>Thank you.</p>
-        </div>
-        <div class="footer">
-            <p>&copy; {{ current_year }} Your Company Name. All rights reserved.</p>
-            <p>This is an automated notification. Please do not reply directly to this email.</p>
-        </div>
+  <div class="container">
+    <div class="header">
+      <h1>Purchase Request Approval</h1>
     </div>
+    <div class="content">
+      <h2>Action Required: New Purchase Request</h2>
+      <p>A new purchase request <strong>#{{ ID }}</strong> has been submitted by <strong>{{ requester }}</strong> on <strong>{{ datereq }}</strong> and requires your approval.</p>
+
+      <p><strong>Total Price:</strong> ${{ "%.2f"|format(totalPrice) }}</p>
+
+      {% if items %}
+      <h3>Items:</h3>
+      <ul class="item-list">
+        {% for item in items %}
+        <li>
+          <strong>{{ item.itemDescription }}</strong><br>
+          Quantity:       {{ item.quantity }}<br>
+          Unit Price:     ${{ "%.2f"|format(item.priceEach) }}<br>
+          Total Price:    ${{ "%.2f"|format(item.totalPrice) }}<br>
+          Fund:           {{ item.fund }}<br>
+          Needed By:      {{ item.dateneed }}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p><em>No items were found on this request.</em></p>
+      {% endif %}
+
+      {% if comments %}
+      <h3>Comments / Justification</h3>
+      <p>{{ comments | e }}</p>
+      {% endif %}
+
+      <p style="text-align:center;">
+        <a href="{{ approval_link }}" class="button">Review &amp; Approve</a>
+      </p>
+
+      <p>If you have any questions, please contact the requester or the purchasing department.</p>
+      <p>Thank you.</p>
+    </div>
+
+    <div class="footer">
+      &copy; {{ current_year }} Your Company Name. All rights reserved.<br>
+      This is an automated notification — please do not reply directly.
+    </div>
+  </div>
 </body>
 </html>

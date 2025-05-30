@@ -1,3 +1,4 @@
+from datetime import datetime
 import mimetypes
 import aiosmtplib
 
@@ -48,9 +49,11 @@ class SMTP_Service:
             "ID": payload.ID,
             "requester": payload.requester,
             "datereq": payload.datereq,
-            "totalPrice": sum(item.totalPrice for item in payload.email_items),
-            "items": payload.email_items,  # my EmailItemsPayload
-            "link_to_request": f"{settings.app_base_url}/approval"
+            "totalPrice": sum(i.totalPrice for i in payload.items),
+            "items": payload.items,
+            "link_to_request": payload.approval_link or f"{settings.app_base_url}/approval",
+            "comments": payload.comments,
+            "current_year": datetime.now().year,
         }
         # Determine the template to use
         if use_approver_template and not use_requester_template:
@@ -96,49 +99,41 @@ class SMTP_Service:
             with open(path, "rb") as f:
                 data = f.read()
             
-            msg.add_attachment(
-                data,
-                maintype=maintype,
-                subtype=subtype,
-                filename=path.name  
-            )
+            attachment = MIMEApplication(data, _subtype=subtype)
+            attachment.add_header('Content-Disposition', 'attachment', filename=path.name)
+            msg.attach(attachment)
         
         #-------------------------------------------------------------------------------
         # Send wity async SMTP client
         smtp = aiosmtplib.SMTP(
             hostname=self.smtp_server,
             port=self.smtp_port,
-            starttls=False,
-            ssl=False,
         )
         
         async with AsyncSMTPClient(
             hostname=self.smtp_server,
             port=self.smtp_port,
-            starttls=False,
-            ssl=False,
-            timeout=10,
         ) as smtp:
             await smtp.send_message(msg)
             
-#-------------------------------------------------------------------------------
-# Email Wrappers
-async def send_approver_email(self, payload: EmailPayload):
-    """
-    Send email to approvers
-    """
-    await self._send_mail_async(
-        payload,
-        use_approver_template=True,
-        use_requester_template=False
-    )   
+    #-------------------------------------------------------------------------------
+    # Email Wrappers
+    async def send_approver_email(self, payload: EmailPayload):
+        """
+        Send email to approvers
+        """
+        await self._send_mail_async(
+            payload,
+            use_approver_template=True,
+            use_requester_template=False
+        )   
 
-async def send_requester_email(self, payload: EmailPayload):
-    """
-    Send email to requester
-    """
-    await self._send_mail_async(
-        payload,
-        use_approver_template=False,
-        use_requester_template=True
-    )
+    async def send_requester_email(self, payload: EmailPayload):
+        """
+        Send email to requester
+        """
+        await self._send_mail_async(
+            payload,
+            use_approver_template=False,
+            use_requester_template=True
+        )

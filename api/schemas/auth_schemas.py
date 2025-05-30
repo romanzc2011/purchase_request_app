@@ -1,6 +1,6 @@
 # api/schemas/auth_schemas.py
 from pydantic import BaseModel, EmailStr
-from typing import List
+from typing import List, Optional
 
 class Token(BaseModel):
     access_token: str
@@ -11,5 +11,5 @@ class TokenData(BaseModel):
 
 class LDAPUser(BaseModel):
     username: str
-    email: EmailStr
+    email: Optional[str] = None
     groups: List[str]

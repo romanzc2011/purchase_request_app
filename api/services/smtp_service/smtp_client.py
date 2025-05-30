@@ -8,24 +8,17 @@ class AsyncSMTPClient:
         self,
         hostname: str,
         port: int,
-        starttls: bool = False,
-        ssl: bool = False,
-        timeout: Optional[int] = 10,
     ):
-        self.hostname = settings.smtp_server
-        self.port = settings.smtp_port
-        self.starttls = starttls
-        self.ssl = ssl
-        self.timeout = timeout
-        self._client = Optional[aiosmtplib.SMTP] = None
+        self.hostname = hostname
+        self.port = port
+        self._client: Optional[aiosmtplib.SMTP] = None
         
     async def __aenter__(self) -> aiosmtplib.SMTP:
         self._client = aiosmtplib.SMTP(
             hostname=self.hostname,
             port=self.port,
-            starttls=self.starttls,
-            ssl=self.ssl,
-            timeout=self.timeout,
+            use_tls=settings.smtp_tls,
+            timeout=10
         )
         await self._client.connect()
         return self._client

@@ -16,9 +16,6 @@ class LineItemStatusSchema(BaseModel):
     updated_by: Optional[str] = None
     updater_username: Optional[str] = None
     updater_email: Optional[str] = None
-    
-
-  
 
 ########################################################
 ##    APPROVE/DENY PAYLOAD SCHEMA ( REQUEST )
