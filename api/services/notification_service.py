@@ -12,16 +12,17 @@ async def notify_requester(
     uploaded_files: List[str]
 ):
     """
-    Notify the requester of the purchase request.
+    1) Build the “base” EmailPayload (subject, body template, line items, etc.)
+    2) Look up the requester’s email address via LDAP
+    3) Assign that address to `email_payload.to`
+    4) Attach the generated PDF and any upload files
+    5) Send the email via your async SMTP client
     """
     # Build line items and base payload
     items, email_payload = build_email_payload(request)
 
     # Pull requester email from LDAP
-    requester_email = ldap_service.get_email_address(
-        ldap_service.get_connection(),
-        request.requester
-    )
+    requester_email = await ldap_service.get_email_address(request.requester)
     email_payload.to = [requester_email]
     email_payload.attachments = [generated_pdf_path] + uploaded_files
     

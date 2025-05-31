@@ -281,7 +281,7 @@ async def set_purchase_request(
     ################################################################3
     ## VALIDATE REQUESTER
     requester = payload.requester
-    requester_email = ldap_service.get_email_address(requester)
+    requester_email = await ldap_service.get_email_address(requester)
     
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
@@ -321,7 +321,7 @@ async def set_purchase_request(
         purchase_req_commit(processed_data, current_user)
     
     # Update the payload with the shared ID
-    payload.ID = shared_id
+    payload.ID = shared_id  
     
     # Create tasks list for files
     uploaded_files = []
@@ -530,7 +530,7 @@ async def add_comments(payload: GroupCommentPayload):
                 raise HTTPException(status_code=404, detail="Failed to add comment")
             
             # Get requester and lookup email address
-            requster_email = ldap_service.get_email_address(ldap_service.get_connection(), success.son_requester)
+            requster_email = await ldap_service.get_email_address(success.son_requester)
             logger.info(f"Requester email: {requster_email}")
             
             # Get requester's name from LDAP
