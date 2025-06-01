@@ -3,6 +3,7 @@ from api.schemas.purchase_schemas import PurchaseRequestPayload
 from api.dependencies.pras_dependencies import smtp_service
 from api.dependencies.pras_dependencies import ldap_service
 from api.services.smtp_service.builders import build_email_payload
+from loguru import logger
 
 #-------------------------------------------------------------------------------
 # Notify requester
@@ -22,9 +23,13 @@ async def notify_requester(
     items, email_payload = build_email_payload(request)
 
     # Pull requester email from LDAP
+    logger.info("Starting to lookup {request.requester} email addr")
     requester_email = await ldap_service.get_email_address(request.requester)
+    logger.info(f"Notifier has email address for {request.requester}: {requester_email}")
+    logger.info(f"email_payload: {email_payload}")
     email_payload.to = [requester_email]
     email_payload.attachments = [generated_pdf_path] + uploaded_files
+    logger.info("About to send mail.....")
     
     # Send email
     await smtp_service.send_requester_email(email_payload)

@@ -1,5 +1,6 @@
 from datetime import datetime
 import mimetypes
+import asyncio
 import aiosmtplib
 
 from api.services.smtp_service.smtp_client import AsyncSMTPClient
@@ -55,6 +56,8 @@ class SMTP_Service:
             "comments": payload.comments,
             "current_year": datetime.now().year,
         }
+        
+        logger.info(f"CONTEXT: {context}")
         # Determine the template to use
         if use_approver_template and not use_requester_template:
             html_body = self.renderer.render_approver_request_template(context)
@@ -74,18 +77,20 @@ class SMTP_Service:
         
         #-------------------------------------------------------------------------------
         # Build MIME 
+        logger.info("Building MIME..")
         msg = MIMEMultipart("mixed")
         msg['Subject'] = payload.subject
-        msg['From'] = payload.sender
-        msg['To'] = ', '.join(payload.to)
-        if cc: msg['Cc'] = ', '.join(cc)
-        if bcc: msg['Bcc'] = ', '.join(bcc)
+        msg['From'] = "romanzc2011@gmail.com"
+        msg['To'] = "roman_campbell@lawb.uscourts.gov"
+        # if cc: msg['Cc'] = ', '.join(cc)
+        # if bcc: msg['Bcc'] = ', '.join(bcc)
         
         #-------------------------------------------------------------------------------
         # Add HTML body
         msg.attach(MIMEText(html_body, "html"))
         if text_body:
             msg.attach(MIMEText(text_body, "plain"))
+        logger.info("Message attached to email")
         
         # Add attachments
         for file_path in attachments:
@@ -104,18 +109,17 @@ class SMTP_Service:
             msg.attach(attachment)
         
         #-------------------------------------------------------------------------------
-        # Send wity async SMTP client
-        smtp = aiosmtplib.SMTP(
+        logger.info("Sending multipart message")
+        smtp_client = aiosmtplib.SMTP(
             hostname=self.smtp_server,
-            port=self.smtp_port,
+            port=25,
+            start_tls=False,
+            use_tls=False,
         )
+        async with smtp_client:
+            result = await smtp_client.send_message(msg)
+            logger.info(f"RESULT: {result}")
         
-        async with AsyncSMTPClient(
-            hostname=self.smtp_server,
-            port=self.smtp_port,
-        ) as smtp:
-            await smtp.send_message(msg)
-            
     #-------------------------------------------------------------------------------
     # Email Wrappers
     async def send_approver_email(self, payload: EmailPayload):
@@ -132,6 +136,7 @@ class SMTP_Service:
         """
         Send email to requester
         """
+        logger.info("In send_requester_email")
         await self._send_mail_async(
             payload,
             use_approver_template=False,

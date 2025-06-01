@@ -281,7 +281,9 @@ async def set_purchase_request(
     ################################################################3
     ## VALIDATE REQUESTER
     requester = payload.requester
+    logger.info(f"FROM PRAS about to find email address for {requester}")
     requester_email = await ldap_service.get_email_address(requester)
+    logger.info(f"FROM PRAS found {requester_email}")
     
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
@@ -336,8 +338,15 @@ async def set_purchase_request(
     
     # Notify requester and approvers
     logger.info("Notifying requester and approvers")
-    background_tasks.add_task(notify_approvers, payload, pdf_path, uploaded_files)
-    background_tasks.add_task(notify_requester, payload, pdf_path, uploaded_files)
+    async with asyncio.TaskGroup() as tg:
+        approver_co = notify_approvers(payload, pdf_path, uploaded_files)
+        requester_co = notify_requester(payload, pdf_path, uploaded_files)
+
+        task_approvers = tg.create_task(approver_co)
+        task_requesters = tg.create_task(requester_co)
+        
+        logger.info("TASKS CREATED")
+    logger.info("ALL WORK EMAILS SENT")
     
     return JSONResponse({"message": "All work completed"})
 

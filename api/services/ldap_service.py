@@ -98,6 +98,7 @@ class LDAPService:
                 return conn.entries[0].mail.value
         except LDAPExceptionError as e:
             logger.error(f"LDAP error fetching email for {username}: {e}")
+        logger.info(f"Going back with {username}")
         return None
 
     
@@ -118,7 +119,6 @@ class LDAPService:
         
         try:
             conn = self.get_connection()
-
             for group_dn in self.group_dns:
                 conn.search(
                     search_base=group_dn,
@@ -215,6 +215,8 @@ class LDAPService:
         groups = await self.check_user_membership(username)
         email  = await self.get_email_address(username)
         approved = [g for g, allowed in groups.items() if allowed]
+        logger.info(f"List of groups {username} is member of:")
+        logger.info(f"{approved}")
         return LDAPUser(username=username, email=email or "", groups=approved)
     
     #-------------------------------------------------------------------
