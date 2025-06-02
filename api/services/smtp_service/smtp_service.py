@@ -1,24 +1,22 @@
 from datetime import datetime
 import mimetypes
-import asyncio
 import aiosmtplib
 
-from api.services.smtp_service.smtp_client import AsyncSMTPClient
 from loguru import logger
 from api.settings import settings
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.message import EmailMessage
 from typing import List, Tuple
 from pathlib import Path
 from email.mime.application import MIMEApplication
+from typing import Optional
 
 from api.services.ldap_service import LDAPService
+from api.schemas.email_schemas import ValidModel, EmailPayloadComment, EmailPayloadRequest
 from api.schemas.comment_schemas import GroupCommentPayload
-from api.schemas.email_schemas import EmailPayload, LineItemsPayload
 from api.services.smtp_service.renderer import TemplateRenderer
 from api.schemas.purchase_schemas import PurchaseItem, PurchaseRequestPayload
-from api.services.smtp_service.builders import build_email_payload
+from api.settings import settings
     
 class SMTP_Service:
     def __init__(
@@ -37,9 +35,10 @@ class SMTP_Service:
     #-------------------------------------------------------------------------------
     async def _send_mail_async(
         self, 
-        payload: EmailPayload, 
-        use_approver_template: bool = False,
-        use_requester_template: bool = False
+        payload: ValidModel, 
+        use_approver_template: Optional[bool] = False,
+        use_requester_template: Optional[bool] = False,
+        use_comment_template: Optional[bool] = False,
         ):
         """
         Send email with asyncio, using Jinja to render the html body
@@ -53,17 +52,21 @@ class SMTP_Service:
             "totalPrice": sum(i.totalPrice for i in payload.items),
             "items": payload.items,
             "link_to_request": payload.approval_link or f"{settings.app_base_url}/approval",
-            "comments": payload.comments,
             "current_year": datetime.now().year,
         }
         
         logger.info(f"CONTEXT: {context}")
+        
         # Determine the template to use
-        if use_approver_template and not use_requester_template:
+        if use_approver_template and not use_requester_template and not use_comment_template:
             html_body = self.renderer.render_approver_request_template(context)
             
-        elif use_requester_template and not use_approver_template:
+        elif use_requester_template and not use_approver_template and not use_comment_template:
             html_body = self.renderer.render_requester_request_template(context)
+            
+        elif use_comment_template and not use_approver_template and not use_requester_template:
+            html_body = self.renderer.render_comment_template(context)
+            
         else:
             raise ValueError("Invalid template parameters")
         
@@ -71,20 +74,22 @@ class SMTP_Service:
         text_body = payload.text_body or None
         #-------------------------------------------------------------------------------
         # Pull out headers and attachments
+        to = payload.to or []
         cc = payload.cc or []
         bcc = payload.bcc or []
         attachments = payload.attachments or []
         
         #-------------------------------------------------------------------------------
-        # Build MIME 
+        # Build MIME
         logger.info("Building MIME..")
         msg = MIMEMultipart("mixed")
         msg['Subject'] = payload.subject
-        msg['From'] = "romanzc2011@gmail.com"
-        msg['To'] = "roman_campbell@lawb.uscourts.gov"
+        #msg['From'] = self.smtp_email_addr
+        msg['From'] = "romanzc2011@gmail.com"  # TESTING ONLY
+        if to: msg['To'] = ', '.join(to)
         # if cc: msg['Cc'] = ', '.join(cc)
         # if bcc: msg['Bcc'] = ', '.join(bcc)
-        
+        logger.info(f"PAYLOAD, look for email: {payload}")
         #-------------------------------------------------------------------------------
         # Add HTML body
         msg.attach(MIMEText(html_body, "html"))
@@ -122,7 +127,7 @@ class SMTP_Service:
         
     #-------------------------------------------------------------------------------
     # Email Wrappers
-    async def send_approver_email(self, payload: EmailPayload):
+    async def send_approver_email(self, payload: EmailPayloadRequest):
         """
         Send email to approvers
         """
@@ -132,7 +137,7 @@ class SMTP_Service:
             use_requester_template=False
         )   
 
-    async def send_requester_email(self, payload: EmailPayload):
+    async def send_requester_email(self, payload: EmailPayloadRequest):
         """
         Send email to requester
         """
@@ -140,5 +145,19 @@ class SMTP_Service:
         await self._send_mail_async(
             payload,
             use_approver_template=False,
-            use_requester_template=True
+            use_requester_template=True,
+            use_comment_template=False
+        )
+        
+    #-------------------------------------------------------------------------------
+    # Email Wrappers - COMMENTS
+    async def send_comments_email(self, payload: EmailPayloadComment):
+        """
+        Send comments
+        """
+        await self._send_mail_async(
+            payload=payload,
+            use_approver_template=False,
+            use_requester_template=False,
+            use_comment_template=True
         )

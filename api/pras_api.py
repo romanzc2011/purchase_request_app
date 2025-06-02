@@ -9,6 +9,7 @@ TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
 
+import json
 from fastapi import (
     FastAPI,
     APIRouter,
@@ -40,6 +41,7 @@ from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import uuid_service
 from api.dependencies.pras_dependencies import settings
+from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 
 # Schemas
 from api.dependencies.pras_schemas import *
@@ -70,8 +72,6 @@ app.add_middleware(
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
-
-
 db_svc = next(get_session())  # Initialize with a session
 
 # Thread safety
@@ -281,9 +281,7 @@ async def set_purchase_request(
     ################################################################3
     ## VALIDATE REQUESTER
     requester = payload.requester
-    logger.info(f"FROM PRAS about to find email address for {requester}")
     requester_email = await ldap_service.get_email_address(requester)
-    logger.info(f"FROM PRAS found {requester_email}")
     
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
@@ -336,16 +334,49 @@ async def set_purchase_request(
     logger.info("Generating PDF document")
     pdf_path: str = await generate_pdf(payload, shared_id, uploaded_files)
     
+    #################################################################################
+    ## BUILD EMAIL PAYLOADS
+    #################################################################################
+    
+    items_for_email = [
+        LineItemsPayload(
+            **item.model_dump(),
+            link_to_request=f"{settings.link_to_request}"
+        )
+        for item in payload.items
+    ]
+    
+    # Payload for Approvers
+    email_approvers_payload = EmailPayloadRequest(
+        model_type="email_request",
+        ID=payload.ID,
+        requester=payload.requester,
+        datereq=payload.items[0].datereq,
+        subject=f"Purchase Request #{payload.ID}",
+        sender=settings.smtp_email_addr,
+        to=["roman_campbell@lawb.uscourts.gov"],   # TODO: This will be the approvers in prod
+        cc=None,
+        bcc=None,
+        attachments=None,
+        text_body=None,
+        approval_link=f"{settings.link_to_request}",
+        items=items_for_email
+    )
+
+    logger.info(f"EMAIL PAYLOAD REQUEST: {email_approvers_payload}")
+    
+    
+    logger.info(f"PAYLOAD IN SEND TO PURCHASE REQUEST: {payload}")
     # Notify requester and approvers
     logger.info("Notifying requester and approvers")
-    async with asyncio.TaskGroup() as tg:
-        approver_co = notify_approvers(payload, pdf_path, uploaded_files)
-        requester_co = notify_requester(payload, pdf_path, uploaded_files)
+    # async with asyncio.TaskGroup() as tg:
+    #     approver_co = notify_approvers(payload, pdf_path, uploaded_files)
+    #     requester_co = notify_requester(payload, pdf_path, uploaded_files)
 
-        task_approvers = tg.create_task(approver_co)
-        task_requesters = tg.create_task(requester_co)
+    #     task_approvers = tg.create_task(approver_co)
+    #     task_requesters = tg.create_task(requester_co)
         
-        logger.info("TASKS CREATED")
+    logger.info("TASKS CREATED")
     logger.info("ALL WORK EMAILS SENT")
     
     return JSONResponse({"message": "All work completed"})
@@ -357,15 +388,54 @@ async def set_purchase_request(
 async def log_requests(request: Request, call_next):
     request_id = str(uuid.uuid4())
     start_time = time.time()
+    
+    # Capture raw body text
+    body_bytes = await request.body()
+    try:
+        raw_json = body_bytes.decode('utf-8')
+    except UnicodeDecodeError:
+        raw_json = "<could not decode body>"
+        
+    # We need to replace request._receive so that downstream code still sees the body
+    async def receive_override():
+        return {"type": "http.request", "body": body_bytes}
+
+    request._receive = receive_override  # overwrite the receive coroutine
+
+    # --- Call the next handler and get the response ---
     response = await call_next(request)
     elapsed = time.time() - start_time
-    logger.bind(
-        request_id=request_id,
-        path=request.url.path,
-        method=request.method,
-        status_code=response.status_code,
-        elapsed=elapsed,
-    ).info("Request processed")
+
+    # --- If it’s a validation error (422), log the body and the validation details ---
+    if response.status_code == 422:
+        # JSONResponse stores its content in .body
+        # For a 422 FastAPI Response, .body is a JSON‐encoded byte string of { "detail": […] }
+        try:
+            error_payload = json.loads(response.body.decode("utf-8"))
+        except Exception:
+            error_payload = {"raw_response": "<unable to parse response body>"}
+
+        logger.error(
+            {
+                "request_id": request_id,
+                "path": request.url.path,
+                "method": request.method,
+                "status_code": response.status_code,
+                "elapsed": elapsed,
+                "raw_request_body": raw_json,
+                "validation_errors": error_payload.get("detail", error_payload),
+            }
+        )
+
+    else:
+        logger.bind(
+            request_id=request_id,
+            path=request.url.path,
+            method=request.method,
+            status_code=response.status_code,
+            elapsed=elapsed,
+        ).info("Request processed")
+
     response.headers["X-Request-ID"] = request_id
     return response
 
@@ -534,27 +604,30 @@ async def add_comments(payload: GroupCommentPayload):
         logger.info(f"PAYLOAD: {payload}")
         
         for comment in payload.comment:
+            logger.info(f"COMMENT: {comment}")
             success = dbas.update_data_by_uuid(uuid=comment.uuid, table="son_comments", comment_text=comment.comment)
             if not success:
                 raise HTTPException(status_code=404, detail="Failed to add comment")
             
             # Get requester and lookup email address
-            requster_email = await ldap_service.get_email_address(success.son_requester)
-            logger.info(f"Requester email: {requster_email}")
+            requester_email = await ldap_service.get_email_address(success.son_requester)
+            logger.info(f"Requester email: {requester_email}")
             
             # Get requester's name from LDAP
-            requester_info = ldap_service.fetch_user(success.son_requester)
+            requester_info = await ldap_service.fetch_user(success.son_requester)
             requester_name = requester_info.username  # Using username as name since that's what we have
-            logger.info(f"SUCCESS: {success}")
-    # Send comment email
-    email_svc.send_comment_email(payload, requster_email, requester_name)
+        logger.info(f"DATA: \n{payload}\n{requester_email}\n{requester_name}")
+        
+        # Get data about the request from Approvals table
+                
+                
+
     
     return {"message": "Comments added successfully"}
 
 ##########################################################################
 ## CYBER SECURITY RELATED
 ##########################################################################
-
 @api_router.put("/cyberSecRelated/{UUID}")
 async def cyber_sec_related(UUID: str, payload: CyberSecRelatedPayload):
     """

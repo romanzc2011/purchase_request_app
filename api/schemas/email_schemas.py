@@ -1,6 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, TypeAdapter
 from typing import List, Optional
+from typing import Annotated, Literal, Union
 from datetime import date
+from api.schemas.comment_schemas import GroupCommentPayload, CommentItem
 
 # --------------------------------------------------------------
 #  EMAIL LINE ITEMS PAYLOAD SCHEMAS
@@ -12,20 +14,42 @@ class LineItemsPayload(BaseModel):
     totalPrice: float
 
 # --------------------------------------------------------------
-#  EMAIL PAYLOAD SCHEMAS
+#  EMAIL PAYLOAD SCHEMAS - LineItemsPayload
 # --------------------------------------------------------------
-class EmailPayload(BaseModel):
+class EmailPayloadRequest(BaseModel):
+    model_type: Literal["email_request"]
+    ID: str
+    requester: str
+    datereq: date
+    subject: str
+    sender: str
+    to: Optional[List[str]] = None
+    cc: Optional[List[str]] = None
+    bcc: Optional[List[str]] = None
+    attachments: Optional[List[str]] = None
+    text_body: Optional[str] = None
+    approval_link: str
+    items: List[LineItemsPayload]
+    
+class EmailPayloadComment(BaseModel):
+    model_type: Literal["email_comments"]
     ID: str
     requester: str
     datereq: date
     subject: str
     sender: str
     to: List[str]
-    approval_link: str
+    approval_link: Optional[str] = None
     cc: Optional[List[str]] = None
     bcc: Optional[List[str]] = None
     attachments: Optional[List[str]] = None
-    comments: Optional[str] = None
     text_body: Optional[str] = None
     
-    items: List[LineItemsPayload]
+    comment_data: List[GroupCommentPayload]
+    
+# Define discrimnated model
+ValidModel = Annotated[
+    Union[EmailPayloadRequest, EmailPayloadComment],
+    Field(discriminator="model_type")]
+
+_valid_model_adapter = TypeAdapter(ValidModel)

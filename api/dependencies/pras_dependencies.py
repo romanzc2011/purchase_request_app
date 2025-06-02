@@ -9,6 +9,8 @@ from api.services.auth_service              import AuthService
 from api.services.pdf_service               import PDFService
 from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
+from api.dependencies.pras_schemas          import *
+from api.schemas.email_schemas              import EmailPayloadRequest, EmailPayloadComment, LineItemsPayload
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
