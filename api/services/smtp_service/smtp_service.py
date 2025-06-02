@@ -43,25 +43,36 @@ class SMTP_Service:
         """
         Send email with asyncio, using Jinja to render the html body
         Determine the template to use based on the use_approver_template and use_requester_template parameters
+         EMAIL PAYLOAD REQUEST: model_type='email_request' ID='LAWB0104' requester='RomanCampbell' datereq=datetime.date(2025, 6, 2) subject='Purchase Request #LAWB0104' sender='it@lawb.uscourts.gov' to=['roman_campbell@lawb.uscourts.gov'] cc=None bcc=None attachments=None text_body=None approval_link="annotation=NoneType required=False default='http://localhost:5004' json_schema_extra={'env': 'VITE_API_URL'}/approval" 
+         items=[LineItemsPayload(itemDescription='item1', quantity=3, priceEach=32.0, totalPrice=96.0)]
         """
         
-        context = {
-            "ID": payload.ID,
-            "requester": payload.requester,
-            "datereq": payload.datereq,
-            "totalPrice": sum(i.totalPrice for i in payload.items),
-            "items": payload.items,
-            "link_to_request": payload.approval_link or f"{settings.app_base_url}/approval",
-            "current_year": datetime.now().year,
-        }
+        if isinstance(payload, EmailPayloadRequest):
+            context = {
+                "ID": payload.ID,
+                "requester": payload.requester,
+                "datereq": payload.datereq,
+                "items": payload.items,
+                "totalPrice": sum(item.totalPrice for item in payload.items)
+            }
         
-        logger.info(f"CONTEXT: {context}")
+        #-------------------------------------------------------------------------------
+        # Build MIME
+        #-------------------------------------------------------------------------------
+        logger.info("Building MIME..")
+        msg = MIMEMultipart("mixed")
+        msg['Subject'] = payload.subject
+        #msg['From'] = self.smtp_email_addr
+        msg['From'] = "romanzc2011@gmail.com"  # TESTING ONLY
         
         # Determine the template to use
         if use_approver_template and not use_requester_template and not use_comment_template:
+            msg['To'] = "roman_campbell@lawb.uscourts.gov"  # TODO: This will be the approvers in prod
+            #if to: msg['To'] = ', '.join(to) 
             html_body = self.renderer.render_approver_request_template(context)
             
         elif use_requester_template and not use_approver_template and not use_comment_template:
+            msg['To'] = payload.requester_email
             html_body = self.renderer.render_requester_request_template(context)
             
         elif use_comment_template and not use_approver_template and not use_requester_template:
@@ -74,21 +85,13 @@ class SMTP_Service:
         text_body = payload.text_body or None
         #-------------------------------------------------------------------------------
         # Pull out headers and attachments
-        to = payload.to or []
         cc = payload.cc or []
         bcc = payload.bcc or []
         attachments = payload.attachments or []
         
-        #-------------------------------------------------------------------------------
-        # Build MIME
-        logger.info("Building MIME..")
-        msg = MIMEMultipart("mixed")
-        msg['Subject'] = payload.subject
-        #msg['From'] = self.smtp_email_addr
-        msg['From'] = "romanzc2011@gmail.com"  # TESTING ONLY
-        if to: msg['To'] = ', '.join(to)
-        # if cc: msg['Cc'] = ', '.join(cc)
-        # if bcc: msg['Bcc'] = ', '.join(bcc)
+       
+        if cc: msg['Cc'] = ', '.join(cc)
+        if bcc: msg['Bcc'] = ', '.join(bcc)
         logger.info(f"PAYLOAD, look for email: {payload}")
         #-------------------------------------------------------------------------------
         # Add HTML body
@@ -134,7 +137,8 @@ class SMTP_Service:
         await self._send_mail_async(
             payload,
             use_approver_template=True,
-            use_requester_template=False
+            use_requester_template=False,
+            use_comment_template=False
         )   
 
     async def send_requester_email(self, payload: EmailPayloadRequest):

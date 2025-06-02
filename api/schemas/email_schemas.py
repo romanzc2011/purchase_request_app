@@ -14,16 +14,17 @@ class LineItemsPayload(BaseModel):
     totalPrice: float
 
 # --------------------------------------------------------------
-#  EMAIL PAYLOAD SCHEMAS - LineItemsPayload
+#  EMAIL PAYLOAD SCHEMAS - EmailPayloadRequest
 # --------------------------------------------------------------
 class EmailPayloadRequest(BaseModel):
     model_type: Literal["email_request"]
     ID: str
     requester: str
+    requester_email: str
     datereq: date
     subject: str
     sender: str
-    to: Optional[List[str]] = None
+    to: Optional[List[str]] = None  # TODO: This will be the approvers in prod
     cc: Optional[List[str]] = None
     bcc: Optional[List[str]] = None
     attachments: Optional[List[str]] = None
@@ -31,6 +32,9 @@ class EmailPayloadRequest(BaseModel):
     approval_link: str
     items: List[LineItemsPayload]
     
+# --------------------------------------------------------------
+#  EMAIL PAYLOAD SCHEMAS - EmailPayloadComment
+# --------------------------------------------------------------    
 class EmailPayloadComment(BaseModel):
     model_type: Literal["email_comments"]
     ID: str

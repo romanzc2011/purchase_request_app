@@ -58,7 +58,7 @@ async def notify_approvers(
     approvers = ["roman_campbell@lawb.uscourts.gov"]
     
     # Construct subject for email payload for approvers
-    subject = f"Purchase Request {payload.ID} for {payload.requester}"
+    
     
     # Build payload
     items, email_payload = build_email_payload(payload=payload, payload_type="request", subject=subject)

@@ -254,10 +254,9 @@ async def generate_pdf(
 
 ##########################################################################
 ## SEND TO PURCHASE REQUEST -- being sent from the purchase req submit
-##########################################################################
+########################################################################## 
 @api_router.post("/sendToPurchaseReq", response_model=PurchaseResponse)
 async def set_purchase_request(
-    background_tasks: BackgroundTasks,
     payload_json: str = Form(..., description="JSON payload as string"),
     files: Optional[List[UploadFile]] = File(None, description="Multiple files"),
     current_user: LDAPUser = Depends(auth_service.get_current_user),
@@ -333,11 +332,9 @@ async def set_purchase_request(
     # Generate PDF
     logger.info("Generating PDF document")
     pdf_path: str = await generate_pdf(payload, shared_id, uploaded_files)
-    
     #################################################################################
     ## BUILD EMAIL PAYLOADS
     #################################################################################
-    
     items_for_email = [
         LineItemsPayload(
             **item.model_dump(),
@@ -346,38 +343,40 @@ async def set_purchase_request(
         for item in payload.items
     ]
     
-    # Payload for Approvers
-    email_approvers_payload = EmailPayloadRequest(
+    #################################################################################
+    ## EMAIL PAYLOADS
+    #################################################################################
+    email_request_payload = EmailPayloadRequest(
         model_type="email_request",
         ID=payload.ID,
         requester=payload.requester,
+        requester_email=requester_email,
         datereq=payload.items[0].datereq,
         subject=f"Purchase Request #{payload.ID}",
         sender=settings.smtp_email_addr,
-        to=["roman_campbell@lawb.uscourts.gov"],   # TODO: This will be the approvers in prod
+        to=None,   # Assign this in the smtp service
         cc=None,
         bcc=None,
-        attachments=None,
         text_body=None,
         approval_link=f"{settings.link_to_request}",
-        items=items_for_email
+        items=items_for_email,
+        attachments=[pdf_path]
     )
+    
+    """
+    # Make the to a condition, if this is a request from a requester, then we need to send it to the approvers
+    # But we need to also send a confirmation to requester that is has been sent to the approvers
+    """
 
-    logger.info(f"EMAIL PAYLOAD REQUEST: {email_approvers_payload}")
+    logger.info(f"EMAIL PAYLOAD REQUEST: {email_request_payload}")
     
-    
-    logger.info(f"PAYLOAD IN SEND TO PURCHASE REQUEST: {payload}")
     # Notify requester and approvers
     logger.info("Notifying requester and approvers")
-    # async with asyncio.TaskGroup() as tg:
-    #     approver_co = notify_approvers(payload, pdf_path, uploaded_files)
-    #     requester_co = notify_requester(payload, pdf_path, uploaded_files)
-
-    #     task_approvers = tg.create_task(approver_co)
-    #     task_requesters = tg.create_task(requester_co)
-        
-    logger.info("TASKS CREATED")
-    logger.info("ALL WORK EMAILS SENT")
+    
+    # Send request to approvers and requester
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(smtp_service.send_approver_email(email_request_payload))
+        tg.create_task(smtp_service.send_requester_email(email_request_payload))
     
     return JSONResponse({"message": "All work completed"})
 
