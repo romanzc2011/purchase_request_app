@@ -9,7 +9,9 @@ TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
 
+from datetime import datetime
 import json
+from api.schemas.comment_schemas import CommentItem
 from fastapi import (
     FastAPI,
     APIRouter,
@@ -48,8 +50,6 @@ from api.dependencies.pras_schemas import *
 
 # Singleton Services
 from api.services.db_service import get_session
-from api.services.smtp_service.builders import build_email_payload
-from api.services.notification_service import notify_requester, notify_approvers
 
 import api.services.db_service as dbas
 
@@ -405,7 +405,7 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     elapsed = time.time() - start_time
 
-    # --- If it’s a validation error (422), log the body and the validation details ---
+    # --- If it's a validation error (422), log the body and the validation details ---
     if response.status_code == 422:
         # JSONResponse stores its content in .body
         # For a 422 FastAPI Response, .body is a JSON‐encoded byte string of { "detail": […] }
@@ -594,9 +594,6 @@ async def add_comments(payload: GroupCommentPayload):
     Args:
         uuids: List of UUIDs of the purchase requests
         comments: List of comments to add
-        
-    Returns:
-        dict: Success message or error
     """
     with next(get_session()) as session:
         # Get the number of elements in the comment list
@@ -610,16 +607,27 @@ async def add_comments(payload: GroupCommentPayload):
             
             # Get requester and lookup email address
             requester_email = await ldap_service.get_email_address(success.son_requester)
-            logger.info(f"Requester email: {requester_email}")
-            
-            # Get requester's name from LDAP
             requester_info = await ldap_service.fetch_user(success.son_requester)
-            requester_name = requester_info.username  # Using username as name since that's what we have
-        logger.info(f"DATA: \n{payload}\n{requester_email}\n{requester_name}")
+            requester_name = requester_info.username
+
+        # Build email payload
+        email_comments_payload = EmailPayloadComment(
+            model_type      = "email_comments",
+            ID              = payload.groupKey,           # reuse groupKey as the email ID
+            requester       = requester_name,
+            requester_email = requester_email,
+            datereq         = datetime.now().date(),
+            subject         = f"Purchase Request #{payload.groupKey} – New Comments",
+            sender          = settings.smtp_email_addr,
+            to              = None, 
+            cc              = None,
+            bcc             = None,
+            text_body       = None,
+            comment_data    = [payload], 
+        )
         
         # Get data about the request from Approvals table
-                
-                
+        await smtp_service.send_comments_email(payload=email_comments_payload)
 
     
     return {"message": "Comments added successfully"}

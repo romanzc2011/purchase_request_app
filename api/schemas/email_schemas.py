@@ -39,14 +39,13 @@ class EmailPayloadComment(BaseModel):
     model_type: Literal["email_comments"]
     ID: str
     requester: str
+    requester_email: str
     datereq: date
     subject: str
     sender: str
-    to: List[str]
-    approval_link: Optional[str] = None
+    to: Optional[List[str]] = None  # TODO: This will be the approvers in prod
     cc: Optional[List[str]] = None
     bcc: Optional[List[str]] = None
-    attachments: Optional[List[str]] = None
     text_body: Optional[str] = None
     
     comment_data: List[GroupCommentPayload]

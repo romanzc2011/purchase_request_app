@@ -1,4 +1,3 @@
-from datetime import datetime
 import mimetypes
 import aiosmtplib
 
@@ -15,7 +14,6 @@ from api.services.ldap_service import LDAPService
 from api.schemas.email_schemas import ValidModel, EmailPayloadComment, EmailPayloadRequest
 from api.schemas.comment_schemas import GroupCommentPayload
 from api.services.smtp_service.renderer import TemplateRenderer
-from api.schemas.purchase_schemas import PurchaseItem, PurchaseRequestPayload
 from api.settings import settings
     
 class SMTP_Service:
@@ -46,7 +44,7 @@ class SMTP_Service:
          EMAIL PAYLOAD REQUEST: model_type='email_request' ID='LAWB0104' requester='RomanCampbell' datereq=datetime.date(2025, 6, 2) subject='Purchase Request #LAWB0104' sender='it@lawb.uscourts.gov' to=['roman_campbell@lawb.uscourts.gov'] cc=None bcc=None attachments=None text_body=None approval_link="annotation=NoneType required=False default='http://localhost:5004' json_schema_extra={'env': 'VITE_API_URL'}/approval" 
          items=[LineItemsPayload(itemDescription='item1', quantity=3, priceEach=32.0, totalPrice=96.0)]
         """
-        
+        # Email payload request
         if isinstance(payload, EmailPayloadRequest):
             context = {
                 "ID": payload.ID,
@@ -54,6 +52,22 @@ class SMTP_Service:
                 "datereq": payload.datereq,
                 "items": payload.items,
                 "totalPrice": sum(item.totalPrice for item in payload.items)
+            }
+            
+        # Email payload comment
+        if isinstance(payload, EmailPayloadComment):
+            # Format items for the template (zip item descriptions with comments)
+            items = []
+            for comment_group in payload.comment_data:
+                for desc, comment in zip(comment_group.item_desc, comment_group.comment):
+                    items.append((desc, comment))
+
+            context = {
+                "groupKey": payload.ID,
+                "requestor_name": payload.requester,
+                "items": items,
+                "sender_name": "IT Department",
+                "sender_dept": "Information Technology"
             }
         
         #-------------------------------------------------------------------------------
@@ -76,6 +90,7 @@ class SMTP_Service:
             html_body = self.renderer.render_requester_request_template(context)
             
         elif use_comment_template and not use_approver_template and not use_requester_template:
+            msg['To'] = payload.requester_email
             html_body = self.renderer.render_comment_template(context)
             
         else:
@@ -87,9 +102,7 @@ class SMTP_Service:
         # Pull out headers and attachments
         cc = payload.cc or []
         bcc = payload.bcc or []
-        attachments = payload.attachments or []
         
-       
         if cc: msg['Cc'] = ', '.join(cc)
         if bcc: msg['Bcc'] = ', '.join(bcc)
         logger.info(f"PAYLOAD, look for email: {payload}")
@@ -100,21 +113,22 @@ class SMTP_Service:
             msg.attach(MIMEText(text_body, "plain"))
         logger.info("Message attached to email")
         
-        # Add attachments
-        for file_path in attachments:
-            path = Path(file_path)
-            ctype, encoding = mimetypes.guess_type(path)
-            if ctype is None or encoding is not None:
-                maintype, subtype = "application", "octet-stream"
-            else:
-                maintype, subtype = ctype.split("/", 1)
-            
-            with open(path, "rb") as f:
-                data = f.read()
-            
-            attachment = MIMEApplication(data, _subtype=subtype)
-            attachment.add_header('Content-Disposition', 'attachment', filename=path.name)
-            msg.attach(attachment)
+        # Add attachments only for request emails
+        if isinstance(payload, EmailPayloadRequest) and payload.attachments:
+            for file_path in payload.attachments:
+                path = Path(file_path)
+                ctype, encoding = mimetypes.guess_type(path)
+                if ctype is None or encoding is not None:
+                    maintype, subtype = "application", "octet-stream"
+                else:
+                    maintype, subtype = ctype.split("/", 1)
+                
+                with open(path, "rb") as f:
+                    data = f.read()
+                
+                attachment = MIMEApplication(data, _subtype=subtype)
+                attachment.add_header('Content-Disposition', 'attachment', filename=path.name)
+                msg.attach(attachment)
         
         #-------------------------------------------------------------------------------
         logger.info("Sending multipart message")
@@ -145,7 +159,6 @@ class SMTP_Service:
         """
         Send email to requester
         """
-        logger.info("In send_requester_email")
         await self._send_mail_async(
             payload,
             use_approver_template=False,

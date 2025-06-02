@@ -18,4 +18,4 @@ class TemplateRenderer:
         return self.render("requester_new_request.html", context)
     
     def render_comment_template(self, context: dict) -> str:
-        return self.render("requesters_comment_template", context)
+        return self.render("requesters_comment_template.html", context)

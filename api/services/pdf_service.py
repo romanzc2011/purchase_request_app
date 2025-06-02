@@ -273,4 +273,56 @@ class PDFService:
         return output_path
 
 
-        
+########################################
+## CONVERT PDF TO EMAIL BODY
+########################################
+
+# from email.mime.multipart import MIMEMultipart
+# from email.mime.application import MIMEApplication
+# from email.utils import formataddr
+
+# async def _send_pdf_as_body(
+#     self,
+#     payload: EmailPayloadRequest,   # or EmailPayloadComment, whichever you’re using
+#     pdf_path: str,
+# ):
+#     """
+#     Send an email whose body *is* the PDF (inline), rather than HTML/text.
+#     """
+#     # Build the “wrapper” message
+#     msg = MIMEMultipart("mixed")
+#     msg["Subject"] = payload.subject
+#     msg["From"]    = formataddr(("My App", self.smtp_email_addr))
+#     msg["To"]      = ", ".join(payload.to or [])      # or a single address
+
+#     # (Optional) CC/BCC
+#     if payload.cc:
+#         msg["Cc"] = ", ".join(payload.cc)
+#     if payload.bcc:
+#         msg["Bcc"] = ", ".join(payload.bcc)
+
+#     # Read the PDF file bytes
+#     with open(pdf_path, "rb") as f:
+#         pdf_data = f.read()
+
+#     # Create a MIMEApplication part, subtype="pdf"
+#     pdf_part = MIMEApplication(pdf_data, _subtype="pdf")
+#     # Set it to “inline” so many clients display it as the body
+#     pdf_part.add_header(
+#         "Content-Disposition",
+#         'inline; filename="request_{}.pdf"'.format(payload.ID),
+#     )
+
+#     # Attach only the PDF (no HTML/text parts)
+#     msg.attach(pdf_part)
+
+#     # Finally, send via aiosmtplib
+#     smtp_client = aiosmtplib.SMTP(
+#         hostname=self.smtp_server,
+#         port=self.smtp_port,
+#         start_tls=False,
+#         use_tls=False,
+#     )
+#     async with smtp_client:
+#         result = await smtp_client.send_message(msg)
+#         logger.info(f"RESULT: {result}")
