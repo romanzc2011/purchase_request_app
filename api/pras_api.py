@@ -659,40 +659,53 @@ app.include_router(api_router)
 ## PROCESS PURCHASE DATA
 def process_purchase_data(item: PurchaseItem) -> dict:
     with lock:
-        local_purchase_cols = {col.name: None for col in dbas.PurchaseRequest.__table__.columns}
+        local_purchase_cols = {
+            col.name: None
+            for col in dbas.PurchaseRequest.__table__.columns
+        }
+        
         try:
             for k, v in item.model_dump().items():
                 if k in local_purchase_cols:
                     local_purchase_cols[k] = v
-                    
                     logger.info(f"LOCAL PURCHASE COLS: {k} = {v}")
+                    
+            # Handle comments based on trainNotAval and needsNotMeet
+            comments_list = []
+            
+            if local_purchase_cols['trainNotAval'] == True:
+                comments_list.append("Training not available")
                 
-            # Build addComments field if trainNotAval or needsNotMeet is True
-            # if train_not or needs_not:
-            #     comment = "Not available and/Or does not meet employee needs"
-            #     existing = local_purchase_cols.get('addComments') or ""
-            #     local_purchase_cols['addComments'] = (
-            #         existing + ("\n" if existing else "") + comment
-            #     )
-            #     # Add trainNotAval and needsNotMeet to local_purchase_cols
-            #     local_purchase_cols['trainNotAval'] = train_not
-            #     local_purchase_cols['needsNotMeet'] = needs_not
+            if local_purchase_cols['needsNotMeet'] == True:
+                comments_list.append("Does not meet employee needs")
                 
-            if 'priceEach' in local_purchase_cols and 'quantity' in local_purchase_cols:
+            if comments_list:
+                local_purchase_cols['addComments'] = "\n".join(comments_list)
+            else: 
+                local_purchase_cols['addComments'] = None
+                
+            # Recalculate total price
+            price_each = local_purchase_cols['priceEach']
+            quantity = local_purchase_cols['quantity']
+            
+            if price_each is not None and quantity is not None:
                 try:
-                    local_purchase_cols['priceEach'] = float(local_purchase_cols['priceEach'])
-                    local_purchase_cols['quantity'] = int(local_purchase_cols['quantity'])
-                    if local_purchase_cols['priceEach'] < 0 or local_purchase_cols['quantity'] <= 0:
+                    price_each = float(price_each)
+                    quantity = int(quantity)
+                    
+                    if price_each < 0 or quantity <= 0:
                         raise ValueError("Invalid values")
-                    local_purchase_cols['totalPrice'] = round(local_purchase_cols['priceEach'] * local_purchase_cols['quantity'], 2)
-                    logger.success(f"TOTAL: {local_purchase_cols['totalPrice']}")
+                    
+                    local_purchase_cols['totalPrice'] = round(price_each * quantity, 2)
                     
                 except ValueError as e:
-                    logger.error("Invalid price or quantity:")
+                    logger.error(f"Invalid price or quantity: {e}")
                     local_purchase_cols['totalPrice'] = 0
                     
         except Exception as e:
             logger.error(f"Error in process_purchase_data: {e}")
+            raise
+       
             
     return local_purchase_cols
 

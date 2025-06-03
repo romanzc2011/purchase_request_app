@@ -52,8 +52,9 @@ class PDFService:
                 # Check if any line items as marked as cyber security related
                 is_cyber = any(row.get("isCyberSecRelated") for row in rows)
                 
-                # Check if there are any comments in son_comments
-                comment_arr = []
+                comment_arr = [] or None
+                additional_comments = [] or None
+                
                 with next(get_session()) as session:
                     comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == ID).all()
                     if comments:
@@ -62,7 +63,16 @@ class PDFService:
                             # Only add non-empty comments
                             if comment_data.comment_text is not None:
                                 comment_arr.append(comment_data.comment_text)
+                                
+                    # Check if there are any additional comments in the addComments field in purchase_requests
+                    additional_comments = session.query(dbas.PurchaseRequest).filter(dbas.PurchaseRequest.UUID == dbas.Approval.UUID).first().addComments
+                    logger.info(f"additional_comments: {additional_comments}")
+                    
+                    if additional_comments:
+                        comment_arr.append(additional_comments)
                 
+                logger.info(f"comment_arr: {comment_arr}")
+
                 # Construct the output path with filename
                 output_path = self.pdf_path / f"statement_of_need-{ID}.pdf"
                                 

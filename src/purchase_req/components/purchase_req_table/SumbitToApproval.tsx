@@ -146,10 +146,8 @@ function SubmitApprovalTable({
                 orderType: item.orderType || "STANDARD",
                 itemDescription: item.itemDescription,
                 justification: item.justification,
-                learnAndDev: {
-                    trainNotAval: Boolean(item.learnAndDev.trainNotAval),
-                    needsNotMeet: Boolean(item.learnAndDev.needsNotMeet)
-                },
+                trainNotAval: Boolean(item.trainNotAval),
+                needsNotMeet: Boolean(item.needsNotMeet),
                 quantity: Number(item.quantity),
                 price: Number(item.price) || (Number(item.priceEach) * Number(item.quantity)),
                 priceEach: Number(item.priceEach),

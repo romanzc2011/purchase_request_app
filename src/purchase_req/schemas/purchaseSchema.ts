@@ -18,10 +18,8 @@ export const purchaseItemSchema = z
     })).optional(),
     itemDescription: z.string().min(1, "Description is required"),
     justification:   z.string().min(1, "Justification is required"),
-    learnAndDev:     z.object({
-                       trainNotAval: z.boolean().optional(),
-                       needsNotMeet: z.boolean().optional(),
-                     }),
+    trainNotAval: z.boolean().optional(),
+    needsNotMeet: z.boolean().optional(),
     budgetObjCode:   z.string().min(1, "Budget code is required"),
     fund:            z.string().min(1, "Fund is required"),
     location:        z.string().min(1, "Location is required"),

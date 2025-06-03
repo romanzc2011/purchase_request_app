@@ -21,10 +21,8 @@ export type FormValues = {
   }[];
   itemDescription: string;
   justification: string;
-  learnAndDev: {
-    trainNotAval: boolean;
-    needsNotMeet: boolean;
-  };
+  trainNotAval: boolean;
+  needsNotMeet: boolean;
   quantity: number;
   price: number;
   priceEach: number;

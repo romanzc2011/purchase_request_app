@@ -132,15 +132,14 @@ function AddItemsForm({
                 orderType: "",
                 itemDescription: "",
                 justification: "",
-                learnAndDev: {
-                    trainNotAval: false,
-                    needsNotMeet: false
-                },
+                trainNotAval: false,
+                needsNotMeet: false,
                 budgetObjCode: "",
                 fund: "",
                 priceEach: 0,
                 location: "",
                 quantity: 0,
+                totalPrice: 0
             });
 
             // Force validation after reset
