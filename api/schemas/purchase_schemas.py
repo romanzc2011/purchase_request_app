@@ -16,6 +16,15 @@ class ItemStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 # --------------------------------------------------------------
+#  FILE ATTACHMENT SCHEMA
+# --------------------------------------------------------------
+class FileAttachment(BaseModel):
+    attachment: Optional[bytes] = None
+    name: Optional[str] = None
+    type: Optional[str] = None
+    size: Optional[int] = None
+
+# --------------------------------------------------------------
 #  PURCHASE ITEM SCHEMA
 # --------------------------------------------------------------
 class PurchaseItem(BaseModel):
@@ -38,7 +47,7 @@ class PurchaseItem(BaseModel):
     budgetObjCode: str
     status: ItemStatus
     dateneed: Optional[date] = None
-    fileAttachments: Optional[List[bytes]] = None
+    fileAttachments: Optional[List[FileAttachment]] = None
     createdTime: Optional[datetime] = None
     
     

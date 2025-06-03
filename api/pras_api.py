@@ -360,7 +360,7 @@ async def set_purchase_request(
         text_body=None,
         approval_link=f"{settings.link_to_request}",
         items=items_for_email,
-        attachments=[pdf_path]
+        attachments=[pdf_path, *uploaded_files]
     )
     
     """

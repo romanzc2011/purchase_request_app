@@ -41,8 +41,6 @@ class SMTP_Service:
         """
         Send email with asyncio, using Jinja to render the html body
         Determine the template to use based on the use_approver_template and use_requester_template parameters
-         EMAIL PAYLOAD REQUEST: model_type='email_request' ID='LAWB0104' requester='RomanCampbell' datereq=datetime.date(2025, 6, 2) subject='Purchase Request #LAWB0104' sender='it@lawb.uscourts.gov' to=['roman_campbell@lawb.uscourts.gov'] cc=None bcc=None attachments=None text_body=None approval_link="annotation=NoneType required=False default='http://localhost:5004' json_schema_extra={'env': 'VITE_API_URL'}/approval" 
-         items=[LineItemsPayload(itemDescription='item1', quantity=3, priceEach=32.0, totalPrice=96.0)]
         """
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
@@ -113,6 +111,7 @@ class SMTP_Service:
             msg.attach(MIMEText(text_body, "plain"))
         logger.info("Message attached to email")
         
+        logger.info(f"PAYLOAD, look for attachments: {payload}")
         # Add attachments only for request emails
         if isinstance(payload, EmailPayloadRequest) and payload.attachments:
             for file_path in payload.attachments:
