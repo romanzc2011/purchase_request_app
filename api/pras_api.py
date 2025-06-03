@@ -305,6 +305,7 @@ async def set_purchase_request(
     # Get the shared ID from the first item, but ensure it's not a temporary ID
     first_item_id = items[0].ID if items else None
     
+    # Generate a new shared ID if the first item ID is not a temporary ID - this keeps the LAWB ID unique just incrementing
     if not first_item_id or first_item_id.startswith("TEMP-"):
         shared_id = dbas.get_next_request_id()
         logger.info(f"Generated new shared ID: {shared_id}")
@@ -314,7 +315,10 @@ async def set_purchase_request(
         
     # Process each item
     for item in payload.items:
+        logger.info(f"Before assigning shared ID: {item.ID}")
         item.ID = shared_id
+        logger.info(f"After assigning shared ID: {item.ID}")
+        
         item.requester = payload.requester
         processed_data = process_purchase_data(item)
         purchase_req_commit(processed_data, current_user)
@@ -352,6 +356,7 @@ async def set_purchase_request(
         requester=payload.requester,
         requester_email=requester_email,
         datereq=payload.items[0].datereq,
+        dateneed=payload.items[0].dateneed,
         subject=f"Purchase Request #{payload.ID}",
         sender=settings.smtp_email_addr,
         to=None,   # Assign this in the smtp service
@@ -488,15 +493,12 @@ async def approve_deny_request(
         # Before allowing the user to approve/deny, check if they are in the correct group
         # were looking for CUE group membership
         #user_group = ldap_service.check_user_membership(ldap_service.get_connection(), current_user.username)
-      
-        # Build list of line items for email payload
-        items, email_payload = build_email_payload(payload)
         
         # Queue email
-        background_tasks.add_task(
-            smtp_service.send_approver_email,
-            email_payload
-        )
+        # background_tasks.add_task(
+        #     smtp_service.send_approver_email,
+        #     email_payload
+        # )
    
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
@@ -662,21 +664,19 @@ def process_purchase_data(item: PurchaseItem) -> dict:
             for k, v in item.model_dump().items():
                 if k in local_purchase_cols:
                     local_purchase_cols[k] = v
-                
-            nested_lnd = item.learnAndDev
-            train_not = bool(nested_lnd.trainNotAval)
-            needs_not = bool(nested_lnd.needsNotMeet)
+                    
+                    logger.info(f"LOCAL PURCHASE COLS: {k} = {v}")
                 
             # Build addComments field if trainNotAval or needsNotMeet is True
-            if train_not or needs_not:
-                comment = "Not available and/Or does not meet employee needs"
-                existing = local_purchase_cols.get('addComments') or ""
-                local_purchase_cols['addComments'] = (
-                    existing + ("\n" if existing else "") + comment
-                )
-                # Add trainNotAval and needsNotMeet to local_purchase_cols
-                local_purchase_cols['trainNotAval'] = train_not
-                local_purchase_cols['needsNotMeet'] = needs_not
+            # if train_not or needs_not:
+            #     comment = "Not available and/Or does not meet employee needs"
+            #     existing = local_purchase_cols.get('addComments') or ""
+            #     local_purchase_cols['addComments'] = (
+            #         existing + ("\n" if existing else "") + comment
+            #     )
+            #     # Add trainNotAval and needsNotMeet to local_purchase_cols
+            #     local_purchase_cols['trainNotAval'] = train_not
+            #     local_purchase_cols['needsNotMeet'] = needs_not
                 
             if 'priceEach' in local_purchase_cols and 'quantity' in local_purchase_cols:
                 try:

@@ -14,7 +14,7 @@ from api.schemas.email_schemas              import EmailPayloadRequest, EmailPay
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
-    template_dir=str(settings.BASE_DIR / "services" / "smtp_service" / "templates")
+    template_dir=str(settings.BASE_DIR / "api"/ "services" / "smtp_service" / "templates")
 )
 
 # —————————————— LDAP Service ————————————————————

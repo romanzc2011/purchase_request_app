@@ -1,4 +1,5 @@
 import mimetypes
+import os
 import aiosmtplib
 
 from loguru import logger
@@ -27,6 +28,7 @@ class SMTP_Service:
         self.smtp_email_addr = settings.smtp_email_addr
         self.renderer = renderer
         self.ldap_service = ldap_service
+        self.logo_file_path = os.path.join(settings.BASE_DIR, "src", "assets", "seal_no_border.png")
         
     #-------------------------------------------------------------------------------
     # SEND EMAIL - async
@@ -42,12 +44,16 @@ class SMTP_Service:
         Send email with asyncio, using Jinja to render the html body
         Determine the template to use based on the use_approver_template and use_requester_template parameters
         """
+        logger.info("#############################################################")
+        logger.info("_SEND_MAIL_ASYNC")
+        logger.info("#############################################################")
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
             context = {
                 "ID": payload.ID,
                 "requester": payload.requester,
                 "datereq": payload.datereq,
+                "dateneed": payload.dateneed,
                 "items": payload.items,
                 "totalPrice": sum(item.totalPrice for item in payload.items)
             }
@@ -59,7 +65,7 @@ class SMTP_Service:
             for comment_group in payload.comment_data:
                 for desc, comment in zip(comment_group.item_desc, comment_group.comment):
                     items.append((desc, comment))
-
+            logger.info(f"PAYLOAD: {payload}")
             context = {
                 "groupKey": payload.ID,
                 "requestor_name": payload.requester,
@@ -76,6 +82,13 @@ class SMTP_Service:
         msg['Subject'] = payload.subject
         #msg['From'] = self.smtp_email_addr
         msg['From'] = "romanzc2011@gmail.com"  # TESTING ONLY
+        
+        # Add logo to email
+        with open(self.logo_file_path, "rb") as f:
+            logo_data = f.read()
+            logo_attachment = MIMEApplication(logo_data, _subtype="png")
+            logo_attachment.add_header('Content-Disposition', 'inline', filename=self.logo_file_path)
+            msg.attach(logo_attachment)
         
         # Determine the template to use
         if use_approver_template and not use_requester_template and not use_comment_template:

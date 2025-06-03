@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     link_to_request: str = f"{app_base_url}/approval"
     
     # -- Project directories
-    BASE_DIR: Path = Path(__file__).resolve().parent
+    BASE_DIR: Path = Path(__file__).resolve().parent.parent
     PDF_OUTPUT_FOLDER: Path = BASE_DIR / "api" / "pdf_output"
     UPLOAD_FOLDER: Path = BASE_DIR / "api" / "uploads"
 

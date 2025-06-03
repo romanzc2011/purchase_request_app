@@ -8,10 +8,14 @@ from api.schemas.comment_schemas import GroupCommentPayload, CommentItem
 #  EMAIL LINE ITEMS PAYLOAD SCHEMAS
 # --------------------------------------------------------------
 class LineItemsPayload(BaseModel):
+    budgetObjCode: str
     itemDescription: str
+    location: str
+    justification: str
     quantity: int
     priceEach: float
     totalPrice: float
+    fund: str
 
 # --------------------------------------------------------------
 #  EMAIL PAYLOAD SCHEMAS - EmailPayloadRequest
@@ -22,6 +26,7 @@ class EmailPayloadRequest(BaseModel):
     requester: str
     requester_email: str
     datereq: date
+    dateneed: date
     subject: str
     sender: str
     to: Optional[List[str]] = None  # TODO: This will be the approvers in prod
