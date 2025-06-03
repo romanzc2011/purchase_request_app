@@ -1,3 +1,4 @@
+from email.mime.image import MIMEImage
 import mimetypes
 import os
 import aiosmtplib
@@ -73,39 +74,49 @@ class SMTP_Service:
                 "sender_name": "IT Department",
                 "sender_dept": "Information Technology"
             }
-        
+            
         #-------------------------------------------------------------------------------
         # Build MIME
         #-------------------------------------------------------------------------------
         logger.info("Building MIME..")
-        msg = MIMEMultipart("mixed")
-        msg['Subject'] = payload.subject
+        msg_root = MIMEMultipart("related")
+        msg_root['Subject'] = payload.subject
         #msg['From'] = self.smtp_email_addr
-        msg['From'] = "romanzc2011@gmail.com"  # TESTING ONLY
-        
-        # Add logo to email
-        with open(self.logo_file_path, "rb") as f:
-            logo_data = f.read()
-            logo_attachment = MIMEApplication(logo_data, _subtype="png")
-            logo_attachment.add_header('Content-Disposition', 'inline', filename=self.logo_file_path)
-            msg.attach(logo_attachment)
+        msg_root['From'] = "romanzc2011@gmail.com"  # TESTING ONLY
         
         # Determine the template to use
         if use_approver_template and not use_requester_template and not use_comment_template:
-            msg['To'] = "roman_campbell@lawb.uscourts.gov"  # TODO: This will be the approvers in prod
+            msg_root['To'] = "roman_campbell@lawb.uscourts.gov"  # TODO: This will be the approvers in prod
             #if to: msg['To'] = ', '.join(to) 
             html_body = self.renderer.render_approver_request_template(context)
             
         elif use_requester_template and not use_approver_template and not use_comment_template:
-            msg['To'] = payload.requester_email
+            msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_requester_request_template(context)
             
         elif use_comment_template and not use_approver_template and not use_requester_template:
-            msg['To'] = payload.requester_email
+            msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_comment_template(context)
             
         else:
             raise ValueError("Invalid template parameters")
+ 
+        # Attach HTML as alternative
+        msg_alt = MIMEMultipart("alternative")
+        msg_root.attach(msg_alt)
+        
+        # Create HTML body and attach to alternative
+        html_body = MIMEText(html_body, "html")
+        msg_alt.attach(html_body)
+        
+        # Read PNG bytes of logo file
+        logo_data = Path(self.logo_file_path).read_bytes()
+        
+        # Attach logo as related part to HTML
+        logo_attachment = MIMEImage(logo_data, _subtype="png")
+        logo_attachment.add_header("Content-ID", "<seal_no_border>")
+        logo_attachment.add_header("Content-Disposition", "inline", filename="seal_no_border.png")
+        msg_root.attach(logo_attachment)
         
         # User text body as fallback if no html body
         text_body = payload.text_body or None
@@ -114,14 +125,13 @@ class SMTP_Service:
         cc = payload.cc or []
         bcc = payload.bcc or []
         
-        if cc: msg['Cc'] = ', '.join(cc)
-        if bcc: msg['Bcc'] = ', '.join(bcc)
+        if cc: msg_root['Cc'] = ', '.join(cc)
+        if bcc: msg_root['Bcc'] = ', '.join(bcc)
         logger.info(f"PAYLOAD, look for email: {payload}")
         #-------------------------------------------------------------------------------
         # Add HTML body
-        msg.attach(MIMEText(html_body, "html"))
         if text_body:
-            msg.attach(MIMEText(text_body, "plain"))
+            msg_root.attach(MIMEText(text_body, "plain"))
         logger.info("Message attached to email")
         
         logger.info(f"PAYLOAD, look for attachments: {payload}")
@@ -140,7 +150,7 @@ class SMTP_Service:
                 
                 attachment = MIMEApplication(data, _subtype=subtype)
                 attachment.add_header('Content-Disposition', 'attachment', filename=path.name)
-                msg.attach(attachment)
+                msg_root.attach(attachment)
         
         #-------------------------------------------------------------------------------
         logger.info("Sending multipart message")
@@ -151,7 +161,7 @@ class SMTP_Service:
             use_tls=False,
         )
         async with smtp_client:
-            result = await smtp_client.send_message(msg)
+            result = await smtp_client.send_message(msg_root)
             logger.info(f"RESULT: {result}")
         
     #-------------------------------------------------------------------------------
