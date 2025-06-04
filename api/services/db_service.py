@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from loguru import logger
 from sqlalchemy import (create_engine, String, Integer,
                          Float, Boolean, Text, LargeBinary, ForeignKey, DateTime, Enum)
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.inspection import inspect

@@ -27,7 +27,7 @@ def add_comment(db_session: Session, ID: str, comment: str) -> bool:
             
         # If there's an existing comment, append the new one
         if approval.addComments:
-            approval.addComments = f"{approval.addComments}\n{formatted_comment}"
+            approval.addComments = f"{approval.addComments};{formatted_comment}"
         else:
             approval.addComments = formatted_comment
             

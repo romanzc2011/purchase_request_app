@@ -74,7 +74,10 @@ class PDFService:
                     logger.info(f"ADDITIONAL COMMENTS: {additional_comments}")
                     
                     if additional_comments:
-                        comment_arr.extend(additional_comments)
+                        # Split comments by semicolon and add each part to the array
+                        for comment in additional_comments:
+                            if comment:
+                                comment_arr.extend(comment.split(';'))
                 
                 logger.info(f"comment_arr: {comment_arr}")
 
@@ -107,6 +110,7 @@ class PDFService:
         logger.info(f"#####################################################")
         logger.info("make_purchase_request_pdf()")
         logger.info(f"#####################################################")
+        logger.info(f"COMMENTS: {comments}")
         
         # ensure output folder exists
         output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
@@ -255,7 +259,8 @@ class PDFService:
 
         # Comments paragraph with all collected comments
         if comments:
-            comments_text = "Comments/Additional Information Requested:<br/>" + "<br/>".join(comments)
+            logger.info(f"IF COMMENTS: {comments}")
+            comments_text = "Comments/Additional Information Requested:<br/>" + "<br/>".join([str(c) for c in comments])
             comments_para = Paragraph(comments_text, comment_style)
             elements.append(comments_para)
             elements.append(Spacer(1, 6))

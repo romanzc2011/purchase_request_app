@@ -101,8 +101,6 @@ class LDAPService:
         logger.info(f"Going back with {username}")
         return None
 
-    
-
     #-------------------------------------------------------------------
     # Check user membership
     #-------------------------------------------------------------------
@@ -237,6 +235,3 @@ class LDAPService:
     async def fetch_usernames(self, query: str) -> List[str]:
         """Async wrapper for fetch_usernames"""
         return await asyncio.to_thread(self._fetch_usernames_sync, query)
-   
-    
-    

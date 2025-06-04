@@ -113,8 +113,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         "user": user.model_dump(),
     }
     
-    
-    
 ##########################################################################
 ## GET APPROVAL DATA
 ##########################################################################
@@ -678,7 +676,7 @@ def process_purchase_data(item: PurchaseItem) -> dict:
                 comments_list.append("Does not meet employee needs")
                 
             if comments_list:
-                local_purchase_cols['addComments'] = "\n".join(comments_list)
+                local_purchase_cols['addComments'] = ";".join(comments_list)
             else: 
                 local_purchase_cols['addComments'] = None
                 
