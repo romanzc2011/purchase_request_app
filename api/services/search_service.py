@@ -102,7 +102,7 @@ class SearchService:
             ix = create_in(self.index_dir, approval_schema)
             
             # Get all purchase requests and their approvals
-            with next(get_session()) as session:
+            with get_session() as session:
                 purchase_requests = dbas.get_all_purchase_requests(session)
                 
                 if not purchase_requests:

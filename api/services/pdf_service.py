@@ -11,6 +11,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.graphics.shapes import Drawing, PolyLine
 from reportlab.lib.units import inch
+from sqlalchemy import select
 from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
@@ -35,10 +36,11 @@ class PDFService:
         payload: dict=None,
         comments: list[str]=None
         ) -> Path:
+        with get_session() as session:
+        
             if not ID:
                 raise HTTPException(status_code=400, detail="ID is required")
             
-            session = next(get_session())
             try:
                 # Get all approvals for this ID
                 approvals = session.query(dbas.Approval).filter(dbas.Approval.ID == ID).all()
@@ -52,24 +54,27 @@ class PDFService:
                 # Check if any line items as marked as cyber security related
                 is_cyber = any(row.get("isCyberSecRelated") for row in rows)
                 
-                comment_arr = [] or None
-                additional_comments = [] or None
-                
-                with next(get_session()) as session:
-                    comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == ID).all()
-                    if comments:
-                        for c in comments:
-                            comment_data = SonCommentSchema.model_validate(c)
-                            # Only add non-empty comments
-                            if comment_data.comment_text is not None:
-                                comment_arr.append(comment_data.comment_text)
+                comment_arr: list[str] = []
+                comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == ID).all()
+                if comments:
+                    for c in comments:
+                        comment_data = SonCommentSchema.model_validate(c)
+                        # Only add non-empty comments
+                        if comment_data.comment_text is not None:
+                            comment_arr.append(comment_data.comment_text)
                                 
                     # Check if there are any additional comments in the addComments field in purchase_requests
-                    additional_comments = session.query(dbas.PurchaseRequest).filter(dbas.PurchaseRequest.UUID == dbas.Approval.UUID).first().addComments
-                    logger.info(f"additional_comments: {additional_comments}")
+                    stmt = (
+                        select(dbas.PurchaseRequest.addComments)
+                        .join(dbas.Approval, dbas.PurchaseRequest.ID == dbas.Approval.ID)
+                        .where(dbas.PurchaseRequest.addComments.is_not(None))
+                        .where(dbas.PurchaseRequest.ID == ID)
+                    )
+                    additional_comments: list[str] = session.scalars(stmt).all()
+                    logger.info(f"ADDITIONAL COMMENTS: {additional_comments}")
                     
                     if additional_comments:
-                        comment_arr.append(additional_comments)
+                        comment_arr.extend(additional_comments)
                 
                 logger.info(f"comment_arr: {comment_arr}")
 
@@ -82,9 +87,6 @@ class PDFService:
             except Exception as e:
                 logger.error(f"Error creating PDF: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
-            finally:
-                session.close()
-
     """
         Generate a purchase request PDF.
 

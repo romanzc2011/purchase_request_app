@@ -7,14 +7,28 @@ from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.inspection import inspect
 from sqlalchemy import Enum as SQLEnum
+from contextlib import contextmanager
 from typing import Optional
 import uuid
 import enum
+import os
+
+# Ensure database directory exists
+db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
+os.makedirs(db_dir, exist_ok=True)
 
 # Create engine and base
 engine = create_engine('sqlite:///api/db/pras.db', echo=False)  # PRAS = Purchase Request Approval System
 Base = declarative_base()
-my_session = sessionmaker(engine)
+SessionLocal = sessionmaker(bind=engine)
+
+@contextmanager
+def get_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 ###################################################################################################
 ##  LINE ITEM STATUS ENUMERATION
@@ -170,20 +184,7 @@ class ITDeptMembers(Base):
     username: Mapped[str] = mapped_column(String)
     email: Mapped[str] = mapped_column(String)
 
-Base.metadata.create_all(engine)
-my_session = sessionmaker(bind=engine)
-
-# TESTING: insert into it_dept_members (id, username, email) values ('roman01', 'romancambell', 'roman_campbell@lawb.uscourts.gov');
-###################################################################################################
- ## Create session for functions/queries
-def get_session():
-    db = my_session()
-    try:
-        yield db
-    finally:
-        db.close()
-
-###################################################################################################   
+##############################################################################   
 ## Get all data from Approval
 def get_all_approval(db_session: Session):
     return db_session.query(Approval).all()
@@ -226,11 +227,11 @@ def insert_data(table=None, data=None):
     valid_cols = set(inspect(model).columns.keys())
     filtered_data = {k: v for k, v in data.items() if k in valid_cols}
     
-    with next(get_session()) as db:
+    with get_session() as session:
         obj = model(**filtered_data)
-        db.add(obj)
-        db.commit()
-        db.refresh(obj)
+        session.add(obj)
+        session.commit()
+        session.refresh(obj)
         logger.info(f"Inserted data into {table}")
         return obj
 
@@ -312,11 +313,11 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
     valid_cols = set(inspect(model).columns.keys())
     filtered_data = {k: v for k, v in kwargs.items() if k in valid_cols}
     
-    with next(get_session()) as db:
+    with get_session() as session:
         # Filters incoming data by UUID for the table
         #Line Item Statuses needs to use approve_uuid 
         
-        obj = db.query(model).filter(getattr(model, pk_field) == uuid).first()
+        obj = session.query(model).filter(getattr(model, pk_field) == uuid).first()
         logger.info(f"GETATTR test: {getattr(model, pk_field)}")
         if not obj:
             raise ValueError(f"No record found with {pk_field} {uuid} in {table}")
@@ -324,8 +325,8 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
         for key, value in filtered_data.items():
             setattr(obj, key, value)
             
-        db.commit()
-        db.refresh(obj)
+        session.commit()
+        session.refresh(obj)
         logger.info(f"Updated data in {table}")
         return obj
 
@@ -371,8 +372,8 @@ def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     if not columns or not isinstance(columns, list):
         raise ValueError("Columns must be a non-empty list")
     
-    with get_session() as db:
-        result = db.query(*columns).filter(condition).params(params).first()
+    with get_session() as session:
+        result = session.query(*columns).filter(condition).params(params).first()
         return result
     
 ###################################################################################################
@@ -383,10 +384,10 @@ def _get_last_id() -> Optional[str]:
     Return the full most‐recent PurchaseRequest.ID (e.g. "20250414-0007"),
     or None if the table is empty.
     """
-    with next(get_session()) as db:
+    with get_session() as session:
         # Query the Approval table instead of PurchaseRequest
         row = (
-            db.query(Approval.ID)
+            session.query(Approval.ID)
             .order_by(Approval.ID.desc())
             .limit(1)
             .first()
@@ -476,17 +477,17 @@ def get_usernames(db_session: Session, prefix: str):
 ###################################################################################################
 def check_status_values():
     """Check what status values exist in the database"""
-    with next(get_session()) as db:
+    with get_session() as session:
         # Check approvals table
-        approval_statuses = db.query(Approval.status).distinct().all()
+        approval_statuses = session.query(Approval.status).distinct().all()
         logger.info(f"Approval statuses: {approval_statuses}")
         
         # Check purchase_requests table
-        pr_statuses = db.query(PurchaseRequest.status).distinct().all()
+        pr_statuses = session.query(PurchaseRequest.status).distinct().all()
         logger.info(f"Purchase Request statuses: {pr_statuses}")
         
         # Check line_item_statuses table
-        lis_statuses = db.query(LineItemStatus.status).distinct().all()
+        lis_statuses = session.query(LineItemStatus.status).distinct().all()
         logger.info(f"Line Item Statuses: {lis_statuses}")
 
 ###################################################################################################
@@ -502,3 +503,13 @@ def get_all_purchase_requests(session):
 def get_approval_by_id(session, ID):
     """Get approval by ID"""
     return session.query(Approval).filter(Approval.ID == ID).first()
+
+# Create all tables
+def init_db():
+    """Initialize the database by creating all tables"""
+    logger.info("Creating database tables...")
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created successfully")
+
+# Call init_db to create tables
+init_db()

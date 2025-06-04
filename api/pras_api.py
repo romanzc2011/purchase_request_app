@@ -72,7 +72,6 @@ app.add_middleware(
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
-db_svc = next(get_session())  # Initialize with a session
 
 # Thread safety
 lock = threading.Lock()
@@ -126,22 +125,21 @@ async def get_approval_data(
     
     # Check if user is in IT group or CUE group
     logger.info(f"CURRENT USER: {current_user}")
-    session = next(get_session())
-    
-    try:
-        if ID:
-            approval = dbas.get_approval_by_id(session, ID)
-            if approval:
-                approval_data = [ApprovalSchema.model_validate(approval)]
+    with get_session() as session:
+        try:
+            if ID:
+                approval = dbas.get_approval_by_id(session, ID)
+                if approval:
+                    approval_data = [ApprovalSchema.model_validate(approval)]
+                else:
+                    approval_data = []
             else:
-                approval_data = []
-        else:
-            approvals = dbas.get_all_approval(session)
-            approval_data = [ApprovalSchema.model_validate(approval) for approval in approvals]
+                approvals = dbas.get_all_approval(session)
+                approval_data = [ApprovalSchema.model_validate(approval) for approval in approvals]
         
-        return approval_data
-    finally:
-        session.close()
+            return approval_data
+        finally:
+            session.close()
         
 ##########################################################################
 ## GET STATEMENT OF NEED FORM
@@ -461,7 +459,7 @@ async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_servi
         raise HTTPException(status_code=400, detail="Missing ID in request")
     
     # Get the UUID using the UUID service
-    with next(get_session()) as session:
+    with get_session() as session:
         uuid = uuid_service.get_uuid_by_id(session, original_id)
     
     # update all tables with the new IRQ1_ID
@@ -568,7 +566,7 @@ async def get_uuid_by_id_endpoint(ID: str, current_user: LDAPUser = Depends(auth
     """
     logger.info(f"Getting UUID for ID: {ID}")
     
-    with next(dbas.get_session()) as session:
+    with get_session() as session:
         UUID = dbas.get_uuid_by_id(session, ID)
         
         if not UUID:
@@ -597,7 +595,7 @@ async def add_comments(payload: GroupCommentPayload):
         uuids: List of UUIDs of the purchase requests
         comments: List of comments to add
     """
-    with next(get_session()) as session:
+    with get_session() as session:
         # Get the number of elements in the comment list
         logger.info(f"PAYLOAD: {payload}")
         
@@ -643,7 +641,7 @@ async def cyber_sec_related(UUID: str, payload: CyberSecRelatedPayload):
     Update the isCyberSecRelated field for a purchase request.
     """
     logger.info(f"Updating isCyberSecRelated for UUID: {UUID} to {payload.isCyberSecRelated}")
-    with next(get_session()) as session:
+    with get_session() as session:
         success = dbas.update_data_by_uuid(uuid=UUID, table="approvals", isCyberSecRelated=payload.isCyberSecRelated)
         return {"message": "Cybersec related field updated successfully"}
 
