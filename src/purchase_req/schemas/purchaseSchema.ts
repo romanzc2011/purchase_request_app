@@ -33,7 +33,7 @@ export const purchaseItemSchema = z
     status:          z.string().optional()
   })
   .superRefine((data, ctx) => {
-    // If neither dateneed nor orderType is provided, add an error on dateneed
+    console.log("superRefine check:", data.dateneed, data.orderType);
     if (!data.dateneed && !data.orderType) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

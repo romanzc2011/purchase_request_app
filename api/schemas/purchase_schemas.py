@@ -36,6 +36,7 @@ class PurchaseItem(BaseModel):
     orderType: str
     itemDescription: str
     justification: str
+    additional_comments: Optional[List[str]] = None
     trainNotAval: Optional[bool] = False
     needsNotMeet: Optional[bool] = False
     quantity: int

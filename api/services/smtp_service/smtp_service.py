@@ -12,12 +12,14 @@ from pathlib import Path
 from email.mime.application import MIMEApplication
 from typing import Optional
 
+from api.services.cache_service import cache_service
 from api.services.ldap_service import LDAPService
 from api.schemas.email_schemas import ValidModel, EmailPayloadComment, EmailPayloadRequest
 from api.schemas.comment_schemas import GroupCommentPayload
 from api.services.smtp_service.renderer import TemplateRenderer
 from api.settings import settings
-    
+import api.services.db_service as dbas
+
 class SMTP_Service:
     def __init__(
         self,
@@ -48,6 +50,15 @@ class SMTP_Service:
         logger.info("#############################################################")
         logger.info("_SEND_MAIL_ASYNC")
         logger.info("#############################################################")
+        
+        # Get additional comments from cache
+        additional_comments = cache_service.get_or_set(
+            "comments",
+            payload.ID, 
+            lambda: dbas.get_additional_comments_by_id(payload.ID))
+        
+        logger.warning(f"ADDITIONAL COMMENTS: {additional_comments}")
+        
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
             context = {
@@ -58,7 +69,8 @@ class SMTP_Service:
                 "items": payload.items,
                 "totalPrice": sum(item.totalPrice for item in payload.items)
             }
-            
+            logger.warning(f"CONTEXT EMAIL PAYLOAD REQUEST: {context}")
+
         # Email payload comment
         if isinstance(payload, EmailPayloadComment):
             # Format items for the template (zip item descriptions with comments)
@@ -66,13 +78,11 @@ class SMTP_Service:
             for comment_group in payload.comment_data:
                 for desc, comment in zip(comment_group.item_desc, comment_group.comment):
                     items.append((desc, comment))
-            logger.info(f"PAYLOAD: {payload}")
+            logger.warning(f"CONTEXT EMAIL PAYLOAD COMMENT: {payload}")
             context = {
                 "groupKey": payload.ID,
                 "requestor_name": payload.requester,
                 "items": items,
-                "sender_name": "IT Department",
-                "sender_dept": "Information Technology"
             }
             
         #-------------------------------------------------------------------------------

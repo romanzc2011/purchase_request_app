@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from loguru import logger
+from sqlalchemy import select
 from sqlalchemy import (create_engine, String, Integer,
                          Float, Boolean, Text, LargeBinary, ForeignKey, DateTime, Enum)
 from sqlalchemy.orm import declarative_base
@@ -498,6 +499,21 @@ def get_all_purchase_requests(session):
     return session.query(PurchaseRequest).all()
 
 ###################################################################################################
+# Get additional comments by ID
+###################################################################################################
+def get_additional_comments_by_id(ID: str):
+    """Get additional comments by ID"""
+    with get_session() as session:
+        stmt = (
+            select(PurchaseRequest.addComments)
+            .join(Approval, PurchaseRequest.ID == Approval.ID)
+            .where(PurchaseRequest.addComments.is_not(None))
+            .where(PurchaseRequest.ID == ID)
+        )
+        additional_comments = session.scalars(stmt).all()
+    return additional_comments
+
+###################################################################################################
 # Get approval by ID
 ###################################################################################################
 def get_approval_by_id(session, ID):
@@ -510,6 +526,6 @@ def init_db():
     logger.info("Creating database tables...")
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created successfully")
-
+    
 # Call init_db to create tables
 init_db()

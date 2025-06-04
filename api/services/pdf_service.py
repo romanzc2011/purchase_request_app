@@ -1,3 +1,4 @@
+from api.services.cache_service import cache_service
 from fastapi import HTTPException
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib import colors
@@ -11,7 +12,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.graphics.shapes import Drawing, PolyLine
 from reportlab.lib.units import inch
-from sqlalchemy import select
+
 from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
@@ -21,14 +22,25 @@ from api.schemas.approval_schemas import ApprovalSchema
 from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
 
-
 class PDFService:
     def __init__(self):
         self.pdf_path = settings.PDF_OUTPUT_FOLDER
         self.pdf_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
         self.page_width = LETTER
         self.page_height = LETTER
-        
+
+    """
+    Generate a purchase request PDF.
+
+    Args:
+        ID (str): The ID of the purchase request.
+        is_cyber (bool): Whether the request is cybersecurity related.
+        payload (dict): The payload of the purchase request.
+        comments (list[str]): The comments of the purchase request.
+
+    Returns:
+        Path: The path to the generated PDF.
+    """
     def create_pdf(
         self,
         ID: str, 
@@ -64,13 +76,15 @@ class PDFService:
                             comment_arr.append(comment_data.comment_text)
                                 
                     # Check if there are any additional comments in the addComments field in purchase_requests
-                    stmt = (
-                        select(dbas.PurchaseRequest.addComments)
-                        .join(dbas.Approval, dbas.PurchaseRequest.ID == dbas.Approval.ID)
-                        .where(dbas.PurchaseRequest.addComments.is_not(None))
-                        .where(dbas.PurchaseRequest.ID == ID)
-                    )
-                    additional_comments: list[str] = session.scalars(stmt).all()
+                    additional_comments = cache_service.get_or_set(
+                        "comments",
+                        ID, 
+                        lambda: dbas.get_additional_comments_by_id(ID))
+                    
+                    # Cache the additional comments
+                    cache_service.set("comments", ID, additional_comments)
+                    
+                    logger.warning(f"CACHED ADDITIONAL COMMENTS: {cache_service.get('comments', ID)}")
                     logger.info(f"ADDITIONAL COMMENTS: {additional_comments}")
                     
                     if additional_comments:
@@ -90,6 +104,7 @@ class PDFService:
             except Exception as e:
                 logger.error(f"Error creating PDF: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
+            
     """
         Generate a purchase request PDF.
 
@@ -100,6 +115,8 @@ class PDFService:
                 Path where the PDF will be saved.  
             is_cyber (bool):  
                 Whether the request is cybersecurity related.
+            comments (list[str]):
+                List of comments to be added to the PDF.
 
         Returns:
             Path:

@@ -43,6 +43,7 @@ from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import uuid_service
 from api.dependencies.pras_dependencies import settings
+from api.services.cache_service import cache_service
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 
 # Schemas
@@ -302,7 +303,7 @@ async def set_purchase_request(
     first_item_id = items[0].ID if items else None
     
     # Generate a new shared ID if the first item ID is not a temporary ID - this keeps the LAWB ID unique just incrementing
-    if not first_item_id or first_item_id.startswith("TEMP-"):
+    if not first_item_id:
         shared_id = dbas.get_next_request_id()
         logger.info(f"Generated new shared ID: {shared_id}")
     else:
@@ -335,9 +336,17 @@ async def set_purchase_request(
     #################################################################################
     ## BUILD EMAIL PAYLOADS
     #################################################################################
+    additional_comments = cache_service.get_or_set(
+        "comments",
+        payload.ID,
+        lambda: dbas.get_additional_comments_by_id(payload.ID)
+    )
+    
+    
     items_for_email = [
         LineItemsPayload(
             **item.model_dump(),
+            additional_comments=item.additional_comments,
             link_to_request=f"{settings.link_to_request}"
         )
         for item in payload.items
@@ -353,6 +362,7 @@ async def set_purchase_request(
         requester_email=requester_email,
         datereq=payload.items[0].datereq,
         dateneed=payload.items[0].dateneed,
+        orderType=payload.items[0].orderType,
         subject=f"Purchase Request #{payload.ID}",
         sender=settings.smtp_email_addr,
         to=None,   # Assign this in the smtp service
@@ -486,16 +496,6 @@ async def approve_deny_request(
     try:
         final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
         
-        # Before allowing the user to approve/deny, check if they are in the correct group
-        # were looking for CUE group membership
-        #user_group = ldap_service.check_user_membership(ldap_service.get_connection(), current_user.username)
-        
-        # Queue email
-        # background_tasks.add_task(
-        #     smtp_service.send_approver_email,
-        #     email_payload
-        # )
-   
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
         raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")

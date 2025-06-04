@@ -2,6 +2,7 @@
 import os
 
 from api.settings                           import settings
+from api.services.cache_service             import CacheService
 from api.services.smtp_service.renderer     import TemplateRenderer
 from api.services.smtp_service.smtp_service import SMTP_Service
 from api.services.ldap_service              import LDAPService

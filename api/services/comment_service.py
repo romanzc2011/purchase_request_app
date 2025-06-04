@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from loguru import logger
 from datetime import datetime
 from .db_service import Approval
+import api.services.db_service as dbas
 
 def add_comment(db_session: Session, ID: str, comment: str) -> bool:
     """
@@ -39,3 +41,25 @@ def add_comment(db_session: Session, ID: str, comment: str) -> bool:
         logger.error(f"Error adding comment to approval {ID}: {e}")
         db_session.rollback()
         return False 
+    
+def get_additional_comments(db_session: Session, ID: str) -> list[str]:
+    """
+    Get additional comments for an approval record.
+    
+    Args:
+        db_session: SQLAlchemy database session
+        ID: The ID of the approval record
+        
+    Returns:
+        list[str]: A list of additional comments
+    """
+    stmt = (
+            select(dbas.PurchaseRequest.addComments)
+            .join(dbas.Approval, dbas.PurchaseRequest.ID == dbas.Approval.ID)
+            .where(dbas.PurchaseRequest.addComments.is_not(None))
+            .where(dbas.PurchaseRequest.ID == ID)
+    )
+    additional_comments: list[str] = db_session.scalars(stmt).all()
+    return additional_comments
+    
+    
