@@ -285,10 +285,10 @@
           {% if comments %}
           <div style="margin-top: 10px;">
             <p>
-              <strong>Comments/Additional Information Requested:</strong>
-              {% for comment in comments.split(';') %}
-              {{ comment }}<br/>
-              {% endfor %}
+                <strong>Comments/Additional Information Requested:</strong>
+                {% for comment in comments %}
+                  {{ comment }}<br/>
+                  {% endfor %}
             </p>
           </div>
           {% endif %}

@@ -8,7 +8,11 @@ export const purchaseItemSchema = z
     requester:       z.string().min(1, "Requester is required"),
     phoneext:        z.string().min(1, "Phone extension is required"),
     datereq:         z.string().nonempty("Date requested is required"),
-    dateneed:        z.union([z.string().min(1), z.null()]).optional(),
+    dateneed: z
+        .string()
+        .transform(val => val === "" ? null : val)
+        .nullable()
+        .optional(),
     orderType:       z.string().optional(),
     fileAttachments: z.array(z.object({
       attachment: z.any().optional(),

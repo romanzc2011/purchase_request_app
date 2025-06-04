@@ -30,8 +30,9 @@ class ApprovalSchema(BaseModel):
     UUID: str
     CO: Optional[str] = None
     requester: str
-    dateneed: str
     datereq: str
+    dateneed: Optional[str] = None
+    orderType: Optional[str] = None
     budgetObjCode: str
     fund: str
     itemDescription: str

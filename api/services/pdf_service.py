@@ -179,12 +179,21 @@ class PDFService:
             logger.info(f"First row data for header: {first}")
             logger.info(f"Date needed value: {first.get('dateneed')}")
             date_val = first.get("dateneed")
+            order_type = first.get("orderType")
             
+            # Format order type
+            if order_type == "QUARTERLY_ORDER":
+                date_str = "Quarterly Order"
+            elif order_type == "NO_RUSH":
+                date_str = "No Rush"
+            
+            # Format date needed
             if isinstance(date_val, (datetime, date)):
                 date_str = date_val.strftime("%Y-%m-%d")
             elif isinstance(date_val, str):
                 date_str = date_val.split("T", 1)[0]
-            else:
+                
+            if date_str is None and order_type is None:
                 date_str = "Not specified"
                 
             items = [
@@ -192,7 +201,8 @@ class PDFService:
                 ("IRQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", first.get("requester","")),
                 ("CO:", first.get("CO","")),
-                ("Date Needed:", date_str),
+                ("Date Needed:", date_str if date_str else order_type),
+                
             ]
             logger.info(f"items: {items}")
             for label, value in items:

@@ -26,7 +26,8 @@ class EmailPayloadRequest(BaseModel):
     requester: str
     requester_email: str
     datereq: date
-    dateneed: date
+    dateneed: Optional[date] = None
+    orderType: Optional[str] = None 
     subject: str
     sender: str
     to: Optional[List[str]] = None  # TODO: This will be the approvers in prod

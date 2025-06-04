@@ -99,9 +99,6 @@ function AddItemsForm({
             const newId = response.ID; // Extract the ID from the response object
             console.log("New ID handleAddItem", newId);
 
-            // If dateneed is null and orderType is set, use today's date
-            const dateneed = data.dateneed ? data.dateneed : (data.orderType ? formattedToday : null);
-
             // Create a new item with the UUID and ID
             const itemToAdd: PurchaseItem = {
                 ...data,
@@ -109,7 +106,7 @@ function AddItemsForm({
                 priceEach: data.priceEach,
                 ID: newId,
                 status: "NEW REQUEST",
-                dateneed: dateneed
+                dateneed: data.dateneed === "" ? null : data.dateneed
             };
 
             // Store the UUID in the UUID store AFTER we have the ID
@@ -311,7 +308,7 @@ function AddItemsForm({
                                 <input
                                     id="quarterlyOrder"
                                     type="radio"
-                                    value="quarterlyOrder"
+                                    value="QUARTERLY_ORDER"
                                     {...register("orderType")}
                                     style={{ marginRight: "5px" }}
                                 />
@@ -333,7 +330,7 @@ function AddItemsForm({
                                 <input
                                     id="noRush"
                                     type="radio"
-                                    value="noRush"
+                                    value="NO_RUSH"
                                     {...register("orderType")}
                                     style={{ marginRight: "5px" }}
                                 />
