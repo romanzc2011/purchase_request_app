@@ -309,7 +309,11 @@ function AddItemsForm({
                                     id="quarterlyOrder"
                                     type="radio"
                                     value="QUARTERLY_ORDER"
-                                    {...register("orderType")}
+                                    {...register("orderType", {
+                                        onChange: (e) => {
+                                            trigger("dateneed");
+                                        }
+                                    })}
                                     style={{ marginRight: "5px" }}
                                 />
                                 Inclusion w/quarterly office supply order
@@ -331,7 +335,11 @@ function AddItemsForm({
                                     id="noRush"
                                     type="radio"
                                     value="NO_RUSH"
-                                    {...register("orderType")}
+                                    {...register("orderType", {
+                                        onChange: (e) => {
+                                            trigger("dateneed");
+                                        }
+                                    })}
                                     style={{ marginRight: "5px" }}
                                 />
                                 No Rush

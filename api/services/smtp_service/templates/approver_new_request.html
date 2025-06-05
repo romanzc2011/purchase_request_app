@@ -76,7 +76,16 @@
             <strong>CO:</strong> {{ CO or 'None' }}
           </p>
           <p style="margin: 4px 0; font-size: 14px;">
-            <strong>Date Needed:</strong> {{ dateneed or orderType }}
+            <strong>Date Needed:</strong>
+            {% if dateneed %}
+              {{ dateneed.split('T')[0] if 'T' in dateneed else dateneed }}
+            {% elif orderType == 'QUARTERLY_ORDER' %}
+              Quarterly Order
+            {% elif orderType == 'NO_RUSH' %}
+              No Rush
+            {% else %}
+              Not specified
+            {% endif %}
           </p>
         </td>
       </tr>
@@ -282,11 +291,11 @@
             Cybersecurity related&nbsp;–&nbsp;consider funding:&nbsp;
             <strong>{{ cyber_related or 'No' }}</strong>
           </p>
-          {% if comments %}
+          {% if additional_comments %}
           <div style="margin-top: 10px;">
             <p>
               <strong>Comments/Additional Information Requested:</strong>
-              {% for comment in comments %}
+              {% for comment in additional_comments %}
                 {{ comment }}<br/>
                 {% endfor %}
             </p>

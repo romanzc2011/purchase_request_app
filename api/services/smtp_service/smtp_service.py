@@ -57,8 +57,6 @@ class SMTP_Service:
             payload.ID, 
             lambda: dbas.get_additional_comments_by_id(payload.ID))
         
-        logger.warning(f"ADDITIONAL COMMENTS: {additional_comments}")
-        
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
             context = {
@@ -66,6 +64,7 @@ class SMTP_Service:
                 "requester": payload.requester,
                 "datereq": payload.datereq,
                 "dateneed": payload.dateneed,
+                "orderType": payload.orderType,
                 "additional_comments": additional_comments,
                 "items": payload.items,
                 "totalPrice": sum(item.totalPrice for item in payload.items)

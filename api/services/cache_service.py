@@ -7,6 +7,7 @@ class CacheService:
             "approvals": TTLCache(maxsize=400, ttl=300),
             "comments": TTLCache(maxsize=400, ttl=300),
             "ldap_users": TTLCache(maxsize=200, ttl=300),
+            "order_types": TTLCache(maxsize=200, ttl=300),
         }
         
     def get(self, namespace: str, key: str):

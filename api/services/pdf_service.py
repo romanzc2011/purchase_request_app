@@ -46,7 +46,7 @@ class PDFService:
         ID: str, 
         is_cyber: bool=False,   
         payload: dict=None,
-        comments: list[str]=None
+        comments: list[str]=None,
         ) -> Path:
         with get_session() as session:
         
@@ -81,17 +81,20 @@ class PDFService:
                         ID, 
                         lambda: dbas.get_additional_comments_by_id(ID))
                     
+                    order_type = cache_service.get_or_set(
+                        "order_types",
+                        ID, 
+                        lambda: dbas.get_order_types(ID))
+                    
                     # Cache the additional comments
                     cache_service.set("comments", ID, additional_comments)
-                    
-                    logger.warning(f"CACHED ADDITIONAL COMMENTS: {cache_service.get('comments', ID)}")
-                    logger.info(f"ADDITIONAL COMMENTS: {additional_comments}")
+                    cache_service.set("order_types", ID, order_type)
                     
                     if additional_comments:
                         # Split comments by semicolon and add each part to the array
                         for comment in additional_comments:
                             if comment:
-                                comment_arr.extend(comment.split(';'))
+                                comment_arr.extend(comment.split(', '))
                 
                 logger.info(f"comment_arr: {comment_arr}")
 
@@ -99,7 +102,7 @@ class PDFService:
                 output_path = self.pdf_path / f"statement_of_need-{ID}.pdf"
                                 
                 # Generate PDF
-                return self._make_purchase_request_pdf(rows=rows, output_path=output_path, is_cyber=is_cyber, comments=comment_arr)
+                return self._make_purchase_request_pdf(rows=rows, output_path=output_path, is_cyber=is_cyber, comments=comment_arr, order_type=order_type)
             
             except Exception as e:
                 logger.error(f"Error creating PDF: {e}")
@@ -123,7 +126,12 @@ class PDFService:
                 The path to the generated PDF.
         """
     @staticmethod
-    def _make_purchase_request_pdf(rows: list[dict], output_path: Path, is_cyber: bool, comments: list[str]=None) -> Path:
+    def _make_purchase_request_pdf(rows: list[dict], 
+                                   output_path: Path, 
+                                   is_cyber: bool, 
+                                   comments: list[str]=None, 
+                                   order_type: str=None
+                                   ) -> Path: 
         logger.info(f"#####################################################")
         logger.info("make_purchase_request_pdf()")
         logger.info(f"#####################################################")
@@ -157,7 +165,7 @@ class PDFService:
 
         comment_style = ParagraphStyle(
             "CommentStyle",
-            parent=normal,
+            parent=cell_style,
             fontName="Play",
             fontSize=9,
             alignment=TA_LEFT,
@@ -173,6 +181,9 @@ class PDFService:
             topMargin=img_h + gap + 1*inch, bottomMargin=1*inch
         )
 
+        # Get first row data
+        first = rows[0] if rows else {}
+
         #— draw header on canvas
         def draw_header(canvas, doc):
             canvas.saveState()
@@ -186,39 +197,40 @@ class PDFService:
             # title
             canvas.setFont("Play-Bold", 16)
             canvas.drawCentredString(LETTER[0]/2, LETTER[1] - 0.6*inch, "STATEMENT OF NEED")
-
             
             # header text
             canvas.setFont("Play-Bold", 9)
             text_x = 0.2*inch
             text_y = y_logo - img_h - 20
-            first = rows[0] if rows else {}
             logger.info(f"First row data for header: {first}")
             logger.info(f"Date needed value: {first.get('dateneed')}")
+            
             date_val = first.get("dateneed")
-            order_type = first.get("orderType")
-            
-            # Format order type
-            if order_type == "QUARTERLY_ORDER":
-                date_str = "Quarterly Order"
-            elif order_type == "NO_RUSH":
-                date_str = "No Rush"
-            
+            # Use the function argument or fallback to row value
+            order_type_val_local = order_type if order_type else first.get("orderType")
+            date_str = None
+
             # Format date needed
             if isinstance(date_val, (datetime, date)):
                 date_str = date_val.strftime("%Y-%m-%d")
-            elif isinstance(date_val, str):
+            elif isinstance(date_val, str) and date_val:
                 date_str = date_val.split("T", 1)[0]
-                
-            if date_str is None and order_type is None:
+            elif isinstance(order_type_val_local, str):
+                if order_type_val_local == "QUARTERLY_ORDER":
+                    date_str = "Quarterly Order"
+                elif order_type_val_local == "NO_RUSH":
+                    date_str = "No Rush"
+                else:
+                    date_str = "Not specified"
+            else:
                 date_str = "Not specified"
-                
+            
             items = [
                 ("Purchase Req ID:", first.get("ID","")),
                 ("IRQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", first.get("requester","")),
                 ("CO:", first.get("CO","")),
-                ("Date Needed:", date_str if date_str else order_type),
+                ("Date Needed:", date_str),
                 
             ]
             logger.info(f"items: {items}")
@@ -286,8 +298,7 @@ class PDFService:
 
         # Comments paragraph with all collected comments
         if comments:
-            logger.info(f"IF COMMENTS: {comments}")
-            comments_text = "Comments/Additional Information Requested:<br/>" + "<br/>".join([str(c) for c in comments])
+            comments_text = "<b>Comments/Additional Information Requested:</b><br/>" + "<br/>".join([str(c) for c in comments])
             comments_para = Paragraph(comments_text, comment_style)
             elements.append(comments_para)
             elements.append(Spacer(1, 6))

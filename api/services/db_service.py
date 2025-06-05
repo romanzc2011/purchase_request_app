@@ -514,6 +514,21 @@ def get_additional_comments_by_id(ID: str):
     return additional_comments
 
 ###################################################################################################
+# Get orderTypes
+###################################################################################################
+def get_order_types(ID: str):
+    """Get order types by ID"""
+    with get_session() as session:
+        stmt = (
+            select(PurchaseRequest.orderType)
+            .join(Approval, PurchaseRequest.ID == Approval.ID)
+            .where(PurchaseRequest.orderType.is_not(None))
+            .where(PurchaseRequest.ID == ID)
+        )
+        order_types = session.scalars(stmt).first()
+    return order_types
+
+###################################################################################################
 # Get approval by ID
 ###################################################################################################
 def get_approval_by_id(session, ID):
