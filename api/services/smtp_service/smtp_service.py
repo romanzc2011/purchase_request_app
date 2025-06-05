@@ -66,6 +66,7 @@ class SMTP_Service:
                 "requester": payload.requester,
                 "datereq": payload.datereq,
                 "dateneed": payload.dateneed,
+                "additional_comments": additional_comments,
                 "items": payload.items,
                 "totalPrice": sum(item.totalPrice for item in payload.items)
             }

@@ -342,13 +342,11 @@ async def set_purchase_request(
         lambda: dbas.get_additional_comments_by_id(payload.ID)
     )
     
+    for item in payload.items:
+        item.additional_comments = additional_comments
     
     items_for_email = [
-        LineItemsPayload(
-            **item.model_dump(),
-            additional_comments=item.additional_comments,
-            link_to_request=f"{settings.link_to_request}"
-        )
+        LineItemsPayload(**item.model_dump())
         for item in payload.items
     ]
     
