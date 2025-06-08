@@ -1,5 +1,5 @@
 # api/schemas/auth_schemas.py
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 
 class Token(BaseModel):
@@ -12,4 +12,4 @@ class TokenData(BaseModel):
 class LDAPUser(BaseModel):
     username: str
     email: Optional[str] = None
-    groups: List[str]
+    groups: List[str] = Field(alias="approved")

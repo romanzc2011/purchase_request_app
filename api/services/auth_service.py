@@ -1,6 +1,6 @@
 from asyncio import Server
 from api.services.cache_service import cache_service
-import os, jwt
+import os, jwt, asyncio
 from urllib.parse import urlparse
 from sqlite3 import Connection
 from datetime import datetime, timedelta, timezone
@@ -11,6 +11,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from loguru import logger
 from ldap3.core.exceptions import LDAPBindError
 from ldap3 import Server, Connection, ALL, SUBTREE, Tls
+from aiocache import cached, Cache
+from api.schemas.auth_schemas import LDAPUser
 
 from api.services.ldap_service import LDAPService
 from api.settings import settings 
@@ -22,15 +24,17 @@ AUTH SERVICE -- handles JWT creation and verification
 """
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
+def run_in_thread(fn):
+    async def wrapper(*args, **kwargs):
+        return await asyncio.to_thread(fn, *args, **kwargs)
+    return wrapper
+
 class AuthService:
     def __init__(self, ldap_service: LDAPService):
         self.ldap_service = ldap_service
         self.JWT_SECRET_KEY = settings.jwt_secret_key
         self.ALGORITHM = "HS256"
-    
-    async def get_user(self, username: str) -> LDAPUser:
-        return await self.ldap_service.fetch_usernames(username)
-    
+
     #####################################################################################
     ## CREATE ACCESS TOKEN
     def create_access_token(
@@ -70,26 +74,13 @@ class AuthService:
 
         if not '\\' in username and not '@' in username:
             username = f"ADU\\{username}"
-            
-        try:
-            user_conn = Connection(
-                Server(host, port, use_ssl=True, get_info=ALL),
-                user=username,
-                password=password,
-                auto_bind=True,
-                receive_timeout=10,
-            )
-            user_conn.unbind()
-        except LDAPBindError:
+        
+        if not await self.ldap_service.verify_credentials(username, password):
             logger.error(f"Failed to bind user: {username}")
             return None
         
-        # Now authenticated, lookup email and groups
-        email = await self.ldap_service.get_email_address(username)
-        groups = await self.ldap_service.check_user_membership(username)
-        
-        return LDAPUser(username=username, email=email, groups=[g for g, ok in groups.items() if ok])
-
+        return await self.ldap_service.fetch_user(username)
+            
     #####################################################################################
     ## Get Current LDAPUser
     async def get_current_user(
@@ -105,20 +96,14 @@ class AuthService:
         try:
             payload = jwt.decode(token, self.JWT_SECRET_KEY, algorithms=[self.ALGORITHM])
             username: str = payload.get("sub")
+            user = await self.ldap_service.fetch_user(username)
+            logger.info(f"CURRENT USER VALIDATED: {user}")
             
-            if not username:
+            if not user:
                 raise credentials_exception
-            
+            return user
+        
         except InvalidTokenError:
             raise credentials_exception
         
-        user = await cache_service.get_or_set_async(
-            "auth_users",
-            username,
-            lambda: self.ldap_service.fetch_user(username)
-        )
-        if user is None:
-            raise credentials_exception
-        
-        logger.info(f"CURRENT USER VALIDATED: {user}")
-        return user
+  
