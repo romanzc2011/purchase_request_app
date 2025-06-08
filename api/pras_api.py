@@ -12,6 +12,7 @@ uvicorn pras_api:app --port 5004
 from datetime import datetime
 import json
 from api.schemas.comment_schemas import CommentItem
+from pydantic import ValidationError
 from fastapi import (
     FastAPI,
     APIRouter,
@@ -270,9 +271,10 @@ async def set_purchase_request(
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
         logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
         
-    except Exception as e:
-        logger.error(f"Error validating payload: {e}")
-        raise HTTPException(status_code=422, detail=f"Invalid payload format: {str(e)}")
+    except ValidationError as e:
+        logger.error("PurchaseRequestPayload errors: %s", e.errors())
+        # Return them to the client so you know exactly what's wrong:
+        raise HTTPException(status_code=422, detail=e.errors())
 
     ################################################################3
     ## VALIDATE REQUESTER
@@ -492,8 +494,9 @@ async def approve_deny_request(
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     try:
+        logger.info(f"INCOMING PAYLOAD: {payload}")
         final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
-        
+        return print("HELLO FROM BACKEND")
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
         raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")

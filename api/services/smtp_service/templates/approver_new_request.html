@@ -78,7 +78,7 @@
           <p style="margin: 4px 0; font-size: 14px;">
             <strong>Date Needed:</strong>
             {% if dateneed %}
-              {{ dateneed.split('T')[0] if 'T' in dateneed else dateneed }}
+              {{ dateneed.strftime("%Y-%m-%d") if dateneed else dateneed }}
             {% elif orderType == 'QUARTERLY_ORDER' %}
               Quarterly Order
             {% elif orderType == 'NO_RUSH' %}
@@ -146,6 +146,16 @@
                 Description
               </th>
               <th
+                align="left"
+                style="
+                  padding: 8px;
+                  border-bottom: 1px solid #dddddd;
+                  font-weight: 600;
+                "
+              >
+                Justification
+              </th>
+              <th
                 align="right"
                 style="
                   padding: 8px;
@@ -178,16 +188,7 @@
               >
                 Total Price
               </th>
-              <th
-                align="left"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                "
-              >
-                Justification
-              </th>
+              
             </tr>
 
             <!-- ITEMS LOOP with alternating row colors -->
@@ -220,6 +221,9 @@
               >
                 {{ item.quantity }}
               </td>
+              <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
+                {{ item.justification or '—' }}
+              </td>
               <td
                 align="right"
                 style="
@@ -240,9 +244,7 @@
               >
                 ${{ "%.2f"|format(item.totalPrice) }}
               </td>
-              <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
-                {{ item.justification or '—' }}
-              </td>
+              
             </tr>
             {% endfor %}
 

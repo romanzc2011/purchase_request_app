@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from ldap3 import Server, Connection, ALL, SUBTREE, Tls
 from ldap3.core.exceptions import LDAPExceptionError
+from aiocache import cached, Cache
 from loguru import logger
 
 from api.schemas.auth_schemas import LDAPUser
@@ -17,6 +18,7 @@ from api.settings import settings
 
 
 class LDAPService:
+
     def __init__(
         self,
         ldap_url: str,
@@ -205,6 +207,11 @@ class LDAPService:
     #-------------------------------------------------------------------
     # Fetch user - async
     #-------------------------------------------------------------------
+    @cached(
+        ttl=300,
+        cache=Cache.MEMORY,
+        key_builder=lambda fn, self, username: f"ldap_email:{username.lower()}"
+    )
     async def fetch_user(self, username: str) -> LDAPUser:
         """
         High-level: get both email + group list,
@@ -220,6 +227,11 @@ class LDAPService:
     #-------------------------------------------------------------------
     # Get email address - async
     #-------------------------------------------------------------------
+    @cached(
+        ttl=300,
+        cache=Cache.MEMORY,
+        key_builder=lambda fn, self, username: f"ldap_email:{username.lower()}"
+    )
     async def get_email_address(self, username: str) -> Optional[str]:
         """Async wrapper for _get_email_sync"""
         start = asyncio.get_event_loop().time()

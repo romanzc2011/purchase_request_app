@@ -25,285 +25,287 @@
     <p>Your purchase request has been submitted. Information regarding the request is below.</p>
     <!-- Outer container table, centered and fixed-width -->
     <table
-      align="center"
-      width="1000"
-      cellpadding="0"
-      cellspacing="0"
-      style="
-        border-collapse: collapse;
-        margin: 20px auto;
-        border: 1px solid #dddddd;
-      "
-    >
-      <!-- HEADER ROW: Logo on left, Title on right -->
-      <tr>
-        <td style="padding: 20px; vertical-align: middle; width: 100px;">
-          <!-- Replace src with your actual CID or URL for the seal/logo -->
-          <img
-            src="cid:seal_no_border"
-            alt="Court Seal"
-            width="80"
-            style="display:block; border:0; outline:none;"
-            />
-        </td>
-        <td style="padding: 20px; text-align: center;">
-          <h1
-            style="
-              margin: 0;
-              font-size: 24px;
-              font-weight: 700;
-              letter-spacing: 1px;
-            "
-          >
-            <strong>STATEMENT OF NEED</strong>
-          </h1>
-        </td>
-      </tr>
+    align="center"
+    width="1000"
+    cellpadding="0"
+    cellspacing="0"
+    style="
+      border-collapse: collapse;
+      margin: 20px auto;
+      border: 1px solid #dddddd;
+    "
+  >
+    <!-- HEADER ROW: Logo on left, Title on right -->
+    <tr>
+      <td style="padding: 20px; vertical-align: middle; width: 100px;">
+        <!-- Replace src with your actual CID or URL for the seal/logo -->
+        <img
+          src="cid:seal_no_border"
+          alt="Court Seal"
+          width="80"
+          style="display:block; border:0; outline:none;"
+          />
+      </td>
+      <td style="padding: 20px; text-align: center;">
+        <h1
+          style="
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 1px;
+          "
+        >
+          <strong>STATEMENT OF NEED</strong>
+        </h1>
+      </td>
+    </tr>
 
-      <!-- SUB-HEADING (Request metadata) -->
-      <tr>
-        <td colspan="2" style="padding: 0 20px 20px 20px;">
-          <p style="margin: 4px 0; font-size: 14px;">
-            <strong>Purchase Req ID:</strong> {{ ID or 'N/A' }}
-          </p>
-          <p style="margin: 4px 0; font-size: 14px;">
-            <strong>IRQ1:</strong> {{ IRQ1 or 'None' }}
-          </p>
-          <p style="margin: 4px 0; font-size: 14px;">
-            <strong>Requester:</strong> {{ requester }}
-          </p>
-          <p style="margin: 4px 0; font-size: 14px;">
-            <strong>CO:</strong> {{ CO or 'None' }}
-          </p>
-          <p style="margin: 4px 0; font-size: 14px;">
-            <strong>Date Needed:</strong>
-            {% if dateneed %}
-              {{ dateneed.split('T')[0] if 'T' in dateneed else dateneed }}
-            {% elif orderType == 'QUARTERLY_ORDER' %}
-              Quarterly Order
-            {% elif orderType == 'NO_RUSH' %}
-              No Rush
-            {% else %}
-              Not specified
-            {% endif %}
-          </p>
-        </td>
-      </tr>
+    <!-- SUB-HEADING (Request metadata) -->
+    <tr>
+      <td colspan="2" style="padding: 0 20px 20px 20px;">
+        <p style="margin: 4px 0; font-size: 14px;">
+          <strong>Purchase Req ID:</strong> {{ ID or 'N/A' }}
+        </p>
+        <p style="margin: 4px 0; font-size: 14px;">
+          <strong>IRQ1:</strong> {{ IRQ1 or 'None' }}
+        </p>
+        <p style="margin: 4px 0; font-size: 14px;">
+          <strong>Requester:</strong> {{ requester }}
+        </p>
+        <p style="margin: 4px 0; font-size: 14px;">
+          <strong>CO:</strong> {{ CO or 'None' }}
+        </p>
+        <p style="margin: 4px 0; font-size: 14px;">
+          <strong>Date Needed:</strong>
+          {% if dateneed %}
+            {{ dateneed.strftime("%Y-%m-%d") if dateneed else dateneed }}
+          {% elif orderType == 'QUARTERLY_ORDER' %}
+            Quarterly Order
+          {% elif orderType == 'NO_RUSH' %}
+            No Rush
+          {% else %}
+            Not specified
+          {% endif %}
+        </p>
+      </td>
+    </tr>
 
-      <!-- ITEMS TABLE HEADER -->
-      {% if items %}
-      <tr>
-        <td colspan="2" style="padding: 0 20px;">
-          <table
-            width="100%"
-            cellpadding="0"
-            cellspacing="0"
-            style="
-              border-collapse: collapse;
-              font-size: 14px;
-              margin-top: 10px;
-            "
-          >
-            <tr style="background-color: #f7f7f7;">
-              <th
-                align="left"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                "
-              >
-                BOC
-              </th>
-              <th
-                align="left"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                "
-              >
-                Fund
-              </th>
-              <th
-                align="left"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                "
-              >
-                Location
-              </th>
-              <th
-                align="left"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                "
-              >
-                Description
-              </th>
-              <th
-                align="right"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                  padding-right: 20px;
-                "
-              >
-                Qty
-              </th>
-              <th
-                align="right"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                  padding-right: 20px;
-                "
-              >
-                Price Each
-              </th>
-              <th
-                align="right"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                  padding-right: 20px;
-                "
-              >
-                Total Price
-              </th>
-              <th
-                align="left"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #dddddd;
-                  font-weight: 600;
-                "
-              >
-                Justification
-              </th>
-            </tr>
-
-            <!-- ITEMS LOOP with alternating row colors -->
-            {% for item in items %}
-            <tr
+    <!-- ITEMS TABLE HEADER -->
+    {% if items %}
+    <tr>
+      <td colspan="2" style="padding: 0 20px;">
+        <table
+          width="100%"
+          cellpadding="0"
+          cellspacing="0"
+          style="
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 10px;
+          "
+        >
+          <tr style="background-color: #f7f7f7;">
+            <th
+              align="left"
               style="
-                background-color:
-                  {% if loop.index0 % 2 == 0 %}#ffffff{% else %}#f7f7f7{% endif %};
+                padding: 8px;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
               "
             >
-              <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
-                {{ item.budgetObjCode or '—' }}
-              </td>
-              <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
-                {{ item.fund }}
-              </td>
-              <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
-                {{ item.location }}
-              </td>
-              <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
-                {{ item.itemDescription }}
-              </td>
-              <td
-                align="right"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #eeeeee;
-                  padding-right: 20px;
-                "
-              >
-                {{ item.quantity }}
-              </td>
-              <td
-                align="right"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #eeeeee;
-                  padding-right: 20px;
-                "
-              >
-                ${{ "%.2f"|format(item.priceEach) }}
-              </td>
-              <td
-                align="right"
-                style="
-                  padding: 8px;
-                  border-bottom: 1px solid #eeeeee;
-                  padding-right: 20px;
-                "
-              >
-                ${{ "%.2f"|format(item.totalPrice) }}
-              </td>
-              <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
-                {{ item.justification or '—' }}
-              </td>
-            </tr>
-            {% endfor %}
+              BOC
+            </th>
+            <th
+              align="left"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
+              "
+            >
+              Fund
+            </th>
+            <th
+              align="left"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
+              "
+            >
+              Location
+            </th>
+            <th
+              align="left"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
+              "
+            >
+              Description
+            </th>
+            <th
+              align="left"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
+              "
+            >
+              Justification
+            </th>
+            <th
+              align="right"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
+                padding-right: 20px;
+              "
+            >
+              Qty
+            </th>
+            <th
+              align="right"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
+                padding-right: 20px;
+              "
+            >
+              Price Each
+            </th>
+            <th
+              align="right"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #dddddd;
+                font-weight: 600;
+                padding-right: 20px;
+              "
+            >
+              Total Price
+            </th>
+            
+          </tr>
 
-            <!-- GRAND TOTAL ROW -->
-            <tr>
-              <td colspan="6"></td>
-              <td
-                align="right"
-                style="
-                  padding: 8px;
-                  border-top: 2px solid #333333;
-                  font-weight: 700;
-                  padding-right: 20px;
-                "
-              >
-                TOTAL:
-              </td>
-              <td
-                align="right"
-                style="
-                  padding: 8px;
-                  border-top: 2px solid #333333;
-                  font-weight: 700;
-                "
-              >
-                ${{ "%.2f"|format(totalPrice) }}
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      {% endif %}
-
-      <!-- FOOTER with Cybersecurity note -->
-      <tr>
-        <td colspan="2" style="padding: 10px 20px;">
-          <p
+          <!-- ITEMS LOOP with alternating row colors -->
+          {% for item in items %}
+          <tr
             style="
-              margin: 10px 0 0 0;
-              font-size: 12px;
-              border-top: 1px solid #dddddd;
-              padding-top: 8px;
-              color: #555555;
+              background-color:
+                {% if loop.index0 % 2 == 0 %}#ffffff{% else %}#f7f7f7{% endif %};
             "
           >
-            Cybersecurity related&nbsp;–&nbsp;consider funding:&nbsp;
-            <strong>{{ cyber_related or 'No' }}</strong>
+            <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
+              {{ item.budgetObjCode or '—' }}
+            </td>
+            <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
+              {{ item.fund }}
+            </td>
+            <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
+              {{ item.location }}
+            </td>
+            <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
+              {{ item.itemDescription }}
+            </td>
+            <td
+              align="right"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #eeeeee;
+                padding-right: 20px;
+              "
+            >
+              {{ item.quantity }}
+            </td>
+            <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
+              {{ item.justification or '—' }}
+            </td>
+            <td
+              align="right"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #eeeeee;
+                padding-right: 20px;
+              "
+            >
+              ${{ "%.2f"|format(item.priceEach) }}
+            </td>
+            <td
+              align="right"
+              style="
+                padding: 8px;
+                border-bottom: 1px solid #eeeeee;
+                padding-right: 20px;
+              "
+            >
+              ${{ "%.2f"|format(item.totalPrice) }}
+            </td>
+            
+          </tr>
+          {% endfor %}
+
+          <!-- GRAND TOTAL ROW -->
+          <tr>
+            <td colspan="6"></td>
+            <td
+              align="right"
+              style="
+                padding: 8px;
+                border-top: 2px solid #333333;
+                font-weight: 700;
+                padding-right: 20px;
+              "
+            >
+              TOTAL:
+            </td>
+            <td
+              align="right"
+              style="
+                padding: 8px;
+                border-top: 2px solid #333333;
+                font-weight: 700;
+              "
+            >
+              ${{ "%.2f"|format(totalPrice) }}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    {% endif %}
+
+    <!-- FOOTER with Cybersecurity note -->
+    <tr>
+      <td colspan="2" style="padding: 10px 20px;">
+        <p
+          style="
+            margin: 10px 0 0 0;
+            font-size: 12px;
+            border-top: 1px solid #dddddd;
+            padding-top: 8px;
+            color: #555555;
+          "
+        >
+          Cybersecurity related&nbsp;–&nbsp;consider funding:&nbsp;
+          <strong>{{ cyber_related or 'No' }}</strong>
+        </p>
+        {% if additional_comments %}
+        <div style="margin-top: 10px;">
+          <p>
+            <strong>Comments/Additional Information Requested:</strong>
+            {% for comment in additional_comments %}
+              {{ comment }}<br/>
+              {% endfor %}
           </p>
-          {% if additional_comments %}
-          <div style="margin-top: 10px;">
-            <p>
-                <strong>Comments/Additional Information Requested:</strong>
-                {% for comment in additional_comments %}
-                  {{ comment }}<br/>
-                  {% endfor %}
-            </p>
-          </div>
-          {% endif %}
-        </td>
-      </tr>
-    </table>
-  </body>
-  <p style="font-size: 12px; color: #555555;">Email generated by the Purchase Request Approval System - [PRAS]</p>
+        </div>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+</body>
+<p style="font-size: 12px; color: #555555;">Email generated by the Purchase Request Approval System - [PRAS]</p>
 </html>

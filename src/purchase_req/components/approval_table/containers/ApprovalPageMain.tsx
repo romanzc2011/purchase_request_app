@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { FormValues } from "../../../types/formTypes";
+import { useState } from "react";
 import ApprovalTable from "../ui/ApprovalTable";
 import SearchBar from "../ui/SearchBar";
-import CommentModal from "../modals/CommentModal";
 import { Box } from "@mui/material";
 import { DataRow } from "../../../types/approvalTypes";
 /* INTERFACE */

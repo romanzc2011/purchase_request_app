@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from api.schemas.purchase_schemas import ItemStatus
@@ -7,8 +7,11 @@ from api.schemas.purchase_schemas import ItemStatus
 #  REQUEST APPROVAL PAYLOAD SCHEMAS
 # --------------------------------------------------------------
 class RequestPayload(BaseModel):
-    item_uuids: List[str]
-    target_status: List[ItemStatus]
+    ID: str
+    UUID: List[str] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
+    item_funds: List[str]
+    totalPrice: List[float]
+    target_status: List[ItemStatus] # Changed to use your ItemStatus enum for better validation
     action: str
     co: Optional[str] = None
 

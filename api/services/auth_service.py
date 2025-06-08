@@ -1,7 +1,7 @@
 from asyncio import Server
+from api.services.cache_service import cache_service
 import os, jwt
 from urllib.parse import urlparse
-from tkinter import ALL
 from sqlite3 import Connection
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -62,6 +62,7 @@ class AuthService:
         username = form_data.username
         password = form_data.password
         logger.info(f"Username: {username}")
+        
         # Verify users creds by binding
         parsed = urlparse(settings.ldap_server)
         host = parsed.hostname or parsed.path
@@ -111,7 +112,11 @@ class AuthService:
         except InvalidTokenError:
             raise credentials_exception
         
-        user = await self.ldap_service.fetch_user(username)
+        user = await cache_service.get_or_set_async(
+            "auth_users",
+            username,
+            lambda: self.ldap_service.fetch_user(username)
+        )
         if user is None:
             raise credentials_exception
         
