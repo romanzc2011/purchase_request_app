@@ -268,7 +268,9 @@ async def set_purchase_request(
       - Commits the request, tagging line items with current_user.username
     """
     try:
+        logger.info(f"PAYLOAD JSON: {payload_json}")
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
+        logger.info(f"PAYLOAD: {payload}")
         logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
         
     except ValidationError as e:
@@ -485,7 +487,10 @@ async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_servi
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
 # This endpoint will deal with all actions on a purchase request
+#final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
+
 ##########################################################################
+
 @api_router.post("/approveDenyRequest")
 async def approve_deny_request(
     payload: RequestPayload,
@@ -494,9 +499,12 @@ async def approve_deny_request(
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     try:
+        # Get size of payload and filter data
+        payload_count = payload.item_count
+        payload_data = payload.model_dump()
+        logger.info(f"PAYLOAD DATA: {payload_data}")
+            
         logger.info(f"INCOMING PAYLOAD: {payload}")
-        final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
-        return print("HELLO FROM BACKEND")
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
         raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")

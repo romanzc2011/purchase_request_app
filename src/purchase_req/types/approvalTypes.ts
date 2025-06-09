@@ -65,6 +65,7 @@ export interface FlatRow extends DataRow {
 // #########################################################################################  
 export interface ApprovalData {
     ID: string;
+    item_count: number;
     item_uuids: string[];
     item_funds: string[];
     totalPrice: number[];

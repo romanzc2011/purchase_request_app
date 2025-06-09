@@ -365,6 +365,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // This will tell the backend what action to take
         const apiPayload: ApprovalData = {
             ID: itemsToProcessForApproval[0].ID,
+            item_count: itemsToProcessForApproval.length,
             item_uuids: itemsToProcessForApproval.map(item => item.UUID),
             item_funds: itemsToProcessForApproval.map(item => item.fund),
             totalPrice: itemsToProcessForApproval.map(item => item.totalPrice),
@@ -975,6 +976,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     // Now prepare the payload for approvals/deny
                     const approvalPayload: ApprovalData = {
                         ID: selectedRows[0].ID,
+                        item_count: selectedRows.length,
                         item_uuids: selectedRows.map(r => r.UUID),
                         item_funds: selectedRows.map(r => r.fund),
                         totalPrice: selectedRows.map(r => r.totalPrice),

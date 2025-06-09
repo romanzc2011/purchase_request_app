@@ -23,17 +23,29 @@ class FileAttachment(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
     size: Optional[int] = None
-
+    
 # --------------------------------------------------------------
-#  PURCHASE ITEM SCHEMA
+#  PURCHASE REQUEST HEADER SCHEMA
 # --------------------------------------------------------------
-class PurchaseItem(BaseModel):
-    UUID: str
+class PurchaseRequestHeader(BaseModel):
     ID: str
+    UUID: str
+    IRQ1_ID: Optional[str] = None
     requester: str
     phoneext: str
     datereq: date
-    orderType: str
+    dateneed: Optional[date] = None
+    orderType: Optional[str] = None
+    status: ItemStatus
+    createdTime: Optional[datetime] = None
+    
+# --------------------------------------------------------------
+#  PURCHASE REQUEST LINE ITEM SCHEMA
+# --------------------------------------------------------------
+class PurchaseRequestLineItem(BaseModel):
+    ID: str
+    UUID: str
+    purchase_req_id: str
     itemDescription: str
     justification: str
     additional_comments: Optional[List[str]] = None
@@ -47,20 +59,45 @@ class PurchaseItem(BaseModel):
     location: str
     budgetObjCode: str
     status: ItemStatus
-    dateneed: Optional[date] = None
     fileAttachments: Optional[List[FileAttachment]] = None
     createdTime: Optional[datetime] = None
+    
+
+
+# # --------------------------------------------------------------
+# #  PURCHASE ITEM SCHEMA
+# # --------------------------------------------------------------
+# class PurchaseItem(BaseModel):
+#     requester: str
+#     phoneext: str
+#     datereq: date
+#     orderType: str
+#     itemDescription: str
+#     justification: str
+#     additional_comments: Optional[List[str]] = None
+#     trainNotAval: Optional[bool] = False
+#     needsNotMeet: Optional[bool] = False
+#     quantity: int
+#     price: float
+#     priceEach: float
+#     totalPrice: float
+#     fund: str
+#     location: str
+#     budgetObjCode: str
+#     status: ItemStatus
+#     dateneed: Optional[date] = None
+#     fileAttachments: Optional[List[FileAttachment]] = None
+#     createdTime: Optional[datetime] = None
     
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST PAYLOAD SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestPayload(BaseModel):
-    requester: str
     ID: Optional[str] = None
     IRQ1_ID: Optional[str] = None
     CO: Optional[str] = None
-    items: List[PurchaseItem]
+    items: List[PurchaseRequestLineItem]
     fileAttachments: Optional[List[bytes]] = None
     itemCount: int
     

@@ -8,12 +8,21 @@ from api.schemas.purchase_schemas import ItemStatus
 # --------------------------------------------------------------
 class RequestPayload(BaseModel):
     ID: str
+    item_count: int
     UUID: List[str] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
     item_funds: List[str]
     totalPrice: List[float]
     target_status: List[ItemStatus] # Changed to use your ItemStatus enum for better validation
     action: str
     co: Optional[str] = None
+    
+class LineItemApprovalPayload(BaseModel):
+    line_item_id: int
+    target_status: ItemStatus
+    comments: Optional[str] = None
+    
+class BulkApprovalPayload(BaseModel):
+    approvals: List[LineItemApprovalPayload]
 
 class ResponsePayload(BaseModel):
     status: str
@@ -50,3 +59,4 @@ class ApprovalSchema(BaseModel):
     status: ItemStatus
     createdTime: datetime
     isCyberSecRelated: Optional[bool] = False
+
