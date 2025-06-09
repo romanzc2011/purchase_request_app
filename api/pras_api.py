@@ -12,6 +12,7 @@ uvicorn pras_api:app --port 5004
 from datetime import datetime
 import json
 from api.schemas.comment_schemas import CommentItem
+from api.schemas.purchase_schemas import PurchaseRequestLineItem
 from pydantic import ValidationError
 from fastapi import (
     FastAPI,
@@ -662,7 +663,7 @@ app.include_router(api_router)
 
 ##########################################################################
 ## PROCESS PURCHASE DATA
-def process_purchase_data(item: PurchaseItem) -> dict:
+def process_purchase_data(item: PurchaseRequestLineItem) -> dict:
     with lock:
         local_purchase_cols = {
             col.name: None

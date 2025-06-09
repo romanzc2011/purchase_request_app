@@ -2,7 +2,6 @@
 import os
 
 from api.settings                           import settings
-from api.services.cache_service             import CacheService
 from api.services.smtp_service.renderer     import TemplateRenderer
 from api.services.smtp_service.smtp_service import SMTP_Service
 from api.services.ldap_service              import LDAPService
@@ -10,8 +9,6 @@ from api.services.auth_service              import AuthService
 from api.services.pdf_service               import PDFService
 from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
-from api.dependencies.pras_schemas          import *
-from api.schemas.email_schemas              import EmailPayloadRequest, EmailPayloadComment, LineItemsPayload
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(

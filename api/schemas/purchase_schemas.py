@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from typing import List, Optional
 from datetime import date, datetime
 from enum import Enum
@@ -24,6 +24,8 @@ class FileAttachment(BaseModel):
     type: Optional[str] = None
     size: Optional[int] = None
     
+
+    
 # --------------------------------------------------------------
 #  PURCHASE REQUEST HEADER SCHEMA
 # --------------------------------------------------------------
@@ -43,66 +45,47 @@ class PurchaseRequestHeader(BaseModel):
 #  PURCHASE REQUEST LINE ITEM SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestLineItem(BaseModel):
-    ID: str
-    UUID: str
-    purchase_req_id: str
-    itemDescription: str
-    justification: str
-    additional_comments: Optional[List[str]] = None
-    trainNotAval: Optional[bool] = False
-    needsNotMeet: Optional[bool] = False
-    quantity: int
-    price: float
-    priceEach: float
-    totalPrice: float
-    fund: str
-    location: str
-    budgetObjCode: str
-    status: ItemStatus
+    ID:                     str
+    UUID:                   str
+    purchase_req_id:        str
+    itemDescription:        str
+    justification:          str
+    additional_comments:    Optional[List[str]] = None
+    trainNotAval:           Optional[bool] = False
+    needsNotMeet:           Optional[bool] = False
+    quantity:                int
+    priceEach:              float
+    totalPrice:             float
+    fund:                   str
+    location:               str
+    budgetObjCode:          str
+    status:                 ItemStatus
+    createdTime:            Optional[datetime] = None
     fileAttachments: Optional[List[FileAttachment]] = None
-    createdTime: Optional[datetime] = None
-    
-
-
-# # --------------------------------------------------------------
-# #  PURCHASE ITEM SCHEMA
-# # --------------------------------------------------------------
-# class PurchaseItem(BaseModel):
-#     requester: str
-#     phoneext: str
-#     datereq: date
-#     orderType: str
-#     itemDescription: str
-#     justification: str
-#     additional_comments: Optional[List[str]] = None
-#     trainNotAval: Optional[bool] = False
-#     needsNotMeet: Optional[bool] = False
-#     quantity: int
-#     price: float
-#     priceEach: float
-#     totalPrice: float
-#     fund: str
-#     location: str
-#     budgetObjCode: str
-#     status: ItemStatus
-#     dateneed: Optional[date] = None
-#     fileAttachments: Optional[List[FileAttachment]] = None
-#     createdTime: Optional[datetime] = None
-    
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST PAYLOAD SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestPayload(BaseModel):
-    ID: Optional[str] = None
-    IRQ1_ID: Optional[str] = None
-    CO: Optional[str] = None
+    header: PurchaseRequestHeader
     items: List[PurchaseRequestLineItem]
-    fileAttachments: Optional[List[bytes]] = None
-    itemCount: int
     
+    @model_validator(mode="after")
+    def _propagate_header_to_items(self, data):
+        hdr, items = data.header, data.items
+        for item in items:
+            item.ID = hdr.ID
+            item.UUID = hdr.UUID
+            item.purchase_req_id = hdr.ID
+        return data
+            
+
+# --------------------------------------------------------------
+#  PURCHASE REQUEST RESPONSE SCHEMA
+# --------------------------------------------------------------
 class PurchaseResponse(BaseModel):
     message: str
     request_id: Optional[str]
+
     
 
