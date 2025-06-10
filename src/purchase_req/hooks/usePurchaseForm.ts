@@ -12,19 +12,20 @@ export const usePurchaseForm = () => {
       phoneext: "",
       datereq: today,
       dateneed: null,
-      orderType: "",
-      itemDescription: "",
+      order_type: "",
+      item_description: "",
       justification: "",
-      trainNotAval: false,
-      needsNotMeet: false,
-      budgetObjCode: "",
+      train_not_aval: false,
+      needs_not_meet: false,
+      budget_obj_code: "",
       fund: "",
-      priceEach: 0,
+      price_each: 0,
       location: "",
-      quantity: 0,
+      quantity: 1,
+      total_price: 0
     },
     mode: "onChange",
     reValidateMode: "onChange",
-    shouldFocusError: true,
+    shouldFocusError: true
   });
 };

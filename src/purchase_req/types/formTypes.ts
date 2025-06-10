@@ -5,15 +5,15 @@ import { ItemStatus } from "./approvalTypes";
 
 /********************************************************/
 export type FormValues = {
-  UUID: string;
-  ID: string;
-  IRQ1_ID: string;
+  uuid?: string;
+  id?: string;
+  irq1_id?: string;
   requester: string;
   phoneext: string;
   datereq: Date | string;
   dateneed: Date | string;
   orderType: string;
-  fileAttachments: {
+  file_attachments: {
     attachment: File | null;
     name?: string;
     type?: string;
@@ -21,15 +21,15 @@ export type FormValues = {
   }[];
   itemDescription: string;
   justification: string;
-  trainNotAval: boolean;
-  needsNotMeet: boolean;
+  train_not_aval: boolean;
+  needs_not_meet: boolean;
   quantity: number;
   price: number;
-  priceEach: number;
-  totalPrice: number;
+  price_each: number;
+  total_price: number;
   fund: string;
   location: string;
-  budgetObjCode: string;
+  budget_obj_code: string;
   status: ItemStatus;
 };
 

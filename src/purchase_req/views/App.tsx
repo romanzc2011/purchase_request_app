@@ -23,12 +23,18 @@ interface AppProps {
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     /* *********************************************************************************** */
     /* SHARED DATA BUFFER */
+    // dataBuffer is the data that is shared between the AddItemsForm and SubmitApprovalTable
+    // it is used to store the data that is added to the form
+    // it is also used to store the data that is submitted to the approval table
+    // it is also used to store the data that is deleted from the form
+    // it is also used to store the data that is updated in the form
+    // it is also used to store the data that is deleted from the approval table
     const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
     const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
     const [loginOpen, setLoginOpen] = useState(!isLoggedIn);
 
-    // Default ID for coms that need it
+    // Default id for coms that need it
     const defaultId = `TEMP-${Date.now()}`;
 
     /* *********************************************************************************** */
@@ -37,9 +43,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
         setDataBuffer([]);
     };
 
-    const onDelete = (ID: string) => {
+    const onDelete = (id: string) => {
         setDataBuffer((prevData) =>
-            prevData.filter((item) => item.ID !== ID)
+            prevData.filter((item) => item.id !== id)
         );
     };
 
@@ -113,7 +119,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                                 {/* ADD ITEMS TO FORM - component */}
                                 {/********************************************************************* */}
                                 <AddItemsForm
-                                    ID={defaultId}
+                                    id={defaultId}
                                     fileInfo={fileInfo}
                                     setDataBuffer={setDataBuffer}
                                     setIsSubmitted={setIsSubmitted}
@@ -130,7 +136,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                                     style={{ marginTop: "20px" }}
                                 >
                                     <SubmitApprovalTable
-                                        ID={defaultId}
+                                        id={defaultId}
                                         dataBuffer={dataBuffer}
                                         onDelete={onDelete}
                                         fileInfo={fileInfo}

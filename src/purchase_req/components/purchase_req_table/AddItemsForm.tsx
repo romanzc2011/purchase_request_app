@@ -28,7 +28,7 @@ import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 /* INTERFACE PROPS */
 /*************************************************************************************** */
 interface AddItemsProps {
-    ID?: string;
+    id?: string;
     fileInfo: IFile[];
     setDataBuffer: React.Dispatch<React.SetStateAction<PurchaseItem[]>>;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
@@ -40,7 +40,7 @@ interface AddItemsProps {
 /* ADD ITEMS FORM */
 /*************************************************************************************** */
 function AddItemsForm({
-    ID,
+    id,
     setDataBuffer,
     setIsSubmitted,
     setID,
@@ -70,9 +70,9 @@ function AddItemsForm({
     /*************************************************************************************** */
     /* CREATE NEW ID -- get from backend */
     /*************************************************************************************** */
-    async function createNewID() {
+    async function create_new_id() {
         const response = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/createNewID`,
+            `${import.meta.env.VITE_API_URL}/api/create_new_id`,
             {
                 method: "POST",
                 headers: {
@@ -95,16 +95,16 @@ function AddItemsForm({
             const uuid = uuidv4();
 
             // Get a new ID from the backend
-            const response = await createNewID();
-            const newId = response.ID; // Extract the ID from the response object
+            const response = await create_new_id();
+            const newId = response.id; // Extract the ID from the response object
             console.log("New ID handleAddItem", newId);
 
             // Create a new item with the UUID and ID
             const itemToAdd: PurchaseItem = {
                 ...data,
-                UUID: uuid,
-                priceEach: data.priceEach,
-                ID: newId,
+                uuid: uuid,
+                price_each: data.price_each,
+                id: newId,
                 status: "NEW REQUEST",
                 dateneed: data.dateneed === "" ? null : data.dateneed
             };
@@ -126,17 +126,17 @@ function AddItemsForm({
                 phoneext: "",
                 datereq: formattedToday,
                 dateneed: null,
-                orderType: "",
-                itemDescription: "",
+                order_type: "",
+                item_description: "",
                 justification: "",
-                trainNotAval: false,
-                needsNotMeet: false,
-                budgetObjCode: "",
+                train_not_aval: false,
+                needs_not_meet: false,
+                budget_obj_code: "",
                 fund: "",
-                priceEach: 0,
+                price_each: 0,
                 location: "",
                 quantity: 0,
-                totalPrice: 0
+                total_price: 0
             });
 
             // Force validation after reset
@@ -309,7 +309,7 @@ function AddItemsForm({
                                     id="quarterlyOrder"
                                     type="radio"
                                     value="QUARTERLY_ORDER"
-                                    {...register("orderType", {
+                                    {...register("order_type", {
                                         onChange: (e) => {
                                             trigger("dateneed");
                                         }
@@ -335,7 +335,7 @@ function AddItemsForm({
                                     id="noRush"
                                     type="radio"
                                     value="NO_RUSH"
-                                    {...register("orderType", {
+                                    {...register("order_type", {
                                         onChange: (e) => {
                                             trigger("dateneed");
                                         }
@@ -390,7 +390,7 @@ function AddItemsForm({
                         {/* Right Side - File Upload Component */}
                         <Grid size={{ xs: "auto" }} sx={{ ml: 2 }}>
                             <FileUpload
-                                ID={ID}
+                                id={id}
                                 isSubmitted={isSubmitted}
                                 fileInfo={fileInfo}
                                 setFileInfo={setFileInfo}
@@ -427,16 +427,16 @@ function AddItemsForm({
                         </Grid>
                         <Grid size={{ xs: 4 }}>
                             <TextField
-                                id="itemDescription"
+                                id="item_description"
                                 multiline
                                 rows={4}
                                 fullWidth
                                 className="form-control"
                                 variant="outlined"
                                 size="small"
-                                {...register("itemDescription")}
-                                error={!!errors.itemDescription}
-                                helperText={errors.itemDescription?.message}
+                                {...register("item_description")}
+                                error={!!errors.item_description}
+                                helperText={errors.item_description?.message}
                                 sx={{
                                     ml: 2,
                                     fontSize: "0.8rem",
@@ -466,11 +466,11 @@ function AddItemsForm({
                         >
                             <Grid>
                                 <BudgetCodePicker
-                                    onSelectBudgetCode={(budgetObjCode) =>
-                                        console.log(budgetObjCode)
+                                    onSelectBudgetCode={(budget_obj_code) =>
+                                        console.log(budget_obj_code)
                                     }
                                     control={control}
-                                    register={register("budgetObjCode")}
+                                    register={register("budget_obj_code")}
                                     errors={errors}
                                 />
                             </Grid>

@@ -9,7 +9,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import Button from "@mui/material/Button";
 
 interface FileUploadProps {
-    ID?: string;
+    id?: string;
     isSubmitted: boolean;
     fileInfo: IFile[];
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
@@ -19,7 +19,7 @@ interface FileUploadProps {
 /* FILE UPLOAD
 Getting file status from types/IFile.ts */
 /************************************************************************************ */
-function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
+function FileUpload({ id, fileInfo, setFileInfo }: FileUploadProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     /************************************************************************************ */
@@ -46,8 +46,8 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
     /* UPLOAD FILE */
     /************************************************************************************ */
     async function uploadFile(file: IFile) {
-        if (!ID) {
-            console.error("No ID provided for file upload");
+        if (!id) {
+            console.error("No id provided for file upload");
             return;
         }
         console.log("Starting upload - Current file status:", file.status);
@@ -70,7 +70,7 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
         try {
             const formData = new FormData();
             formData.append("file", file.file);
-            formData.append("ID", ID);
+            formData.append("id", id);
 
             // const API_URL = `${import.meta.env.VITE_API_URL}/api/upload_file`;
             // const accessToken = localStorage.getItem("access_token");
@@ -110,10 +110,10 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
 
     // Delete file from backend
     async function apiDeleteFile(
-        ID: string,
+        id: string,
         filename: string
     ): Promise<number> {
-        const API_URL = `${import.meta.env.VITE_API_URL}/api/deleteFile`;
+        const API_URL = `${import.meta.env.VITE_API_URL}/api/delete_file`;
         const accessToken = localStorage.getItem("access_token");
         const response = await fetch(API_URL, {
             method: "POST",
@@ -121,7 +121,7 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({ ID: ID, filename: filename }),
+            body: JSON.stringify({ id: id, filename: filename }),
         });
 
         if (!response.ok) {
@@ -144,7 +144,7 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
         // Check if file has been uploaded, if so, delete it, this is if user changes their mind
         if (file.status === "ready") {
             console.log("File was ready, calling apiDeleteFile");
-            apiDeleteFile(ID || "", file.name).catch((error) =>
+            apiDeleteFile(id || "", file.name).catch((error) =>
                 console.error("Error deleting file: ", error)
             );
         }

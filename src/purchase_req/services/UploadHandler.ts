@@ -2,16 +2,16 @@ import UploadService from "./UploadService";
 import { IFile } from "../types/IFile";
 
 interface UploadFileProps {
-    file: IFile;
-    ID: string;
+    file: File;
+    id: string;
     setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
 }
 
-async function UploadFile({ file, ID, setFileInfo }: UploadFileProps) {
-    if (!file || !file.file) {
-        console.warn(
+async function UploadFile({ file, id, setFileInfo }: UploadFileProps) {
+    if (!file) {
+        console.error(
             "No file provided or file object is missing for",
-            file?.name
+            id,
         );
         return;
     }
@@ -26,8 +26,8 @@ async function UploadFile({ file, ID, setFileInfo }: UploadFileProps) {
     try {
         console.log("UploadHandler.ts");
         const response = await UploadService.upload({
-            file: file.file,
-            ID,
+            file: file,
+            ID: id,
             dataBuffer: [],
             api_call: "/api/upload",
         });

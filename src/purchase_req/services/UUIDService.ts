@@ -1,14 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const API_URL_ITEM_UUIDS = `${import.meta.env.VITE_API_URL}/api/getItemUUIDs`
-const STORAGE_KEY = 'UUID_store';
+const STORAGE_KEY = 'uuid_store';
 
 export const useUUIDStore = () => {
     const queryClient = useQueryClient();
     
     // Get UUIDs from localStorage or query cache
-    const { data: UUIDs = {} } = useQuery<Record<string, string>>({
-        queryKey: ['UUIDs'],
+    const { data: uuids = {} } = useQuery<Record<string, string>>({
+        queryKey: ['uuids'],
         queryFn: () => {
             // Try to get from localStorage first
             const stored = localStorage.getItem(STORAGE_KEY);
@@ -25,12 +25,12 @@ export const useUUIDStore = () => {
     });
     
     // Set a UUID for a specific ID
-    const setUUID = (ID: string, UUID: string) => {
-        console.log(`Setting UUID for ID ${ID}: ${UUID}`);
-        queryClient.setQueryData(['UUIDs'], (oldData: Record<string, string> = {}) => {
+    const setUUID = (id: string, uuid: string) => {
+        console.log(`Setting UUID for ID ${id}: ${uuid}`);
+        queryClient.setQueryData(['uuids'], (oldData: Record<string, string> = {}) => {
             const newData = {
                 ...oldData,
-                [ID]: UUID
+                [id]: uuid
             };
             // Persist to localStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
@@ -40,14 +40,14 @@ export const useUUIDStore = () => {
     };
     
     // Get a UUID for a specific ID
-    const getUUID = async (ID: string) => {
+    const getUUID = async (id: string) => {
         // Try localStorage first
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
             try {
                 const storedData = JSON.parse(stored);
-                if (storedData[ID]) {
-                    return storedData[ID];
+                if (storedData[id]) {
+                    return storedData[id];
                 }
             } catch (e) {
                 console.error('Error parsing stored UUIDs:', e);
@@ -55,16 +55,16 @@ export const useUUIDStore = () => {
         }
         
         // Try query cache
-        const UUID = UUIDs[ID];
-        if (UUID) {
-            console.log(`Getting UUID for ID ${ID} from cache: ${UUID}`);
-            return UUID;
+        const uuid = uuids[id];
+        if (uuid) {
+            console.log(`Getting UUID for ID ${id} from cache: ${uuid}`);
+            return uuid;
         }
         
         // If not found in cache or localStorage, try to fetch from backend
-        console.log(`UUID not found in cache for ID ${ID}, trying backend...`);
+        console.log(`UUID not found in cache for ID ${id}, trying backend...`);
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/getUUID/${ID}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/getUUID/${id}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -75,20 +75,20 @@ export const useUUIDStore = () => {
             if (response.ok) {
                 const data = await response.json();
                 if (data.UUID) {
-                    console.log(`Got UUID from backend for ID ${ID}: ${data.UUID}`);
+                    console.log(`Got UUID from backend for ID ${id}: ${data.UUID}`);
                     // Store in cache and localStorage for future use
-                    setUUID(ID, data.UUID);
+                    setUUID(id, data.UUID);
                     return data.UUID;
                 }
             }
             
-            console.log(`No UUID found in backend for ID ${ID}`);
+            console.log(`No UUID found in backend for ID ${id}`);
             return null;
         } catch (error) {
-            console.error(`Error fetching UUID from backend for ID ${ID}:`, error);
+            console.error(`Error fetching UUID from backend for ID ${id}:`, error);
             return null;
         }
     };
 
-    return { UUIDs, setUUID, getUUID };
+    return { uuids, setUUID, getUUID };
 };

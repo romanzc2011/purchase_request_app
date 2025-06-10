@@ -9,7 +9,7 @@ TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from api.schemas.comment_schemas import CommentItem
 from api.schemas.purchase_schemas import PurchaseRequestLineItem
@@ -121,15 +121,15 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 ##########################################################################
 @api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
 async def get_approval_data(
-    ID: Optional[str] = Query(None),
+    id: Optional[str] = Query(None),
     current_user: LDAPUser = Depends(auth_service.get_current_user)):
     
     # Check if user is in IT group or CUE group
     logger.info(f"CURRENT USER: {current_user}")
     with get_session() as session:
         try:
-            if ID:
-                approval = dbas.get_approval_by_id(session, ID)
+            if id:
+                approval = dbas.get_approval_by_id(session, id)
                 if approval:
                     approval_data = [ApprovalSchema.model_validate(approval)]
                 else:
@@ -151,15 +151,15 @@ async def download_statement_of_need_form(
     current_user: LDAPUser = Depends(auth_service.get_current_user),
 ):
     """
-    This endpoint is used to download the statement of need form for a given ID.
+    This endpoint is used to download the statement of need form for a given id.
     """
-    ID = payload.get("ID")
-    if not ID:
-        raise HTTPException(status_code=400, detail="ID is required")
+    id = payload.get("id")
+    if not id:
+        raise HTTPException(status_code=400, detail="id is required")
 
     try:
         output_path = pdf_service.create_pdf(
-            ID=ID,
+            id=id,
             payload=payload
         )
         
@@ -197,14 +197,14 @@ async def get_search_data(
 ## COROUTINE FUNCTIONS
 ##########################################################################
 # Save file async via aiofiles
-async def _save_files(ID: str, file: UploadFile) -> str:
+async def _save_files(id: str, file: UploadFile) -> str:
     try:
         # Ensure upload directory exists
         os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
         
         # Create secure filename
         secure_name = secure_filename(file.filename)
-        dest = os.path.join(settings.UPLOAD_FOLDER, f"{ID}_{secure_name}")
+        dest = os.path.join(settings.UPLOAD_FOLDER, f"{id}_{secure_name}")
         
         logger.info("###########################################################")
         logger.info(f"Saving file to: {dest}")
@@ -226,7 +226,7 @@ async def _save_files(ID: str, file: UploadFile) -> str:
 # Generate PDF
 async def generate_pdf(
     payload: PurchaseRequestPayload, 
-    ID: str, 
+    id: str, 
     uploaded_files: Optional[List[str]] = None) -> str:
     try:
         # Make sure dir exists
@@ -236,7 +236,7 @@ async def generate_pdf(
         # Create PDF on thread
         pdf_path = await asyncio.to_thread(
             pdf_service.create_pdf,
-            ID=ID,
+            id=id,
             payload=jsonable_encoder(payload)
         )
         
@@ -276,13 +276,14 @@ async def set_purchase_request(
         # Build header data 
         request_data = payload.items[0]
         header_data = {
-            "ID":           request_data.ID,
+            "id":           request_data.id,
             "requester":    payload.requester,
             "phoneext":     request_data.phoneext,
             "datereq":      request_data.datereq,
             "dateneed":     request_data.dateneed,
             "orderType":    request_data.orderType,
             "status":       request_data.status,
+            "created_time": datetime.now(timezone.utc),
         }
         
         # Insert header data into purchase request tabl
@@ -291,10 +292,24 @@ async def set_purchase_request(
         # Loop through the line items and extract line item data of purchase_request
         for item in payload.items:
             line_data = {
-                "purchase_req_uuid":    hdr.UUID,
-                "purchase_req_id":      hdr.ID,
-                
+                "purchase_request_uuid":    hdr.uuid,
+                "item_description":         item.item_description,
+                "justification":            item.justification,
+                "add_comments":             item.add_comments,
+                "train_not_aval":           item.train_not_aval,
+                "needs_not_meet":           item.needs_not_meet,
+                "budget_obj_code":          item.budget_obj_code,
+                "fund":                     item.fund,
+                "quantity":                 item.quantity,
+                "price_each":               item.price_each,
+                "total_price":              item.total_price,
+                "location":                 item.location,
+                "is_cyber_sec_related":     item.is_cyber_sec_related,
+                "status":                   item.status,
+                "created_time":             datetime.now(timezone.utc),
             }
+            
+            logger.info(f"LINE DATA: {line_data}")
         
     except ValidationError as e:
         logger.error("PurchaseRequestPayload errors: %s", e.errors())
@@ -302,7 +317,7 @@ async def set_purchase_request(
         raise HTTPException(status_code=422, detail=e.errors())
 
     ################################################################3
-    ## VALIDATE REQUESTER
+    ## VALidATE REQUESTER
     requester = payload.requester
     requester_email = await ldap_service.get_email_address(requester)
     
@@ -314,7 +329,7 @@ async def set_purchase_request(
         raise HTTPException(status_code=400, detail="Invalid data")
     
     ################################################################3
-    ## VALIDATE/PROCESS PAYLOAD
+    ## VALidATE/PROCESS PAYLOAD
     logger.debug(f"DATA: {payload}")
     #fileAttachments=[FileAttachment(attachment=None, name='NBIS_questionaire_final.pdf', type='application/pdf', size=160428)])]
     
@@ -326,29 +341,29 @@ async def set_purchase_request(
         logger.error("No items found in request data")
         raise HTTPException(status_code=400, detail="No items found in request data")
 
-    # Get the shared ID from the first item, but ensure it's not a temporary ID
-    first_item_id = items[0].ID if items else None
+    # Get the shared id from the first item, but ensure it's not a temporary id
+    first_item_id = items[0].id if items else None
     
-    # Generate a new shared ID if the first item ID is not a temporary ID - this keeps the LAWB ID unique just incrementing
+    # Generate a new shared id if the first item id is not a temporary id - this keeps the LAWB id unique just incrementing
     if not first_item_id:
         shared_id = dbas.get_next_request_id()
-        logger.info(f"Generated new shared ID: {shared_id}")
+        logger.info(f"Generated new shared id: {shared_id}")
     else:
         shared_id = first_item_id
-        logger.info(f"Using existing shared ID: {shared_id}")
+        logger.info(f"Using existing shared id: {shared_id}")
         
     # Process each item
     for item in payload.items:
-        logger.info(f"Before assigning shared ID: {item.ID}")
-        item.ID = shared_id
-        logger.info(f"After assigning shared ID: {item.ID}")
+        logger.info(f"Before assigning shared id: {item.id}")
+        item.id = shared_id
+        logger.info(f"After assigning shared id: {item.id}")
         
         item.requester = payload.requester
         processed_data = process_purchase_data(item)
         purchase_req_commit(processed_data, current_user)
     
-    # Update the payload with the shared ID
-    payload.ID = shared_id  
+    # Update the payload with the shared id
+    payload.id = shared_id  
     
     # Create tasks list for files
     uploaded_files = []
@@ -365,8 +380,8 @@ async def set_purchase_request(
     #################################################################################
     additional_comments = cache_service.get_or_set(
         "comments",
-        payload.ID,
-        lambda: dbas.get_additional_comments_by_id(payload.ID)
+        payload.id,
+        lambda: dbas.get_additional_comments_by_id(payload.id)
     )
     
     for item in payload.items:
@@ -382,13 +397,13 @@ async def set_purchase_request(
     #################################################################################
     email_request_payload = EmailPayloadRequest(
         model_type="email_request",
-        ID=payload.ID,
+        id=payload.id,
         requester=payload.requester,
         requester_email=requester_email,
         datereq=payload.items[0].datereq,
         dateneed=payload.items[0].dateneed,
         orderType=payload.items[0].orderType,
-        subject=f"Purchase Request #{payload.ID}",
+        subject=f"Purchase Request #{payload.id}",
         sender=settings.smtp_email_addr,
         to=None,   # Assign this in the smtp service
         cc=None,
@@ -471,41 +486,41 @@ async def log_requests(request: Request, call_next):
             elapsed=elapsed,
         ).info("Request processed")
 
-    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Request-id"] = request_id
     return response
 
 #########################################################################
-## ASSIGN REQUISITION ID
+## ASSIGN REQUISITION id
 ##########################################################################
-@api_router.post("/assignIRQ1_ID")
-async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_service.get_current_user)):
+@api_router.post("/assignirq1_id")
+async def assign_irq1_id(data: dict, current_user: LDAPUser = Depends(auth_service.get_current_user)):
     """
-    This is called from the frontend to assign a requisition ID
-    to the purchase request. It also updates the UUID in the approval table.
+    This is called from the frontend to assign a requisition id
+    to the purchase request. It also updates the uuid in the approval table.
     IRQ number that is retrieved from JFIMS by Lela
     """
-    logger.info(f"Assigning requisition ID: {data.get('IRQ1_ID')}")
+    logger.info(f"Assigning requisition id: {data.get('irq1_id')}")
     
-    # Get the original ID from the request
-    original_id = data.get('ID')
+    # Get the original id from the request
+    original_id = data.get('id')
     if not original_id:
-        raise HTTPException(status_code=400, detail="Missing ID in request")
+        raise HTTPException(status_code=400, detail="Missing id in request")
     
-    # Get the UUID using the UUID service
+    # Get the uuid using the uuid service
     with get_session() as session:
         uuid = uuid_service.get_uuid_by_id(session, original_id)
     
-    # update all tables with the new IRQ1_ID
-    dbas.update_data_by_uuid(uuid=uuid, table="approvals", IRQ1_ID=data.get('IRQ1_ID'))
-    dbas.update_data_by_uuid(uuid=uuid, table="line_item_statuses", IRQ1_ID=data.get('IRQ1_ID'))
-    dbas.update_data_by_uuid(uuid=uuid, table="son_comments", IRQ1_ID=data.get('IRQ1_ID'))
+    # update all tables with the new irq1_id
+    dbas.update_data_by_uuid(uuid=uuid, table="approvals", irq1_id=data.get('irq1_id'))
+    dbas.update_data_by_uuid(uuid=uuid, table="line_item_statuses", irq1_id=data.get('irq1_id'))
+    dbas.update_data_by_uuid(uuid=uuid, table="son_comments", irq1_id=data.get('irq1_id'))
     
     if not uuid:
-        raise HTTPException(status_code=400, detail="Missing UUID in request")
+        raise HTTPException(status_code=400, detail="Missing uuid in request")
     
-    # Update the database with the requisition ID using the UUID
-    dbas.update_data_by_uuid(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
-    return {"IRQ1_ID_ASSIGNED": True}
+    # Update the database with the requisition id using the uuid
+    dbas.update_data_by_uuid(uuid, "approvals", irq1_id=data.get('irq1_id'))
+    return {"irq1_id_ASSIGNED": True}
 
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
@@ -569,40 +584,40 @@ async def refresh_token(refresh_token: str):
         )
         
 ##########################################################################
-## CREATE NEW ID
+## CREATE NEW id
 ##########################################################################
-@api_router.post("/createNewID")
+@api_router.post("/create_new_id")
 async def create_new_id(request: Request):
     """
-    Create a new ID for a purchase request.
+    Create a new id for a purchase request.
     """
     try:
-        # Get the next request ID using the function from db_service
+        # Get the next request id using the function from db_service
         new_id = dbas.get_next_request_id()
-        logger.info(f"Created new ID: {new_id}")
-        return {"ID": new_id}
+        logger.info(f"Created new id: {new_id}")
+        return {"id": new_id}
     except Exception as e:
-        logger.error(f"Error creating new ID: {e}")
+        logger.error(f"Error creating new id: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
 ##########################################################################
-## GET UUID BY ID
+## GET uuid BY id
 ##########################################################################
-@api_router.get("/getUUID/{ID}")
-async def get_uuid_by_id_endpoint(ID: str, current_user: LDAPUser = Depends(auth_service.get_current_user)):
+@api_router.get("/get_uuid/{id}")
+async def get_uuid_by_id_endpoint(id: str, current_user: LDAPUser = Depends(auth_service.get_current_user)):
     """
-    Get the UUID for a given ID.
-    This endpoint can be used by other programs to retrieve the UUID.
+    Get the uuid for a given id.
+    This endpoint can be used by other programs to retrieve the uuid.
     """
-    logger.info(f"Getting UUID for ID: {ID}")
+    logger.info(f"Getting uuid for id: {id}")
     
     with get_session() as session:
-        UUID = dbas.get_uuid_by_id(session, ID)
+        uuid = dbas.get_uuid_by_id(session, id)
         
-        if not UUID:
-            raise HTTPException(status_code=404, detail=f"No UUID found for ID: {ID}")
+        if not uuid:
+            raise HTTPException(status_code=404, detail=f"No uuid found for id: {id}")
             
-        return {"UUID": UUID}
+        return {"uuid": uuid}
 ##########################################################################
 ## FETCH USERNAMES
 ##########################################################################
@@ -622,7 +637,7 @@ async def add_comments(payload: GroupCommentPayload):
     Add multiple comments to purchase requests.
 
     Args:
-        uuids: List of UUIDs of the purchase requests
+        uuids: List of uuids of the purchase requests
         comments: List of comments to add
     """
     with get_session() as session:
@@ -643,7 +658,7 @@ async def add_comments(payload: GroupCommentPayload):
         # Build email payload
         email_comments_payload = EmailPayloadComment(
             model_type      = "email_comments",
-            ID              = payload.groupKey,           # reuse groupKey as the email ID
+            id              = payload.groupKey,           # reuse groupKey as the email id
             requester       = requester_name,
             requester_email = requester_email,
             datereq         = datetime.now().date(),
@@ -665,14 +680,14 @@ async def add_comments(payload: GroupCommentPayload):
 ##########################################################################
 ## CYBER SECURITY RELATED
 ##########################################################################
-@api_router.put("/cyberSecRelated/{UUID}")
-async def cyber_sec_related(UUID: str, payload: CyberSecRelatedPayload):
+@api_router.put("/cyber_sec_related/{uuid}")
+async def cyber_sec_related(uuid: str, payload: CyberSecRelatedPayload):
     """
     Update the isCyberSecRelated field for a purchase request.
     """
-    logger.info(f"Updating isCyberSecRelated for UUID: {UUID} to {payload.isCyberSecRelated}")
+    logger.info(f"Updating isCyberSecRelated for uuid: {uuid} to {payload.isCyberSecRelated}")
     with get_session() as session:
-        success = dbas.update_data_by_uuid(uuid=UUID, table="approvals", isCyberSecRelated=payload.isCyberSecRelated)
+        success = dbas.update_data_by_uuid(uuid=uuid, table="approvals", isCyberSecRelated=payload.isCyberSecRelated)
         return {"message": "Cybersec related field updated successfully"}
 
 ##########################################################################
@@ -701,10 +716,10 @@ def process_purchase_data(item: PurchaseRequestLineItem) -> dict:
             # Handle comments based on trainNotAval and needsNotMeet
             comments_list = []
             
-            if local_purchase_cols['trainNotAval'] == True:
+            if local_purchase_cols['train_not_aval'] == True:
                 comments_list.append("Training not available")
                 
-            if local_purchase_cols['needsNotMeet'] == True:
+            if local_purchase_cols['needs_not_meet'] == True:
                 comments_list.append("Does not meet employee needs")
                 
             if comments_list:
@@ -713,7 +728,7 @@ def process_purchase_data(item: PurchaseRequestLineItem) -> dict:
                 local_purchase_cols['addComments'] = None
                 
             # Recalculate total price
-            price_each = local_purchase_cols['priceEach']
+            price_each = local_purchase_cols['price_each']
             quantity = local_purchase_cols['quantity']
             
             if price_each is not None and quantity is not None:
@@ -724,11 +739,11 @@ def process_purchase_data(item: PurchaseRequestLineItem) -> dict:
                     if price_each < 0 or quantity <= 0:
                         raise ValueError("Invalid values")
                     
-                    local_purchase_cols['totalPrice'] = round(price_each * quantity, 2)
+                    local_purchase_cols['total_price'] = round(price_each * quantity, 2)
                     
                 except ValueError as e:
                     logger.error(f"Invalid price or quantity: {e}")
-                    local_purchase_cols['totalPrice'] = 0
+                    local_purchase_cols['total_price'] = 0
                     
         except Exception as e:
             logger.error(f"Error in process_purchase_data: {e}")
@@ -750,24 +765,24 @@ def process_approval_data(processed_data):
     logger.info(f"processed_data: {processed_data}")
     # Define allowed keys that correspond to the Approval model's columns.
     allowed_keys = [
-        'UUID', 'purchase_request_uuid',
-        'ID', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet',
-        'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location',
+        'uuid', 'purchase_request_uuid',
+        'id', 'requester', 'budget_obj_code', 'fund', 'train_not_aval', 'needs_not_meet',
+        'item_description', 'justification', 'quantity', 'total_price', 'price_each', 'location',
         'phoneext', 'datereq', 'dateneed', 'orderType'
 ]
     
     # Populate approval_data from processed_data
     for key, value in processed_data.items():
-        # Handle the UUID field from the frontend
-        if key == "UUID":
-            approval_data["UUID"] = value
+        # Handle the uuid field from the frontend
+        if key == "uuid":
+            approval_data["uuid"] = value
         elif key in allowed_keys:
             approval_data[key] = value
     
     # Set default values for required fields if not present
-    # Handle IRQ1_ID - convert empty string to None to avoid unique constraint violation
-    irq1_id = processed_data.get('IRQ1_ID', '')
-    approval_data['IRQ1_ID'] = None if irq1_id == '' else irq1_id
+    # Handle irq1_id - convert empty string to None to avoid unique constraint violation
+    irq1_id = processed_data.get('irq1_id', '')
+    approval_data['irq1_id'] = None if irq1_id == '' else irq1_id
 
     return approval_data
 
@@ -777,10 +792,10 @@ def process_approval_data(processed_data):
 def purchase_req_commit(processed_data: dict, current_user: LDAPUser):
     with lock:
         try:
-            logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")
+            logger.info(f"Inserting purchase request data for id: {processed_data['id']}")
             
-            if isinstance(processed_data.get('fileAttachments'), list):
-                processed_data['fileAttachments'] = None
+            if isinstance(processed_data.get('file_attachments'), list):
+                processed_data['file_attachments'] = None
                 
             # First create purchase request
             purchase_request = dbas.insert_data(table="purchase_requests", data=processed_data)
@@ -788,26 +803,26 @@ def purchase_req_commit(processed_data: dict, current_user: LDAPUser):
             # Process and create approval data
             approval_data = process_approval_data(processed_data)
             approval_data['status'] = dbas.ItemStatus.NEW
-            approval_data['purchase_request_uuid'] = purchase_request.UUID
+            approval_data['purchase_request_uuid'] = purchase_request.uuid
             approval = dbas.insert_data(table="approvals", data=approval_data)
             
             logger.info(f"Approval object: {approval}")
-            logger.info(f"Approval UUID: {getattr(approval, 'UUID', None)}")
+            logger.info(f"Approval uuid: {getattr(approval, 'uuid', None)}")
             
-            # Create line item status with required IDs and current user
+            # Create line item status with required ids and current user
             line_item_data = {
-                'UUID': approval.UUID,
+                'uuid': approval.uuid,
                 'status': dbas.ItemStatus.NEW,
                 'updated_by': current_user.username
             }
             line_item_status = dbas.insert_data(table="line_item_statuses", data=line_item_data)
             
-            # Create son comment with required IDs
+            # Create son comment with required ids
             son_comment_data = {
-                'UUID': approval.UUID,
-                'purchase_req_id': approval.ID,
+                'uuid': approval.uuid,
+                'purchase_req_id': approval.id,
                 'son_requester': current_user.username,
-                'item_description': processed_data['itemDescription'],
+                'item_description': processed_data['item_description'],
             }
             son_comment = dbas.insert_data(table="son_comments", data=son_comment_data)
             
@@ -825,14 +840,14 @@ def purchase_req_commit(processed_data: dict, current_user: LDAPUser):
 ## HANDLE FILE UPLOAD
 ##########################################################################
 @api_router.post("/upload_file")
-async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_service.get_current_user)):
+async def upload_file(id: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_service.get_current_user)):
     # Ensure the upload directory exists
     if not os.path.exists(settings.UPLOAD_FOLDER):
         os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
         
     try:
         secure_name = secure_filename(file.filename)
-        new_filename = f"{ID}_{secure_name}"
+        new_filename = f"{id}_{secure_name}"
         file_path = os.path.join(settings.UPLOAD_FOLDER, new_filename)
         logger.info(f"File path: {file_path}")
         
@@ -854,19 +869,19 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 ##########################################################################
 async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.get_current_user)):
     """
-    Deletes a file given its ID and filename.
-    Expects a JSON payload containing "ID" and "filename".
+    Deletes a file given its id and filename.
+    Expects a JSON payload containing "id" and "filename".
     """
     if not data:
         raise HTTPException(status_code=400, detail="Invalid data")
     
-    ID = data.get("ID")
+    id = data.get("id")
     filename = data.get("filename")
-    if not ID or not filename:
-        raise HTTPException(status_code=400, detail="Missing ID or filename")
+    if not id or not filename:
+        raise HTTPException(status_code=400, detail="Missing id or filename")
     
     # Construct the upload filename
-    upload_filename = f"{ID}_{filename}"
+    upload_filename = f"{id}_{filename}"
     files = os.listdir(settings.UPLOAD_FOLDER)
     file_found = False
     

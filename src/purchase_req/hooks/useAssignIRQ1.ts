@@ -12,14 +12,14 @@ const API_URL_ASSIGN_IRQ1 = `${import.meta.env.VITE_API_URL}/api/assignIRQ1_ID`;
  * @param UUID - The UUID of the request
  */
 interface AssignIRQ1Args {
-    ID: string;
-    newIRQ1ID: string;
+    id: string;
+    new_irq1_id: string;
 }
 
 /* Response from IRQ1 endpoint */
 interface AssignIRQ1Response {
-    IRQ1_ID_ASSIGNED: boolean;
-    IRQ1_ID: string;
+    irq1_id_assigned: boolean;
+    irq1_id: string;
 }
 
 /** 
@@ -30,8 +30,8 @@ export function useAssignIRQ1() {
     const { getUUID } = useUUIDStore();
 
     return useMutation<AssignIRQ1Response, Error, AssignIRQ1Args>({
-        mutationFn: async ({ ID, newIRQ1ID }) => {
-            const UUID = await getUUID(ID);
+        mutationFn: async ({ id, new_irq1_id }) => {
+            const UUID = await getUUID(id);
             if (!UUID) throw new Error("UUID not found for this request");
 
             const res = await fetch(API_URL_ASSIGN_IRQ1, {
@@ -41,8 +41,8 @@ export function useAssignIRQ1() {
                     Authorization: `Bearer ${localStorage.getItem("access_token")}`,
                 },
                 body: JSON.stringify({
-                    ID,
-                    IRQ1_ID: newIRQ1ID,
+                    id,
+                    irq1_id: new_irq1_id,
                     UUID,
                 }),
             });
@@ -52,7 +52,7 @@ export function useAssignIRQ1() {
             }
             return res.json();
         },
-        onSuccess: (data, { ID }) => {
+        onSuccess: (data, { id }) => {
             queryClient.invalidateQueries({ queryKey: ["approvalData"] });
             queryClient.invalidateQueries({ queryKey: ["search"] });
             toast.success("IRQ1 ID assigned successfully");

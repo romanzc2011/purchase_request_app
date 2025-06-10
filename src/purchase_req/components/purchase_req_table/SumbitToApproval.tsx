@@ -24,7 +24,7 @@ import { toast } from "react-toastify";
 import { ItemStatus } from "../../types/approvalTypes";
 
 const baseURL = import.meta.env.VITE_API_URL;
-const API_CALL: string = "/api/sendToPurchaseReq";
+const API_CALL: string = "/api/send_to_purchase_req";
 const API_URL = `${baseURL}${API_CALL}`;
 
 /************************************************************************************ */
@@ -32,8 +32,8 @@ const API_URL = `${baseURL}${API_CALL}`;
 /************************************************************************************ */
 interface SubmitApprovalTableProps {
     dataBuffer: FormValues[];
-    onDelete: (ID: string) => void;
-    ID?: string;
+    onDelete: (id: string) => void;
+    id?: string;
     fileInfo: IFile[];
     isSubmitted: boolean;
     setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
@@ -45,7 +45,7 @@ interface SubmitApprovalTableProps {
 function SubmitApprovalTable({
     dataBuffer,
     onDelete,
-    ID,
+    id,
     fileInfo,
     isSubmitted,
     setIsSubmitted,
@@ -80,7 +80,7 @@ function SubmitApprovalTable({
          calculations */
     /************************************************************************************ */
     function calculatePrice(item: FormValues): number {
-        const price = Number(item.priceEach) || 0;
+        const price = Number(item.price_each) || 0;
         const quantity = Number(item.quantity) || 1;
         return price * quantity;
     }
@@ -88,7 +88,7 @@ function SubmitApprovalTable({
     // Preprocess data to calculate price
     const processedData = dataBuffer.map((item) => ({
         ...item,
-        priceEach: Number(item.priceEach),
+        priceEach: Number(item.price_each),
         calculatedPrice: calculatePrice(item)
     }));
 
@@ -98,7 +98,8 @@ function SubmitApprovalTable({
 
     // Group items by ID
     const groupedItems = processedData.reduce<Record<string, FormValues[]>>((acc, item) => {
-        (acc[item.ID] = acc[item.ID] || []).push(item);
+        const itemId = item.id || 'default';
+        (acc[itemId] = acc[itemId] || []).push(item);
         return acc;
     }, {});
     console.log("processedData==", processedData);
@@ -108,7 +109,7 @@ function SubmitApprovalTable({
     const handleSubmitData = async (processedData: FormValues[]) => {
         try {
             // Get a proper ID from the backend
-            const idRequest = await fetch(`${baseURL}/api/createNewID`, {
+            const idRequest = await fetch(`${baseURL}/api/create_new_id`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -122,7 +123,7 @@ function SubmitApprovalTable({
             }
 
             const idData = await idRequest.json();
-            const requestId = idData.ID;
+            const requestId = idData.id;
 
             // Get the requester from the first item
             const requester = processedData[0]?.requester;
@@ -132,9 +133,9 @@ function SubmitApprovalTable({
 
             // Process each item in the data buffer
             const processedItems = processedData.map(item => ({
-                ID: requestId,
-                UUID: item.UUID || uuidv4(),
-                IRQ1_ID: item.IRQ1_ID || null,
+                id: requestId,
+                uuid: item.uuid || uuidv4(),
+                irq1_id: item.irq1_id || null,
                 requester: item.requester,
                 phoneext: String(item.phoneext),
                 datereq: item.datereq instanceof Date
@@ -146,17 +147,17 @@ function SubmitApprovalTable({
                 orderType: item.orderType || "STANDARD",
                 itemDescription: item.itemDescription,
                 justification: item.justification,
-                trainNotAval: Boolean(item.trainNotAval),
-                needsNotMeet: Boolean(item.needsNotMeet),
+                train_not_aval: Boolean(item.train_not_aval),
+                needs_not_meet: Boolean(item.needs_not_meet),
                 quantity: Number(item.quantity),
-                price: Number(item.price) || (Number(item.priceEach) * Number(item.quantity)),
-                priceEach: Number(item.priceEach),
-                totalPrice: Number(item.totalPrice) || (Number(item.priceEach) * Number(item.quantity)),
+                price: Number(item.price) || (Number(item.price_each) * Number(item.quantity)),
+                price_each: Number(item.price_each),
+                total_price: Number(item.total_price) || (Number(item.price_each) * Number(item.quantity)),
                 fund: item.fund,
                 location: item.location,
-                budgetObjCode: String(item.budgetObjCode).padStart(4, '0'),
+                budget_obj_code: String(item.budget_obj_code).padStart(4, '0'),
                 status: ItemStatus.NEW_REQUEST,
-                fileAttachments: fileInfo.map(file => ({
+                file_attachments: fileInfo.map(file => ({
                     name: file.name,
                     file: file.file,
                     type: file.file?.type || '',
@@ -282,10 +283,7 @@ function SubmitApprovalTable({
                                     )}
                                 </TableCell>
                                 <TableCell sx={{ color: "white" }}>
-                                    {items[0].ID}
-                                </TableCell>
-                                <TableCell sx={{ color: "white" }}>
-                                    {convertBOC(items[0].budgetObjCode)}
+                                    {items[0].id}
                                 </TableCell>
                                 <TableCell sx={{ color: "white" }}>
                                     {items[0].fund}
@@ -297,8 +295,8 @@ function SubmitApprovalTable({
                                     {items[0].quantity}
                                 </TableCell>
                                 <TableCell sx={{ color: "white" }}>
-                                    {typeof items[0].priceEach === "number"
-                                        ? items[0].priceEach.toFixed(2)
+                                    {typeof items[0].price_each === "number"
+                                        ? items[0].price_each.toFixed(2)
                                         : "0.00"}
                                 </TableCell>
                                 <TableCell sx={{ color: "white" }}>
@@ -309,7 +307,7 @@ function SubmitApprovalTable({
                                         variant="contained"
                                         color="error"
                                         onClick={() => {
-                                            onDelete(items[0].ID);
+                                            onDelete(items[0].id || 'default');
                                         }}
                                     >
                                         Delete
@@ -366,10 +364,10 @@ function SubmitApprovalTable({
                                                         {items.slice(1).map((item, idx) => (
                                                             <TableRow key={idx}>
                                                                 <TableCell sx={{ color: "white" }}>
-                                                                    {item.ID}
+                                                                    {item.id}
                                                                 </TableCell>
                                                                 <TableCell sx={{ color: "white" }}>
-                                                                    {convertBOC(item.budgetObjCode)}
+                                                                    {convertBOC(item.budget_obj_code)}
                                                                 </TableCell>
                                                                 <TableCell sx={{ color: "white" }}>
                                                                     {item.fund}
@@ -381,8 +379,8 @@ function SubmitApprovalTable({
                                                                     {item.quantity}
                                                                 </TableCell>
                                                                 <TableCell sx={{ color: "white" }}>
-                                                                    {typeof item.priceEach === "number"
-                                                                        ? item.priceEach.toFixed(2)
+                                                                    {typeof item.price_each === "number"
+                                                                        ? item.price_each.toFixed(2)
                                                                         : "0.00"}
                                                                 </TableCell>
                                                                 <TableCell sx={{ color: "white" }}>

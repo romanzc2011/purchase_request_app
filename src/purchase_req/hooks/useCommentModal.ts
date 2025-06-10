@@ -8,7 +8,7 @@ export function useCommentModal() {
   const resolverRef                 = useRef<(value: string) => void>();
 
   // open with whatever payload you have (single or multi)
-  const openCommentModal = useCallback((payload: GroupCommentPayload) => {
+  const openCommentModal = useCallback(() => {
     setIsOpen(true);
     return new Promise<string>(resolve => {
       resolverRef.current = resolve;
@@ -19,7 +19,7 @@ export function useCommentModal() {
     setIsOpen(false);
   }, []);
 
-  // called by your CommentModal’s “Submit” button
+  // called by your CommentModal's "Submit" button
   const handleSubmit = useCallback(
     (userComment: string) => {
         console.log("🔥 handleSubmit fired with:", userComment);
