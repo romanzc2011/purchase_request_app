@@ -9,6 +9,7 @@ from api.services.auth_service              import AuthService
 from api.services.pdf_service               import PDFService
 from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
+from api.schemas.purchase_schemas           import *
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(

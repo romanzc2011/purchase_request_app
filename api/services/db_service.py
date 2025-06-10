@@ -47,54 +47,117 @@ class ItemStatus(enum.Enum):
 class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
 
-    UUID:            Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID:              Mapped[str] = mapped_column(String, unique=False, nullable=False)
-    requester:       Mapped[str] = mapped_column(String, nullable=False)
-    phoneext:        Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq:         Mapped[str] = mapped_column(String)      
-    dateneed:        Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    orderType:       Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    status:          Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
-                                                                name="item_status",
-                                                                native_enum=False,
-                                                                values_callable=lambda enum: [e.value for e in enum]
-                                                                ),
-                                                                default=ItemStatus.NEW
-                                                            )
-    createdTime:     Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
-    __searchable__ = ['ID', 'IRQ1_ID', 'requester', 'status', 'createdTime']
+    uuid          = mapped_column(
+                       String,
+                       primary_key=True,
+                       default=lambda: str(uuid.uuid4())
+                    )
+    request_id    = mapped_column(
+                       String,
+                       unique=True,
+                       nullable=False
+                    )
+    requester     = mapped_column(String, nullable=False)
+    phone_ext     = mapped_column(Integer, nullable=False)
+    date_requested= mapped_column(Date,  nullable=False)
+    date_needed   = mapped_column(Date,  nullable=True)
+    order_type    = mapped_column(String,nullable=True)
+    status        = mapped_column(
+                       SQLEnum(ItemStatus, name="item_status"),
+                       default=ItemStatus.NEW_REQUEST,
+                       nullable=False
+                    )
+    created_time  = mapped_column(
+                       DateTime(timezone=True),
+                       default=lambda: datetime.now(timezone.utc),
+                       nullable=False
+                    )
+
     # Relationships
-    approvals = relationship("Approval", back_populates="purchase_request", cascade="all, delete-orphan")
-    # One to many relationship with LineItem
-    line_items = relationship("LineItem", back_populates="purchase_request", cascade="all, delete-orphan")
-    inbound_approvals = relationship("InboundApproval", back_populates="purchase_request", cascade="all, delete-orphan")
-    
+    approvals           = relationship(
+                             "Approval",
+                             back_populates="purchase_request",
+                             cascade="all, delete-orphan"
+                         )
+    line_items          = relationship(
+                             "LineItem",
+                             back_populates="purchase_request",
+                             cascade="all, delete-orphan"
+                         )
+    inbound_approvals   = relationship(
+                             "InboundApproval",
+                             back_populates="purchase_request",
+                             cascade="all, delete-orphan"
+                         )
+
+    __searchable__ = [
+        "request_id",
+        "requester",
+        "status",
+        "created_time",
+    ]
 ###################################################################################################
 ## Line Item Table
 # Keeps track of the line items for the purchase request
+from datetime import datetime, timezone
+from sqlalchemy import (
+    String, Integer, Text, Boolean, Float, DateTime, ForeignKey
+)
+from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
+from sqlalchemy import Enum as SQLEnum
+
+Base = declarative_base()
+
 class LineItem(Base):
     __tablename__ = "line_items"
-    ID:                 Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    UUID:               Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.UUID"), nullable=False)
-    purchase_req_id:    Mapped[str] = mapped_column(String, nullable=False, index=True)
-    item_description:   Mapped[str] = mapped_column(Text)
-    justification:      Mapped[str] = mapped_column(Text)
-    addComments:        Mapped[Optional[str]] = mapped_column(Text) 
-    trainNotAval:       Mapped[bool] = mapped_column(Boolean, nullable=True)
-    needsNotMeet:       Mapped[bool] = mapped_column(Boolean, nullable=True)
-    budgetObjCode:      Mapped[str] = mapped_column(String)
-    fund:               Mapped[str] = mapped_column(String)
-    quantity:           Mapped[int] = mapped_column(Integer)
-    priceEach:          Mapped[float] = mapped_column(Float)
-    totalPrice:         Mapped[float] = mapped_column(Float)
-    location:           Mapped[str] = mapped_column(String)
-    isCyberSecRelated:  Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    status:             Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus))
-    
-    purchase_request = relationship("PurchaseRequest", back_populates="line_items")
-    approvals = relationship("ItemApproval", back_populates="line_item", cascade="all, delete-orphan")
-    
-    __searchable__ = ['ID', 'purchase_req_id', 'item_description', 'quantity', 'priceEach', 'totalPrice', 'status', 'location']
+
+    id                      = mapped_column(Integer, primary_key=True, autoincrement=True)
+    purchase_request_uuid   = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False, index=True)
+    item_description        = mapped_column(Text,   nullable=False)
+    justification           = mapped_column(Text,   nullable=False)
+    add_comments            = mapped_column(Text,   nullable=True)
+    train_not_aval          = mapped_column(Boolean, default=False, nullable=False)
+    needs_not_meet          = mapped_column(Boolean, default=False, nullable=False)
+    budget_obj_code         = mapped_column(String, nullable=False)
+    fund                    = mapped_column(String, nullable=False)
+    quantity                = mapped_column(Integer,nullable=False)
+    price_each              = mapped_column(Float,  nullable=False)
+    total_price             = mapped_column(Float,  nullable=False)
+    location                = mapped_column(String, nullable=False)
+    is_cyber_sec_related    = mapped_column(Boolean, default=False, nullable=False)
+    status                  = mapped_column(
+                                 SQLEnum(ItemStatus, name="item_status"),
+                                 default=ItemStatus.NEW_REQUEST,
+                                 nullable=False
+                             )
+    created_time            = mapped_column(
+                                 DateTime(timezone=True),
+                                 default=lambda: datetime.now(timezone.utc),
+                                 nullable=False
+                             )
+
+    # ORM relationships
+    purchase_request = relationship(
+        "PurchaseRequest",
+        back_populates="line_items"
+    )
+    approvals        = relationship(
+        "ItemApproval",
+        back_populates="line_item",
+        cascade="all, delete-orphan"
+    )
+
+    __searchable__ = [
+        "id",
+        "purchase_request_uuid",
+        "item_description",
+        "quantity",
+        "price_each",
+        "total_price",
+        "status",
+        "location",
+    ]
+
 
 ###################################################################################################
 ## approval TABLE

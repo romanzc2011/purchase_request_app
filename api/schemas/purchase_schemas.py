@@ -1,4 +1,4 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date, datetime
 from enum import Enum
@@ -24,15 +24,13 @@ class FileAttachment(BaseModel):
     type: Optional[str] = None
     size: Optional[int] = None
     
-
-    
 # --------------------------------------------------------------
 #  PURCHASE REQUEST HEADER SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestHeader(BaseModel):
-    ID: str
-    UUID: str
-    IRQ1_ID: Optional[str] = None
+    id:             str   = Field(..., alias="ID")
+    uuid:           str   = Field(..., alias="UUID")
+    irq1_id:        Optional[str] = Field(None, alias="IRQ1_ID")
     requester: str
     phoneext: str
     datereq: date
@@ -45,40 +43,35 @@ class PurchaseRequestHeader(BaseModel):
 #  PURCHASE REQUEST LINE ITEM SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestLineItem(BaseModel):
-    ID:                     str
-    UUID:                   str
-    purchase_req_id:        str
-    itemDescription:        str
-    justification:          str
-    additional_comments:    Optional[List[str]] = None
-    trainNotAval:           Optional[bool] = False
-    needsNotMeet:           Optional[bool] = False
-    quantity:                int
-    priceEach:              float
-    totalPrice:             float
-    fund:                   str
-    location:               str
-    budgetObjCode:          str
-    status:                 ItemStatus
-    createdTime:            Optional[datetime] = None
-    fileAttachments: Optional[List[FileAttachment]] = None
+    id:             str   = Field(..., alias="ID")
+    uuid:           str   = Field(..., alias="UUID")
+    irq1_id:        Optional[str] = Field(None, alias="IRQ1_ID")
+    requester:      str
+    phoneext:       str
+    datereq:        date
+    dateneed:       Optional[date] = None
+    order_type:     Optional[str]  = Field(None, alias="orderType")
+    item_description: str         = Field(..., alias="itemDescription")
+    justification:    str
+    train_not_aval:   bool         = Field(..., alias="trainNotAval")
+    needs_not_meet:   bool         = Field(..., alias="needsNotMeet")
+    quantity:         int
+    price:            float
+    price_each:       float        = Field(..., alias="priceEach")
+    total_price:      float        = Field(..., alias="totalPrice")
+    fund:             str
+    location:         str
+    budget_obj_code:  str          = Field(..., alias="budgetObjCode")
+    status:           ItemStatus
+    file_attachments: Optional[List[FileAttachment]] = Field(None, alias="fileAttachments")
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST PAYLOAD SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestPayload(BaseModel):
-    header: PurchaseRequestHeader
-    items: List[PurchaseRequestLineItem]
-    
-    @model_validator(mode="after")
-    def _propagate_header_to_items(self, data):
-        hdr, items = data.header, data.items
-        for item in items:
-            item.ID = hdr.ID
-            item.UUID = hdr.UUID
-            item.purchase_req_id = hdr.ID
-        return data
-            
+    requester:      str
+    items:          List[PurchaseRequestLineItem]
+    itemCount:      int
 
 # --------------------------------------------------------------
 #  PURCHASE REQUEST RESPONSE SCHEMA

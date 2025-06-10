@@ -271,8 +271,30 @@ async def set_purchase_request(
     try:
         logger.info(f"PAYLOAD JSON: {payload_json}")
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
-        logger.info(f"PAYLOAD: {payload}")
         logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
+        
+        # Build header data 
+        request_data = payload.items[0]
+        header_data = {
+            "ID":           request_data.ID,
+            "requester":    payload.requester,
+            "phoneext":     request_data.phoneext,
+            "datereq":      request_data.datereq,
+            "dateneed":     request_data.dateneed,
+            "orderType":    request_data.orderType,
+            "status":       request_data.status,
+        }
+        
+        # Insert header data into purchase request tabl
+        hdr = dbas.insert_data("purchase_requests", request_data)
+        
+        # Loop through the line items and extract line item data of purchase_request
+        for item in payload.items:
+            line_data = {
+                "purchase_req_uuid":    hdr.UUID,
+                "purchase_req_id":      hdr.ID,
+                
+            }
         
     except ValidationError as e:
         logger.error("PurchaseRequestPayload errors: %s", e.errors())
