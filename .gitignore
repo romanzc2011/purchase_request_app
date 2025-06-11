@@ -17,7 +17,6 @@ __pycache__
 
 # Editor directories and files
 .vscode/*
-api/PRAS_API/
 api/flask_session/*
 tls_certs/*
 documentation
@@ -37,4 +36,6 @@ api/pdf_output
 indexdir/*
 pdf_output/*
 db/*
+api/PRAS_API/*
+api/db/*
 
