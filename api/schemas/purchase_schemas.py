@@ -28,42 +28,42 @@ class FileAttachment(BaseModel):
 #  PURCHASE REQUEST HEADER SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestHeader(BaseModel):
-    id:             str   = Field(..., alias="ID")
-    uuid:           str   = Field(..., alias="UUID")
-    irq1_id:        Optional[str] = Field(None, alias="IRQ1_ID")
+    id:             str
+    uuid:           str 
+    irq1_id:        Optional[str]
     requester: str
     phoneext: str
     datereq: date
     dateneed: Optional[date] = None
-    orderType: Optional[str] = None
+    order_type: Optional[str] = None
     status: ItemStatus
-    createdTime: Optional[datetime] = None
+    created_time: Optional[datetime] = None
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST LINE ITEM SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestLineItem(BaseModel):
-    id:             str   = Field(..., alias="ID")
-    uuid:           str   = Field(..., alias="UUID")
-    irq1_id:        Optional[str] = Field(None, alias="IRQ1_ID")
+    id:             str
+    uuid:           str
+    irq1_id:        Optional[str]
     requester:      str
     phoneext:       str
     datereq:        date
     dateneed:       Optional[date] = None
-    order_type:     Optional[str]  = Field(None, alias="orderType")
-    item_description: str         = Field(..., alias="itemDescription")
+    order_type:     Optional[str] = None
+    item_description: str
     justification:    str
-    train_not_aval:   bool         = Field(..., alias="trainNotAval")
-    needs_not_meet:   bool         = Field(..., alias="needsNotMeet")
+    train_not_aval:   bool
+    needs_not_meet:   bool
     quantity:         int
     price:            float
-    price_each:       float        = Field(..., alias="priceEach")
-    total_price:      float        = Field(..., alias="totalPrice")
+    price_each:       float
+    total_price:      float
     fund:             str
     location:         str
-    budget_obj_code:  str          = Field(..., alias="budgetObjCode")
+    budget_obj_code:  str
     status:           ItemStatus
-    file_attachments: Optional[List[FileAttachment]] = Field(None, alias="fileAttachments")
+    file_attachments: Optional[List[FileAttachment]]
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST PAYLOAD SCHEMA
@@ -71,13 +71,13 @@ class PurchaseRequestLineItem(BaseModel):
 class PurchaseRequestPayload(BaseModel):
     requester:      str
     items:          List[PurchaseRequestLineItem]
-    itemCount:      int
+    item_count:     int
 
 # --------------------------------------------------------------
 #  PURCHASE REQUEST RESPONSE SCHEMA
 # --------------------------------------------------------------
 class PurchaseResponse(BaseModel):
-    message: str
+    message:    str
     request_id: Optional[str]
 
     

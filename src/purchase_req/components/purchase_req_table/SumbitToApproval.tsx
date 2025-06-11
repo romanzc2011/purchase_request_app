@@ -88,7 +88,7 @@ function SubmitApprovalTable({
     // Preprocess data to calculate price
     const processedData = dataBuffer.map((item) => ({
         ...item,
-        priceEach: Number(item.price_each),
+        price_each: Number(item.price_each),
         calculatedPrice: calculatePrice(item)
     }));
 
@@ -144,13 +144,12 @@ function SubmitApprovalTable({
                 dateneed: item.dateneed instanceof Date
                     ? item.dateneed.toISOString().split('T')[0]
                     : item.dateneed || null,
-                orderType: item.orderType || "STANDARD",
-                itemDescription: item.itemDescription,
+                order_type: item.order_type || "STANDARD",
+                item_description: item.item_description,
                 justification: item.justification,
                 train_not_aval: Boolean(item.train_not_aval),
                 needs_not_meet: Boolean(item.needs_not_meet),
                 quantity: Number(item.quantity),
-                price: Number(item.price) || (Number(item.price_each) * Number(item.quantity)),
                 price_each: Number(item.price_each),
                 total_price: Number(item.total_price) || (Number(item.price_each) * Number(item.quantity)),
                 fund: item.fund,
@@ -284,6 +283,9 @@ function SubmitApprovalTable({
                                 </TableCell>
                                 <TableCell sx={{ color: "white" }}>
                                     {items[0].id}
+                                </TableCell>
+                                <TableCell sx={{ color: "white" }}>
+                                    {convertBOC(items[0].budget_obj_code)}
                                 </TableCell>
                                 <TableCell sx={{ color: "white" }}>
                                     {items[0].fund}

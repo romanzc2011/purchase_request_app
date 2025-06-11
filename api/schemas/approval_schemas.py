@@ -7,11 +7,11 @@ from api.schemas.purchase_schemas import ItemStatus
 #  REQUEST APPROVAL PAYLOAD SCHEMAS
 # --------------------------------------------------------------
 class RequestPayload(BaseModel):
-    ID: str
+    id: str
     item_count: int
-    UUID: List[str] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
+    uuid: List[str] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
     item_funds: List[str]
-    totalPrice: List[float]
+    total_price: List[float]
     target_status: List[ItemStatus] # Changed to use your ItemStatus enum for better validation
     action: str
     co: Optional[str] = None
@@ -29,7 +29,7 @@ class ResponsePayload(BaseModel):
     message: str
 
 class LineItemStatusSchema(BaseModel):
-    UUID: Optional[str] = None
+    uuid: Optional[str] = None
     status: str
     last_updated: datetime
     updated_by: Optional[str] = None
@@ -37,26 +37,26 @@ class LineItemStatusSchema(BaseModel):
 class ApprovalSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    ID: str
-    IRQ1_ID: Optional[str] = None
-    UUID: str
-    CO: Optional[str] = None
+    id: str
+    irq1_id: Optional[str] = None
+    uuid: str
+    co: Optional[str] = None
     requester: str
     datereq: str
     dateneed: Optional[str] = None
-    orderType: Optional[str] = None
-    budgetObjCode: str
+    order_type: Optional[str] = None
+    budget_obj_code: str
     fund: str
-    itemDescription: str
+    item_description: str
     justification: str
-    addComments: Optional[List[str]] = None
-    trainNotAval: Optional[bool] = False
-    needsNotMeet: Optional[bool] = False
+    additional_comments: Optional[List[str]] = None
+    train_not_aval: Optional[bool] = False
+    needs_not_meet: Optional[bool] = False
     quantity: int
-    totalPrice: float
-    priceEach: float
+    total_price: float
+    price_each: float
     location: str
     status: ItemStatus
-    createdTime: datetime
-    isCyberSecRelated: Optional[bool] = False
+    created_time: datetime
+    is_cyber_sec_related: Optional[bool] = False
 

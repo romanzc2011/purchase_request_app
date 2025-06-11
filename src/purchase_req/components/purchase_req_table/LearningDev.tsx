@@ -22,7 +22,7 @@ export default function LearningDev({ control }: LearningDevProps) {
                     websites.
                 </Typography>
                 <Controller
-                    name="trainNotAval"
+                    name="train_not_aval"
                     control={control}
                     defaultValue={false}
                     render={({ field }) => (
@@ -61,7 +61,7 @@ export default function LearningDev({ control }: LearningDevProps) {
                     Justification is required or as an attachment.
                 </Typography>
                 <Controller
-                    name="needsNotMeet"
+                    name="needs_not_meet"
                     control={control}
                     defaultValue={false}
                     render={({ field }) => (

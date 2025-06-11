@@ -25,10 +25,10 @@ export default function ApprovalPageMain({ onDelete, resetTable }: ApprovalTable
             <Box sx={{ flex: 1 }}>
                 <ApprovalTable
 
-                    onDelete={(ID: string) =>
+                    onDelete={(id: string) =>
                         setDataBuffer(
                             dataBuffer.filter(
-                                (item) => item.ID !== ID
+                                (item) => item.id !== id
                             )
                         )
                     }

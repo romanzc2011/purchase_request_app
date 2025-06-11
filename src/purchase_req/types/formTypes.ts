@@ -12,14 +12,14 @@ export type FormValues = {
   phoneext: string;
   datereq: Date | string;
   dateneed: Date | string;
-  orderType: string;
+  order_type: string;
   file_attachments: {
     attachment: File | null;
     name?: string;
     type?: string;
     size?: number;
   }[];
-  itemDescription: string;
+  item_description: string;
   justification: string;
   train_not_aval: boolean;
   needs_not_meet: boolean;

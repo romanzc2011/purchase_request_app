@@ -9,7 +9,7 @@ from api.schemas.purchase_schemas import ItemStatus
 class LineItemStatusSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    UUID: Optional[str] = None
+    uuid: Optional[str] = None
     status: str
     hold_until: Optional[datetime] = None
     last_updated: datetime
@@ -21,10 +21,10 @@ class LineItemStatusSchema(BaseModel):
 ##    APPROVE/DENY PAYLOAD SCHEMA ( REQUEST )
 ########################################################  
 class RequestPayload(BaseModel):
-    ID: str
-    UUID: List[str] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
+    id: str
+    uuid: List[str] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
     item_funds: List[str]
-    totalPrice: List[float]
+    total_price: List[float]
     target_status: List[ItemStatus] # Changed to use your ItemStatus enum for better validation
     action: str
     co: Optional[str] = None
@@ -39,9 +39,9 @@ class ResponsePayload(BaseModel):
 class IRQ1IDSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    ID: str
-    IRQ1_ID: str
+    id: str
+    irq1_id: str
     
 class CyberSecRelatedPayload(BaseModel):
-    isCyberSecRelated: bool
+    is_cyber_sec_related: bool
 

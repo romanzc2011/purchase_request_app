@@ -8,7 +8,7 @@ from typing import List, Optional
 class SonCommentSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    UUID: Optional[str] = None
+    uuid: Optional[str] = None
     comment_text: Optional[str] = None
     created_at: Optional[datetime] = None
     son_requester: str
@@ -20,7 +20,7 @@ class CommentItem(BaseModel):
     comment: str
     
 class GroupCommentPayload(BaseModel):
-    groupKey: str
+    group_key: str
     group_count: int
     item_desc: List[str]
     item_uuids: List[str]

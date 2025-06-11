@@ -20,18 +20,18 @@ export enum ItemStatus {
 // DataRow
 // #########################################################################################    
 export interface DataRow {
-    IRQ1_ID         : string;
-    ID              : string;
-    UUID            : string;       // Unique key for React/data-grid
+    irq1_id         : string;
+    id              : string;
+    uuid            : string;       // Unique key for React/data-grid
 
     requester       : string;
-    budgetObjCode   : string;
+    budget_obj_code : string;
     fund            : string;
     location        : string;
     quantity        : number;
-    priceEach       : number;
-    totalPrice      : number;
-    itemDescription : string;
+    price_each      : number;
+    total_price     : number;
+    item_description: string;
     justification   : string;
     status          : ItemStatus;
 }
@@ -44,7 +44,7 @@ export interface FlatRow extends DataRow {
     groupKey: string;
     rowCount: number;
     rowId: string;
-    UUID: string;
+    uuid: string;
     hidden?: boolean;
 }
 
@@ -56,7 +56,7 @@ export interface FlatRow extends DataRow {
     groupKey: string;
     rowCount: number;
     rowId: string;
-    UUID: string;
+    uuid: string;
     hidden?: boolean;
 }
 
@@ -64,11 +64,11 @@ export interface FlatRow extends DataRow {
 // Approval data
 // #########################################################################################  
 export interface ApprovalData {
-    ID: string;
+    id: string;
     item_count: number;
     item_uuids: string[];
     item_funds: string[];
-    totalPrice: number[];
+    total_price: number[];
     target_status: ItemStatus[];
     action: string;
     co?: string;

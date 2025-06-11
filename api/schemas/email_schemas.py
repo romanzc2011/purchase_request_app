@@ -8,13 +8,13 @@ from api.schemas.comment_schemas import GroupCommentPayload, CommentItem
 #  EMAIL LINE ITEMS PAYLOAD SCHEMAS
 # --------------------------------------------------------------
 class LineItemsPayload(BaseModel):
-    budgetObjCode: str
-    itemDescription: str
+    budget_obj_code: str
+    item_description: str
     location: str
     justification: str
     quantity: int
-    priceEach: float
-    totalPrice: float
+    price_each: float
+    total_price: float
     fund: str
 
 # --------------------------------------------------------------
@@ -22,12 +22,12 @@ class LineItemsPayload(BaseModel):
 # --------------------------------------------------------------
 class EmailPayloadRequest(BaseModel):
     model_type: Literal["email_request"]
-    ID: str
+    id: str
     requester: str
     requester_email: str
     datereq: date
     dateneed: Optional[date] = None
-    orderType: Optional[str] = None 
+    order_type: Optional[str] = None 
     additional_comments: Optional[List[str]] = None
     subject: str
     sender: str
@@ -44,7 +44,7 @@ class EmailPayloadRequest(BaseModel):
 # --------------------------------------------------------------    
 class EmailPayloadComment(BaseModel):
     model_type: Literal["email_comments"]
-    ID: str
+    id: str
     requester: str
     requester_email: str
     datereq: date

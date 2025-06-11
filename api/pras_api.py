@@ -271,6 +271,7 @@ async def set_purchase_request(
     try:
         logger.info(f"PAYLOAD JSON: {payload_json}")
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
+        logger.info(f"PAYLOAD: {payload}")
         logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
         
         # Build header data 

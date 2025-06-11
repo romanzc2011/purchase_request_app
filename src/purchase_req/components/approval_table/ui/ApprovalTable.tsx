@@ -61,7 +61,7 @@ type DataGridSxProps = {
 /***********************************************************************************/
 async function fetchApprovalData(ID?: string) {
     if (ID) {
-        const response = await fetch(`${API_URL_APPROVAL_DATA}?ID=${ID}`, {
+        const response = await fetch(`${API_URL_APPROVAL_DATA}?id=${ID}`, {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${localStorage.getItem("access_token")}`
@@ -105,10 +105,10 @@ async function fetchCyberSecRelated(UUID: string) {
 /***********************************************************************************/
 // FETCH/DOWNLOAD STATEMENT OF NEED FORM - also send approval data to backend - download form
 /***********************************************************************************/
-async function downloadStatementOfNeedForm(ID: string) {
+async function downloadStatementOfNeedForm(id: string) {
     try {
         // fetch approval data
-        const approvalData = await fetchApprovalData(ID);
+        const approvalData = await fetchApprovalData(id);
 
         // Ensure approvalData is an array
         const approvalDataArray = Array.isArray(approvalData) ? approvalData : [approvalData];
@@ -121,7 +121,7 @@ async function downloadStatementOfNeedForm(ID: string) {
                 Authorization: `Bearer ${localStorage.getItem("access_token")}`
             },
             body: JSON.stringify({
-                ID,
+                id,
                 approvalData: approvalDataArray
             })
         });
@@ -136,7 +136,7 @@ async function downloadStatementOfNeedForm(ID: string) {
         // Create temporary link element
         const link = document.createElement("a");
         link.href = blobUrl;
-        link.download = `statement_of_need-${ID}.pdf`;
+        link.download = `statement_of_need-${id}.pdf`;
 
         // Append to body
         document.body.appendChild(link);
@@ -182,11 +182,11 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
     // Build grouped map once per load
     const rowsWithUUID: DataRow[] = approvalData.map((r, i) =>
-        r.UUID ? r : { ...r, UUID: `row-${i}` }
+        r.uuid ? r : { ...r, uuid: `row-${i}` }
     );
 
     const grouped: Record<string, DataRow[]> = rowsWithUUID.reduce((acc, row) => {
-        (acc[row.ID] ||= []).push(row);
+        (acc[row.id] ||= []).push(row);
         return acc;
     }, {} as Record<string, DataRow[]>);
 
@@ -200,18 +200,17 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                 groupKey,
                 rowCount: items.length,
                 rowId: `header-${groupKey}`,
-                UUID: `header-${groupKey}`,
+                uuid: `header-${groupKey}`,
             };
 
-            // build ever child-with hidden flag
+            // build children without hidden flag
             const children: FlatRow[] = items.map(item => ({
                 ...item,
                 isGroup: false,
                 groupKey,
                 rowCount: items.length,
-                rowId: item.UUID,
-                UUID: item.UUID,
-                hidden: !expandedRows[groupKey]
+                rowId: item.uuid,
+                uuid: item.uuid
             }));
 
             return [header, ...children];
@@ -244,12 +243,12 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // flatten if not then count but theres 10 items altogether but this is count 1 if everything is collapsed
     const getTotalSelectedItems = () => {
         if (rowSelectionModel.type === 'exclude') {
-            return flatRows.filter(row => !row.isGroup && !rowSelectionModel.ids.has(row.UUID)).length;
+            return flatRows.filter(row => !row.isGroup && !rowSelectionModel.ids.has(row.uuid)).length;
         }
         let total = 0;
         const selectedGroupKeys = new Set<string>();
         Array.from(rowSelectionModel.ids).forEach(uuid => {
-            const row = flatRows.find(r => r.UUID === uuid);
+            const row = flatRows.find(r => r.uuid === uuid);
             if (row && row.isGroup) {
                 selectedGroupKeys.add(row.groupKey);
                 total += row.rowCount;
@@ -258,7 +257,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
         // count selected non-group rows that are NOT part of a selected group
         Array.from(rowSelectionModel.ids).forEach(uuid => {
-            const row = flatRows.find(r => r.UUID === uuid);
+            const row = flatRows.find(r => r.uuid === uuid);
             if (row && !row.isGroup && !selectedGroupKeys.has(row.groupKey)) {
                 total += 1;
             }
@@ -285,7 +284,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     const assignedIRQ1s = useMemo(() => {
         const map: Record<string, string> = {};
         approvalData.forEach(r => {
-            if (r.IRQ1_ID) map[r.ID] = r.IRQ1_ID;
+            if (r.irq1_id) map[r.id] = r.irq1_id;
         });
         return map;
     }, [approvalData]);
@@ -352,7 +351,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // From main data source of approvalData, find DataRow objects with UUIDs that
         // are a NEW REQUEST or PENDING
         const itemsToProcessForApproval = approvalData.filter(item =>
-            selectedItemUuids.includes(item.UUID) &&
+            selectedItemUuids.includes(item.uuid) &&
             (item.status === ItemStatus.NEW_REQUEST || item.status === ItemStatus.PENDING_APPROVAL)
         );
 
@@ -364,11 +363,11 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // Reconstruct the payload for API call
         // This will tell the backend what action to take
         const apiPayload: ApprovalData = {
-            ID: itemsToProcessForApproval[0].ID,
+            id: itemsToProcessForApproval[0].id,
             item_count: itemsToProcessForApproval.length,
-            item_uuids: itemsToProcessForApproval.map(item => item.UUID),
+            item_uuids: itemsToProcessForApproval.map(item => item.uuid),
             item_funds: itemsToProcessForApproval.map(item => item.fund),
-            totalPrice: itemsToProcessForApproval.map(item => item.totalPrice),
+            total_price: itemsToProcessForApproval.map(item => item.total_price),
             target_status: itemsToProcessForApproval.map(item => ItemStatus.PENDING_APPROVAL), // Change to this if conditions met in backend
             action: "APPROVE"
         }
@@ -440,7 +439,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
     // HANDLE CYBERSECURITY RELATED
     //####################################################################
     async function handleCyberSecRow(row: DataRow) {
-        const uuid = await getUUID(row.ID);
+        const uuid = await getUUID(row.id);
         if (!uuid) {
             toast.error("Failed to get UUID");
             console.error("Failed to get UUID");
@@ -459,7 +458,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         let cyberSecRows: DataRow[] = [];
 
         for (const uuid of Array.from(rowSelectionModel.ids)) {
-            const flat = flatRows.find(r => r.UUID === uuid);
+            const flat = flatRows.find(r => r.uuid === uuid);
             if (!flat) continue;
 
             if (flat.isGroup && grouped[flat.groupKey]) {
@@ -471,7 +470,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
         // dedupe by UUID
         const uniqueRows = Array.from(
-            new Map(cyberSecRows.map(r => [r.UUID, r])).values()
+            new Map(cyberSecRows.map(r => [r.uuid, r])).values()
         );
 
         for (const row of uniqueRows) {
@@ -541,7 +540,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
             sortable: true,
             renderCell: params => {
                 if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                const id = params.row.ID;
+                const id = params.row.id;
                 const existingIRQ1 = assignedIRQ1s[id] || "";
                 const currentDraftIRQ1 = draftIRQ1[id] || "";
 
@@ -613,7 +612,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // BUDGET OBJECT CODE COLUMN
         /***********************************************************************************/
         {
-            field: "budgetObjCode",
+            field: "budget_obj_code",
             headerName: "Budget Object Code",
             width: 150,
             renderCell: params => {
@@ -670,7 +669,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // PRICE EACH COLUMN
         /***********************************************************************************/
         {
-            field: "priceEach",
+            field: "price_each",
             headerName: "Price Each",
             type: "number",
             align: "center",
@@ -686,7 +685,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // LINE TOTAL COLUMN
         /***********************************************************************************/
         {
-            field: "totalPrice",
+            field: "total_price",
             headerName: "Line Total",
             type: "number",
             align: "center",
@@ -702,7 +701,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
         // ITEM DESCRIPTION COLUMN
         /***********************************************************************************/
         {
-            field: "itemDescription",
+            field: "item_description",
             headerName: "Item Description",
             align: "center",
             width: 200,
@@ -825,7 +824,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
 
                     {/* Download Button */}
-                    <Button startIcon={<DownloadOutlinedIcon />} variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
+                    <Button startIcon={<DownloadOutlinedIcon />} variant="contained" color="primary" onClick={() => handleDownload(params.row.id)}>
                         Download
                     </Button>
                 </Box>
@@ -912,12 +911,12 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
             <DataGrid
                 rows={flatRows}
-                getRowId={r => r.isGroup ? `header-${r.groupKey}` : r.UUID}
+                getRowId={r => r.isGroup ? `header-${r.groupKey}` : r.uuid}
                 columns={allColumns}
                 getRowClassName={(params) => {
-                    if (params.row.hidden) return 'hidden-row';
-                    if (params.row.isGroup && expandedRows[params.row.groupKey]) return 'expanded-group-row';
-                    return '';
+                    if (params.row.isGroup) return 'group-header-row';
+                    if (!expandedRows[params.row.groupKey]) return 'collapsed-row';
+                    return 'expanded-row';
                 }}
                 checkboxSelection
                 rowSelectionModel={rowSelectionModel}
@@ -926,12 +925,12 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     const prev = rowSelectionModel.ids;
                     // Process each selected UUID
                     Array.from(newModel.ids).forEach(uuid => {
-                        const row = flatRows.find(r => r.UUID === uuid);
+                        const row = flatRows.find(r => r.uuid === uuid);
                         if (row) {
                             if (row.isGroup) {
                                 // If it's a group, add all items in that group
                                 const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
-                                groupItems.forEach(item => newSelection.add(item.UUID));
+                                groupItems.forEach(item => newSelection.add(item.uuid));
                             } else {
                                 // If it's an individual item, add it directly
                                 newSelection.add(uuid);
@@ -943,9 +942,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     const removed = Array.from(prev).filter(id => !newSelection.has(id));
                     const updated = new Set(newSelection);
                     removed.forEach(uuid => {
-                        const row = flatRows.find(r => r.UUID === uuid);
+                        const row = flatRows.find(r => r.uuid === uuid);
                         if (row?.isGroup) {
-                            flatRows.filter(r => r.groupKey === row.groupKey && !r.isGroup).forEach(r => updated.delete(r.UUID));
+                            flatRows.filter(r => r.groupKey === row.groupKey && !r.isGroup).forEach(r => updated.delete(r.uuid));
                         }
                     });
 
@@ -953,7 +952,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
                     // Update comment payload based on selection
                     const selectedRows = Array.from(newSelection)
-                        .map(uuid => flatRows.find(r => r.UUID === uuid))
+                        .map(uuid => flatRows.find(r => r.uuid === uuid))
                         .filter((r): r is FlatRow => !!r && !r.isGroup) as FlatRow[];
 
                     if (selectedRows.length === 0) return;
@@ -965,8 +964,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     const payload: GroupCommentPayload = {
                         groupKey: selectedRows[0].groupKey,
                         group_count: selectedRows.length,
-                        item_uuids: selectedRows.map(r => r.UUID),
-                        item_desc: selectedRows.map(r => r.itemDescription),
+                        item_uuids: selectedRows.map(r => r.uuid),
+                        item_desc: selectedRows.map(r => r.item_description),
                         comment: []
                     };
 
@@ -975,11 +974,11 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
                     // Now prepare the payload for approvals/deny
                     const approvalPayload: ApprovalData = {
-                        ID: selectedRows[0].ID,
+                        id: selectedRows[0].id,
                         item_count: selectedRows.length,
-                        item_uuids: selectedRows.map(r => r.UUID),
+                        item_uuids: selectedRows.map(r => r.uuid),
                         item_funds: selectedRows.map(r => r.fund),
-                        totalPrice: selectedRows.map(r => r.totalPrice),
+                        total_price: selectedRows.map(r => r.total_price),
                         target_status: selectedRows.map(r => r.status),
                         action: selectedRows[0].status === ItemStatus.APPROVED ? "APPROVE" : "DENY"
                     };
@@ -1015,9 +1014,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                     // Pagination labels
                     ...paginationStyles,
 
-                    // any one-off tweaks
-
-                    '& .expanded-group-row': {
+                    // Group header styling
+                    '& .group-header-row': {
                         background: 'linear-gradient(180deg, #800000 0%, #600000 100%) !important',
                         '&:hover': {
                             background: 'linear-gradient(180deg, #600000 0%, #400000 100%) !important',
@@ -1029,8 +1027,24 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                             fontWeight: 'bold',
                         }
                     },
-                    '& .hidden-row': {
-                        display: 'none',
+                    // Collapsed row styling
+                    '& .collapsed-row': {
+                        height: '0px !important',
+                        minHeight: '0px !important',
+                        padding: '0px !important',
+                        margin: '0px !important',
+                        border: 'none !important',
+                        '& .MuiDataGrid-cell': {
+                            padding: '0px !important',
+                            border: 'none !important',
+                        }
+                    },
+                    // Expanded row styling
+                    '& .expanded-row': {
+                        background: '#2c2c2c',
+                        '&:hover': {
+                            background: '#3c3c3c',
+                        }
                     }
                 } as DataGridSxProps}
             />

@@ -172,22 +172,22 @@ class LineItem(Base):
 ## approval TABLE
 class Approval(Base):
     __tablename__ =  "approvals"
-    __searchable__ = ['id', 'IRQ1_id', 'CO', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet',
-                      'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
-                      'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
+    __searchable__ = ['id', 'irq1_id', 'co', 'requester', 'budget_obj_code', 'fund', 'train_not_aval', 'needs_not_meet',
+                      'quantity', 'total_price', 'price_each', 'location', 'new_request', 
+                      'approved', 'pending_approval', 'status', 'created_time', 'approved_time', 'denied_time']
 
     # Sequential id for user-facing operations
-    approval_uuid:                   Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    approval_id:                     Mapped[str] = mapped_column(String, nullable=False)
+    approval_uuid:          Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    approval_id:            Mapped[str] = mapped_column(String, nullable=False)
     irq1_id:                Mapped[str] = mapped_column(String, nullable=True, unique=True)
     purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False)
     purchase_request_id:    Mapped[str] = mapped_column(String, nullable=False)
     requester:              Mapped[str] = mapped_column(String, nullable=False)
-    CO:                     Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    co:                     Mapped[Optional[str]] = mapped_column(String, nullable=True)
     phoneext:               Mapped[int] = mapped_column(Integer, nullable=False)
     datereq:                Mapped[str] = mapped_column(String)      
     dateneed:               Mapped[Optional[str]] = mapped_column(String, nullable=True)      
-    orderType:              Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    order_type:             Mapped[Optional[str]] = mapped_column(String, nullable=True)
     file_attachments:       Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
     item_description:       Mapped[str] = mapped_column(Text)
     justification:          Mapped[str] = mapped_column(Text)
@@ -219,7 +219,7 @@ class Approval(Base):
 class ItemApproval(Base):
     __tablename__ = "item_approvals"
     
-    id:   Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id:                 Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     approval_uuid:      Mapped[str] = mapped_column(String, ForeignKey("approvals.approval_uuid"), nullable=False)
     line_item_id:       Mapped[int] = mapped_column(Integer, ForeignKey("line_items.id"), nullable=False)
     approver:           Mapped[str] = mapped_column(String, nullable=False)
@@ -235,7 +235,7 @@ class ItemApproval(Base):
 ## Line Item Status TABLE
 class LineItemStatus(Base):
     __tablename__ = "line_item_statuses"
-    item_approval_id:                     Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    item_approval_id:       Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     approval_uuid:          Mapped[str] = mapped_column(String, ForeignKey("approvals.approval_uuid"), nullable=False)
     purchase_req_id:        Mapped[str] = mapped_column(String, nullable=False)
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"),
@@ -307,7 +307,7 @@ class ApprovalPayload(Base):
     approval_uuid:      Mapped[str] = mapped_column(String, ForeignKey("approvals.approval_uuid"), nullable=False)
     purchase_req_id:    Mapped[Optional[str]] = mapped_column(String, nullable=False)
     item_funds:         Mapped[str] = mapped_column(String, nullable=False)
-    totalPrice:         Mapped[float] = mapped_column(Float, nullable=False)
+    total_price:        Mapped[float] = mapped_column(Float, nullable=False)
     target_status:      Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"), nullable=False)
     action:             Mapped[str] = mapped_column(SAEnum(ItemStatus), nullable=False)    # APPROVED / DENIED / ON_HOLD etc.
     co:                 Mapped[Optional[str]] = mapped_column(String, nullable=True)       # Contracting Officer
@@ -362,7 +362,7 @@ def insert_data(table=None, data=None):
             
         case "son_comments":
             model = SonComment
-            pk_field = "uuid"
+            pk_field = "id"
             
         case "item_approvals":
             model = ItemApproval
@@ -452,7 +452,7 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
             
         case "son_comments":
             model = SonComment
-            pk_field = "uuid"
+            pk_field = "id"
             
         case _:
             raise ValueError(f"Unsupported table: {table}")
