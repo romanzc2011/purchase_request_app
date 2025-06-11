@@ -56,7 +56,6 @@ class PurchaseRequestLineItem(BaseModel):
     train_not_aval:   bool
     needs_not_meet:   bool
     quantity:         int
-    price:            float
     price_each:       float
     total_price:      float
     fund:             str

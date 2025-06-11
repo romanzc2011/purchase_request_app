@@ -52,7 +52,7 @@ from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, Ema
 from api.dependencies.pras_schemas import *
 
 # Singleton Services
-from api.services.db_service import get_session
+from api.services.db_service import get_session, init_db
 
 import api.services.db_service as dbas
 
@@ -63,6 +63,11 @@ tracemalloc.start(10)
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
+
+# Initialize database
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 # Add CORS middleware
 app.add_middleware(
@@ -282,11 +287,11 @@ async def set_purchase_request(
             "phoneext":     request_data.phoneext,
             "datereq":      request_data.datereq,
             "dateneed":     request_data.dateneed,
-            "orderType":    request_data.orderType,
+            "order_type":   request_data.order_type,
             "status":       request_data.status,
             "created_time": datetime.now(timezone.utc),
         }
-        
+        logger.info(f"HEADER DATA: {header_data}")
         # Insert header data into purchase request tabl
         hdr = dbas.insert_data("purchase_requests", request_data)
         
@@ -311,6 +316,7 @@ async def set_purchase_request(
             }
             
             logger.info(f"LINE DATA: {line_data}")
+            exit(0)
         
     except ValidationError as e:
         logger.error("PurchaseRequestPayload errors: %s", e.errors())
@@ -403,7 +409,7 @@ async def set_purchase_request(
         requester_email=requester_email,
         datereq=payload.items[0].datereq,
         dateneed=payload.items[0].dateneed,
-        orderType=payload.items[0].orderType,
+        order_type=payload.items[0].order_type,
         subject=f"Purchase Request #{payload.id}",
         sender=settings.smtp_email_addr,
         to=None,   # Assign this in the smtp service
@@ -768,7 +774,7 @@ def process_approval_data(processed_data):
         'uuid', 'purchase_request_uuid',
         'id', 'requester', 'budget_obj_code', 'fund', 'train_not_aval', 'needs_not_meet',
         'item_description', 'justification', 'quantity', 'total_price', 'price_each', 'location',
-        'phoneext', 'datereq', 'dateneed', 'orderType'
+        'phoneext', 'datereq', 'dateneed', 'order_type'
 ]
     
     # Populate approval_data from processed_data

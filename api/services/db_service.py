@@ -649,13 +649,10 @@ def get_order_types(id: str):
 def get_approval_by_id(session, id):
     """Get approval by id"""
     return session.query(Approval).filter(Approval.id == id).first()
-
-# Create all tables
+    
+# Call init_db to create tables on startup
 def init_db():
-    """Initialize the database by creating all tables"""
-    logger.info("Creating database tables...")
+    logger.info("Initializing database...")
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created successfully")
-    
-# Call init_db to create tables
-init_db()
+

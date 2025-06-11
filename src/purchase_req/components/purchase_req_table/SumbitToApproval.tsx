@@ -93,8 +93,8 @@ function SubmitApprovalTable({
     }));
 
     /* Check if data buffer is multiple items */
-    const itemCount = dataBuffer.length;
-    console.log("itemCount==", itemCount);
+    const item_count = dataBuffer.length;
+    console.log("item_count==", item_count);
 
     // Group items by ID
     const groupedItems = processedData.reduce<Record<string, FormValues[]>>((acc, item) => {
@@ -168,7 +168,7 @@ function SubmitApprovalTable({
             const requestData = {
                 requester: requester,
                 items: processedItems,
-                itemCount: itemCount
+                item_count: item_count
             };
 
             const formData = new FormData();
