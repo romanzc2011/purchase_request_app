@@ -14,18 +14,23 @@ from sqlalchemy import (
     DateTime, 
     Enum as SAEnum, 
     JSON, 
-    func)
+    func,
+    Enum as SQLEnum,
+    literal,
+    func,
+    select
+    )
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.inspection import inspect
-from sqlalchemy import Enum as SQLEnum
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from typing import List, Optional
 import uuid
 import enum
 import os
+import sqlite3
 
 
 # Ensure database directory exists
@@ -60,26 +65,22 @@ class ItemStatus(enum.Enum):
 ## PURCHASE REQUEST - this is the top level purchase request, line items are added to this request
 class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
-
+    id            = mapped_column(Integer, primary_key=True, autoincrement=True)
     uuid          = mapped_column(
                        String,
-                       primary_key=True,
+                       unique=True,
                        default=lambda: str(uuid.uuid4())
                     )
-    request_id    = mapped_column(
-                       String,
-                       unique=True,
-                       nullable=False
-                    )
-    requester     = mapped_column(String, nullable=False)
-    phone_ext     = mapped_column(Integer, nullable=False)
-    date_requested= mapped_column(Date,  nullable=False)
+                      
+    requester     = mapped_column(String, nullable=True)
+    phone_ext     = mapped_column(Integer, nullable=True)
+    date_requested= mapped_column(Date,  nullable=True)
     date_needed   = mapped_column(Date,  nullable=True)
     order_type    = mapped_column(String,nullable=True)
     status        = mapped_column(
                        SQLEnum(ItemStatus, name="item_status"),
                        default=ItemStatus.NEW_REQUEST,
-                       nullable=False
+                       nullable=True
                     )
     created_time  = mapped_column(
                        DateTime(timezone=True),
@@ -524,56 +525,24 @@ def fetch_single_row(self, model_class, columns: list, condition, params: dict):
         return result
     
 ###################################################################################################
-# Get last 4 digits of the id from the database
-###################################################################################################
-def _get_last_id() -> Optional[str]:
-    """
-    Return the full most‐recent PurchaseRequest.id (e.g. "20250414-0007"),
-    or None if the table is empty.
-    """
-    with get_session() as session:
-        # Query the Approval table instead of PurchaseRequest
-        row = (
-            session.query(Approval.id)
-            .order_by(Approval.id.desc())
-            .limit(1)
-            .first()
-        )
-        # Return just the id string, not the tuple
-        return row[0] if row else None
-    
-###################################################################################################
 # Get next  request id
 ###################################################################################################
-def get_next_request_id() -> str:
-    """
-    Build the next id in "YYYYMMDD-XXXX" format:
-    - If today's date ≠ last id's date, start at 0001
-    - Otherwise increment the last 4‑digit suffix
-    """
-    first_section = "LAWB"
-    last_id = _get_last_id()
+def set_purchase_req_id() -> str:
     
-    if not last_id:
-        logger.info("No previous ids found, starting with 0001")
-        next_suffix = 1
-    else:
-        try:
-           # Extract numeric suffix from last_id
-           raw_suffix = last_id.replace(first_section, "")
-           last_suffix = int(raw_suffix)
-           next_suffix = last_suffix + 1
-           logger.info(f"Last id: {last_id}, next suffix: {next_suffix}")
-        except ValueError:
-            logger.warning(f"Invalid suffix in id: {last_id}, starting with 0001")
-            next_suffix = 1
-        except Exception as e:
-            logger.error(f"Error processing last id: {e}, starting with 0001")
-            next_suffix = 1
-            
-    suffix_str = f"{next_suffix:04d}"
-    return first_section + suffix_str
-            
+    first_prefix = "LAWB"
+    # Create next id for incoming purchase request
+    try:
+        with get_session() as session:
+            stmt = select(
+                (func.coalesce(func.max(PurchaseRequest.id), literal(0)) + 1).label("next_id")
+            ).select_from(PurchaseRequest)
+            next_int_id = session.execute(stmt).scalar_one()
+            next_id = f"{first_prefix}{str(next_int_id).zfill(4)}"
+            logger.info(f"Next purchase request id: {next_id}")
+            return next_id
+    except Exception as e:
+        logger.error(f"Error setting purchase request id: {e}")
+        return None
             
 ###################################################################################################
 # Get status of request from Approval table by uuid

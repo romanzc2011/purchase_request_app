@@ -53,6 +53,14 @@ function AddItemsForm({
     const { errors, isValid, isSubmitted } = formState;
     const [showSuccess, setShowSuccess] = useState(false);
 
+    // Reserve the ID for the request
+    useEffect(() => {
+        (async () => {
+            const { id } = await create_new_id();
+            setID?.(id);
+        })();
+    }, []);
+
     // Debug form state
     useEffect(() => {
         console.log('Form State:', {
@@ -96,21 +104,21 @@ function AddItemsForm({
 
             // Get a new ID from the backend
             const response = await create_new_id();
-            const newId = response.id; // Extract the ID from the response object
-            console.log("New ID handleAddItem", newId);
+            const new_id = response.id; // Extract the ID from the response object
+            console.log("New ID handleAddItem", new_id);
 
             // Create a new item with the UUID and ID
             const itemToAdd: PurchaseItem = {
                 ...data,
                 uuid: uuid,
                 price_each: data.price_each,
-                id: newId,
+                id: new_id,
                 status: "NEW REQUEST",
                 dateneed: data.dateneed === "" ? null : data.dateneed
             };
 
             // Store the UUID in the UUID store AFTER we have the ID
-            setUUID(newId, uuid);
+            setUUID(new_id, uuid);
 
             console.log("Item to add:", itemToAdd);
 

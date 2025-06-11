@@ -18,7 +18,7 @@ interface SearchBarProps {
 /* CONFIG API URL- */
 /************************************************************************************ */
 const baseURL = import.meta.env.VITE_API_URL;
-const API_CALL: string = "/api/getSearchData";
+const API_CALL: string = "/api/get_search_data";
 const API_URL = `${baseURL}${API_CALL}`;
 const DEBOUNCE_MS = 100;
 

@@ -8,7 +8,7 @@ export function useCommentModal() {
   const resolverRef                 = useRef<(value: string) => void>();
 
   // open with whatever payload you have (single or multi)
-  const openCommentModal = useCallback(() => {
+  const openCommentModal = useCallback((payload?: GroupCommentPayload) => {
     setIsOpen(true);
     return new Promise<string>(resolve => {
       resolverRef.current = resolve;

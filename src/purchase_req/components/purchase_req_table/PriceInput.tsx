@@ -29,11 +29,11 @@ const PriceInput = ({ register, errors }: PriceInputProps) => {
                     type="number"
                     variant="outlined"
                     placeholder="Enter Price"
-                    error={!!errors.priceEach}
-                    helperText={errors.priceEach?.message}
+                    error={!!errors.price_each}
+                    helperText={errors.price_each?.message}
                     sx={{ backgroundColor: "white" }}
                     inputProps={{ min: 0, step: "0.01" }}
-                    {...register("priceEach", { valueAsNumber: true })}
+                    {...register("price_each", { valueAsNumber: true })}
                 />
             </Grid>
         </Grid>

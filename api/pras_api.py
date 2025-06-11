@@ -119,7 +119,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 ##########################################################################
 ## GET APPROVAL DATA
 ##########################################################################
-@api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
+@api_router.get("/get_approval_data", response_model=List[ApprovalSchema])
 async def get_approval_data(
     id: Optional[str] = Query(None),
     current_user: LDAPUser = Depends(auth_service.get_current_user)):
@@ -145,7 +145,7 @@ async def get_approval_data(
 ##########################################################################
 ## GET STATEMENT OF NEED FORM
 ##########################################################################
-@api_router.post("/downloadStatementOfNeedForm")
+@api_router.post("/download_statement_of_need_form")
 async def download_statement_of_need_form(
     payload: dict,
     current_user: LDAPUser = Depends(auth_service.get_current_user),
@@ -178,7 +178,7 @@ async def download_statement_of_need_form(
 ##########################################################################
 ## GET SEARCH DATA
 ##########################################################################
-@api_router.get("/getSearchData/search", response_model=List[ApprovalSchema])
+@api_router.get("/get_search_data/search", response_model=List[ApprovalSchema])
 async def get_search_data(
     query: str = "",
     column: Optional[str] = None,
@@ -254,7 +254,7 @@ async def generate_pdf(
 ##########################################################################
 ## SEND TO PURCHASE REQUEST -- being sent from the purchase req submit
 ########################################################################## 
-@api_router.post("/sendToPurchaseReq", response_model=PurchaseResponse)
+@api_router.post("/send_to_purchase_req", response_model=PurchaseResponse)
 async def set_purchase_request(
     payload_json: str = Form(..., description="JSON payload as string"),
     files: Optional[List[UploadFile]] = File(None, description="Multiple files"),
@@ -529,7 +529,7 @@ async def assign_irq1_id(data: dict, current_user: LDAPUser = Depends(auth_servi
 
 ##########################################################################
 
-@api_router.post("/approveDenyRequest")
+@api_router.post("/approve_deny_request")
 async def approve_deny_request(
     payload: RequestPayload,
     background_tasks: BackgroundTasks,
@@ -592,10 +592,9 @@ async def create_new_id(request: Request):
     Create a new id for a purchase request.
     """
     try:
-        # Get the next request id using the function from db_service
-        new_id = dbas.get_next_request_id()
-        logger.info(f"Created new id: {new_id}")
-        return {"id": new_id}
+        purchase_req_id = dbas.set_purchase_req_id()
+        logger.info(f"New purchase request id: {purchase_req_id}")
+        return {"id": purchase_req_id}
     except Exception as e:
         logger.error(f"Error creating new id: {e}")
         raise HTTPException(status_code=500, detail=str(e))

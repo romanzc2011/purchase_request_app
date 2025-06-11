@@ -45,10 +45,10 @@ let groupCommentPayload: GroupCommentPayload = {
 };
 
 /* API URLs */
-const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
-const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
-const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
+const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/get_approval_data`;
+const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyber_sec_related`;
+const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approve_deny_request`;
+const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/download_statement_of_need_form`;
 
 // Define a type for the DataGrid sx prop
 type DataGridSxProps = {
@@ -553,8 +553,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
                             label={assignedIRQ1s[id] ? "Assigned" : "Assign"}
                             onClick={() => {
                                 assignIRQ1Mutation.mutate({
-                                    ID: id,
-                                    newIRQ1ID: currentDraftIRQ1
+                                    id: id,
+                                    new_irq1_id: currentDraftIRQ1
                                 }, {
                                     onSuccess: (data) => {
                                         // Invalidate the query to refresh the data
