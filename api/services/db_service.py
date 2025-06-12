@@ -616,28 +616,28 @@ def get_all_purchase_requests(session):
 ###################################################################################################
 # Get additional comments by id
 ###################################################################################################
-def get_additional_comments_by_id(id: str):
+def get_add_comments_by_id(id: str):
     """Get additional comments by id"""
     with get_session() as session:
         stmt = (
-            select(PurchaseRequest.addComments)
+            select(PurchaseRequest.add_comments)
             .join(Approval, PurchaseRequest.id == Approval.id)
-            .where(PurchaseRequest.addComments.is_not(None))
+            .where(PurchaseRequest.add_comments.is_not(None))
             .where(PurchaseRequest.id == id)
         )
-        additional_comments = session.scalars(stmt).all()
-    return additional_comments
+        add_comments = session.scalars(stmt).all()
+        return add_comments
 
 ###################################################################################################
-# Get orderTypes
+# Get order_types
 ###################################################################################################
 def get_order_types(id: str):
-    """Get order types by id"""
+    """Get order_types by id"""
     with get_session() as session:
         stmt = (
-            select(PurchaseRequest.orderType)
+            select(PurchaseRequest.order_type)
             .join(Approval, PurchaseRequest.id == Approval.id)
-            .where(PurchaseRequest.orderType.is_not(None))
+            .where(PurchaseRequest.order_type.is_not(None))
             .where(PurchaseRequest.id == id)
         )
         order_types = session.scalars(stmt).first()

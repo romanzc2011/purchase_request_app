@@ -33,7 +33,7 @@ class PDFService:
     Generate a purchase request PDF.
 
     Args:
-        ID (str): The ID of the purchase request.
+        id (str): The id of the purchase request.
         is_cyber (bool): Whether the request is cybersecurity related.
         payload (dict): The payload of the purchase request.
         comments (list[str]): The comments of the purchase request.
@@ -43,21 +43,21 @@ class PDFService:
     """
     def create_pdf(
         self,
-        ID: str, 
+        id: str, 
         is_cyber: bool=False,   
         payload: dict=None,
         comments: list[str]=None,
         ) -> Path:
         with get_session() as session:
         
-            if not ID:
-                raise HTTPException(status_code=400, detail="ID is required")
+            if not id:
+                raise HTTPException(status_code=400, detail="id is required")
             
             try:
-                # Get all approvals for this ID
-                approvals = session.query(dbas.Approval).filter(dbas.Approval.ID == ID).all()
+                # Get all approvals for this id
+                approvals = session.query(dbas.Approval).filter(dbas.Approval.id == id).all()
                 if not approvals:
-                    raise HTTPException(status_code=404, detail="No approvals found for this ID")
+                    raise HTTPException(status_code=404, detail="No approvals found for this id")
                 
                 # Convert to list of dicts
                 rows = [ApprovalSchema.model_validate(a).model_dump() for a in approvals]
@@ -67,7 +67,7 @@ class PDFService:
                 is_cyber = any(row.get("isCyberSecRelated") for row in rows)
                 
                 comment_arr: list[str] = []
-                comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == ID).all()
+                comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == id).all()
                 if comments:
                     for c in comments:
                         comment_data = SonCommentSchema.model_validate(c)
@@ -76,30 +76,30 @@ class PDFService:
                             comment_arr.append(comment_data.comment_text)
                                 
                     # Check if there are any additional comments in the addComments field in purchase_requests
-                    additional_comments = cache_service.get_or_set(
+                    add_comments = cache_service.get_or_set(
                         "comments",
-                        ID, 
-                        lambda: dbas.get_additional_comments_by_id(ID))
+                        id, 
+                        lambda: dbas.get_add_comments_by_id(id))
                     
                     order_type = cache_service.get_or_set(
                         "order_types",
-                        ID, 
-                        lambda: dbas.get_order_types(ID))
+                        id, 
+                        lambda: dbas.get_order_types(id))
                     
                     # Cache the additional comments
-                    cache_service.set("comments", ID, additional_comments)
-                    cache_service.set("order_types", ID, order_type)
+                    cache_service.set("comments", id, add_comments)
+                    cache_service.set("order_types", id, order_type)
                     
-                    if additional_comments:
+                    if add_comments:
                         # Split comments by semicolon and add each part to the array
-                        for comment in additional_comments:
+                        for comment in add_comments:
                             if comment:
                                 comment_arr.extend(comment.split(', '))
                 
                 logger.info(f"comment_arr: {comment_arr}")
 
                 # Construct the output path with filename
-                output_path = self.pdf_path / f"statement_of_need-{ID}.pdf"
+                output_path = self.pdf_path / f"statement_of_need-{id}.pdf"
                                 
                 # Generate PDF
                 return self._make_purchase_request_pdf(rows=rows, output_path=output_path, is_cyber=is_cyber, comments=comment_arr, order_type=order_type)
@@ -207,7 +207,7 @@ class PDFService:
             
             date_val = first.get("dateneed")
             # Use the function argument or fallback to row value
-            order_type_val_local = order_type if order_type else first.get("orderType")
+            order_type_val_local = order_type if order_type else first.get("order_type")
             date_str = None
 
             # Format date needed
@@ -226,7 +226,7 @@ class PDFService:
                 date_str = "Not specified"
             
             items = [
-                ("Purchase Req ID:", first.get("ID","")),
+                ("Purchase Req id:", first.get("id","")),
                 ("IRQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", first.get("requester","")),
                 ("CO:", first.get("CO","")),
@@ -254,13 +254,13 @@ class PDFService:
         
         for r in rows:
             table_data.append([
-                Paragraph(r.get("budgetObjCode",""), cell_style),
+                Paragraph(r.get("budget_obj_code",""), cell_style),
                 Paragraph(r.get("fund",""), cell_style),
                 Paragraph(r.get("location",""), cell_style),
-                Paragraph(r.get("itemDescription",""), cell_style),
+                Paragraph(r.get("item_description",""), cell_style),
                 Paragraph(str(r.get("quantity","")), cell_style),
                 Paragraph(f"${r.get('priceEach',0):.2f}", cell_style),
-                Paragraph(f"${r.get('totalPrice',0):.2f}", cell_style),
+                Paragraph(f"${r.get('total_price',0):.2f}", cell_style),
                 Paragraph(r.get("justification",""), cell_style),
             ])
         
@@ -285,7 +285,7 @@ class PDFService:
         #########################################################
         # Footer section
         #########################################################
-        total = sum(r.get("totalPrice", 0) for r in rows)
+        total = sum(r.get("total_price", 0) for r in rows)
 
         use_cyber = "Yes" if is_cyber else "No"
         # Cybersecurity line with inline checkmark

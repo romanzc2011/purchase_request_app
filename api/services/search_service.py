@@ -25,34 +25,34 @@ from datetime import datetime
 # -----------------------------------------------------------------------------
 # Whoosh schema: define once here, reuse in index creation and searches
 approval_schema = Schema(
-    ID            = ID(stored=True, unique=True),
-    UUID          = ID(stored=True, unique=True),
-    IRQ1_ID       = ID(stored=True),
-    CO            = TEXT(stored=True),
+    id            = ID(stored=True, unique=True),
+    uuid          = ID(stored=True, unique=True),
+    irq1_id       = ID(stored=True),
+    co            = TEXT(stored=True),
     requester     = TEXT(stored=True, analyzer=StemmingAnalyzer()),
     datereq       = TEXT(stored=True),
     dateneed      = TEXT(stored=True),
-    orderType     = TEXT(stored=True),
-    itemDescription = TEXT(stored=True),
+    order_type    = TEXT(stored=True),
+    item_description = TEXT(stored=True),
     justification = TEXT(stored=True),
-    addComments   = TEXT(stored=True),
-    trainNotAval  = BOOLEAN(stored=True),
-    needsNotMeet  = BOOLEAN(stored=True),
-    budgetObjCode = ID(stored=True),
+    add_comments   = TEXT(stored=True),
+    train_not_aval  = BOOLEAN(stored=True),
+    needs_not_meet  = BOOLEAN(stored=True),
+    budget_obj_code = ID(stored=True),
     fund          = ID(stored=True),
-    priceEach     = NUMERIC(stored=True, numtype=float),
-    totalPrice    = NUMERIC(stored=True, numtype=float),
+    price_each     = NUMERIC(stored=True, numtype=float),
+    total_price    = NUMERIC(stored=True, numtype=float),
     location      = TEXT(stored=True),
     quantity      = NUMERIC(stored=True, numtype=int),
     status        = TEXT(stored=True),
-    createdTime   = TEXT(stored=True)
+    created_time   = TEXT(stored=True)
 )
 
 # Fields used for full-text/prefix searching
 searchable_fields = [
-    'ID', 'IRQ1_ID', 'CO', 'requester', 'dateneed', 'datereq', 'budgetObjCode',
-    'fund', 'itemDescription', 'justification', 'trainNotAval', 'needsNotMeet',
-    'quantity', 'totalPrice', 'priceEach', 'location', 'status', 'createdTime'
+    'id', 'irq1_id', 'co', 'requester', 'dateneed', 'datereq', 'budget_obj_code',
+    'fund', 'item_description', 'justification', 'train_not_aval', 'needs_not_meet',
+    'quantity', 'total_price', 'price_each', 'location', 'status', 'created_time'
 ]
 
 class SearchService:
@@ -66,7 +66,7 @@ class SearchService:
 
     def __init__(self, session: Optional[Session] = None, use_ram: bool = False):
         self.session = session
-        self.primary_key = "ID"
+        self.primary_key = "id"
         self._pending_updates: List[Any] = []
         self.index_dir = "indexdir"
 
@@ -115,7 +115,7 @@ class SearchService:
                 # Index each purchase request and its approval
                 for pr in purchase_requests:
                     # Get the approval for this purchase request
-                    approval = dbas.get_approval_by_id(session, pr.ID)
+                    approval = dbas.get_approval_by_id(session, pr.id)
                     if not approval:
                         continue
                         

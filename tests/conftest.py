@@ -66,7 +66,7 @@
 # deps.auth_service    = DummyAuthService()
 # deps.renderer        = types.SimpleNamespace()   # since renderer was created module-level
 
-# # ─── 3) Now it’s safe to import your FastAPI app ───────────────────────────────
+# # ─── 3) Now it's safe to import your FastAPI app ───────────────────────────────
 # from fastapi.testclient import TestClient
 # from api.pras_api import app
 
@@ -81,6 +81,7 @@ import warnings
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import types
 
 # Get the project root directory
 project_root = str(Path(__file__).parent.parent)

@@ -6,7 +6,7 @@ def make_dummy_payload():
     return {
         "requester": "roman",
         "ID": "REQ-2025-0001",
-        "additional_comments": [
+        "add_comments": [
             "Training not available",
             "Does not meet employee needs"
         ],
@@ -17,16 +17,16 @@ def make_dummy_payload():
                 "requester": "roman",
                 "phoneext": "1234",
                 "datereq": "2025-06-05",
-                "orderType": "QUARTERLY_ORDER",
-                "itemDescription": "Wireless Keyboard and Mouse Combo",
+                "order_type": "QUARTERLY_ORDER",
+                "item_description": "Wireless Keyboard and Mouse Combo",
                 "justification": "Replacement for broken peripherals in the main office",
                 "quantity": 5,
                 "price": 45.00,
-                "priceEach": 45.00,
-                "totalPrice": 225.00,
+                "price_each": 45.00,
+                "total_price": 225.00,
                 "fund": "OF-SUP-01",
                 "location": "LKCH/C",
-                "budgetObjCode": "6100",
+                "budget_obj_code": "6100",
                 "status": "NEW REQUEST"
             }
         ],

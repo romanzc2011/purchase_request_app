@@ -49,7 +49,7 @@ class ApprovalSchema(BaseModel):
     fund: str
     item_description: str
     justification: str
-    additional_comments: Optional[List[str]] = None
+    add_comments: Optional[List[str]] = None
     train_not_aval: Optional[bool] = False
     needs_not_meet: Optional[bool] = False
     quantity: int

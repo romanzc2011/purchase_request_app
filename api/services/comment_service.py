@@ -42,24 +42,15 @@ def add_comment(db_session: Session, ID: str, comment: str) -> bool:
         db_session.rollback()
         return False 
     
-def get_additional_comments(db_session: Session, ID: str) -> list[str]:
-    """
-    Get additional comments for an approval record.
-    
-    Args:
-        db_session: SQLAlchemy database session
-        ID: The ID of the approval record
-        
-    Returns:
-        list[str]: A list of additional comments
-    """
+def get_add_comments(db_session: Session, ID: str) -> list[str]:
+    """Get additional comments by id"""
     stmt = (
-            select(dbas.PurchaseRequest.addComments)
-            .join(dbas.Approval, dbas.PurchaseRequest.ID == dbas.Approval.ID)
-            .where(dbas.PurchaseRequest.addComments.is_not(None))
-            .where(dbas.PurchaseRequest.ID == ID)
+        select(PurchaseRequest.add_comments)
+        .join(Approval, PurchaseRequest.id == Approval.id)
+        .where(PurchaseRequest.add_comments.is_not(None))
+        .where(PurchaseRequest.id == ID)
     )
-    additional_comments: list[str] = db_session.scalars(stmt).all()
-    return additional_comments
+    add_comments: list[str] = db_session.scalars(stmt).all()
+    return add_comments
     
     

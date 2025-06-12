@@ -52,22 +52,22 @@ class SMTP_Service:
         logger.info("#############################################################")
         
         # Get additional comments from cache
-        additional_comments = cache_service.get_or_set(
+        add_comments = cache_service.get_or_set(
             "comments",
-            payload.ID, 
-            lambda: dbas.get_additional_comments_by_id(payload.ID))
+            payload.id, 
+            lambda: dbas.get_add_comments_by_id(payload.id))
         
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
             context = {
-                "ID": payload.ID,
+                "id": payload.id,
                 "requester": payload.requester,
                 "datereq": payload.datereq,
                 "dateneed": payload.dateneed,
-                "orderType": payload.orderType,
-                "additional_comments": additional_comments,
+                "order_type": payload.order_type,
+                "add_comments": add_comments,
                 "items": payload.items,
-                "totalPrice": sum(item.totalPrice for item in payload.items)
+                "total_price": sum(item.total_price for item in payload.items)
             }
             logger.warning(f"CONTEXT EMAIL PAYLOAD REQUEST: {context}")
 
@@ -80,7 +80,7 @@ class SMTP_Service:
                     items.append((desc, comment))
             logger.warning(f"CONTEXT EMAIL PAYLOAD COMMENT: {payload}")
             context = {
-                "groupKey": payload.ID,
+                "groupKey": payload.id,
                 "requestor_name": payload.requester,
                 "items": items,
             }

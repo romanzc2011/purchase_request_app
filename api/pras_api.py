@@ -385,14 +385,14 @@ async def set_purchase_request(
     #################################################################################
     ## BUILD EMAIL PAYLOADS
     #################################################################################
-    additional_comments = cache_service.get_or_set(
+    add_comments = cache_service.get_or_set(
         "comments",
         payload.id,
         lambda: dbas.get_additional_comments_by_id(payload.id)
     )
     
     for item in payload.items:
-        item.additional_comments = additional_comments
+        item.add_comments = add_comments
     
     items_for_email = [
         LineItemsPayload(**item.model_dump())
