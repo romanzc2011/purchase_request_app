@@ -10,11 +10,17 @@ from api.services.pdf_service               import PDFService
 from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
 from api.schemas.purchase_schemas           import *
+from api.services.db_service import init_db
+
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
     template_dir=str(settings.BASE_DIR / "api"/ "services" / "smtp_service" / "templates")
 )
+
+# —————————————— DB Service ————————————————————
+db = init_db()
+
 
 # —————————————— LDAP Service ————————————————————
 ldap_service = LDAPService(

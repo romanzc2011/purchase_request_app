@@ -124,7 +124,7 @@ def client(monkeypatch):
     
     # 1. Fake "get_current_user" so that dependency injection in FastAPI returns a known user
     async def fake_current_user():
-        return LDAPUser(username="roman", email="roman@example.com", groups=["users"])
+        return LDAPUser(username="roman", email="roman@example.com", approved=["users"])
     app.dependency_overrides[auth_service.get_current_user] = fake_current_user
     
     # 2. Fake "get_email_address" so nobody goes to LDAP

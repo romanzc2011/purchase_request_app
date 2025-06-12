@@ -11,13 +11,7 @@ CREATE TABLE purchase_requests (
         PRIMARY KEY (id),
         UNIQUE (uuid)
 );
-CREATE TABLE users (
-        id INTEGER NOT NULL,
-        username VARCHAR NOT NULL,
-        email VARCHAR NOT NULL,
-        department VARCHAR NOT NULL,
-        PRIMARY KEY (id)
-);
+
 CREATE TABLE line_items (
         id INTEGER NOT NULL,
         purchase_request_uuid VARCHAR NOT NULL,

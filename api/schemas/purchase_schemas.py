@@ -25,6 +25,39 @@ class FileAttachment(BaseModel):
     size: Optional[int] = None
     
 # --------------------------------------------------------------
+#  INCOMING REQUEST DATA SCHEMA
+# --------------------------------------------------------------
+"""
+This is what is incoming from front end, split up after validation
+Must accept this model first
+"""
+class PurchaseRequestItem(BaseModel):
+    uuid: str
+    id: str
+    requester: str
+    phoneext: str
+    datereq: date
+    order_type: str
+    item_description: str
+    justification: str
+    add_comments: Optional[List[str]] = None
+    train_not_aval: Optional[bool] = False
+    needs_not_meet: Optional[bool] = False
+    quantity: int
+    price_each: float
+    total_price: float
+    fund: str
+    location: str
+    budget_obj_code: str
+    status: ItemStatus
+    dateneed: Optional[date] = None
+    file_attachments: Optional[List[FileAttachment]] = None
+    created_time: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+    
+# --------------------------------------------------------------
 #  PURCHASE REQUEST HEADER SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestHeader(BaseModel):
@@ -40,7 +73,7 @@ class PurchaseRequestHeader(BaseModel):
     created_time: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST LINE ITEM SCHEMA
@@ -64,14 +97,14 @@ class PurchaseRequestLineItem(BaseModel):
     created_time:           datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST PAYLOAD SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestPayload(BaseModel):
     requester:      str
-    items:          List[PurchaseRequestLineItem]
+    items:  List[PurchaseRequestItem]
     item_count:     int
 
 # --------------------------------------------------------------

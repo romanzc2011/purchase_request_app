@@ -12,7 +12,6 @@ uvicorn pras_api:app --port 5004
 from datetime import datetime, timezone
 import json
 from api.schemas.comment_schemas import CommentItem
-from api.schemas.purchase_schemas import PurchaseRequestLineItem
 from pydantic import ValidationError
 from fastapi import (
     FastAPI,
@@ -25,7 +24,8 @@ from fastapi import (
     HTTPException,
     Request,
     Query,
-    status
+    status,
+    Body
 )
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
@@ -34,6 +34,10 @@ from fastapi.security import (
     OAuth2PasswordBearer,
     OAuth2PasswordRequestForm,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+from api.services.db_service import get_db
+import asyncio
+
 # PRAS Miscellaneous Dependencies
 from api.dependencies.misc_dependencies import *
 
@@ -47,6 +51,16 @@ from api.dependencies.pras_dependencies import uuid_service
 from api.dependencies.pras_dependencies import settings
 from api.services.cache_service import cache_service
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
+
+# Database ORM Model Imports
+from api.services.db_service import (
+    PurchaseRequest as ORM_PurchaseRequest, 
+    PurchaseRequestLineItem as ORM_PurchaseRequestLineItem, 
+    Approval as ORM_Approval, 
+    ApprovalRequest as ORM_ApprovalRequest, 
+    SonComment as ORM_SonComment, 
+    LineItemApproval as ORM_LineItemApproval,
+)
 
 # Schemas
 from api.dependencies.pras_schemas import *
@@ -63,11 +77,6 @@ tracemalloc.start(10)
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
-
-# Initialize database
-@app.on_event("startup")
-def on_startup():
-    init_db()
 
 # Add CORS middleware
 app.add_middleware(
@@ -260,69 +269,83 @@ async def generate_pdf(
 ## SEND TO PURCHASE REQUEST -- being sent from the purchase req submit
 ########################################################################## 
 @api_router.post("/send_to_purchase_req", response_model=PurchaseResponse)
-async def set_purchase_request(
-    payload_json: str = Form(..., description="JSON payload as string"),
+async def send_purchase_request(
+    payload_json: str = Form(..., description="The JSON payload for your request"),
     files: Optional[List[UploadFile]] = File(None, description="Multiple files"),
     current_user: LDAPUser = Depends(auth_service.get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    logger.info(f"Type of current_user: {type(current_user)}")
-
     """
     This endpoint:
       - Parses the incoming payload
       - Ensures the user is active via the LDAPUser we got from the token
       - Commits the request, tagging line items with current_user.username
     """
-    try:
-        logger.info(f"PAYLOAD JSON: {payload_json}")
-        payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
-        logger.info(f"PAYLOAD: {payload}")
-        logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
-        
-        # Build header data 
+    logger.info(f"PAYLOAD JSON: {payload_json}")
+    payload = PurchaseRequestPayload.model_validate_json(payload_json)
+    logger.info(f"PAYLOAD: {payload}")
+    logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
+    
+    # Create the human readable id for the purchase request
+    request_id = dbas.set_purchase_req_id()
+    logger.info(f"REQUEST ID: {request_id}")
+    
+    # Build header data 
+    # Build all Database Models
+    async with db.begin():
         request_data = payload.items[0]
-        header_data = {
-            "id":           request_data.id,
-            "requester":    payload.requester,
-            "phoneext":     request_data.phoneext,
-            "datereq":      request_data.datereq,
-            "dateneed":     request_data.dateneed,
-            "order_type":   request_data.order_type,
-            "status":       request_data.status,
-            "created_time": datetime.now(timezone.utc),
-        }
-        logger.info(f"HEADER DATA: {header_data}")
-        # Insert header data into purchase request tabl
+        orm_pr_header = ORM_PurchaseRequest(
+            request_id=request_id,
+            uuid=request_data.uuid,
+            requester=payload.requester,
+            phoneext=request_data.phoneext,
+            datereq=request_data.datereq,
+            dateneed=request_data.dateneed,
+            order_type=request_data.order_type,
+            status=request_data.status,
+            created_time=datetime.now(timezone.utc),
+        )
+        db.add(orm_pr_header)
+        #flush so ORM Purchase Request is created
+        await db.flush()
         
-        # Loop through the line items and extract line item data of purchase_request
+        # Build and add each line item
         for item in payload.items:
-            line_data = {
-                "purchase_request_uuid":    hdr.uuid,
-                "item_description":         item.item_description,
-                "justification":            item.justification,
-                "add_comments":             item.add_comments,
-                "train_not_aval":           item.train_not_aval,
-                "needs_not_meet":           item.needs_not_meet,
-                "budget_obj_code":          item.budget_obj_code,
-                "fund":                     item.fund,
-                "quantity":                 item.quantity,
-                "price_each":               item.price_each,
-                "total_price":              item.total_price,
-                "location":                 item.location,
-                "is_cyber_sec_related":     item.is_cyber_sec_related,
-                "status":                   item.status,
-                "created_time":             datetime.now(timezone.utc),
-            }
-            
-            logger.info(f"LINE DATA: {line_data}")
-            hdr = dbas.insert_data("purchase_requests", header_data)
-            line_item = dbas.insert_data("line_items", line_data)
-            
-            exit(0)
+            orm_pr_line_item = ORM_PurchaseRequestLineItem(
+                purchase_request_uuid=orm_pr_header.uuid,
+                item_description=item.item_description,
+                justification=item.justification,
+                add_comments= (
+                    None if not item.add_comments else item.add_comments
+                ),
+                train_not_aval=item.train_not_aval,
+                needs_not_meet=item.needs_not_meet,
+                budget_obj_code=item.budget_obj_code,
+                fund=item.fund,
+                quantity=item.quantity,
+                price_each=item.price_each,
+                total_price=item.total_price,
+                location=item.location,
+                status=item.status,
+                created_time=datetime.now(timezone.utc),
+            )
+            db.add(orm_pr_line_item)
+
+    try:
+        # Validate requester
+        requester = payload.requester
+        requester_email = await ldap_service.get_email_address(requester)
         
+        if not requester_email: 
+            logger.error(f"Could not find email for user {requester}")
+            raise HTTPException(status_code=400, detail="Invalid requester")
+        
+        if not payload:
+            raise HTTPException(status_code=400, detail="Invalid data")
+            
     except ValidationError as e:
         logger.error("PurchaseRequestPayload errors: %s", e.errors())
-        # Return them to the client so you know exactly what's wrong:
+        logger.error("Validation error details: %s", str(e))
         raise HTTPException(status_code=422, detail=e.errors())
 
     ################################################################3
@@ -342,37 +365,36 @@ async def set_purchase_request(
     logger.debug(f"DATA: {payload}")
     #fileAttachments=[FileAttachment(attachment=None, name='NBIS_questionaire_final.pdf', type='application/pdf', size=160428)])]
     
-    requester = payload.requester
-    items = payload.items
+    # requester = payload.requester
+    # items = payload.items
     
-    # Process each item in the items array
-    if not items:
-        logger.error("No items found in request data")
-        raise HTTPException(status_code=400, detail="No items found in request data")
+    # # Process each item in the items array
+    # if not items:
+    #     logger.error("No items found in request data")
+    #     raise HTTPException(status_code=400, detail="No items found in request data")
 
     # Get the shared id from the first item, but ensure it's not a temporary id
-    first_item_id = items[0].id if items else None
     
     # Generate a new shared id if the first item id is not a temporary id - this keeps the LAWB id unique just incrementing
-    if not first_item_id:
-        shared_id = dbas.get_next_request_id()
-        logger.info(f"Generated new shared id: {shared_id}")
-    else:
-        shared_id = first_item_id
-        logger.info(f"Using existing shared id: {shared_id}")
+    # if not first_item_id:
+    #     shared_id = dbas.get_next_request_id()
+    #     logger.info(f"Generated new shared id: {shared_id}")
+    # else:
+    #     shared_id = first_item_id
+    #     logger.info(f"Using existing shared id: {shared_id}")
         
-    # Process each item
-    for item in payload.items:
-        logger.info(f"Before assigning shared id: {item.id}")
-        item.id = shared_id
-        logger.info(f"After assigning shared id: {item.id}")
+    # # Process each item
+    # for item in payload.items:
+    #     logger.info(f"Before assigning shared id: {item.id}")
+    #     item.id = shared_id
+    #     logger.info(f"After assigning shared id: {item.id}")
         
-        item.requester = payload.requester
-        processed_data = process_purchase_data(item)
-        purchase_req_commit(processed_data, current_user)
+    #     item.requester = payload.requester
+    #     processed_data = process_purchase_data(item)
+    #     purchase_req_commit(processed_data, current_user)
     
-    # Update the payload with the shared id
-    payload.id = shared_id  
+    # # Update the payload with the shared id
+    # payload.id = shared_id  
     
     # Create tasks list for files
     uploaded_files = []
