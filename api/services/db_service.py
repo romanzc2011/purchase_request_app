@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from api.schemas.purchase_schemas import PurchaseRequestHeader, PurchaseRequestLineItem
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy import (
@@ -345,11 +346,11 @@ def insert_data(table=None, data=None):
     # Pick the right table
     match table:
         case "purchase_requests":
-            model = PurchaseRequest
+            model = PurchaseRequestHeader
             pk_field = "uuid"
         
         case "line_items":
-            model = LineItem
+            model = PurchaseRequestLineItem
             pk_field = "id"
             
         case "approvals":

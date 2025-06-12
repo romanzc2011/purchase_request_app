@@ -39,30 +39,32 @@ class PurchaseRequestHeader(BaseModel):
     status: ItemStatus
     created_time: Optional[datetime] = None
     
+    class Config:
+        orm_mode = True
+    
 # --------------------------------------------------------------
 #  PURCHASE REQUEST LINE ITEM SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestLineItem(BaseModel):
-    id:             str
-    uuid:           str
-    irq1_id:        Optional[str]
-    requester:      str
-    phoneext:       str
-    datereq:        date
-    dateneed:       Optional[date] = None
-    order_type:     Optional[str] = None
-    item_description: str
-    justification:    str
-    train_not_aval:   bool
-    needs_not_meet:   bool
-    quantity:         int
-    price_each:       float
-    total_price:      float
-    fund:             str
-    location:         str
-    budget_obj_code:  str
-    status:           ItemStatus
-    file_attachments: Optional[List[FileAttachment]]
+    id:                     int
+    purchase_request_uuid:  str
+    item_description:       str
+    justification:          str
+    add_comments:           Optional[str]
+    train_not_aval:         bool
+    needs_not_meet:         bool
+    budget_obj_code:        str
+    fund:                   str
+    quantity:               int
+    price_each:             float
+    total_price:            float
+    location:               str
+    is_cyber_sec_related:   bool
+    status:                 ItemStatus
+    created_time:           datetime
+    
+    class Config:
+        orm_mode = True
     
 # --------------------------------------------------------------
 #  PURCHASE REQUEST PAYLOAD SCHEMA

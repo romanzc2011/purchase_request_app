@@ -293,7 +293,6 @@ async def set_purchase_request(
         }
         logger.info(f"HEADER DATA: {header_data}")
         # Insert header data into purchase request tabl
-        hdr = dbas.insert_data("purchase_requests", request_data)
         
         # Loop through the line items and extract line item data of purchase_request
         for item in payload.items:
@@ -316,6 +315,9 @@ async def set_purchase_request(
             }
             
             logger.info(f"LINE DATA: {line_data}")
+            hdr = dbas.insert_data("purchase_requests", header_data)
+            line_item = dbas.insert_data("line_items", line_data)
+            
             exit(0)
         
     except ValidationError as e:
