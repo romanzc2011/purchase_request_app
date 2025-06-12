@@ -365,47 +365,16 @@ async def send_purchase_request(
     logger.debug(f"DATA: {payload}")
     #fileAttachments=[FileAttachment(attachment=None, name='NBIS_questionaire_final.pdf', type='application/pdf', size=160428)])]
     
-    # requester = payload.requester
-    # items = payload.items
-    
-    # # Process each item in the items array
-    # if not items:
-    #     logger.error("No items found in request data")
-    #     raise HTTPException(status_code=400, detail="No items found in request data")
-
-    # Get the shared id from the first item, but ensure it's not a temporary id
-    
-    # Generate a new shared id if the first item id is not a temporary id - this keeps the LAWB id unique just incrementing
-    # if not first_item_id:
-    #     shared_id = dbas.get_next_request_id()
-    #     logger.info(f"Generated new shared id: {shared_id}")
-    # else:
-    #     shared_id = first_item_id
-    #     logger.info(f"Using existing shared id: {shared_id}")
-        
-    # # Process each item
-    # for item in payload.items:
-    #     logger.info(f"Before assigning shared id: {item.id}")
-    #     item.id = shared_id
-    #     logger.info(f"After assigning shared id: {item.id}")
-        
-    #     item.requester = payload.requester
-    #     processed_data = process_purchase_data(item)
-    #     purchase_req_commit(processed_data, current_user)
-    
-    # # Update the payload with the shared id
-    # payload.id = shared_id  
-    
     # Create tasks list for files
     uploaded_files = []
     if files:
         for file in files:
             logger.info(f"Saving uploaded file: {file.filename}")
-            uploaded_files.append(await _save_files(shared_id, file))
+            uploaded_files.append(await _save_files(request_id, file)) 
     
     # Generate PDF
     logger.info("Generating PDF document")
-    pdf_path: str = await generate_pdf(payload, shared_id, uploaded_files)
+    pdf_path: str = await generate_pdf(payload, request_id, uploaded_files)
     #################################################################################
     ## BUILD EMAIL PAYLOADS
     #################################################################################
