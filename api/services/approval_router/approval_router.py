@@ -1,5 +1,5 @@
 from api.services.approval_router.approval_handlers import ITHandler, FinanceHandler, ClerkAdminHandler
-from api.schemas.approval_schemas import ApprovalRequest
+from api.schemas.approval_schemas import PendingApprovalCreate as PendingApproval
 
 class ApprovalRouter:
     def __init__(self):
@@ -14,5 +14,5 @@ class ApprovalRouter:
         
         self._head = self.it_handler
         
-    def route(self, request: ApprovalRequest) -> ApprovalRequest:
+    def route(self, request: PendingApproval) -> PendingApproval:
         return self._head.handle(request)

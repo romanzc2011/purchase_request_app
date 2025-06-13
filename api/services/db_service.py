@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from http.client import HTTPException
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from loguru import logger
 from sqlalchemy import select
@@ -60,30 +61,17 @@ def get_session():
         yield db
     finally:
         db.close()
-
-###################################################################################################
-## Make insert into Approval table (THE VIEW ONLY TABLE)
-###################################################################################################
-## Inbound/IngestStatus (incoming Approve/Deny Request)
-""" 
-Inbound/IngestStatus (incoming Approve/Deny Request) - this is keeping track of the actual processing of the request,
-not the status of the request if it was approved or denied, etc...
-"""
-class InboundStatus(enum.Enum):
-    PENDING = "PENDING"
-    PROCESSED = "PROCESSED"
-    ERROR = "ERROR"
     
 ###################################################################################################
 ##  LINE ITEM STATUS ENUMERATION
 class ItemStatus(enum.Enum):
-    NEW_REQUEST = "NEW REQUEST"  # This matches what's in your database
-    PENDING = "PENDING"
-    APPROVED = "APPROVED"
-    DENIED = "DENIED"
-    ON_HOLD = "ON HOLD"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
+    NEW_REQUEST = "NEW REQUEST" 
+    PENDING     = "PENDING APPROVAL"
+    APPROVED    = "APPROVED"
+    DENIED      = "DENIED"
+    ON_HOLD     = "ON HOLD"
+    COMPLETED   = "COMPLETED"
+    CANCELLED   = "CANCELLED"
 
 ###################################################################################################
 ## PURCHASE REQUEST - this is the top level purchase request, line items are added to this request
@@ -91,42 +79,32 @@ class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
     id            = mapped_column(Integer, primary_key=True, autoincrement=True)
     request_id    = mapped_column(String, nullable=False, unique=True)
-    uuid          = mapped_column(
-                       String,
-                       unique=True,
-                       default=lambda: str(uuid.uuid4())
-                    )
-                      
+    uuid          = mapped_column(String, unique=True, default=lambda: str(uuid.uuid4()))
     requester     = mapped_column(String, nullable=True)
-    phoneext     = mapped_column(Integer, nullable=True)
-    datereq= mapped_column(Date,  nullable=True)
-    dateneed   = mapped_column(Date,  nullable=True)
-    order_type    = mapped_column(String,nullable=True)
-    status        = mapped_column(SQLEnum(ItemStatus,
-                    name="item_status",
-                    native_enum=False,
-                    values_callable=lambda enum: [e.value for e in enum]
-                    ),
-            default=ItemStatus.NEW_REQUEST,
-            nullable=False
-        )
+    phoneext      = mapped_column(Integer, nullable=True)
+    datereq       = mapped_column(Date, nullable=True)
+    dateneed      = mapped_column(Date, nullable=True)
+    order_type    = mapped_column(String, nullable=True)
+    status        = mapped_column(
+        SQLEnum(
+            ItemStatus,
+            name="item_status",
+            native_enum=False,
+            values_callable=lambda enum: [e.value for e in enum]
+        ),
+        default=ItemStatus.NEW_REQUEST,
+        nullable=False
+    )
     created_time  = mapped_column(
-                       DateTime(timezone=True),
-                       default=lambda: datetime.now(timezone.utc),
-                       nullable=False
-                    )
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
     #---------------------------------------------------------------------
     # Relationships
-    approvals           = relationship(
-                             "Approval",
-                             back_populates="purchase_requests",
-                             cascade="all, delete-orphan"
-                         )
-    purchase_request_line_items = relationship(
-                             "PurchaseRequestLineItem",
-                             back_populates="purchase_requests",
-                             cascade="all, delete-orphan"
-                         )
+    approvals = relationship("Approval", back_populates ="purchase_request", cascade="all, delete-orphan")
+    purchase_request_line_items = relationship("PurchaseRequestLineItem", back_populates="purchase_request", cascade="all, delete-orphan")
+    pending_approvals = relationship("PendingApproval", back_populates="purchase_request", cascade="all, delete-orphan")
 
     __searchable__ = [
         "request_id",
@@ -171,16 +149,13 @@ class PurchaseRequestLineItem(Base):
 
     #---------------------------------------------------------------------
     # ORM relationships
-    purchase_requests = relationship(
-        "PurchaseRequest",
-        back_populates="purchase_request_line_items"
-    )
+    purchase_request = relationship("PurchaseRequest", back_populates="purchase_request_line_items")
 
-    line_item_approvals = relationship(
-        "LineItemApproval",
-        back_populates="purchase_request_line_items",
-        cascade="all, delete-orphan"
-    )
+    line_item_approvals = relationship("LineItemApproval",
+                                       back_populates="purchase_request_line_items",
+                                       cascade="all, delete-orphan")
+    
+    pending_approvals = relationship("PendingApproval", back_populates="line_item", cascade="all, delete-orphan")
 
     __searchable__ = [
         "id",
@@ -239,45 +214,69 @@ class Approval(Base):
                                                             )
     #---------------------------------------------------------------------
     # RELATIONSHIPS
-    purchase_requests = relationship("PurchaseRequest", back_populates="approvals")
+    purchase_request = relationship("PurchaseRequest", back_populates="approvals")
     son_comments = relationship("SonComment", back_populates="approvals", cascade="all, delete-orphan")
     line_item_approvals = relationship("LineItemApproval", back_populates="approvals", cascade="all, delete-orphan")
-    approval_requests     = relationship("ApprovalRequest", back_populates="approvals", cascade="all, delete-orphan")
+    
+    # TODO: How is there no relationship between Approval and PendingApproval?
+   # pending_approvals     = relationship("PendingApproval", back_populates="approvals", cascade="all, delete-orphan")
 
 ###################################################################################################
 ## Approval Event TABLE
 """
 This is for incoming requests from an external system or webhook ("here's a JSON payload telling you to approve/deny").
 """
-class ApprovalRequest(Base):
-    __tablename__ = "approval_requests"
-    id:                 Mapped[int]        = mapped_column(Integer, primary_key=True)
-    approvals_uuid:      Mapped[str]       = mapped_column(String, ForeignKey("approvals.uuid"), nullable=False)
-    purchase_request_uuid:  Mapped[str]    = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False)
-    action:             Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus), nullable=False)  # APPROVED / DENIED
-    target_status:      Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus), nullable=False)
-    co:                 Mapped[Optional[str]]= mapped_column(String, nullable=True)
-    item_funds:         Mapped[str]        = mapped_column(String, nullable=False)
-    total_price:        Mapped[float]      = mapped_column(Float, nullable=False)
+class TaskStatus(enum.Enum):
+    NEW         = "NEW"
+    PENDING     = "PENDING"
+    PROCESSED   = "PROCESSED"
+    ERROR       = "ERROR"
+    CANCELLED   = "CANCELLED"
+    
+class PendingApproval(Base):
+    __tablename__ = "pending_approvals"
 
-    status:             Mapped[InboundStatus] = mapped_column(
-                               SQLEnum(InboundStatus),
-                               default=InboundStatus.PENDING,
-                               nullable=False
-                           )
-    error_message:      Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at:         Mapped[datetime]       = mapped_column(
-                               DateTime(timezone=True),
-                               default=lambda: datetime.now(timezone.utc),
-                               nullable=False
-                           )
-    processed_at:       Mapped[Optional[datetime]] = mapped_column(
-                               DateTime(timezone=True),
-                               nullable=True
-                           )
+    task_id                    = mapped_column(Integer, primary_key=True, autoincrement=True)
+    purchase_request_uuid      = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False, index=True)
+    purchase_request_line_item_id = mapped_column(Integer, ForeignKey("purchase_request_line_items.id"), nullable=True, index=True)
+    assigned_group             = mapped_column(String, nullable=False)
 
-    # relationship back to Approval
-    approvals = relationship("Approval", back_populates="approval_requests")
+    # workflow‐status enum
+    status                     = mapped_column(
+        SQLEnum(TaskStatus),
+        default=TaskStatus.NEW,
+        nullable=False
+    )
+    # What the approver decided
+    action = mapped_column(
+        SQLEnum(
+            ItemStatus, 
+            name="item_status",
+            native_enum=False, 
+            values_callable=lambda enum: [e.value for e in enum]
+            ), 
+        nullable=True)
+    # Timestamps, error info, etc.
+    created_at                 = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+    processed_at               = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+    error_message              = mapped_column(Text, nullable=True)
+
+    # relationships
+    purchase_request = relationship(
+        "PurchaseRequest",
+        back_populates="pending_approvals"
+    )
+    line_item = relationship(
+        "PurchaseRequestLineItem",
+        back_populates="pending_approvals"
+    )
 
 ###################################################################################################
 ## Line Item Status TABLE
@@ -323,12 +322,45 @@ class Users(Base):
     email:      Mapped[str] = mapped_column(String)
     department: Mapped[str] = mapped_column(String)
 
-## Get all data from Approval
-def get_all_approval(db_session: Session):
-    return db_session.query(Approval).all()
+###################################################################################################
+# Get all data from Approval
+###################################################################################################
+def get_all_approvals(id: str):
+    if not id:
+        raise HTTPException(status_code=400, detail="id is required")
+    with get_session() as session:
+        stmt = select(Approval).where(Approval.purchase_request_id == id)
+        approvals = session.scalars(stmt).all()
+        
+        if not approvals:
+            raise HTTPException(status_code=404, detail="Approval not found")
+        
+        return approvals
 
-def get_approval_by_id(db_session: Session, id: str):
-    return db_session.query(Approval).filter(Approval.id == id).first()
+###################################################################################################
+# Get all son comments by id
+###################################################################################################
+def get_all_son_comments(id: str):
+    if not id:
+        raise HTTPException(status_code=400, detail="id is required")
+    with get_session() as session:
+        stmt = select(SonComment).where(SonComment.purchase_request_id == id)
+        son_comments = session.scalars(stmt).all()
+        
+        if not son_comments:
+            raise HTTPException(status_code=404, detail="Son comment not found")
+        
+        return son_comments
+
+def get_approval_by_id(id: str):
+    with get_session() as session:
+        stmt = select(Approval).where(Approval.id == id)
+        approval = session.scalars(stmt).first()
+        
+        if not approval:
+            raise HTTPException(status_code=404, detail="Approval not found")
+        
+        return approval
 
 ###################################################################################################
 # Get status of request from Approval table

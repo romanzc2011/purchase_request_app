@@ -2,10 +2,10 @@ from api.schemas.comment_schemas import SonCommentSchema
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import date, datetime
-from api.services.db_service import InboundStatus, ItemStatus
+from api.services.db_service import TaskStatus, ItemStatus
 
 # ——————————————————————————————————————
-# 2) A full “detail” view for internal use / metadata
+# 2) A full "detail" view for internal use / metadata
 # ——————————————————————————————————————
 
 class LineItemApprovalSchema(BaseModel):
@@ -112,25 +112,26 @@ class ApprovalRequestCreate(BaseModel):
     item_funds: str
     total_price: float
 
-
 # ───────────────────────────────────────────────────────────────────────────────
 # 3) DETAIL schemas (single‐item endpoints with full relationships)
 # ───────────────────────────────────────────────────────────────────────────────
-class ApprovalRequestDetail(BaseModel):
+class PendingApprovalSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    approvals_uuid: str
+    task_id: int
     purchase_request_uuid: str
-    action: ItemStatus
-    target_status: ItemStatus
-    co: Optional[str]
-    item_funds: str
-    total_price: float
-    status: InboundStatus
-    error_message: Optional[str]
+    purchase_request_line_item_id: Optional[int] = None
+    assigned_group: str
+
+    # lifecycle of the task
+    status: TaskStatus
+    # what the approver chose
+    action: Optional[ItemStatus] = None
+
+    # timestamps & errors
     created_at: datetime
-    processed_at: Optional[datetime]
+    processed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
 
 class SonCommentDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)

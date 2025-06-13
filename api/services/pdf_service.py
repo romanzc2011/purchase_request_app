@@ -17,8 +17,11 @@ from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
 from api.settings import settings
-from api.services.db_service import get_session
+from api.services.db_service import Approval, SonComment, get_all_son_comments, get_session
+from api.services.db_service import get_all_approvals
 from api.schemas.comment_schemas import SonCommentSchema
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 import api.services.db_service as dbas
 
 class PDFService:
@@ -56,7 +59,10 @@ class PDFService:
             
             try:
                 # Get all approvals for this id
-                approvals = session.query(dbas.Approval).filter(dbas.Approval.id == id).all()
+                stmt = select(Approval).where(Approval.purchase_request_id == id)
+                approvals = session.scalars(stmt).all()
+                
+                logger.info(f"approvals: {approvals}")
                 if not approvals:
                     raise HTTPException(status_code=404, detail="No approvals found for this id")
                 
@@ -68,7 +74,12 @@ class PDFService:
                 is_cyber = any(row.get("is_cyber_sec_related") for row in rows)
                 
                 comment_arr: list[str] = []
-                comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == id).all()
+                # Initialize order_type with a default value
+                order_type = None
+                
+                stmt = select(SonComment).where(SonComment.purchase_request_id == id)
+                comments = session.scalars(stmt).all()
+                
                 if comments:
                     for c in comments:
                         comment_data = SonCommentSchema.model_validate(c)

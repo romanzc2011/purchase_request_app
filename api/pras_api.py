@@ -36,7 +36,7 @@ from fastapi.security import (
     OAuth2PasswordRequestForm,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.services.db_service import get_db
+from api.services.db_service import PendingApproval, TaskStatus, get_db
 import asyncio
 
 # PRAS Miscellaneous Dependencies
@@ -58,7 +58,7 @@ from api.services.db_service import (
     PurchaseRequest as ORM_PurchaseRequest, 
     PurchaseRequestLineItem as ORM_PurchaseRequestLineItem, 
     Approval as ORM_Approval, 
-    ApprovalRequest as ORM_ApprovalRequest, 
+    PendingApproval as ORM_PendingApproval, 
     SonComment as ORM_SonComment, 
     LineItemApproval as ORM_LineItemApproval,
 )
@@ -292,7 +292,6 @@ async def send_purchase_request(
     logger.info(f"REQUEST ID: {request_id}")
     
     # Build header data 
-    # Build all Database Models
     async with db.begin():
         request_data = payload.items[0]
         orm_pr_header = ORM_PurchaseRequest(
@@ -307,9 +306,14 @@ async def send_purchase_request(
             created_time=datetime.now(timezone.utc),
         )
         db.add(orm_pr_header)
-        #flush so ORM Purchase Request is created
+        """
+		Will perform db flushes to get data such as uuid for later operations
+        """
         await db.flush()
         
+        # Create line items and remember ids for later operations
+        pr_line_item_ids = []
+        approvals = [] # TODO: I may need this, not sure, worked before I added the PendingApproval table
         # Build and add each line item
         for item in payload.items:
             orm_pr_line_item = ORM_PurchaseRequestLineItem(
@@ -331,8 +335,12 @@ async def send_purchase_request(
                 created_time=datetime.now(timezone.utc),
             )
             db.add(orm_pr_line_item)
-            approvals = []
-        for item in payload.items:
+            await db.flush()
+             # grab the id for each request, id is the whole request, uuid is individual line items
+            pr_line_item_ids.append(orm_pr_line_item.id) 
+         # Create Approval rows and also seed PendingApproval tasks
+         # Use zip in for loop, Approval has all the data and PendingApproval doesnt need all
+        for item, line_id in zip(payload.items, pr_line_item_ids):  
             appr = ORM_Approval(
                 uuid                  = str(uuid.uuid4()),
                 purchase_request_uuid = orm_pr_header.uuid,
@@ -359,6 +367,20 @@ async def send_purchase_request(
             db.add(appr)
             await db.flush()
             approvals.append(appr)
+            
+            # The pending approvals holds the tasks that need to be approved or denied
+            # Now we seed the pending_approvals table with the task
+            # Route the task to IT if fund starts with 511, otherwise route to finance
+            assigned_group = "IT" if item.fund.startswith("511") else "Finance"
+            task = PendingApproval(
+                purchase_request_uuid=orm_pr_header.uuid,
+                purchase_request_line_item_id=line_id,
+                assigned_group=assigned_group,
+                status=TaskStatus.NEW,
+            )
+            db.add(task)
+            await db.flush()
+            
     try:
         # Validate requester
         requester = payload.requester

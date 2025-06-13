@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from loguru import logger
 from api.schemas.misc_schemas import ItemStatus
-from api.schemas.approval_schemas import ApprovalRequest
+from api.schemas.approval_schemas import ApprovalRequest, PendingApprovalCreate as PendingApproval
 from api.services.database_service import DatabaseService as dbas
 
 # Approval Router to determine the routing of requests
@@ -19,7 +19,7 @@ class Handler(ABC):
         return handler
     
     @abstractmethod
-    def handle(self, request: ApprovalRequest) -> ApprovalRequest:
+    def handle(self, request: PendingApproval) -> PendingApproval:
         logger.info(f"Handling request: {request}")
         if self._next:
             logger.info(f"Passing request to next handler: {self._next}")
@@ -27,7 +27,7 @@ class Handler(ABC):
         return "No handler could process the request."
     
 class ITHandler(Handler):
-    def handle(self, request: ApprovalRequest) -> ApprovalRequest:
+    def handle(self, request: PendingApproval) -> PendingApproval:
         # IT can only approve requests from fund 511***
         logger.info(f"ITHandler: Checking if request is from fund 511*** and status is NEW_REQUEST")
         if request.fund.startswith("511") and request.status == ItemStatus.NEW_REQUEST:
@@ -50,7 +50,7 @@ class ITHandler(Handler):
         return super().handle(request)
     
 class FinanceHandler(Handler):
-    def handle(self, request: ApprovalRequest) -> ApprovalRequest:
+    def handle(self, request: PendingApproval) -> PendingApproval:
         # Finance can approve any request
         if request.status == ItemStatus.NEW_REQUEST and not request.fund.startswith("511"):
             request.status = ItemStatus.PENDING_APPROVAL
@@ -68,7 +68,7 @@ class FinanceHandler(Handler):
 class ClerkAdminHandler(Handler):
     def __init__(self):
         self._next: Optional[Handler] = FinanceHandler()
-    def handle(self, request: ApprovalRequest) -> ApprovalRequest:
+    def handle(self, request: PendingApproval) -> PendingApproval:
         # This variable determines if Edmund can approve the request
         if request.total_price < 250:
             edmund_can_approve = True
