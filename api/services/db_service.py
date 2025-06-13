@@ -62,6 +62,8 @@ def get_session():
         db.close()
 
 ###################################################################################################
+## Make insert into Approval table (THE VIEW ONLY TABLE)
+###################################################################################################
 ## Inbound/IngestStatus (incoming Approve/Deny Request)
 """ 
 Inbound/IngestStatus (incoming Approve/Deny Request) - this is keeping track of the actual processing of the request,
@@ -100,11 +102,14 @@ class PurchaseRequest(Base):
     datereq= mapped_column(Date,  nullable=True)
     dateneed   = mapped_column(Date,  nullable=True)
     order_type    = mapped_column(String,nullable=True)
-    status        = mapped_column(
-                       SQLEnum(ItemStatus, name="item_status"),
-                       default=ItemStatus.NEW_REQUEST,
-                       nullable=True
-                    )
+    status        = mapped_column(SQLEnum(ItemStatus,
+                    name="item_status",
+                    native_enum=False,
+                    values_callable=lambda enum: [e.value for e in enum]
+                    ),
+            default=ItemStatus.NEW_REQUEST,
+            nullable=False
+        )
     created_time  = mapped_column(
                        DateTime(timezone=True),
                        default=lambda: datetime.now(timezone.utc),
@@ -151,11 +156,13 @@ class PurchaseRequestLineItem(Base):
     total_price             = mapped_column(Float,  nullable=False)
     location                = mapped_column(String, nullable=False)
     is_cyber_sec_related    = mapped_column(Boolean, default=False, nullable=False)
-    status                  = mapped_column(
-                                 SQLEnum(ItemStatus, name="item_status"),
-                                 default=ItemStatus.NEW_REQUEST,
-                                 nullable=False
-                             )
+    status                  = mapped_column(SQLEnum(ItemStatus, 
+                                                    name="item_status",
+                                                    native_enum=False,
+                                                    values_callable=lambda enum: [e.value for e in enum]
+                                                    ),
+                                                    default=ItemStatus.NEW_REQUEST
+                                                )
     created_time            = mapped_column(
                                  DateTime(timezone=True),
                                  default=lambda: datetime.now(timezone.utc),
@@ -185,7 +192,6 @@ class PurchaseRequestLineItem(Base):
         "status",
         "location",
     ]
-
 
 ###################################################################################################
 ## approval TABLE
@@ -316,10 +322,7 @@ class Users(Base):
     username:   Mapped[str] = mapped_column(String)
     email:      Mapped[str] = mapped_column(String)
     department: Mapped[str] = mapped_column(String)
-    
 
-
-##############################################################################   
 ## Get all data from Approval
 def get_all_approval(db_session: Session):
     return db_session.query(Approval).all()
@@ -541,7 +544,6 @@ def check_status_values():
         # Check purchase_requests table
         pr_statuses = session.query(PurchaseRequest.status).distinct().all()
         logger.info(f"Purchase Request statuses: {pr_statuses}")
-        
 
 
 ###################################################################################################
@@ -549,7 +551,8 @@ def check_status_values():
 ###################################################################################################``
 def get_all_purchase_requests(session):
     """Get all purchase requests from the database"""
-    return session.query(PurchaseRequest).all()
+    # return session.query(PurchaseRequest).all()
+    pass
 
 ###################################################################################################
 # Get additional comments by id

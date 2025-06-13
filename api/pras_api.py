@@ -11,6 +11,7 @@ uvicorn pras_api:app --port 5004
 
 from datetime import datetime, timezone
 import json
+from api.schemas.approval_schemas import ApprovalCreateSchema
 from api.schemas.comment_schemas import CommentItem
 from pydantic import ValidationError
 from fastapi import (
@@ -66,11 +67,10 @@ from api.services.db_service import (
 from api.dependencies.pras_schemas import *
 
 # Singleton Services
-from api.services.db_service import get_session, init_db
+from api.services.db_service import get_session
 
 import api.services.db_service as dbas
 
-# TODO: Investigate why rendering approval data is taking so long,
 # TODO: There seems to be too much member validation in the approval schema when rendering the Approval Table
 import tracemalloc
 tracemalloc.start(10)
@@ -288,6 +288,7 @@ async def send_purchase_request(
     
     # Create the human readable id for the purchase request
     request_id = dbas.set_purchase_req_id()
+    now = datetime.now(timezone.utc)
     logger.info(f"REQUEST ID: {request_id}")
     
     # Build header data 
@@ -330,7 +331,34 @@ async def send_purchase_request(
                 created_time=datetime.now(timezone.utc),
             )
             db.add(orm_pr_line_item)
-
+            approvals = []
+        for item in payload.items:
+            appr = ORM_Approval(
+                uuid                  = str(uuid.uuid4()),
+                purchase_request_uuid = orm_pr_header.uuid,
+                purchase_request_id   = orm_pr_header.request_id,
+                requester             = payload.requester,
+                phoneext              = item.phoneext,
+                datereq               = item.datereq,
+                dateneed              = item.dateneed,
+                order_type            = item.order_type,
+                item_description      = item.item_description,
+                justification         = item.justification,
+                train_not_aval        = item.train_not_aval,
+                needs_not_meet        = item.needs_not_meet,
+                budget_obj_code       = item.budget_obj_code,
+                fund                  = item.fund,
+                price_each            = item.price_each,
+                total_price           = item.total_price,
+                location              = item.location,
+                quantity              = item.quantity,
+                is_cyber_sec_related  = item.is_cyber_sec_related,
+                status                = item.status,
+                created_time          = datetime.now(timezone.utc),
+            )
+            db.add(appr)
+            await db.flush()
+            approvals.append(appr)
     try:
         # Validate requester
         requester = payload.requester

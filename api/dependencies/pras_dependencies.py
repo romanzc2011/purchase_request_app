@@ -1,6 +1,4 @@
 # Dependencies for PRAS
-import os
-
 from api.settings                           import settings
 from api.services.smtp_service.renderer     import TemplateRenderer
 from api.services.smtp_service.smtp_service import SMTP_Service
@@ -12,7 +10,6 @@ from api.services.search_service            import SearchService
 from api.schemas.purchase_schemas           import *
 from api.services.db_service import init_db
 
-
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
     template_dir=str(settings.BASE_DIR / "api"/ "services" / "smtp_service" / "templates")
@@ -20,7 +17,6 @@ renderer = TemplateRenderer(
 
 # —————————————— DB Service ————————————————————
 db = init_db()
-
 
 # —————————————— LDAP Service ————————————————————
 ldap_service = LDAPService(

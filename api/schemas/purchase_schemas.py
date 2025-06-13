@@ -53,6 +53,7 @@ class PurchaseRequestItem(BaseModel):
     dateneed: Optional[date] = None
     file_attachments: Optional[List[FileAttachment]] = None
     created_time: Optional[datetime] = None
+    is_cyber_sec_related: Optional[bool] = False
     
     class Config:
         from_attributes = True

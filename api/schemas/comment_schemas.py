@@ -8,12 +8,12 @@ from typing import List, Optional
 class SonCommentSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    uuid: Optional[str] = None
+    approvals_uuid: Optional[str] = None
+    purchase_request_id: Optional[str] = None
     comment_text: Optional[str] = None
     created_at: Optional[datetime] = None
     son_requester: str
     item_description: Optional[str] = None
-    purchase_req_id: Optional[str] = None
 
 class CommentItem(BaseModel):
     uuid: str

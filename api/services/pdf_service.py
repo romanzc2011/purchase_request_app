@@ -18,7 +18,6 @@ from loguru import logger
 from pathlib import Path
 from api.settings import settings
 from api.services.db_service import get_session
-from api.schemas.approval_schemas import ApprovalSchema
 from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
 
@@ -48,6 +47,8 @@ class PDFService:
         payload: dict=None,
         comments: list[str]=None,
         ) -> Path:
+        from api.schemas.approval_schemas import ApprovalDetailSchema
+        
         with get_session() as session:
         
             if not id:
@@ -60,11 +61,11 @@ class PDFService:
                     raise HTTPException(status_code=404, detail="No approvals found for this id")
                 
                 # Convert to list of dicts
-                rows = [ApprovalSchema.model_validate(a).model_dump() for a in approvals]
+                rows = [ApprovalDetailSchema.model_validate(a).model_dump() for a in approvals]
                 logger.info(f"rows: {rows}")
                 
                 # Check if any line items as marked as cyber security related
-                is_cyber = any(row.get("isCyberSecRelated") for row in rows)
+                is_cyber = any(row.get("is_cyber_sec_related") for row in rows)
                 
                 comment_arr: list[str] = []
                 comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == id).all()
