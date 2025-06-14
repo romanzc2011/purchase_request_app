@@ -104,6 +104,7 @@ class PurchaseRequestLineItem(BaseModel):
 #  PURCHASE REQUEST PAYLOAD SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestPayload(BaseModel):
+    id:             Optional[str] = None
     requester:      str
     items:  List[PurchaseRequestItem]
     item_count:     int

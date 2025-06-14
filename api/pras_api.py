@@ -431,7 +431,7 @@ async def send_purchase_request(
     add_comments = cache_service.get_or_set(
         "comments",
         payload.id,
-        lambda: dbas.get_additional_comments_by_id(payload.id)
+        lambda: dbas.get_add_comments_by_id(payload.id)
     )
     
     for item in payload.items:
