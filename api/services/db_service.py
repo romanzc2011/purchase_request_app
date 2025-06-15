@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from http.client import HTTPException
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from loguru import logger
+from aiocache import Cache, cached
 from sqlalchemy import select
 from sqlalchemy import (
     create_engine, 
@@ -121,10 +122,9 @@ class PurchaseRequestLineItem(Base):
     __tablename__ = "purchase_request_line_items"
 
     id                      = mapped_column(Integer, primary_key=True, autoincrement=True)
-    purchase_request_uuid       = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False, index=True)
+    purchase_request_id       = mapped_column(String, ForeignKey("purchase_requests.request_id"), nullable=False, index=True)
     item_description        = mapped_column(Text,   nullable=False)
     justification           = mapped_column(Text,   nullable=False)
-    add_comments            = mapped_column(Text,   nullable=True)
     train_not_aval          = mapped_column(Boolean, default=False, nullable=False)
     needs_not_meet          = mapped_column(Boolean, default=False, nullable=False)
     budget_obj_code         = mapped_column(String, nullable=False)
@@ -220,6 +220,49 @@ class Approval(Base):
     
     # TODO: How is there no relationship between Approval and PendingApproval?
    # pending_approvals     = relationship("PendingApproval", back_populates="approvals", cascade="all, delete-orphan")
+
+# Justification ORM model - singleton table for justification text
+class JustificationTemplate(Base):
+    __tablename__ = "justification_templates"
+    code        = mapped_column(String, primary_key=True)
+    description = mapped_column(
+        Text, 
+        nullable=False)
+    
+# Seed justification templates
+async def seed_justification_templates(db: AsyncSession):
+    # Only insert if empty
+    existing = await db.execute(select(JustificationTemplate).limit(1))
+    if existing.scalars().first():
+        return
+    
+    templates = [
+		JustificationTemplate(
+			code="NOT_AVAILABLE",
+			description="No comparable programs listed on approved sites."
+		),
+		JustificationTemplate(
+			code="DOESNT_MEET_NEEDS",
+			description="Current offerings lack the spcc"
+		),
+	]
+    db.add_all(templates)
+    await db.commit()
+
+# After table creation, seed the table with the following data:
+# Create cache to store justification text
+cache = Cache(Cache.MEMORY)
+
+# Help function to fetch and cache justification text
+@cached(ttl=300, cache=Cache.MEMORY, key="justification_templates")
+async def get_justification_templates(db: AsyncSession) -> dict[str, str]:
+    """
+    Returns a dictionary mapping code -> template
+    Cached in memory every 5minutes
+    """
+    result = await db.execute(select(JustificationTemplate))
+    rows = result.scalars().all()
+    return {r.code: r.description for r in rows}
 
 ###################################################################################################
 ## Approval Event TABLE
@@ -340,6 +383,17 @@ def get_all_approvals(id: str):
 ###################################################################################################
 # Get all son comments by id
 ###################################################################################################
+def fetch_just_flags_by_id(id: str):
+    with get_session() as session:
+        stmt = (select(
+            PurchaseRequestLineItem.train_not_aval,
+            PurchaseRequestLineItem.needs_not_meet,
+        ).where(PurchaseRequestLineItem.purchase_request_id == id))
+        return session.execute(stmt).all()
+    
+###################################################################################################
+# Get all son comments by id
+###################################################################################################
 def get_all_son_comments(id: str):
     if not id:
         raise HTTPException(status_code=400, detail="id is required")
@@ -352,6 +406,9 @@ def get_all_son_comments(id: str):
         
         return son_comments
 
+###################################################################################################
+# Get all add comments by id
+###################################################################################################
 def get_approval_by_id(id: str):
     with get_session() as session:
         stmt = select(Approval).where(Approval.id == id)
@@ -627,21 +684,25 @@ def get_approval_by_id(session, id):
 def init_db():
     """Initialize the database by creating all tables."""
     try:
-        # Create all tables
+        # Create (sync) all tables
         Base.metadata.create_all(bind=engine)
         
-        # Add request_id column if it doesn't exist
-        with engine.connect() as conn:
-            # Check if column exists
-            result = conn.execute(text("PRAGMA table_info(purchase_requests)"))
-            columns = [row[1] for row in result]
-            
-            if 'request_id' not in columns:
-                conn.execute(text("ALTER TABLE purchase_requests ADD COLUMN request_id VARCHAR"))
-                conn.commit()
-                
+        # Seed justification templates
+        with SessionLocal() as session:
+            if not session.query(JustificationTemplate).first():
+                logger.info("Seeding justification templates")
+                session.add_all([
+                    JustificationTemplate(
+                        code="NOT_AVAILABLE",
+                        description="No comparable programs listed on approved sites."
+                    ),
+                    JustificationTemplate(
+                        code="DOESNT_MEET_NEEDS",
+                        description="Current offerings lack the spcc"
+                    ),
+                ])
+                session.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing database: {e}")
         raise
-

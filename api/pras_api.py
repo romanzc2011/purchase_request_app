@@ -286,12 +286,11 @@ async def send_purchase_request(
     logger.info(f"PAYLOAD: {payload}")
     logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
     
-    # Create the human readable id for the purchase request
+    # Create the human-readable ID for the purchase request
     request_id = dbas.set_purchase_req_id()
-    now = datetime.now(timezone.utc)
     logger.info(f"REQUEST ID: {request_id}")
     
-    # Build header data 
+    # Build header & line items inside a single transaction
     async with db.begin():
         request_data = payload.items[0]
         orm_pr_header = ORM_PurchaseRequest(
@@ -306,23 +305,14 @@ async def send_purchase_request(
             created_time=datetime.now(timezone.utc),
         )
         db.add(orm_pr_header)
-        """
-		Will perform db flushes to get data such as uuid for later operations
-        """
-        await db.flush()
-        
-        # Create line items and remember ids for later operations
-        pr_line_item_ids = []
-        approvals = [] # TODO: I may need this, not sure, worked before I added the PendingApproval table
-        # Build and add each line item
+        await db.flush()  # makes ORM defaults (like pk/uuid) available
+
+        pr_line_item_ids: List[int] = []
         for item in payload.items:
             orm_pr_line_item = ORM_PurchaseRequestLineItem(
-                purchase_request_uuid=orm_pr_header.uuid,
+                purchase_request_id=orm_pr_header.request_id,
                 item_description=item.item_description,
                 justification=item.justification,
-                add_comments= (
-                    None if not item.add_comments else item.add_comments
-                ),
                 train_not_aval=item.train_not_aval,
                 needs_not_meet=item.needs_not_meet,
                 budget_obj_code=item.budget_obj_code,
@@ -336,41 +326,37 @@ async def send_purchase_request(
             )
             db.add(orm_pr_line_item)
             await db.flush()
-             # grab the id for each request, id is the whole request, uuid is individual line items
-            pr_line_item_ids.append(orm_pr_line_item.id) 
-         # Create Approval rows and also seed PendingApproval tasks
-         # Use zip in for loop, Approval has all the data and PendingApproval doesnt need all
-        for item, line_id in zip(payload.items, pr_line_item_ids):  
+            pr_line_item_ids.append(orm_pr_line_item.id)
+
+        approvals: List[ORM_Approval] = []
+        for item, line_id in zip(payload.items, pr_line_item_ids):
             appr = ORM_Approval(
-                uuid                  = str(uuid.uuid4()),
-                purchase_request_uuid = orm_pr_header.uuid,
-                purchase_request_id   = orm_pr_header.request_id,
-                requester             = payload.requester,
-                phoneext              = item.phoneext,
-                datereq               = item.datereq,
-                dateneed              = item.dateneed,
-                order_type            = item.order_type,
-                item_description      = item.item_description,
-                justification         = item.justification,
-                train_not_aval        = item.train_not_aval,
-                needs_not_meet        = item.needs_not_meet,
-                budget_obj_code       = item.budget_obj_code,
-                fund                  = item.fund,
-                price_each            = item.price_each,
-                total_price           = item.total_price,
-                location              = item.location,
-                quantity              = item.quantity,
-                is_cyber_sec_related  = item.is_cyber_sec_related,
-                status                = item.status,
-                created_time          = datetime.now(timezone.utc),
+                uuid=str(uuid.uuid4()),
+                purchase_request_uuid=orm_pr_header.uuid,
+                purchase_request_id=orm_pr_header.request_id,
+                requester=payload.requester,
+                phoneext=item.phoneext,
+                datereq=item.datereq,
+                dateneed=item.dateneed,
+                order_type=item.order_type,
+                item_description=item.item_description,
+                justification=item.justification,
+                train_not_aval=item.train_not_aval,
+                needs_not_meet=item.needs_not_meet,
+                budget_obj_code=item.budget_obj_code,
+                fund=item.fund,
+                price_each=item.price_each,
+                total_price=item.total_price,
+                location=item.location,
+                quantity=item.quantity,
+                is_cyber_sec_related=item.is_cyber_sec_related,
+                status=item.status,
+                created_time=datetime.now(timezone.utc),
             )
             db.add(appr)
             await db.flush()
             approvals.append(appr)
-            
-            # The pending approvals holds the tasks that need to be approved or denied
-            # Now we seed the pending_approvals table with the task
-            # Route the task to IT if fund starts with 511, otherwise route to finance
+
             assigned_group = "IT" if item.fund.startswith("511") else "Finance"
             task = PendingApproval(
                 purchase_request_uuid=orm_pr_header.uuid,
@@ -380,71 +366,40 @@ async def send_purchase_request(
             )
             db.add(task)
             await db.flush()
-            
-    try:
-        # Validate requester
-        requester = payload.requester
-        requester_email = await ldap_service.get_email_address(requester)
-        
-        if not requester_email: 
-            logger.error(f"Could not find email for user {requester}")
-            raise HTTPException(status_code=400, detail="Invalid requester")
-        
-        if not payload:
-            raise HTTPException(status_code=400, detail="Invalid data")
-            
-    except ValidationError as e:
-        logger.error("PurchaseRequestPayload errors: %s", e.errors())
-        logger.error("Validation error details: %s", str(e))
-        raise HTTPException(status_code=422, detail=e.errors())
+    # ← transaction is committed here
 
-    ################################################################3
-    ## VALidATE REQUESTER
-    requester = payload.requester
-    requester_email = await ldap_service.get_email_address(requester)
-    
-    if not requester_email: 
-        logger.error(f"Could not find email for user {requester}")
+    # Now do the LDAP lookup, file saves, PDF & email outside the DB block
+    requester_email = await ldap_service.get_email_address(payload.requester)
+    if not requester_email:
+        logger.error(f"Could not find email for user {payload.requester}")
         raise HTTPException(status_code=400, detail="Invalid requester")
-    
-    if not payload:
-        raise HTTPException(status_code=400, detail="Invalid data")
-    
-    ################################################################3
-    ## VALidATE/PROCESS PAYLOAD
-    logger.debug(f"DATA: {payload}")
-    #fileAttachments=[FileAttachment(attachment=None, name='NBIS_questionaire_final.pdf', type='application/pdf', size=160428)])]
-    
-    # Create tasks list for files
-    uploaded_files = []
+
+    # Save uploaded files (if any)
+    uploaded_files: List[str] = []
     if files:
         for file in files:
             logger.info(f"Saving uploaded file: {file.filename}")
-            uploaded_files.append(await _save_files(request_id, file)) 
-    
-    # Generate PDF
+            uploaded_files.append(await _save_files(request_id, file))
+
+    # Generate the PDF
     logger.info("Generating PDF document")
     pdf_path: str = await generate_pdf(payload, request_id, uploaded_files)
-    #################################################################################
-    ## BUILD EMAIL PAYLOADS
-    #################################################################################
+
+    # Fetch flags/comments for the SON
     add_comments = cache_service.get_or_set(
         "comments",
         payload.id,
-        lambda: dbas.get_add_comments_by_id(payload.id)
+        lambda: dbas.fetch_just_flags_by_id(payload.id)
     )
-    
     for item in payload.items:
         item.add_comments = add_comments
-    
+
     items_for_email = [
         LineItemsPayload(**item.model_dump())
         for item in payload.items
     ]
-    
-    #################################################################################
-    ## EMAIL PAYLOADS
-    #################################################################################
+
+    # Build the email payload
     email_request_payload = EmailPayloadRequest(
         model_type="email_request",
         id=payload.id,
@@ -455,7 +410,7 @@ async def send_purchase_request(
         order_type=payload.items[0].order_type,
         subject=f"Purchase Request #{payload.id}",
         sender=settings.smtp_email_addr,
-        to=None,   # Assign this in the smtp service
+        to=None,   # Assign this in the SMTP service
         cc=None,
         bcc=None,
         text_body=None,
@@ -463,22 +418,14 @@ async def send_purchase_request(
         items=items_for_email,
         attachments=[pdf_path, *uploaded_files]
     )
-    
-    """
-    # Make the to a condition, if this is a request from a requester, then we need to send it to the approvers
-    # But we need to also send a confirmation to requester that is has been sent to the approvers
-    """
-
     logger.info(f"EMAIL PAYLOAD REQUEST: {email_request_payload}")
-    
-    # Notify requester and approvers
+
+    # Send emails concurrently
     logger.info("Notifying requester and approvers")
-    
-    # Send request to approvers and requester
     async with asyncio.TaskGroup() as tg:
         tg.create_task(smtp_service.send_approver_email(email_request_payload))
         tg.create_task(smtp_service.send_requester_email(email_request_payload))
-    
+
     return JSONResponse({"message": "All work completed"})
 
 #########################################################################

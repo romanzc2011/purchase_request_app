@@ -17,7 +17,7 @@ from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
 from api.settings import settings
-from api.services.db_service import Approval, SonComment, get_all_son_comments, get_session
+from api.services.db_service import Approval, JustificationTemplate, SonComment, get_all_son_comments, get_session
 from api.services.db_service import get_all_approvals
 from api.schemas.comment_schemas import SonCommentSchema
 from sqlalchemy import select
@@ -80,6 +80,30 @@ class PDFService:
                 stmt = select(SonComment).where(SonComment.purchase_request_id == id)
                 comments = session.scalars(stmt).all()
                 
+                flags = dbas.fetch_just_flags_by_id(id)
+                logger.info(f"Flags: {flags}")
+                
+                include_train_not_aval = any(flag[0] for flag in flags)
+                include_needs_not_meet = any(flag[1] for flag in flags)
+                
+                logger.info(f"include_train_not_aval: {include_train_not_aval}")
+                logger.info(f"include_needs_not_meet: {include_needs_not_meet}")
+                
+                add_comments = []
+                #---------------------------------------------------------------------------
+                # Query justification templates
+                if include_train_not_aval:
+                    stmt = select(JustificationTemplate).where(JustificationTemplate.code == "NOT_AVAILABLE")
+                    not_available_comment = session.scalars(stmt).first()
+                    add_comments.append(not_available_comment.description)
+                    logger.info(f"Not available comment: {not_available_comment}")
+							
+                if include_needs_not_meet:
+                    stmt = select(JustificationTemplate).where(JustificationTemplate.code == "DOESNT_MEET_NEEDS")
+                    doesnt_meet_needs_comment = session.scalars(stmt).first()
+                    add_comments.append(doesnt_meet_needs_comment.description)
+                    logger.info(f"Doesnt meet needs comment: {doesnt_meet_needs_comment}")
+            
                 if comments:
                     for c in comments:
                         comment_data = SonCommentSchema.model_validate(c)
@@ -87,12 +111,7 @@ class PDFService:
                         if comment_data.comment_text is not None:
                             comment_arr.append(comment_data.comment_text)
                                 
-                    # Check if there are any additional comments in the addComments field in purchase_requests
-                    add_comments = cache_service.get_or_set(
-                        "comments",
-                        id, 
-                        lambda: dbas.get_add_comments_by_id(id))
-                    
+                    # Check if there are any additional comments in the add_comments field in purchase_requests
                     order_type = cache_service.get_or_set(
                         "order_types",
                         id, 
@@ -238,7 +257,7 @@ class PDFService:
                 date_str = "Not specified"
             
             items = [
-                ("Purchase Req id:", first.get("id","")),
+                ("Purchase Req id:", first.get("request_id","")),
                 ("IRQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", first.get("requester","")),
                 ("CO:", first.get("CO","")),
