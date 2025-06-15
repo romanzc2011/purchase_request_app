@@ -28,7 +28,6 @@ class EmailPayloadRequest(BaseModel):
     datereq: date
     dateneed: Optional[date] = None
     order_type: Optional[str] = None 
-    add_comments: Optional[List[str]] = None
     subject: str
     sender: str
     to: Optional[List[str]] = None  # TODO: This will be the approvers in prod

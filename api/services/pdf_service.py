@@ -81,53 +81,55 @@ class PDFService:
                 comments = session.scalars(stmt).all()
                 
                 flags = dbas.fetch_just_flags_by_id(id)
-                logger.info(f"Flags: {flags}")
-                
                 include_train_not_aval = any(flag[0] for flag in flags)
                 include_needs_not_meet = any(flag[1] for flag in flags)
                 
+                add_comments: list[str] = []
                 logger.info(f"include_train_not_aval: {include_train_not_aval}")
                 logger.info(f"include_needs_not_meet: {include_needs_not_meet}")
                 
-                add_comments = []
                 #---------------------------------------------------------------------------
                 # Query justification templates
                 if include_train_not_aval:
-                    stmt = select(JustificationTemplate).where(JustificationTemplate.code == "NOT_AVAILABLE")
-                    not_available_comment = session.scalars(stmt).first()
-                    add_comments.append(not_available_comment.description)
-                    logger.info(f"Not available comment: {not_available_comment}")
+                    template = session.scalars(
+						select(JustificationTemplate)
+						.where(JustificationTemplate.code == "NOT_AVAILABLE")
+					).first()
+                    add_comments.append(template.description)
 							
                 if include_needs_not_meet:
-                    stmt = select(JustificationTemplate).where(JustificationTemplate.code == "DOESNT_MEET_NEEDS")
-                    doesnt_meet_needs_comment = session.scalars(stmt).first()
-                    add_comments.append(doesnt_meet_needs_comment.description)
-                    logger.info(f"Doesnt meet needs comment: {doesnt_meet_needs_comment}")
+                    template = session.scalars(
+						select(JustificationTemplate)
+						.where(JustificationTemplate.code == "DOESNT_MEET_NEEDS")
+					).first()
+                    add_comments.append(template.description)
             
+				# Append any SON comments first
                 if comments:
                     for c in comments:
-                        comment_data = SonCommentSchema.model_validate(c)
-                        # Only add non-empty comments
-                        if comment_data.comment_text is not None:
-                            comment_arr.append(comment_data.comment_text)
-                                
-                    # Check if there are any additional comments in the add_comments field in purchase_requests
-                    order_type = cache_service.get_or_set(
-                        "order_types",
-                        id, 
-                        lambda: dbas.get_order_types(id))
-                    
-                    # Cache the additional comments
-                    cache_service.set("comments", id, add_comments)
-                    cache_service.set("order_types", id, order_type)
-                    
-                    if add_comments:
-                        # Split comments by semicolon and add each part to the array
-                        for comment in add_comments:
-                            if comment:
-                                comment_arr.extend(comment.split(', '))
-                
+                        cd = SonCommentSchema.model_validate(c)
+                        if cd.comment_text is not None:
+                            comment_arr.append(cd.comment_text)
+                            
+                # Merge add_comments with comment_arr
+                if add_comments:
+                    for comment in add_comments:
+                        # split on comma 
+                        comment_arr.extend(comment.split(', '))
+                        
                 logger.info(f"comment_arr: {comment_arr}")
+                                
+                    # # Check if there are any additional comments in the add_comments field in purchase_requests
+                    # order_type = cache_service.get_or_set(
+                    #     "order_types",
+                    #     id, 
+                    #     lambda: dbas.get_order_types(id))
+                    
+                    # # Cache the additional comments
+                    # cache_service.set("comments", id, add_comments)
+                    # cache_service.set("order_types", id, order_type)
+                    
+			
 
                 # Construct the output path with filename
                 output_path = self.pdf_path / f"statement_of_need-{id}.pdf"
@@ -257,10 +259,10 @@ class PDFService:
                 date_str = "Not specified"
             
             items = [
-                ("Purchase Req id:", first.get("request_id","")),
-                ("IRQ1:", first.get("IRQ1_ID","")),
+                ("Request ID:", first.get("request_id","")),
                 ("Requester:", first.get("requester","")),
                 ("CO:", first.get("CO","")),
+                ("IRQ1:", first.get("IRQ1_ID","")),
                 ("Date Needed:", date_str),
                 
             ]
