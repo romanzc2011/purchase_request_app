@@ -24,7 +24,7 @@ from sqlalchemy import (
     select,
     text
     )
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, selectinload
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.inspection import inspect
@@ -81,6 +81,8 @@ class PurchaseRequest(Base):
     id            = mapped_column(Integer, primary_key=True, autoincrement=True)
     request_id    = mapped_column(String, nullable=False, unique=True)
     uuid          = mapped_column(String, unique=True, default=lambda: str(uuid.uuid4()))
+    irq1_id       = mapped_column(String, nullable=True)
+    co            = mapped_column(String, nullable=True)
     requester     = mapped_column(String, nullable=True)
     phoneext      = mapped_column(Integer, nullable=True)
     datereq       = mapped_column(Date, nullable=True)
@@ -104,8 +106,13 @@ class PurchaseRequest(Base):
     #---------------------------------------------------------------------
     # Relationships
     approvals = relationship("Approval", back_populates ="purchase_request", cascade="all, delete-orphan")
-    purchase_request_line_items = relationship("PurchaseRequestLineItem", back_populates="purchase_request", cascade="all, delete-orphan")
     pending_approvals = relationship("PendingApproval", back_populates="purchase_request", cascade="all, delete-orphan")
+    pr_line_items = relationship(
+		"PurchaseRequestLineItem",
+		back_populates="purchase_request",
+		cascade="all, delete-orphan",
+        foreign_keys=lambda: [PurchaseRequestLineItem.purchase_request_uuid]
+	)
 
     __searchable__ = [
         "request_id",
@@ -119,14 +126,17 @@ class PurchaseRequest(Base):
 Keeps track of the line items for the purchase request
 """
 class PurchaseRequestLineItem(Base):
-    __tablename__ = "purchase_request_line_items"
+    __tablename__ = "pr_line_items"
 
     id                      = mapped_column(Integer, primary_key=True, autoincrement=True)
-    purchase_request_id       = mapped_column(String, ForeignKey("purchase_requests.request_id"), nullable=False, index=True)
+    uuid                    = mapped_column(String, unique=True, default=lambda: str(uuid.uuid4()))
+    purchase_request_uuid   = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False, index=True)
+    request_id              = mapped_column(String, ForeignKey("purchase_requests.request_id"), nullable=False, index=True)
     item_description        = mapped_column(Text,   nullable=False)
     justification           = mapped_column(Text,   nullable=False)
-    train_not_aval          = mapped_column(Boolean, default=False, nullable=False)
+    train_not_aval          = mapped_column(Boolean, default=False, nullable=True)
     needs_not_meet          = mapped_column(Boolean, default=False, nullable=False)
+    add_comments            = mapped_column(Text, nullable=True)
     budget_obj_code         = mapped_column(String, nullable=False)
     fund                    = mapped_column(String, nullable=False)
     quantity                = mapped_column(Integer,nullable=False)
@@ -149,16 +159,27 @@ class PurchaseRequestLineItem(Base):
 
     #---------------------------------------------------------------------
     # ORM relationships
-    purchase_request = relationship("PurchaseRequest", back_populates="purchase_request_line_items")
+    purchase_request = relationship(
+        "PurchaseRequest",
+        back_populates="pr_line_items",
+        foreign_keys=[purchase_request_uuid]
+    )
 
-    line_item_approvals = relationship("LineItemApproval",
-                                       back_populates="purchase_request_line_items",
-                                       cascade="all, delete-orphan")
+    pending_approvals = relationship(
+        "PendingApproval",
+        back_populates="pr_line_item",
+        cascade="all, delete-orphan",
+    )
     
-    pending_approvals = relationship("PendingApproval", back_populates="line_item", cascade="all, delete-orphan")
-
+    line_item_approvals = relationship(
+        "LineItemApproval",
+        back_populates="pr_line_items",
+        cascade="all, delete-orphan",
+    )
+    
     __searchable__ = [
         "id",
+        "uuid",
         "purchase_request_uuid",
         "item_description",
         "quantity",
@@ -175,35 +196,33 @@ FOR READ ONLY PURPOSES WHEN LOOKING AT THE APPROVALS
 """
 class Approval(Base):
     __tablename__ =  "approvals"
-    __searchable__ = ['id', 'irq1_id', 'co', 'requester', 'budget_obj_code', 'fund', 'train_not_aval', 'needs_not_meet',
-                      'quantity', 'total_price', 'price_each', 'location', 'new_request', 
-                      'approved', 'pending_approval', 'status', 'created_time', 'approved_time', 'denied_time']
+    __searchable__ = ['id', 'uuid', 'irq1_id', 'co', 'requester', 'budget_obj_code', 'fund', 'train_not_aval', 'needs_not_meet',
+                      'quantity', 'total_price', 'price_each', 'location', 'status', 'created_time']
 
     # Sequential id for user-facing operations
     id:                     Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    uuid:                   Mapped[str] = mapped_column(String, default=lambda: str(uuid.uuid4()))
+    uuid:                   Mapped[str] = mapped_column(String, unique=True, default=lambda: str(uuid.uuid4()))
     irq1_id:                Mapped[str] = mapped_column(String, nullable=True, unique=True)
-    purchase_request_uuid:      Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False)
-    purchase_request_id:        Mapped[str] = mapped_column(String, nullable=False)
+    purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False, index=True)
     requester:              Mapped[str] = mapped_column(String, nullable=False)
     co:                     Mapped[Optional[str]] = mapped_column(String, nullable=True)
     phoneext:               Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq:                Mapped[str] = mapped_column(String)      
+    datereq:                Mapped[str] = mapped_column(String, nullable=False)      
     dateneed:               Mapped[Optional[str]] = mapped_column(String, nullable=True)      
     order_type:             Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    file_attachments:       Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
-    item_description:       Mapped[str] = mapped_column(Text)
-    justification:          Mapped[str] = mapped_column(Text)
+    file_attachments:       Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    item_description:       Mapped[str] = mapped_column(Text, nullable=False)
+    justification:          Mapped[str] = mapped_column(Text, nullable=False)
     train_not_aval:         Mapped[bool] = mapped_column(Boolean, nullable=True)
     needs_not_meet:         Mapped[bool] = mapped_column(Boolean, nullable=True)
-    budget_obj_code:        Mapped[str] = mapped_column(String)
-    fund:                   Mapped[str] = mapped_column(String)
-    price_each:             Mapped[float] = mapped_column(Float)
-    total_price:            Mapped[float] = mapped_column(Float)
-    location:               Mapped[str] = mapped_column(String)
-    quantity:               Mapped[int] = mapped_column(Integer)
+    budget_obj_code:        Mapped[str] = mapped_column(String, nullable=False)
+    fund:                   Mapped[str] = mapped_column(String, nullable=False)
+    price_each:             Mapped[float] = mapped_column(Float, nullable=False)
+    total_price:            Mapped[float] = mapped_column(Float, nullable=False)
+    location:               Mapped[str] = mapped_column(String, nullable=False)
+    quantity:               Mapped[int] = mapped_column(Integer, nullable=False)
     created_time:           Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
-    is_cyber_sec_related:   Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    is_cyber_sec_related:   Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
      
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
                                                                 name="item_status",
@@ -217,9 +236,7 @@ class Approval(Base):
     purchase_request = relationship("PurchaseRequest", back_populates="approvals")
     son_comments = relationship("SonComment", back_populates="approvals", cascade="all, delete-orphan")
     line_item_approvals = relationship("LineItemApproval", back_populates="approvals", cascade="all, delete-orphan")
-    
-    # TODO: How is there no relationship between Approval and PendingApproval?
-   # pending_approvals     = relationship("PendingApproval", back_populates="approvals", cascade="all, delete-orphan")
+    pending_approvals = relationship("PendingApproval", back_populates="approval", cascade="all, delete-orphan")
 
 # Justification ORM model - singleton table for justification text
 class JustificationTemplate(Base):
@@ -243,7 +260,7 @@ async def seed_justification_templates(db: AsyncSession):
 		),
 		JustificationTemplate(
 			code="DOESNT_MEET_NEEDS",
-			description="Current offerings lack the spcc"
+			description="Current offerings do not meet the needs of the requester."
 		),
 	]
     db.add_all(templates)
@@ -278,10 +295,15 @@ class TaskStatus(enum.Enum):
     
 class PendingApproval(Base):
     __tablename__ = "pending_approvals"
+    """
+    This is more of a workflow table, it tracks the status of the approval process for a single line item.
+    """
 
     task_id                    = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uuid                       = mapped_column(String, unique=True, default=lambda: str(uuid.uuid4()))
     purchase_request_uuid      = mapped_column(String, ForeignKey("purchase_requests.uuid"), nullable=False, index=True)
-    purchase_request_line_item_id = mapped_column(Integer, ForeignKey("purchase_request_line_items.id"), nullable=True, index=True)
+    pr_line_item_id           = mapped_column(Integer, ForeignKey("pr_line_items.id"), nullable=True, index=True)
+    approval_uuid              = mapped_column(String, ForeignKey("approvals.uuid"), nullable=True, index=True)
     assigned_group             = mapped_column(String, nullable=False)
 
     # workflow‐status enum
@@ -316,26 +338,31 @@ class PendingApproval(Base):
         "PurchaseRequest",
         back_populates="pending_approvals"
     )
-    line_item = relationship(
+    pr_line_item = relationship(
         "PurchaseRequestLineItem",
+        back_populates="pending_approvals"
+    )
+    approval = relationship(
+        "Approval",
         back_populates="pending_approvals"
     )
 
 ###################################################################################################
-## Line Item Status TABLE
+## Line Item Status TABLE ( This is the approval for a single line item, decision maker payload/table )
 class LineItemApproval(Base):
     __tablename__ = "line_item_approvals"
     id            = mapped_column(Integer, primary_key=True)
-    approvals_uuid = mapped_column(String, ForeignKey("approvals.uuid"))
-    purchase_req_line_item_id  = mapped_column(Integer, ForeignKey("purchase_request_line_items.id"))
-    approver      = mapped_column(String)
-    decision      = mapped_column(SQLEnum(ItemStatus))
+    uuid          = mapped_column(String, unique=True, default=lambda: str(uuid.uuid4()))
+    approvals_uuid = mapped_column(String, ForeignKey("approvals.uuid"), nullable=False, index=True)
+    pr_line_item_uuid = mapped_column(String, ForeignKey("pr_line_items.uuid"), nullable=False, index=True)
+    approver      = mapped_column(String, nullable=False)
+    decision      = mapped_column(SQLEnum(ItemStatus), nullable=False)
     comments      = mapped_column(Text, nullable=True)
-    created_at    = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at    = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     #---------------------------------------------------------------------
     # RELATIONSHIPS
-    purchase_request_line_items = relationship("PurchaseRequestLineItem", back_populates="line_item_approvals")
+    pr_line_items = relationship("PurchaseRequestLineItem", back_populates="line_item_approvals")
     approvals = relationship("Approval", back_populates="line_item_approvals")
 
 ###################################################################################################
@@ -345,7 +372,7 @@ class SonComment(Base):
     
     id:                 Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     approvals_uuid:      Mapped[str] = mapped_column(String, ForeignKey("approvals.uuid"), nullable=False)
-    purchase_request_id:   Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    request_id:			Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.request_id"), nullable=False)
     comment_text:       Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at:         Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
     son_requester:      Mapped[str] = mapped_column(String, nullable=False)
@@ -353,7 +380,10 @@ class SonComment(Base):
     
     #---------------------------------------------------------------------
     # RELATIONSHIPS
-    approvals = relationship("Approval", back_populates="son_comments")
+    approvals = relationship(
+        "Approval",
+        foreign_keys=[approvals_uuid],
+        back_populates="son_comments")
 
 ###################################################################################################
 ## USERS TABLE  -- TESTING ONLY
@@ -368,28 +398,59 @@ class Users(Base):
 ###################################################################################################
 # Get all data from Approval
 ###################################################################################################
-def get_all_approvals(id: str):
-    if not id:
-        raise HTTPException(status_code=400, detail="id is required")
+def get_all_approvals(uuid: str):	
+    if not uuid:
+        raise HTTPException(status_code=400, detail="uuid is required")
     with get_session() as session:
-        stmt = select(Approval).where(Approval.purchase_request_id == id)
+        stmt = select(Approval).where(Approval.purchase_request_uuid == uuid)
         approvals = session.scalars(stmt).all()
         
         if not approvals:
             raise HTTPException(status_code=404, detail="Approval not found")
         
         return approvals
+    
+###################################################################################################
+# Get Purchase Request Header and Line Items
+###################################################################################################
+def get_pr_header_and_line_items(request_id: str):
+    with get_session() as session:
+        # 1) Load the header AND its .pr_line_items relationship in one query
+        pr_header = session.scalar(
+            select(PurchaseRequest)
+            .options(selectinload(PurchaseRequest.pr_line_items))
+            .where(PurchaseRequest.request_id == request_id)
+        )
+        if not pr_header:
+            raise HTTPException(status_code=404, detail=f"Purchase Request '{request_id}' not found")
 
+        # 2) The related items are now on pr_header.pr_line_items  
+        line_items = pr_header.pr_line_items
+        if not line_items:
+            raise HTTPException(status_code=404, detail=f"No line items for Purchase Request '{request_id}'")
+
+        return pr_header, line_items
+    
 ###################################################################################################
 # Get all son comments by id
 ###################################################################################################
 def fetch_just_flags_by_id(id: str):
     with get_session() as session:
-        stmt = (select(
-            PurchaseRequestLineItem.train_not_aval,
-            PurchaseRequestLineItem.needs_not_meet,
-        ).where(PurchaseRequestLineItem.purchase_request_id == id))
-        return session.execute(stmt).all()
+        stmt = (
+            select(
+                PurchaseRequestLineItem.train_not_aval,
+                PurchaseRequestLineItem.needs_not_meet,
+            ).join(
+                PurchaseRequest,
+                PurchaseRequest.uuid == PurchaseRequestLineItem.purchase_request_uuid
+            ).where(
+                PurchaseRequest.request_id == id
+            )
+        )
+        results = session.execute(stmt).all()
+        if not results:
+            raise HTTPException(status_code=404, detail=f"No line items for Purchase Request '{id}'")
+        return results
     
 ###################################################################################################
 # Get all son comments by id

@@ -310,7 +310,8 @@ async def send_purchase_request(
         pr_line_item_ids: List[int] = []
         for item in payload.items:
             orm_pr_line_item = ORM_PurchaseRequestLineItem(
-                purchase_request_id=orm_pr_header.request_id,
+                purchase_request_uuid=orm_pr_header.uuid,
+                request_id=orm_pr_header.request_id,
                 item_description=item.item_description,
                 justification=item.justification,
                 train_not_aval=item.train_not_aval,
@@ -333,7 +334,6 @@ async def send_purchase_request(
             appr = ORM_Approval(
                 uuid=str(uuid.uuid4()),
                 purchase_request_uuid=orm_pr_header.uuid,
-                purchase_request_id=orm_pr_header.request_id,
                 requester=payload.requester,
                 phoneext=item.phoneext,
                 datereq=item.datereq,
@@ -360,7 +360,8 @@ async def send_purchase_request(
             assigned_group = "IT" if item.fund.startswith("511") else "Finance"
             task = PendingApproval(
                 purchase_request_uuid=orm_pr_header.uuid,
-                purchase_request_line_item_id=line_id,
+                pr_line_item_id=line_id,
+                approval_uuid=appr.uuid,
                 assigned_group=assigned_group,
                 status=TaskStatus.NEW,
             )
@@ -385,30 +386,16 @@ async def send_purchase_request(
     logger.info("Generating PDF document")
     pdf_path: str = await generate_pdf(payload, request_id, uploaded_files)
 
-    # Fetch flags/comments for the SON
-    add_comments = cache_service.get_or_set(
-        "comments",
-        payload.id,
-        lambda: dbas.fetch_just_flags_by_id(payload.id)
-    )
-    for item in payload.items:
-        item.add_comments = add_comments
-
-    items_for_email = [
-        LineItemsPayload(**item.model_dump())
-        for item in payload.items
-    ]
-
     # Build the email payload
     email_request_payload = EmailPayloadRequest(
         model_type="email_request",
-        id=payload.id,
+        id=payload.request_id,
         requester=payload.requester,
         requester_email=requester_email,
         datereq=payload.items[0].datereq,
         dateneed=payload.items[0].dateneed,
         order_type=payload.items[0].order_type,
-        subject=f"Purchase Request #{payload.id}",
+        subject=f"Purchase Request #{payload.request_id}",
         sender=settings.smtp_email_addr,
         to=None,   # Assign this in the SMTP service
         cc=None,

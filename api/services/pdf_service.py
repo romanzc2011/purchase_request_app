@@ -1,3 +1,4 @@
+from api.schemas.purchase_schemas import PurchaseRequestHeader, PurchaseRequestLineItem
 from api.services.cache_service import cache_service
 from fastapi import HTTPException
 from reportlab.lib.pagesizes import LETTER
@@ -58,16 +59,21 @@ class PDFService:
                 raise HTTPException(status_code=400, detail="id is required")
             
             try:
+                # Get header and line items data from purchase_requests
+                pr_header, line_items = dbas.get_pr_header_and_line_items(id)
+                logger.info(f"pr_header: {pr_header}")
+                logger.info(f"line_items: {line_items}")
+                
                 # Get all approvals for this id
-                stmt = select(Approval).where(Approval.purchase_request_id == id)
-                approvals = session.scalars(stmt).all()
+                # stmt = select(Approval).where(Approval.purchase_request_id == id)
+                # approvals = session.scalars(stmt).all()
                 
-                logger.info(f"approvals: {approvals}")
-                if not approvals:
-                    raise HTTPException(status_code=404, detail="No approvals found for this id")
-                
-                # Convert to list of dicts
-                rows = [ApprovalDetailSchema.model_validate(a).model_dump() for a in approvals]
+                # logger.info(f"approvals: {approvals}")
+                # if not approvals:
+                #     raise HTTPException(status_code=404, detail="No approvals found for this id")
+              
+                pr_header = PurchaseRequestHeader.model_validate(pr_header).model_dump()
+                rows = [PurchaseRequestLineItem.model_validate(li).model_dump() for li in line_items]
                 logger.info(f"rows: {rows}")
                 
                 # Check if any line items as marked as cyber security related
@@ -77,7 +83,7 @@ class PDFService:
                 # Initialize order_type with a default value
                 order_type = None
                 
-                stmt = select(SonComment).where(SonComment.purchase_request_id == id)
+                stmt = select(SonComment).where(SonComment.request_id == pr_header.get("request_id"))
                 comments = session.scalars(stmt).all()
                 
                 flags = dbas.fetch_just_flags_by_id(id)
@@ -118,24 +124,18 @@ class PDFService:
                         comment_arr.extend(comment.split(', '))
                         
                 logger.info(f"comment_arr: {comment_arr}")
-                                
-                    # # Check if there are any additional comments in the add_comments field in purchase_requests
-                    # order_type = cache_service.get_or_set(
-                    #     "order_types",
-                    #     id, 
-                    #     lambda: dbas.get_order_types(id))
-                    
-                    # # Cache the additional comments
-                    # cache_service.set("comments", id, add_comments)
-                    # cache_service.set("order_types", id, order_type)
-                    
-			
 
                 # Construct the output path with filename
                 output_path = self.pdf_path / f"statement_of_need-{id}.pdf"
                                 
                 # Generate PDF
-                return self._make_purchase_request_pdf(rows=rows, output_path=output_path, is_cyber=is_cyber, comments=comment_arr, order_type=order_type)
+                return self._make_purchase_request_pdf(
+                    pr_header=pr_header, 
+                    rows=rows, 
+                    output_path=output_path, 
+                    is_cyber=is_cyber, 
+                    comments=comment_arr, 
+                    order_type=order_type)
             
             except Exception as e:
                 logger.error(f"Error creating PDF: {e}")
@@ -159,7 +159,8 @@ class PDFService:
                 The path to the generated PDF.
         """
     @staticmethod
-    def _make_purchase_request_pdf(rows: list[dict], 
+    def _make_purchase_request_pdf(pr_header: dict, 
+                                   rows: list[dict], 
                                    output_path: Path, 
                                    is_cyber: bool, 
                                    comments: list[str]=None, 
@@ -215,7 +216,8 @@ class PDFService:
         )
 
         # Get first row data
-        first = rows[0] if rows else {}
+        pr_header = rows[0] if rows else {}
+        logger.info(f"First row data for header: {pr_header}")
 
         #— draw header on canvas
         def draw_header(canvas, doc):
@@ -235,19 +237,21 @@ class PDFService:
             canvas.setFont("Play-Bold", 9)
             text_x = 0.2*inch
             text_y = y_logo - img_h - 20
-            logger.info(f"First row data for header: {first}")
-            logger.info(f"Date needed value: {first.get('dateneed')}")
+            logger.info(f"First row data for header: {pr_header}")
+            logger.info(f"Date needed value: {pr_header.get('dateneed')}")
             
-            date_val = first.get("dateneed")
+            date_val = pr_header.get("dateneed")
             # Use the function argument or fallback to row value
-            order_type_val_local = order_type if order_type else first.get("order_type")
+            order_type_val_local = order_type if order_type else pr_header.get("order_type")
             date_str = None
 
             # Format date needed
             if isinstance(date_val, (datetime, date)):
                 date_str = date_val.strftime("%Y-%m-%d")
+                
             elif isinstance(date_val, str) and date_val:
                 date_str = date_val.split("T", 1)[0]
+                
             elif isinstance(order_type_val_local, str):
                 if order_type_val_local == "QUARTERLY_ORDER":
                     date_str = "Quarterly Order"
@@ -259,10 +263,10 @@ class PDFService:
                 date_str = "Not specified"
             
             items = [
-                ("Request ID:", first.get("request_id","")),
-                ("Requester:", first.get("requester","")),
-                ("CO:", first.get("CO","")),
-                ("IRQ1:", first.get("IRQ1_ID","")),
+                ("Request ID:", pr_header.get("request_id","")),
+                ("Requester:", pr_header.get("requester","")),
+                ("CO:", pr_header.get("CO","")),
+                ("IRQ1:", pr_header.get("IRQ1_ID","")),
                 ("Date Needed:", date_str),
                 
             ]
@@ -330,11 +334,16 @@ class PDFService:
         elements.append(Spacer(1, 6))
 
         # Comments paragraph with all collected comments
+        # if comments:
+        #     comments_text = "Comments/Additional Information Requested:<br/>" + "<br/>".join([str(c) for c in comments])
+        #     comments_para = Paragraph(comments_text, comment_style)
+        #     elements.append(comments_para)
+        #     elements.append(Spacer(1, 6))
+        
         if comments:
-            comments_text = "<b>Comments/Additional Information Requested:</b><br/>" + "<br/>".join([str(c) for c in comments])
-            comments_para = Paragraph(comments_text, comment_style)
-            elements.append(comments_para)
-            elements.append(Spacer(1, 6))
+            heading_para = Paragraph("Comments/Additional Information Requested:", bold_style)
+            body_para = Paragraph("<br />".join(str(c) for c in comments), comment_style)
+            elements.extend([heading_para, Spacer(1, 6), body_para, Spacer(1, 6)])
 
         # Build TOTAL line
         total_style = ParagraphStyle(

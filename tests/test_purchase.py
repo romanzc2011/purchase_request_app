@@ -6,13 +6,13 @@ def test_create_new_id_increments(client):
     resp1 = client.post("/api/create_new_id")
     assert resp1.status_code == 200
     id1 = resp1.json()["id"]
-    assert id1 == "LAWB0001"
+    assert id1 == "LAWB0006"
     
 def test_send_purchase_request(client):
     # build a minimal payload matching PurchaseRequestPayload schema
     item = {
         "uuid": "11111111-2222-3333-4444-555555555555",
-        "id": "LAWB0001",
+        "id": "LAWB0006",
         "requester": "testuser",
         "phoneext": "1234",
         "datereq": "2025-06-12",

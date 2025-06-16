@@ -33,9 +33,9 @@ Must accept this model first
 """
 class PurchaseRequestItem(BaseModel):
     uuid: str
-    id: str
+    request_id: str = Field(alias="id")
     requester: str
-    phoneext: str
+    phoneext: int
     datereq: date
     order_type: str
     item_description: str
@@ -62,11 +62,13 @@ class PurchaseRequestItem(BaseModel):
 #  PURCHASE REQUEST HEADER SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestHeader(BaseModel):
-    id:             str
+    id:             int
+    request_id:     str
     uuid:           str 
-    irq1_id:        Optional[str]
-    requester: str
-    phoneext: str
+    irq1_id:        Optional[str] = None
+    co:             Optional[str] = None
+    requester:      str
+    phoneext:       Optional[int] = None
     datereq: date
     dateneed: Optional[date] = None
     order_type: Optional[str] = None
@@ -80,7 +82,7 @@ class PurchaseRequestHeader(BaseModel):
 #  PURCHASE REQUEST LINE ITEM SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestLineItem(BaseModel):
-    id:                     int
+    request_id:             str
     purchase_request_uuid:  str
     item_description:       str
     justification:          str
@@ -104,7 +106,7 @@ class PurchaseRequestLineItem(BaseModel):
 #  PURCHASE REQUEST PAYLOAD SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestPayload(BaseModel):
-    id:             Optional[str] = None
+    request_id:     Optional[str] = None
     requester:      str
     items:  List[PurchaseRequestItem]
     item_count:     int
