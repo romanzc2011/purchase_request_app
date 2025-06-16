@@ -62,7 +62,6 @@ class PurchaseRequestItem(BaseModel):
 #  PURCHASE REQUEST HEADER SCHEMA
 # --------------------------------------------------------------
 class PurchaseRequestHeader(BaseModel):
-    id:             int
     request_id:     str
     uuid:           str 
     irq1_id:        Optional[str] = None

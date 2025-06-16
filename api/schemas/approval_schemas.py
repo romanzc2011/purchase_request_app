@@ -1,4 +1,5 @@
 from api.schemas.comment_schemas import SonCommentSchema
+from api.schemas.purchase_schemas import PurchaseRequestHeader
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import date, datetime
@@ -23,10 +24,11 @@ class LineItemApprovalSchema(BaseModel):
 class ApprovalDetailSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    # all the table fields
+    # core approval fields
     id: int
-    request_id: str
     uuid: str
+    purchase_request_uuid: str
+    purchase_request_id: str
     irq1_id: Optional[str]
     requester: str
     budget_obj_code: str
@@ -39,31 +41,34 @@ class ApprovalDetailSchema(BaseModel):
     justification: str
     status: ItemStatus
 
+    # parent‐request fields
     purchase_request_uuid: str
     purchase_request_id: str
     co: Optional[str]
     phoneext: int
-    datereq: str
-    dateneed: Optional[str]
+    datereq: date
+    dateneed: Optional[date]
     order_type: Optional[str]
     file_attachments: Optional[bytes]
     created_time: datetime
     is_cyber_sec_related: bool
 
-    # relationships
+    # nested relationships
     son_comments: Optional[List[SonCommentSchema]] = None
     line_item_approvals: Optional[List[LineItemApprovalSchema]] = None
+    purchase_request: Optional[PurchaseRequestHeader] = None
     
 # ——————————————————————————————————————
 # APPROVAL CREATE SCHEMA
-# what your endpoint expects in the request body
-class ApprovalCreateSchema(BaseModel):
+# what your endpoint e`xpects in the request body
+class ApprovalSchema(BaseModel):
     """What the client must send to create a new Approval."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
-    request_id: str
     uuid: str
     purchase_request_uuid: str
-    purchase_request_id: str
+    irq1_id: Optional[str] = None
     requester: str
     co: Optional[str] = None
     phoneext: int
@@ -82,16 +87,26 @@ class ApprovalCreateSchema(BaseModel):
     quantity: int
     is_cyber_sec_related: bool = Field(False, alias="is_cyber_sec_related")
     status: ItemStatus
-        
-        # ——————————————————————————————————————
+    created_time: datetime
+
+    @property
+    def request_id(self) -> str:
+        return self.purchase_request.request_id if hasattr(self, 'purchase_request') else None
+
+    @property
+    def purchase_request_id(self) -> str:
+        return self.purchase_request.request_id if hasattr(self, 'purchase_request') else None
+
+# ——————————————————————————————————————
 # 1) ApprovalTableSchema
 # for listing in your table view (12 columns)
 # ——————————————————————————————————————
 class ApprovalTableSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    request_id: str
+    uuid: str
+    purchase_request_uuid: str
+    purchase_request_id: str
     irq1_id: Optional[str] = Field(None, alias="irq1_id", title="IRQ1 #")
     requester: str
     budget_obj_code: str

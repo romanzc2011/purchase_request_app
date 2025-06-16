@@ -19,7 +19,6 @@ from loguru import logger
 from pathlib import Path
 from api.settings import settings
 from api.services.db_service import Approval, JustificationTemplate, SonComment, get_all_son_comments, get_session
-from api.services.db_service import get_all_approvals
 from api.schemas.comment_schemas import SonCommentSchema
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -171,6 +170,8 @@ class PDFService:
         logger.info(f"#####################################################")
         logger.info(f"COMMENTS: {comments}")
         
+        header_data = pr_header
+        
         # ensure output folder exists
         output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
         
@@ -215,10 +216,6 @@ class PDFService:
             topMargin=img_h + gap + 1*inch, bottomMargin=1*inch
         )
 
-        # Get first row data
-        pr_header = rows[0] if rows else {}
-        logger.info(f"First row data for header: {pr_header}")
-
         #— draw header on canvas
         def draw_header(canvas, doc):
             canvas.saveState()
@@ -228,6 +225,8 @@ class PDFService:
             x_logo = 0.2*inch
             y_logo = LETTER[1] - 0.2*inch
             canvas.drawImage(str(logo_path), x_logo, y_logo - img_h, width=img_w, height=img_h, mask='auto')
+            logger.info(f"Using for header: {header_data}")
+            logger.info(f"Date needed value: {header_data.get('dateneed')}")
 
             # title
             canvas.setFont("Play-Bold", 16)
@@ -240,9 +239,9 @@ class PDFService:
             logger.info(f"First row data for header: {pr_header}")
             logger.info(f"Date needed value: {pr_header.get('dateneed')}")
             
-            date_val = pr_header.get("dateneed")
+            date_val = header_data.get("dateneed")
             # Use the function argument or fallback to row value
-            order_type_val_local = order_type if order_type else pr_header.get("order_type")
+            order_type_val_local = order_type or header_data.get("order_type")
             date_str = None
 
             # Format date needed
@@ -263,10 +262,10 @@ class PDFService:
                 date_str = "Not specified"
             
             items = [
-                ("Request ID:", pr_header.get("request_id","")),
-                ("Requester:", pr_header.get("requester","")),
-                ("CO:", pr_header.get("CO","")),
-                ("IRQ1:", pr_header.get("IRQ1_ID","")),
+                ("Request ID:", header_data.get("request_id","")),
+                ("Requester:", header_data.get("requester","")),
+                ("CO:", header_data.get("CO","")),
+                ("IRQ1:", header_data.get("IRQ1_ID","")),
                 ("Date Needed:", date_str),
                 
             ]

@@ -11,9 +11,9 @@ uvicorn pras_api:app --port 5004
 
 from datetime import datetime, timezone
 import json
-from api.schemas.approval_schemas import ApprovalCreateSchema
 from api.schemas.comment_schemas import CommentItem
 from pydantic import ValidationError
+from api.schemas.approval_schemas import ApprovalSchema
 from fastapi import (
     FastAPI,
     APIRouter,
@@ -36,7 +36,7 @@ from fastapi.security import (
     OAuth2PasswordRequestForm,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.services.db_service import PendingApproval, TaskStatus, get_db
+from api.services.db_service import PendingApproval, TaskStatus, get_async_session
 import asyncio
 
 # PRAS Miscellaneous Dependencies
@@ -135,27 +135,34 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 ##########################################################################
 @api_router.get("/get_approval_data", response_model=List[ApprovalSchema])
 async def get_approval_data(
-    id: Optional[str] = Query(None),
+    request_id: Optional[str] = Query(None),
     current_user: LDAPUser = Depends(auth_service.get_current_user)):
     
     # Check if user is in IT group or CUE group
     logger.info(f"CURRENT USER: {current_user}")
+    
     with get_session() as session:
         try:
-            if id:
-                approval = dbas.get_approval_by_id(session, id)
+            if request_id:
+                approval = dbas.get_approval_by_id(session, request_id)
                 if approval:
+                    # Ensure the purchase_request relationship is loaded
+                    session.refresh(approval)
                     approval_data = [ApprovalSchema.model_validate(approval)]
                 else:
                     approval_data = []
             else:
                 approvals = dbas.get_all_approval(session)
+                # Ensure all relationships are loaded
+                for approval in approvals:
+                    session.refresh(approval)
                 approval_data = [ApprovalSchema.model_validate(approval) for approval in approvals]
         
             return approval_data
         finally:
             session.close()
-        
+    
+    
 ##########################################################################
 ## GET STATEMENT OF NEED FORM
 ##########################################################################
@@ -273,7 +280,7 @@ async def send_purchase_request(
     payload_json: str = Form(..., description="The JSON payload for your request"),
     files: Optional[List[UploadFile]] = File(None, description="Multiple files"),
     current_user: LDAPUser = Depends(auth_service.get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     This endpoint:
