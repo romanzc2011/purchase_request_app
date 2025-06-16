@@ -22,7 +22,7 @@ class LineItemsPayload(BaseModel):
 # --------------------------------------------------------------
 class EmailPayloadRequest(BaseModel):
     model_type: Literal["email_request"]
-    id: str
+    request_id: str
     requester: str
     requester_email: str
     datereq: date

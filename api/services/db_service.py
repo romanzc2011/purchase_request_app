@@ -759,7 +759,7 @@ def init_db():
                     ),
                     JustificationTemplate(
                         code="DOESNT_MEET_NEEDS",
-                        description="Current offerings lack the spcc"
+                        description="Current offerings do not meet the needs of the requester."
                     ),
                 ])
                 session.commit()

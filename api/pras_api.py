@@ -386,16 +386,30 @@ async def send_purchase_request(
     logger.info("Generating PDF document")
     pdf_path: str = await generate_pdf(payload, request_id, uploaded_files)
 
+    # Fetch flags/comments for the SON
+    add_comments = cache_service.get_or_set(
+        "comments",
+        request_id,
+        lambda: dbas.fetch_just_flags_by_id(request_id)
+    )
+    for item in payload.items:
+        item.add_comments = add_comments
+
+    items_for_email = [
+        LineItemsPayload(**item.model_dump())
+        for item in payload.items
+    ]
+
     # Build the email payload
     email_request_payload = EmailPayloadRequest(
         model_type="email_request",
-        id=payload.request_id,
+        request_id=request_id,
         requester=payload.requester,
         requester_email=requester_email,
         datereq=payload.items[0].datereq,
         dateneed=payload.items[0].dateneed,
         order_type=payload.items[0].order_type,
-        subject=f"Purchase Request #{payload.request_id}",
+        subject=f"Purchase Request #{request_id}",
         sender=settings.smtp_email_addr,
         to=None,   # Assign this in the SMTP service
         cc=None,

@@ -3,7 +3,7 @@
   <head>
     <!--
       Inlining a Google-hosted font rarely works in most email clients,
-      so we’ll just specify a fallback stack that approximates “Google Play”.
+      so we'll just specify a fallback stack that approximates "Google Play".
       If your environment supports webfonts (rare for email), you can uncomment
       the @import below and hope the client loads it.
     -->
@@ -64,24 +64,24 @@
       <tr>
         <td colspan="2" style="padding: 0 20px 20px 20px;">
           <p style="margin: 4px 0; font-size: 14px;">
-            <strong>Purchase Req ID:</strong> {{ ID or 'N/A' }}
+            <strong>Purchase Request ID:</strong> {{ request_id or 'N/A' }}
           </p>
           <p style="margin: 4px 0; font-size: 14px;">
-            <strong>IRQ1:</strong> {{ IRQ1 or 'None' }}
+            <strong>IRQ1:</strong> {{ irq1_id or 'None' }}
           </p>
           <p style="margin: 4px 0; font-size: 14px;">
             <strong>Requester:</strong> {{ requester }}
           </p>
           <p style="margin: 4px 0; font-size: 14px;">
-            <strong>CO:</strong> {{ CO or 'None' }}
+            <strong>CO:</strong> {{ co or 'None' }}
           </p>
           <p style="margin: 4px 0; font-size: 14px;">
             <strong>Date Needed:</strong>
             {% if dateneed %}
               {{ dateneed.strftime("%Y-%m-%d") if dateneed else dateneed }}
-            {% elif orderType == 'QUARTERLY_ORDER' %}
+            {% elif order_type == 'QUARTERLY_ORDER' %}
               Quarterly Order
-            {% elif orderType == 'NO_RUSH' %}
+            {% elif order_type == 'NO_RUSH' %}
               No Rush
             {% else %}
               Not specified
@@ -200,7 +200,7 @@
               "
             >
               <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
-                {{ item.budgetObjCode or '—' }}
+                {{ item.budget_obj_code or '—' }}
               </td>
               <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
                 {{ item.fund }}
@@ -209,7 +209,7 @@
                 {{ item.location }}
               </td>
               <td style="padding: 8px; border-bottom: 1px solid #eeeeee;">
-                {{ item.itemDescription }}
+                {{ item.item_description }}
               </td>
               <td
                 align="right"
@@ -232,7 +232,7 @@
                   padding-right: 20px;
                 "
               >
-                ${{ "%.2f"|format(item.priceEach) }}
+                ${{ "%.2f"|format(item.price_each) }}
               </td>
               <td
                 align="right"
@@ -242,7 +242,7 @@
                   padding-right: 20px;
                 "
               >
-                ${{ "%.2f"|format(item.totalPrice) }}
+                ${{ "%.2f"|format(item.total_price) }}
               </td>
               
             </tr>
@@ -270,7 +270,7 @@
                   font-weight: 700;
                 "
               >
-                ${{ "%.2f"|format(totalPrice) }}
+                ${{ "%.2f"|format(total_price) }}
               </td>
             </tr>
           </table>

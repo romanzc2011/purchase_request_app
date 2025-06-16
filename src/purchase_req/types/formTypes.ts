@@ -7,6 +7,7 @@ import { ItemStatus } from "./approvalTypes";
 export type FormValues = {
   uuid?: string;
   id?: string;
+  request_id?: string;
   irq1_id?: string;
   requester: string;
   phoneext: string;

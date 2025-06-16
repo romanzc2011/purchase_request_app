@@ -4,6 +4,7 @@ export const purchaseItemSchema = z
   .object({
     uuid:            z.string().optional(),
     id:              z.string().optional(),
+    request_id:      z.string().optional(),
     irq1_id:         z.string().optional(),
     requester:       z.string().min(1, "Requester is required"),
     phoneext:        z.string().min(1, "Phone extension is required"),

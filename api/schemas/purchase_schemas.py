@@ -33,7 +33,7 @@ Must accept this model first
 """
 class PurchaseRequestItem(BaseModel):
     uuid: str
-    request_id: str = Field(alias="id")
+    request_id: Optional[str] = None
     requester: str
     phoneext: int
     datereq: date
