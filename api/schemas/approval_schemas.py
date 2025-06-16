@@ -11,6 +11,7 @@ from api.services.db_service import TaskStatus, ItemStatus
 class LineItemApprovalSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    request_id: str
     approver: str
     decision: ItemStatus
     comments: Optional[str]
@@ -24,6 +25,7 @@ class ApprovalDetailSchema(BaseModel):
 
     # all the table fields
     id: int
+    request_id: str
     uuid: str
     irq1_id: Optional[str]
     requester: str
@@ -58,6 +60,7 @@ class ApprovalDetailSchema(BaseModel):
 class ApprovalCreateSchema(BaseModel):
     """What the client must send to create a new Approval."""
     id: int
+    request_id: str
     uuid: str
     purchase_request_uuid: str
     purchase_request_id: str
@@ -88,6 +91,7 @@ class ApprovalTableSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    request_id: str
     irq1_id: Optional[str] = Field(None, alias="irq1_id", title="IRQ1 #")
     requester: str
     budget_obj_code: str
@@ -119,6 +123,7 @@ class PendingApprovalSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     task_id: int
+    request_id: str
     purchase_request_uuid: str
     purchase_request_line_item_id: Optional[int] = None
     assigned_group: str
@@ -138,7 +143,7 @@ class SonCommentDetail(BaseModel):
 
     id: int
     approvals_uuid: str
-    purchase_request_id: Optional[str]
+    request_id: Optional[str]
     comment_text: Optional[str]
     son_requester: str
     item_description: Optional[str]
