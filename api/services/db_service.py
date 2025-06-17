@@ -1,15 +1,37 @@
 from datetime import datetime, timezone
+from http.client import HTTPException
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from loguru import logger
+from aiocache import Cache, cached
 from sqlalchemy import select
-from sqlalchemy import (create_engine, String, Integer,
-                         Float, Boolean, Text, LargeBinary, ForeignKey, DateTime, Enum)
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import (
+    create_engine, 
+    String, 
+    Integer, 
+    Date, 
+    Float, 
+    Boolean, 
+    Text, 
+    LargeBinary, 
+    ForeignKey, 
+    DateTime, 
+    Enum as SAEnum, 
+    JSON, 
+    func,
+    Enum as SQLEnum,
+    literal,
+    func,
+    select,
+    text,
+    )
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import declarative_base, selectinload, aliased
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.inspection import inspect
-from sqlalchemy import Enum as SQLEnum
+from datetime import datetime, timezone
 from contextlib import contextmanager
-from typing import Optional
+from typing import List, Optional
 import uuid
 import enum
 import os
@@ -19,9 +41,18 @@ db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
 os.makedirs(db_dir, exist_ok=True)
 
 # Create engine and base
-engine = create_engine('sqlite:///api/db/pras.db', echo=False)  # PRAS = Purchase Request Approval System
+engine = create_engine('sqlite:///api/db/pras.db', echo=True)  # PRAS = Purchase Request Approval System
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
+
+DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
+engine_async = create_async_engine(DATABASE_URL_ASYNC, echo=True)
+AsyncSessionLocal = sessionmaker(bind=engine_async, class_=AsyncSession)
+
+# dependency to hand out AsyncSession instances
+async def get_async_session() -> AsyncSession:
+    async with AsyncSessionLocal() as async_session:
+        yield async_session
 
 @contextmanager
 def get_session():
@@ -30,6 +61,11 @@ def get_session():
         yield db
     finally:
         db.close()
+        
+@staticmethod
+def utc_now_truncated() -> datetime:
+    now = datetime.now(timezone.utc)
+    return now.replace(microsecond=0)
 
 ###################################################################################################
 ##  LINE ITEM STATUS ENUMERATION
@@ -44,42 +80,78 @@ class ItemStatus(enum.Enum):
 
 ###################################################################################################
 ## PURCHASE REQUEST
-class PurchaseRequest(Base):
-    __tablename__ = "purchase_requests"
+class PurchaseRequestHeader(Base):
+    __tablename__ = "purchase_request_headers"
 
     UUID:            Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID:              Mapped[str] = mapped_column(String, unique=False, nullable=False)
+    ID:              Mapped[str] = mapped_column(String, unique=True, nullable=False)
     requester:       Mapped[str] = mapped_column(String, nullable=False)
     phoneext:        Mapped[int] = mapped_column(Integer, nullable=False)
     datereq:         Mapped[str] = mapped_column(String)      
     dateneed:        Mapped[Optional[str]] = mapped_column(String, nullable=True)
     orderType:       Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    fileAttachments: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
-    itemDescription: Mapped[str] = mapped_column(Text)
-    justification:   Mapped[str] = mapped_column(Text)
-    addComments:     Mapped[Optional[str]] = mapped_column(Text) 
-    trainNotAval:    Mapped[bool] = mapped_column(Boolean, nullable=True)
-    needsNotMeet:    Mapped[bool] = mapped_column(Boolean, nullable=True)
-    budgetObjCode:   Mapped[str] = mapped_column(String)
-    fund:            Mapped[str] = mapped_column(String)
-    status:          Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
+    status        = mapped_column(
+        SQLEnum(
+            ItemStatus,
+            name="item_status",
+            native_enum=False,
+            values_callable=lambda enum: [e.value for e in enum]
+        ),
+        default=ItemStatus.NEW,
+        nullable=False
+    )
+    created_time  = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now_truncated,
+        nullable=False
+    )
+
+    __searchable__ = ['ID', 'IRQ1_ID', 'CO', 'requester', 'phoneext', 'datereq', 'dateneed', 'orderType', 'status', 'createdTime']
+
+    # Relationships
+    line_items: Mapped[List["PurchaseRequestLineItem"]] = relationship(
+        "PurchaseRequestLineItem",
+        back_populates="purchase_request",
+        foreign_keys="PurchaseRequestLineItem.PR_HEADER_UUID",
+        cascade="all, delete-orphan"
+    )
+    # Approval relationship
+    approvals: Mapped[List["Approval"]] = relationship(
+        "Approval",
+        back_populates="purchase_request",
+        foreign_keys="Approval.purchase_request_uuid",
+        cascade="all, delete-orphan"
+    )
+    
+class PurchaseRequestLineItem(Base):
+    __tablename__ = "purchase_request_line_items"
+    UUID: 				Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    PR_HEADER_UUID: 	Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
+    itemDescription: 	Mapped[str] = mapped_column(Text)
+    justification: 		Mapped[str] = mapped_column(Text)
+    addComments:     	Mapped[Optional[str]] = mapped_column(Text) 
+    trainNotAval:    	Mapped[bool] = mapped_column(Boolean, nullable=True)
+    needsNotMeet:    	Mapped[bool] = mapped_column(Boolean, nullable=True)
+    budgetObjCode:   	Mapped[str] = mapped_column(String)
+    fund:            	Mapped[str] = mapped_column(String)
+    quantity: 			Mapped[int] = mapped_column(Integer)
+    priceEach: 			Mapped[float] = mapped_column(Float)
+    totalPrice: 		Mapped[float] = mapped_column(Float)
+    location: 			Mapped[str] = mapped_column(String)
+    createdTime: 		Mapped[datetime] = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
+    status: 			Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
                                                                 name="item_status",
                                                                 native_enum=False,
                                                                 values_callable=lambda enum: [e.value for e in enum]
                                                                 ),
                                                                 default=ItemStatus.NEW
                                                             )
-    priceEach:       Mapped[float] = mapped_column(Float)
-    totalPrice:      Mapped[float] = mapped_column(Float)
-    location:        Mapped[str] = mapped_column(String)
-    quantity:        Mapped[int] = mapped_column(Integer)
-    createdTime:     Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
-
-    __searchable__ = ['ID', 'IRQ1_ID', 'requester', 'budgetObjCode', 'fund',
-                     'location', 'quantity', 'priceEach', 'totalPrice', 'status', 'trainNotAval', 'needsNotMeet']
-
-    # Relationships
-    approvals = relationship("Approval", back_populates="purchase_request", cascade="all, delete-orphan")
+    # Relationship back to PurchaseRequestHeader
+    purchase_request : Mapped[PurchaseRequestHeader] = relationship(
+        "PurchaseRequestHeader",
+        back_populates="line_items",
+        foreign_keys=[PR_HEADER_UUID]
+    )
 
 ###################################################################################################
 ## approval TABLE
@@ -93,7 +165,7 @@ class Approval(Base):
     UUID:                   Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     ID:                     Mapped[str] = mapped_column(String, nullable=False)
     IRQ1_ID:                Mapped[str] = mapped_column(String, nullable=True, unique=True)
-    purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_requests.UUID"), nullable=False)
+    purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
     requester:              Mapped[str] = mapped_column(String, nullable=False)
     CO:                     Mapped[Optional[str]] = mapped_column(String, nullable=True)
     phoneext:               Mapped[int] = mapped_column(Integer, nullable=False)
@@ -120,7 +192,11 @@ class Approval(Base):
                                                                 ),
                                                                 default=ItemStatus.NEW
                                                             )
-    purchase_request = relationship("PurchaseRequest", back_populates="approvals")
+    purchase_request: Mapped[PurchaseRequestHeader] = relationship(
+        "PurchaseRequestHeader",
+        back_populates="approvals",
+        foreign_keys=[purchase_request_uuid]
+    )
     son_comments = relationship("SonComment", back_populates="approval", cascade="all, delete-orphan")
     line_item_statuses = relationship("LineItemStatus", back_populates="approval", cascade="all, delete-orphan")
  
@@ -132,13 +208,9 @@ class LineItemStatus(Base):
     status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, name="item_status"),
                                                                         nullable=False,
                                                                         default=ItemStatus.NEW)
-    created_at:             Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    hold_until:             Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    last_updated:           Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_by:             Mapped[Optional[str]] = mapped_column(String, nullable=True)
     updater_username:       Mapped[Optional[str]] = mapped_column(String, nullable=True)
     updater_email:          Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    
+    created_at:             Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     # Relationships
     approval = relationship("Approval", back_populates="line_item_statuses")
 
@@ -156,34 +228,61 @@ class SonComment(Base):
     
     # Relationships
     approval = relationship("Approval", back_populates="son_comments")
+    
+###################################################################################################
+## Approval Event TABLE
+"""
+This is for incoming requests from an external system or webhook ("here's a JSON payload telling you to approve/deny").
+"""
+class TaskStatus(enum.Enum):
+    NEW         = "NEW"
+    PENDING     = "PENDING"
+    PROCESSED   = "PROCESSED"
+    ERROR       = "ERROR"
+    CANCELLED   = "CANCELLED"
 
-###################################################################################################
-## Finance Dept Members
-###################################################################################################
-class FinanceDeptMembers(Base):
-    __tablename__ = "finance_dept_members"
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    username: Mapped[str] = mapped_column(String)
-    email: Mapped[str] = mapped_column(String)
-# TESTING: insert into finance_dept_members (id, username, email) values ('roman01', 'romancambell', 'roman_campbell@lawb.uscourts.gov');
-###################################################################################################
-## Request Approvers
-###################################################################################################
-class RequestApprovers(Base):
-    __tablename__ = "request_approvers"
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    username: Mapped[str] = mapped_column(String)
-    email: Mapped[str] = mapped_column(String)
-# TESTING: insert into request_approvers (id, username, email) values ('roman01', 'romancambell', 'roman_campbell@lawb.uscourts.gov');
+# Justification ORM model - singleton table for justification text
+class JustificationTemplate(Base):
+    __tablename__ = "justification_templates"
+    code        = mapped_column(String, primary_key=True)
+    description = mapped_column(
+        Text, 
+        nullable=False)
+    
+# Seed justification templates
+async def seed_justification_templates(async_session: AsyncSession):
+    # Only insert if empty
+    existing = await async_session.execute(select(JustificationTemplate).limit(1))
+    if existing.scalars().first():
+        return
+    
+    templates = [
+		JustificationTemplate(
+			code="NOT_AVAILABLE",
+			description="No comparable programs listed on approved sites."
+		),
+		JustificationTemplate(
+			code="DOESNT_MEET_NEEDS",
+			description="Current offerings do not meet the needs of the requester."
+		),
+	]
+    async_session.add_all(templates)
+    await async_session.commit()
 
-###################################################################################################
-## Request Approvers
-###################################################################################################
-class ITDeptMembers(Base):
-    __tablename__ = "it_dept_members"
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    username: Mapped[str] = mapped_column(String)
-    email: Mapped[str] = mapped_column(String)
+# After table creation, seed the table with the following data:
+# Create cache to store justification text
+cache = Cache(Cache.MEMORY)
+
+# Help function to fetch and cache justification text
+@cached(ttl=300, cache=Cache.MEMORY, key="justification_templates")
+async def get_justification_templates(async_session: AsyncSession) -> dict[str, str]:
+    """
+    Returns a dictionary mapping code -> template
+    Cached in memory every 5minutes
+    """
+    result = await async_session.execute(select(JustificationTemplate))
+    rows = result.scalars().all()
+    return {r.code: r.description for r in rows}
 
 ##############################################################################   
 ## Get all data from Approval
@@ -206,7 +305,7 @@ def insert_data(table=None, data=None):
     # Pick the right table
     match table:
         case "purchase_requests":
-            model = PurchaseRequest
+            model = PurchaseRequestHeader
             pk_field = "UUID"
             
         case "approvals":
@@ -292,7 +391,7 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
     # Pick the right table
     match table:
         case "purchase_requests":
-            model = PurchaseRequest
+            model = PurchaseRequestHeader
             pk_field = "UUID"
             
         case "approvals":
@@ -432,35 +531,35 @@ def get_next_request_id() -> str:
 ###################################################################################################
 # Get status of request from Approval table by uuid
 ###################################################################################################
-def get_status_by_uuid(db_session: Session, uuid: str):
-    logger.info(f"Fetching status for uuid: {uuid}")
+def get_status_by_uuid(db_session: Session, UUID: str):
+    logger.info(f"Fetching status for uuid: {UUID}")
     
-    if not uuid:
-        raise ValueError("uuid must be a non-empty string")
+    if not UUID:
+        raise ValueError("UUID must be a non-empty string")
     
-    result = db_session.query(Approval.status).filter(Approval.uuid == uuid).first()
+    result = db_session.query(Approval.status).filter(Approval.UUID == UUID).first()
     
     if result:
         return result[0]  # Return just the status string
     else:
-        logger.warning(f"No status found for uuid: {uuid}")
+        logger.warning(f"No status found for UUID: {UUID}")
         return None
 
 ###################################################################################################
 # Get uuids for multiple IDs
 ###################################################################################################
-def get_uuids_by_ids(db_session: Session, ids: list):
+def get_uuids_by_ids(db_session: Session, IDs: list):
     """
     Get uuids for multiple IDs.
     Returns a dictionary mapping IDs to uuids.
     """
-    logger.info(f"Getting uuids for {len(ids)} IDs")
+    logger.info(f"Getting uuids for {len(IDs)} IDs")
     
     result = {}
-    for id in ids:
-        uuid = get_uuid_by_id(db_session, id)
+    for ID in IDs:
+        uuid = get_uuid_by_id(db_session, ID)
         if uuid:
-            result[id] = uuid
+            result[ID] = uuid
     
     return result
 
@@ -484,7 +583,7 @@ def check_status_values():
         logger.info(f"Approval statuses: {approval_statuses}")
         
         # Check purchase_requests table
-        pr_statuses = session.query(PurchaseRequest.status).distinct().all()
+        pr_statuses = session.query(PurchaseRequestHeader.status).distinct().all()
         logger.info(f"Purchase Request statuses: {pr_statuses}")
         
         # Check line_item_statuses table
@@ -496,7 +595,7 @@ def check_status_values():
 ###################################################################################################``
 def get_all_purchase_requests(session):
     """Get all purchase requests from the database"""
-    return session.query(PurchaseRequest).all()
+    return session.query(PurchaseRequestHeader).all()
 
 ###################################################################################################
 # Get additional comments by ID
@@ -505,10 +604,10 @@ def get_additional_comments_by_id(ID: str):
     """Get additional comments by ID"""
     with get_session() as session:
         stmt = (
-            select(PurchaseRequest.addComments)
-            .join(Approval, PurchaseRequest.ID == Approval.ID)
-            .where(PurchaseRequest.addComments.is_not(None))
-            .where(PurchaseRequest.ID == ID)
+            select(PurchaseRequestLineItem.addComments)
+            .join(Approval, PurchaseRequestHeader.ID == Approval.ID)
+            .where(PurchaseRequestLineItem.addComments.is_not(None))
+            .where(PurchaseRequestHeader.ID == ID)
         )
         additional_comments = session.scalars(stmt).all()
     return additional_comments
@@ -520,13 +619,33 @@ def get_order_types(ID: str):
     """Get order types by ID"""
     with get_session() as session:
         stmt = (
-            select(PurchaseRequest.orderType)
-            .join(Approval, PurchaseRequest.ID == Approval.ID)
-            .where(PurchaseRequest.orderType.is_not(None))
-            .where(PurchaseRequest.ID == ID)
+            select(PurchaseRequestHeader.orderType)
+            .join(Approval, PurchaseRequestHeader.ID == Approval.ID)
+            .where(PurchaseRequestHeader.orderType.is_not(None))
+            .where(PurchaseRequestHeader.ID == ID)
         )
         order_types = session.scalars(stmt).first()
     return order_types
+
+###################################################################################################
+# Get next  request id
+###################################################################################################
+def set_purchase_req_id() -> str:
+    
+    first_prefix = "LAWB"
+    # Create next id for incoming purchase request
+    try:
+        with get_session() as session:
+            stmt = select(
+                (func.coalesce(func.max(PurchaseRequestHeader.ID), literal(0)) + 1).label("next_id")
+            ).select_from(PurchaseRequestHeader)
+            next_int_id = session.execute(stmt).scalar_one()
+            next_id = f"{first_prefix}{str(next_int_id).zfill(4)}"
+            logger.info(f"Next purchase request id: {next_id}")
+            return next_id
+    except Exception as e:
+        logger.error(f"Error setting purchase request id: {e}")
+        return None
 
 ###################################################################################################
 # Get approval by ID
@@ -535,12 +654,32 @@ def get_approval_by_id(session, ID):
     """Get approval by ID"""
     return session.query(Approval).filter(Approval.ID == ID).first()
 
-# Create all tables
+# Call init_db to create tables on startup
 def init_db():
-    """Initialize the database by creating all tables"""
-    logger.info("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created successfully")
+    """Initialize the database by creating all tables."""
+    try:
+        # Create (sync) all tables
+        Base.metadata.create_all(bind=engine)
+        
+        # Seed justification templates
+        with SessionLocal() as session:
+            if not session.query(JustificationTemplate).first():
+                logger.info("Seeding justification templates")
+                session.add_all([
+                    JustificationTemplate(
+                        code="NOT_AVAILABLE",
+                        description="No comparable programs listed on approved sites."
+                    ),
+                    JustificationTemplate(
+                        code="DOESNT_MEET_NEEDS",
+                        description="Current offerings do not meet the needs of the requester."
+                    ),
+                ])
+                session.commit()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+        raise
     
 # Call init_db to create tables
 init_db()

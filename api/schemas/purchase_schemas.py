@@ -25,15 +25,27 @@ class FileAttachment(BaseModel):
     size: Optional[int] = None
 
 # --------------------------------------------------------------
+#  PURCHASE REQUEST HEADER SCHEMA
+# --------------------------------------------------------------
+class PurchaseRequestHeader(BaseModel):
+    UUID: str
+    ID: str
+    IRQ1_ID: str
+    CO: str
+    requester: str
+    phoneext: str
+    datereq: date
+    dateneed: date
+    orderType: str
+    status: ItemStatus
+    createdTime: Optional[datetime] = None
+    
+# --------------------------------------------------------------
 #  PURCHASE ITEM SCHEMA
 # --------------------------------------------------------------
 class PurchaseItem(BaseModel):
     UUID: str
     ID: str
-    requester: str
-    phoneext: str
-    datereq: date
-    orderType: str
     itemDescription: str
     justification: str
     additional_comments: Optional[List[str]] = None
