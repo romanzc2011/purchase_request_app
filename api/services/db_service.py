@@ -32,8 +32,8 @@ from sqlalchemy.inspection import inspect
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from typing import List, Optional
+from api.schemas.enums import ItemStatus, TaskStatus
 import uuid
-import enum
 import os
 
 # Ensure database directory exists
@@ -68,25 +68,8 @@ def utc_now_truncated() -> datetime:
     return now.replace(microsecond=0)
 
 ###################################################################################################
-##  LINE ITEM STATUS ENUMERATION
-class ItemStatus(enum.Enum):
-    NEW = "NEW REQUEST"  # This matches what's in your database
-    PENDING = "PENDING"
-    APPROVED = "APPROVED"
-    DENIED = "DENIED"
-    ON_HOLD = "ON HOLD"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-    
-class TaskStatus(enum.Enum):
-    NEW         = "NEW"
-    PENDING     = "PENDING"
-    PROCESSED   = "PROCESSED"
-    ERROR       = "ERROR"
-    CANCELLED   = "CANCELLED"
-
-###################################################################################################
 ## PURCHASE REQUEST
+#  one-to-many parent-child relationship: Purchase Request Data: ---------| PR Header & PR Line Items
 class PurchaseRequestHeader(Base):
     __tablename__ = "purchase_request_headers"
 
@@ -116,32 +99,35 @@ class PurchaseRequestHeader(Base):
 	#---------------------------------------------------------------------
 	# Relationships
 	#---------------------------------------------------------------------
-    # Relationship back to Approval
-    approvals = relationship(
-        "Approval",
-        back_populates ="purchase_request", 
-        cascade="all, delete-orphan", 
-        foreign_keys=lambda: [Approval.purchase_request_uuid]
-    )
-    pending_approvals = relationship(
-        "PendingApproval", 
-        back_populates="purchase_request", 
-        cascade="all, delete-orphan", 
-        foreign_keys=lambda: [PendingApproval.purchase_request_uuid]
-    )
-    line_items = relationship(
+    # 1️⃣ One-to-many: PurchaseRequestHeader → PurchaseRequestLineItem
+    pr_line_item_attr = relationship(
 		"PurchaseRequestLineItem",
-		back_populates="purchase_request",
+		back_populates="pr_header_attr",
 		cascade="all, delete-orphan",
-        foreign_keys=lambda: [PurchaseRequestLineItem.purchase_request_uuid]
+		foreign_keys=lambda: [PurchaseRequestLineItem.purchase_request_uuid]
 	)
     
+    # 2️⃣ One-to-many: PurchaseRequestHeader → Approval
+    approval_attr = relationship(
+        "Approval",
+        back_populates="pr_header_attr",
+        cascade="all, delete-orphan",
+        foreign_keys=lambda: [Approval.purchase_request_uuid]
+    )
+    
+    # 3️⃣ One-to-many: PurchaseRequestHeader → PendingApproval
+    pending_approval_attr = relationship(
+		"PendingApproval",
+		back_populates="pr_header_attr",
+		cascade="all, delete-orphan",
+		foreign_keys=lambda: [PendingApproval.purchase_request_uuid]
+	)
 
     __searchable__ = [
-        "request_id",
+        "ID",
         "requester",
         "status",
-        "created_time",
+        "createdTime",
     ]
     
 #--------------------------------------------------------------------------------------------------
@@ -150,7 +136,7 @@ class PurchaseRequestHeader(Base):
 class PurchaseRequestLineItem(Base):
     __tablename__ = "pr_line_items"
     UUID: 				Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    PR_HEADER_UUID: 	Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
+    purchase_request_uuid: 	Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
     itemDescription: 	Mapped[str] = mapped_column(Text)
     justification: 		Mapped[str] = mapped_column(Text)
     addComments:     	Mapped[Optional[str]] = mapped_column(Text) 
@@ -175,32 +161,45 @@ class PurchaseRequestLineItem(Base):
 	# Relationships
 	#---------------------------------------------------------------------
     # Relationship back to PurchaseRequestHeader
-    purchase_request = relationship(
-        "PurchaseRequest",
-        back_populates="pr_line_items",
-        foreign_keys=[PR_HEADER_UUID]
-    )
-
-    pending_approvals = relationship(
-        "PendingApproval",
-        back_populates="pr_line_item",
-        cascade="all, delete-orphan",
-    )
+    # 1️⃣ The header it belongs to
+    pr_header_attr = relationship(
+		"PurchaseRequestHeader",
+		back_populates="pr_line_item_attr",
+		foreign_keys=lambda: [PurchaseRequestLineItem.purchase_request_uuid]
+	)
     
-    line_item_approvals = relationship(
-        "LineItemApproval",
-        back_populates="pr_line_items",
-        cascade="all, delete-orphan",
-    )
+    # All the approvals for this line item
+    approval_attr = relationship(
+		"Approval",
+		back_populates="pr_line_item_attr",
+		cascade="all, delete-orphan",
+		foreign_keys=lambda: [Approval.line_item_uuid]
+	)
+    
+    # Line item approvals (join table)
+    line_item_approval_attr = relationship(
+		"LineItemApproval",
+		back_populates="pr_line_item_attr",
+		cascade="all, delete-orphan",
+		foreign_keys=lambda: [LineItemApproval.line_item_uuid]
+	)
+    
+    # Workflow tasks (pending approvals)
+    pending_approval_attr = relationship(
+		"PendingApproval",
+		back_populates="pr_line_item_attr",
+		cascade="all, delete-orphan",
+		foreign_keys=lambda: [PendingApproval.line_item_uuid]
+	)
     
     __searchable__ = [
-        "id",
-        "uuid",
+        "ID",
+        "UUID",
         "purchase_request_uuid",
-        "item_description",
+        "itemDescription",
         "quantity",
-        "price_each",
-        "total_price",
+        "priceEach",
+        "totalPrice",
         "status",
         "location",
     ]
@@ -219,7 +218,7 @@ class Approval(Base):
     ID:                     Mapped[str] = mapped_column(String, nullable=False)
     IRQ1_ID:                Mapped[str] = mapped_column(String, nullable=True, unique=True)
     purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
-    pr_line_items_uuid:     Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=False)
+    line_item_uuid:     Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=False)
     requester:              Mapped[str] = mapped_column(String, nullable=False)
     CO:                     Mapped[Optional[str]] = mapped_column(String, nullable=True)
     phoneext:               Mapped[int] = mapped_column(Integer, nullable=False)
@@ -249,59 +248,67 @@ class Approval(Base):
     #---------------------------------------------------------------------
     # Relationships
     #---------------------------------------------------------------------
-    purchase_request = relationship(
-        "PurchaseRequestHeader",
-        back_populates="approvals",
-        foreign_keys=[purchase_request_uuid]
-    )
+    # 1️⃣ One-to-many: Approval → PurchaseRequestHeader
+    pr_header_attr = relationship(
+		"PurchaseRequestHeader",
+		back_populates="approval_attr",
+		foreign_keys=[purchase_request_uuid]
+	)
+    
+    # 1️⃣ One-to-many: Approval → PurchaseRequestLineItem
+    pr_line_item_attr = relationship(
+		"PurchaseRequestLineItem",
+		back_populates="approval_attr",
+		foreign_keys=[line_item_uuid]
+	)
+    
+    # 2️⃣ One-to-many: Approval → LineItemApproval
+    line_item_approval_attr = relationship(
+		"LineItemApproval",
+		back_populates="approval_attr",
+		cascade="all, delete-orphan",
+		foreign_keys=lambda: [LineItemApproval.approvals_uuid]
+	)
+    
+    # 3️⃣ One-to-many: Approval → PendingApproval
+    pending_approval_attr = relationship(
+		"PendingApproval",
+		back_populates="approval_attr",
+		cascade="all, delete-orphan",
+		foreign_keys=lambda: [PendingApproval.approvals_uuid]
+	)
+    
+    # 4️⃣ One-to-many: Approval → SonComment
+    son_comment_attr = relationship(
+		"SonComment",
+		back_populates="approval_attr",
+		cascade="all, delete-orphan",
+		foreign_keys=lambda: [SonComment.approvals_uuid]
+	)
 
-    # SonComments point at approvals.uuid via their approvals_uuid column
-    son_comments = relationship(
-        "SonComment",
-        back_populates="approvals",
-        cascade="all, delete-orphan",
-        foreign_keys="[SonComment.approvals_uuid]"
-    )
-
-    # LineItemApproval has its own approvals_uuid FK
-    line_item_approvals = relationship(
-        "LineItemApproval",
-        back_populates="approvals",
-        cascade="all, delete-orphan",
-        foreign_keys="[LineItemApproval.approvals_uuid]"
-    )
-
-    # PendingApproval typically points at approvals.id or .uuid — adjust as needed
-    pending_approvals = relationship(
-        "PendingApproval",
-        back_populates="approval",
-        cascade="all, delete-orphan",
-        foreign_keys=lambda: [PendingApproval.approval_uuid]
-    )
- 
 ###################################################################################################
 ## review TABLE
 class LineItemApproval(Base):
     __tablename__ = "line_item_approvals"
     # keep this as your PK so front-end code still sees one "approval UUID"
-    approval_uuid:    Mapped[str] = mapped_column(
-        String,
-        ForeignKey("approvals.UUID"),
-        primary_key=True,
-    )
-    pr_line_item_uuid:Mapped[str] = mapped_column(
-        String,
-        ForeignKey("pr_line_items.UUID"),
-        primary_key=True,
-    )
+    approvals_uuid:    Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True)
+    line_item_uuid:Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), primary_key=True)
     approver      = mapped_column(String, nullable=False)
     status        = mapped_column(SQLEnum(ItemStatus), nullable=False)
     decision      = mapped_column(SQLEnum(ItemStatus), nullable=False)
     created_at    = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
     
     # Relationships
-    approval = relationship("Approval", foreign_keys=[approval_uuid], back_populates="line_item_approval")
-    line_items = relationship("PurchaseRequestLineItem", foreign_keys=[pr_line_item_uuid], back_populates="line_item_approval")
+    approval_attr = relationship(
+        "Approval",
+        back_populates="line_item_approval_attr",
+        foreign_keys=[approvals_uuid]
+    )
+    pr_line_item_attr = relationship(
+        "PurchaseRequestLineItem",
+        back_populates="line_item_approval_attr",
+        foreign_keys=[line_item_uuid]
+    )
     
 ###################################################################################################
 ## PENDING APPROVAL TABLE
@@ -311,30 +318,13 @@ class PendingApproval(Base):
     This is more of a workflow table, it tracks the status of the approval process for a single line item.
     Decisions made with this table for example is what group based on fund etc...
     """
-    task_id:Mapped[int] 	      = mapped_column(Integer, primary_key=True, autoincrement=True)
-    pr_uuid:           Mapped[str] = mapped_column(
-                            String,
-                            ForeignKey("purchase_request_headers.UUID"),
-                            nullable=False,
-                            index=True,
-                        )
-    pr_line_item_uuid: Mapped[str] = mapped_column(
-                            String,
-                            ForeignKey("pr_line_items.UUID"),
-                            nullable=True,
-                            index=True,
-                        )
-    approval_uuid:     Mapped[str] = mapped_column(
-                            String,
-                            ForeignKey("approvals.UUID"),
-                            nullable=True,
-                            index=True,
-                        )
-    assigned_group:Mapped[str] 	  = mapped_column(String, nullable=False)
+    task_id:           		Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False, index=True)
+    line_item_uuid: 		Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=True, index=True)
+    approvals_uuid:     		Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True, index=True)
+    # What group the approval is assigned to, IT, FINANCE, etc.
+    assigned_group:    		Mapped[str] = mapped_column(String, nullable=False)
 
-    # workflow‐status enum
-    status:Mapped[TaskStatus] = mapped_column(SQLEnum(TaskStatus), default=TaskStatus.NEW, nullable=False)
-    
     # What the approver decided
     action = mapped_column(
         SQLEnum(
@@ -370,20 +360,20 @@ class PendingApproval(Base):
 	#-------------------------------------------------------------------------------------
     # relationships
     #-------------------------------------------------------------------------------------
-    purchase_request: Mapped[PurchaseRequestHeader] = relationship(
+    pr_header_attr: Mapped[PurchaseRequestHeader] = relationship(
         "PurchaseRequestHeader",
-        back_populates="pending_approvals",
-        foreign_keys=[pr_uuid],
+        back_populates="pending_approval_attr",
+        foreign_keys=lambda: [PendingApproval.purchase_request_uuid],
     )
-    line_items:      Mapped[PurchaseRequestLineItem] = relationship(
+    pr_line_item_attr:      Mapped[PurchaseRequestLineItem] = relationship(
         "PurchaseRequestLineItem",
-        back_populates="pending_approvals",
-        foreign_keys=[pr_line_item_uuid],
+        back_populates="pending_approval_attr",
+        foreign_keys=[line_item_uuid],
     )
-    approval:          Mapped[Approval] = relationship(
+    approval_attr:          Mapped[Approval] = relationship(
         "Approval",
-        back_populates="pending_approvals",
-        foreign_keys=[approval_uuid],
+        back_populates="pending_approval_attr",
+        foreign_keys=[approvals_uuid],
     )
 
 ###################################################################################################
@@ -391,7 +381,7 @@ class PendingApproval(Base):
 class SonComment(Base):
     __tablename__ = "son_comments"
     
-    UUID:               Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True, nullable=False)
+    approvals_uuid:      Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True, nullable=False)
     comment_text:       Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at:         Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
     son_requester:      Mapped[str] = mapped_column(String, nullable=False)
@@ -399,7 +389,8 @@ class SonComment(Base):
     purchase_req_id:    Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     # Relationships
-    approval = relationship("Approval", back_populates="son_comments")
+    approval_attr = relationship("Approval", back_populates="son_comment_attr",
+                                 foreign_keys=lambda: [SonComment.approvals_uuid])
 
 ###################################################################################################
 ## SEEDING JUSTIFICATION TEMPLATES
