@@ -23,7 +23,6 @@ export interface DataRow {
     IRQ1_ID         : string;
     ID              : string;
     UUID            : string;       // Unique key for React/data-grid
-
     requester       : string;
     budgetObjCode   : string;
     fund            : string;

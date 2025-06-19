@@ -8,8 +8,9 @@ from loguru import logger
 from six import text_type
 import api.services.db_service as dbas
 from api.services.db_service import get_session
-from sqlalchemy import event
+from sqlalchemy import event, select, or_, and_
 from sqlalchemy.orm.session import Session
+from sqlalchemy.orm import aliased
 from whoosh.filedb.filestore import RamStorage
 from whoosh.analysis import RegexTokenizer, LowercaseFilter, StopFilter, StemmingAnalyzer
 from whoosh.fields import Schema, ID, TEXT, NUMERIC, BOOLEAN, DATETIME
@@ -21,6 +22,7 @@ import os
 from functools import lru_cache
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+from .db_service import PurchaseRequestHeader, PurchaseRequestLineItem, Approval, PendingApproval
 
 # -----------------------------------------------------------------------------
 # Whoosh schema: define once here, reuse in index creation and searches
@@ -211,3 +213,107 @@ class SearchService:
             writer.cancel()
             logger.error(f"Error in after_commit: {e}")
             raise
+
+    async def search_purchase_requests(self, search_term: str) -> List[Dict[str, Any]]:
+        """
+        Search purchase requests by various fields
+        """
+        # Create aliases for the tables
+        header = aliased(PurchaseRequestHeader)
+        line_item = aliased(PurchaseRequestLineItem)
+        approval = aliased(Approval)
+        pending = aliased(PendingApproval)
+
+        # Build the search query
+        query = (
+            select(header)
+            .outerjoin(line_item, header.UUID == line_item.purchase_request_uuid)
+            .outerjoin(approval, header.UUID == approval.purchase_request_uuid)
+            .outerjoin(pending, header.UUID == pending.purchase_request_uuid)
+            .where(
+                or_(
+                    header.ID.ilike(f"%{search_term}%"),
+                    header.requester.ilike(f"%{search_term}%"),
+                    line_item.itemDescription.ilike(f"%{search_term}%"),
+                    line_item.justification.ilike(f"%{search_term}%"),
+                    approval.status.ilike(f"%{search_term}%"),
+                    pending.approver.ilike(f"%{search_term}%")
+                )
+            )
+            .distinct()
+        )
+
+        # Execute the query
+        result = await self.session.execute(query)
+        headers = result.scalars().all()
+
+        # Convert to dictionaries
+        return [self._header_to_dict(header) for header in headers]
+
+    def _header_to_dict(self, header: PurchaseRequestHeader) -> Dict[str, Any]:
+        """
+        Convert a PurchaseRequestHeader object to a dictionary
+        """
+        return {
+            "id": header.ID,
+            "uuid": header.UUID,
+            "requester": header.requester,
+            "phoneext": header.phoneext,
+            "datereq": header.datereq.isoformat() if header.datereq else None,
+            "dateneed": header.dateneed.isoformat() if header.dateneed else None,
+            "orderType": header.orderType,
+            "status": header.status,
+            "created_time": header.created_time.isoformat() if header.created_time else None,
+            "line_items": [self._line_item_to_dict(item) for item in header.line_items],
+            "approvals": [self._approval_to_dict(approval) for approval in header.approvals]
+        }
+
+    def _line_item_to_dict(self, item: PurchaseRequestLineItem) -> Dict[str, Any]:
+        """
+        Convert a PurchaseRequestLineItem object to a dictionary
+        """
+        return {
+            "uuid": item.UUID,
+            "id": item.ID,
+            "itemDescription": item.itemDescription,
+            "justification": item.justification,
+            "addComments": item.addComments,
+            "trainNotAval": item.trainNotAval,
+            "needsNotMeet": item.needsNotMeet,
+            "budgetObjCode": item.budgetObjCode,
+            "fund": item.fund,
+            "quantity": item.quantity,
+            "priceEach": item.priceEach,
+            "totalPrice": item.totalPrice,
+            "location": item.location,
+            "status": item.status,
+            "fileAttachments": item.fileAttachments,
+            "isCyberSecRelated": item.isCyberSecRelated,
+            "created_time": item.created_time.isoformat() if item.created_time else None
+        }
+
+    def _approval_to_dict(self, approval: Approval) -> Dict[str, Any]:
+        """
+        Convert an Approval object to a dictionary
+        """
+        return {
+            "uuid": approval.UUID,
+            "requester": approval.requester,
+            "phoneext": approval.phoneext,
+            "datereq": approval.datereq.isoformat() if approval.datereq else None,
+            "dateneed": approval.dateneed.isoformat() if approval.dateneed else None,
+            "orderType": approval.orderType,
+            "itemDescription": approval.itemDescription,
+            "justification": approval.justification,
+            "trainNotAval": approval.trainNotAval,
+            "needsNotMeet": approval.needsNotMeet,
+            "budgetObjCode": approval.budgetObjCode,
+            "fund": approval.fund,
+            "priceEach": approval.priceEach,
+            "totalPrice": approval.totalPrice,
+            "location": approval.location,
+            "quantity": approval.quantity,
+            "isCyberSecRelated": approval.isCyberSecRelated,
+            "status": approval.status,
+            "created_time": approval.created_time.isoformat() if approval.created_time else None
+        }

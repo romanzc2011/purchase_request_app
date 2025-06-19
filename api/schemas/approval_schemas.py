@@ -50,3 +50,49 @@ class ApprovalSchema(BaseModel):
     status: ItemStatus
     createdTime: datetime
     isCyberSecRelated: Optional[bool] = False
+
+def to_camel(s: str) -> str:
+    parts = s.split('_')
+    return parts[0] + ''.join(w.title() for w in parts[1:])
+
+
+#------------------------------------------------
+#  APPROVAL VIEW SCHEMAS
+#------------------------------------------------
+class ApprovalView(BaseModel):
+    # header fields
+    id:                str
+    uuid:              str
+    irq1_id:           Optional[str]
+    co:                Optional[str]
+    requester:         str
+    phoneext:          int
+    datereq:           str
+    dateneed:          Optional[str]
+    order_type:        Optional[str]
+
+    # line-item fields
+    item_description:  str
+    justification:     str
+    add_comments:      Optional[str]
+    train_not_aval:    bool
+    needs_not_meet:    bool
+    budget_obj_code:   str
+    fund:              str
+
+    # approval fields
+    status:            str
+    created_time:      datetime
+    is_cyber_sec_related: bool = False
+
+    # any other fields you were projecting
+    price_each:        float
+    total_price:       float
+    location:          str
+    quantity:          int
+
+    class Config:
+        alias_generator    = to_camel
+        populate_by_name   = True
+        # if you want JSON out in camelCase by default:
+        by_alias           = True

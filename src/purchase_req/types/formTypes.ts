@@ -24,7 +24,6 @@ export type FormValues = {
   trainNotAval: boolean;
   needsNotMeet: boolean;
   quantity: number;
-  price: number;
   priceEach: number;
   totalPrice: number;
   fund: string;

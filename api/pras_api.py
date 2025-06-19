@@ -9,7 +9,7 @@ TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from api.schemas.comment_schemas import CommentItem
 from pydantic import ValidationError
@@ -33,6 +33,12 @@ from fastapi.security import (
     OAuth2PasswordBearer,
     OAuth2PasswordRequestForm,
 )
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from api.services.db_service import get_async_session
+from api.schemas.enums import ItemStatus, TaskStatus
+import asyncio
+
 # PRAS Miscellaneous Dependencies
 from api.dependencies.misc_dependencies import *
 
@@ -46,6 +52,15 @@ from api.dependencies.pras_dependencies import uuid_service
 from api.dependencies.pras_dependencies import settings
 from api.services.cache_service import cache_service
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
+from api.services.db_service import utc_now_truncated
+
+# Database ORM Model Imports
+from api.services.db_service import (
+    PurchaseRequestHeader,
+    PurchaseRequestLineItem,
+    Approval,
+    PendingApproval
+)
 
 # Schemas
 from api.dependencies.pras_schemas import *
@@ -118,23 +133,29 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 ##########################################################################
 ## GET APPROVAL DATA
 ##########################################################################
-@api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
+@api_router.get("/get_approval_data", response_model=List[ApprovalSchema])
 async def get_approval_data(
     ID: Optional[str] = Query(None),
     current_user: LDAPUser = Depends(auth_service.get_current_user)):
     
     # Check if user is in IT group or CUE group
     logger.info(f"CURRENT USER: {current_user}")
+    
     with get_session() as session:
         try:
             if ID:
                 approval = dbas.get_approval_by_id(session, ID)
                 if approval:
+                    # Ensure the purchase_request relationship is loaded
+                    session.refresh(approval)
                     approval_data = [ApprovalSchema.model_validate(approval)]
                 else:
                     approval_data = []
             else:
                 approvals = dbas.get_all_approval(session)
+                # Ensure all relationships are loaded
+                for approval in approvals:
+                    session.refresh(approval)
                 approval_data = [ApprovalSchema.model_validate(approval) for approval in approvals]
         
             return approval_data
@@ -254,10 +275,11 @@ async def generate_pdf(
 ## SEND TO PURCHASE REQUEST -- being sent from the purchase req submit
 ########################################################################## 
 @api_router.post("/sendToPurchaseReq", response_model=PurchaseResponse)
-async def set_purchase_request(
+async def send_purchase_request(
     payload_json: str = Form(..., description="JSON payload as string"),
     files: Optional[List[UploadFile]] = File(None, description="Multiple files"),
     current_user: LDAPUser = Depends(auth_service.get_current_user),
+    db: AsyncSession = Depends(get_async_session)
 ):
     logger.info(f"Type of current_user: {type(current_user)}")
 
@@ -272,9 +294,16 @@ async def set_purchase_request(
         logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
         
     except ValidationError as e:
-        logger.error("PurchaseRequestPayload errors: %s", e.errors())
+        error_details = e.errors()
+        logger.error("PurchaseRequestPayload validation errors: %s", error_details)
         # Return them to the client so you know exactly what's wrong:
-        raise HTTPException(status_code=422, detail=e.errors())
+        return JSONResponse(
+            status_code=422,
+            content={
+                "message": "Validation error",
+                "errors": error_details
+            }
+        )
 
     ################################################################3
     ## VALIDATE REQUESTER
@@ -283,10 +312,127 @@ async def set_purchase_request(
     
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
-        raise HTTPException(status_code=400, detail="Invalid requester")
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Invalid requester"}
+        )
     
     if not payload:
-        raise HTTPException(status_code=400, detail="Invalid data")
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Invalid data"}
+        )
+    
+    
+    #################################################################################
+    ## BUILD EMAIL PAYLOADS
+    #################################################################################
+    # Get additional comments
+    additional_comments = cache_service.get_or_set(
+        "comments",
+        payload.id,
+        lambda: dbas.get_additional_comments_by_id(payload.id)
+    )
+    
+    for item in payload.items:
+        item.additional_comments = additional_comments
+    
+    items_for_email = [
+        LineItemsPayload(
+            budgetObjCode=item.budget_obj_code,
+            itemDescription=item.item_description,
+            location=item.location,
+            justification=item.justification,
+            quantity=item.quantity,
+            priceEach=item.price_each,
+            totalPrice=item.total_price,
+            fund=item.fund
+        )
+        for item in payload.items
+    ]
+    
+    # Build header & line items inside a single transaction
+    async with db.begin():
+        # Generate the purchase request ID
+        purchase_req_id = dbas.set_purchase_req_id()
+        
+        # Create the purchase request header
+        orm_pr_header = PurchaseRequestHeader(
+            ID=purchase_req_id,  # Set the ID explicitly
+            requester=current_user.username,
+            phoneext=payload.items[0].phoneext,
+            datereq=payload.items[0].datereq,
+            dateneed=payload.items[0].dateneed,
+            orderType=payload.items[0].order_type,
+            status=ItemStatus.NEW_REQUEST
+        )
+        db.add(orm_pr_header)
+        await db.flush()  # makes ORM defaults (like pk/uuid) available
+
+        pr_line_item_ids: List[int] = []
+        for item in payload.items:
+            orm_pr_line_item = PurchaseRequestLineItem(
+                purchase_request_uuid=orm_pr_header.uuid,
+                ID=orm_pr_header.id,
+                itemDescription=item.item_description,
+                justification=item.justification,
+                addComments=item.additional_comments,
+                trainNotAval=item.train_not_aval,
+                needsNotMeet=item.needs_not_meet,
+                budgetObjCode=item.budget_obj_code,
+                fund=item.fund,
+                quantity=item.quantity,
+                priceEach=item.price_each,
+                totalPrice=item.total_price,
+                location=item.location,
+                status=item.status,
+                fileAttachments=item.file_attachments,
+                isCyberSecRelated=item.is_cyber_sec_related,
+                created_time=utc_now_truncated(),
+            )
+            db.add(orm_pr_line_item)
+            await db.flush()
+            pr_line_item_ids.append(orm_pr_line_item.id)
+
+        approvals: List[Approval] = []
+        for item, line_id in zip(payload.items, pr_line_item_ids):
+            appr = Approval(
+                UUID=str(uuid.uuid4()),
+                purchase_request_uuid=orm_pr_header.uuid,
+                requester=payload.requester,
+                phoneext=item.phoneext,
+                datereq=item.datereq,
+                dateneed=item.dateneed,
+                orderType=item.order_type,
+                itemDescription=item.item_description,
+                justification=item.justification,
+                trainNotAval=item.train_not_aval,
+                needsNotMeet=item.needs_not_meet,
+                budgetObjCode=item.budget_obj_code,
+                fund=item.fund,
+                priceEach=item.price_each,
+                totalPrice=item.total_price,
+                location=item.location,
+                quantity=item.quantity,
+                isCyberSecRelated=item.is_cyber_sec_related,
+                status=item.status,
+                created_time=utc_now_truncated(),
+            )
+            db.add(appr)
+            await db.flush()
+            approvals.append(appr)
+
+            assigned_group = "IT" if item.fund.startswith("511") else "Finance"
+            task = PendingApproval(
+                purchase_request_uuid=orm_pr_header.uuid,
+                pr_line_item_uuid=line_id,
+                approvals_uuid=appr.UUID,
+                assigned_group=assigned_group,
+                task_status=TaskStatus.NEW_REQUEST,
+            )
+            db.add(task)
+            await db.flush()
+    # <--- transaction is committed here
     
     ################################################################3
     ## VALIDATE/PROCESS PAYLOAD
@@ -300,70 +446,38 @@ async def set_purchase_request(
     if not items:
         logger.error("No items found in request data")
         raise HTTPException(status_code=400, detail="No items found in request data")
-
-    # Get the shared ID from the first item, but ensure it's not a temporary ID
-    first_item_id = items[0].ID if items else None
     
-    # Generate a new shared ID if the first item ID is not a temporary ID - this keeps the LAWB ID unique just incrementing
-    if not first_item_id:
-        shared_id = dbas.get_next_request_id()
-        logger.info(f"Generated new shared ID: {shared_id}")
-    else:
-        shared_id = first_item_id
-        logger.info(f"Using existing shared ID: {shared_id}")
-        
-    # Process each item
-    for item in payload.items:
-        logger.info(f"Before assigning shared ID: {item.ID}")
-        item.ID = shared_id
-        logger.info(f"After assigning shared ID: {item.ID}")
-        
-        item.requester = payload.requester
-        processed_data = process_purchase_data(item)
-        purchase_req_commit(processed_data, current_user)
+    # Get ID from first item if not in payload
+    if not payload.id and items:
+        payload.id = items[0].id
     
-    # Update the payload with the shared ID
-    payload.ID = shared_id  
+    if not payload.id:
+        logger.error("No ID found in request data")
+        raise HTTPException(status_code=400, detail="ID is required")
     
     # Create tasks list for files
     uploaded_files = []
     if files:
         for file in files:
             logger.info(f"Saving uploaded file: {file.filename}")
-            uploaded_files.append(await _save_files(shared_id, file))
+            uploaded_files.append(await _save_files(payload.id, file))
     
     # Generate PDF
     logger.info("Generating PDF document")
-    pdf_path: str = await generate_pdf(payload, shared_id, uploaded_files)
-    #################################################################################
-    ## BUILD EMAIL PAYLOADS
-    #################################################################################
-    additional_comments = cache_service.get_or_set(
-        "comments",
-        payload.ID,
-        lambda: dbas.get_additional_comments_by_id(payload.ID)
-    )
-    
-    for item in payload.items:
-        item.additional_comments = additional_comments
-    
-    items_for_email = [
-        LineItemsPayload(**item.model_dump())
-        for item in payload.items
-    ]
+    pdf_path: str = await generate_pdf(payload, payload.id, uploaded_files)
     
     #################################################################################
     ## EMAIL PAYLOADS
     #################################################################################
     email_request_payload = EmailPayloadRequest(
         model_type="email_request",
-        ID=payload.ID,
+        ID=payload.id,
         requester=payload.requester,
         requester_email=requester_email,
         datereq=payload.items[0].datereq,
         dateneed=payload.items[0].dateneed,
         orderType=payload.items[0].orderType,
-        subject=f"Purchase Request #{payload.ID}",
+        subject=f"Purchase Request #{payload.id}",
         sender=settings.smtp_email_addr,
         to=None,   # Assign this in the smtp service
         cc=None,
@@ -418,24 +532,49 @@ async def log_requests(request: Request, call_next):
 
     # --- If it's a validation error (422), log the body and the validation details ---
     if response.status_code == 422:
-        # JSONResponse stores its content in .body
-        # For a 422 FastAPI Response, .body is a JSON‐encoded byte string of { "detail": […] }
         try:
-            error_payload = json.loads(response.body.decode("utf-8"))
-        except Exception:
-            error_payload = {"raw_response": "<unable to parse response body>"}
-
-        logger.error(
-            {
-                "request_id": request_id,
-                "path": request.url.path,
-                "method": request.method,
-                "status_code": response.status_code,
-                "elapsed": elapsed,
-                "raw_request_body": raw_json,
-                "validation_errors": error_payload.get("detail", error_payload),
-            }
-        )
+            # Get the response body
+            response_body = b""
+            async for chunk in response.body_iterator:
+                response_body += chunk
+            
+            # Parse the response body
+            error_payload = json.loads(response_body.decode("utf-8"))
+            validation_errors = error_payload.get("errors", [])
+            
+            logger.error(
+                {
+                    "request_id": request_id,
+                    "path": request.url.path,
+                    "method": request.method,
+                    "status_code": response.status_code,
+                    "elapsed": elapsed,
+                    "raw_request_body": raw_json,
+                    "validation_errors": validation_errors
+                }
+            )
+            
+            # Reconstruct the response
+            return JSONResponse(
+                status_code=422,
+                content=error_payload,
+                headers=dict(response.headers)
+            )
+            
+        except Exception as e:
+            logger.error(f"Error parsing validation response: {e}")
+            logger.error(
+                {
+                    "request_id": request_id,
+                    "path": request.url.path,
+                    "method": request.method,
+                    "status_code": response.status_code,
+                    "elapsed": elapsed,
+                    "raw_request_body": raw_json,
+                    "validation_errors": "<unable to parse response body>"
+                }
+            )
+            return response
 
     else:
         logger.bind(
@@ -538,20 +677,19 @@ async def refresh_token(refresh_token: str):
         )
         
 ##########################################################################
-## CREATE NEW ID
+## CREATE NEW id
 ##########################################################################
 @api_router.post("/createNewID")
 async def create_new_id(request: Request):
     """
-    Create a new ID for a purchase request.
+    Create a new id for a purchase request.
     """
     try:
-        # Get the next request ID using the function from db_service
-        new_id = dbas.get_next_request_id()
-        logger.info(f"Created new ID: {new_id}")
-        return {"ID": new_id}
+        purchase_req_id = dbas.set_purchase_req_id()
+        logger.info(f"New purchase request id: {purchase_req_id}")
+        return {"ID": purchase_req_id}
     except Exception as e:
-        logger.error(f"Error creating new ID: {e}")
+        logger.error(f"Error creating new id: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
 ##########################################################################

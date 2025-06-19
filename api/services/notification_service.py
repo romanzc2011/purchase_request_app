@@ -15,8 +15,8 @@ async def notify_requester(
     uploaded_files: List[str]
 ):
     """
-    1) Build the “base” EmailPayload (subject, body template, line items, etc.)
-    2) Look up the requester’s email address via LDAP
+    1) Build the "base" EmailPayload (subject, body template, line items, etc.)
+    2) Look up the requester's email address via LDAP
     3) Assign that address to `email_payload.to`
     4) Attach the generated PDF and any upload files
     5) Send the email via your async SMTP client
@@ -24,7 +24,7 @@ async def notify_requester(
     logger.info(f"PAYLOAD IN NOTIFY REQUESTER: {payload}")
     
     # Construct subject for email payload for requester
-    subject = f"Purchase Request {payload.ID} for {payload.requester}"
+    subject = f"Purchase Request {payload.id} for {payload.requester}"
     
     items, email_payload = build_email_payload(payload=payload, payload_type="request", subject=subject)
     logger.info(f"EMAIL PAYLOAD IN NOTIFY REQUESTER: {email_payload}")

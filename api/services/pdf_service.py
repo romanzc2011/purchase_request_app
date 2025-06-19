@@ -21,13 +21,82 @@ from api.services.db_service import get_session
 from api.schemas.approval_schemas import ApprovalSchema
 from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
+from datetime import datetime
+import os
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from .db_service import PurchaseRequestHeader, PurchaseRequestLineItem, Approval, PendingApproval
 
 class PDFService:
     def __init__(self):
-        self.pdf_path = settings.PDF_OUTPUT_FOLDER
-        self.pdf_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
-        self.page_width = LETTER
-        self.page_height = LETTER
+        self.output_dir = Path("output")
+        self.output_dir.mkdir(exist_ok=True)
+
+    def create_pdf(self, ID: str, payload: Dict[str, Any]) -> Path:
+        """
+        Create a PDF document for a purchase request
+        """
+        try:
+            # Get the purchase request data
+            with get_session() as session:
+                result = session.execute(
+                    select(PurchaseRequestHeader)
+                    .where(PurchaseRequestHeader.ID == ID)
+                )
+                header = result.scalar_one_or_none()
+                
+                if not header:
+                    raise ValueError(f"Purchase request with ID {ID} not found")
+                
+                # Get line items
+                result = session.execute(
+                    select(PurchaseRequestLineItem)
+                    .where(PurchaseRequestLineItem.purchase_request_uuid == header.UUID)
+                )
+                line_items = result.scalars().all()
+                
+                # Get approvals
+                result = session.execute(
+                    select(Approval)
+                    .where(Approval.purchase_request_uuid == header.UUID)
+                )
+                approvals = result.scalars().all()
+                
+                # Get pending approvals
+                result = session.execute(
+                    select(PendingApproval)
+                    .where(PendingApproval.purchase_request_uuid == header.UUID)
+                )
+                pending_approvals = result.scalars().all()
+            
+            # Create the PDF
+            output_path = self.output_dir / f"{ID}.pdf"
+            
+            # TODO: Implement PDF generation
+            # For now, just create an empty file
+            output_path.touch()
+            
+            return output_path
+            
+        except Exception as e:
+            raise Exception(f"Error creating PDF: {e}")
+
+    def generate_pdf(self, ID: str, payload: Dict[str, Any], uploaded_files: Optional[List[str]] = None) -> str:
+        """
+        Generate a PDF document for a purchase request
+        """
+        try:
+            # Create the PDF
+            output_path = self.create_pdf(ID, payload)
+            
+            # TODO: Add uploaded files to the PDF
+            
+            return str(output_path)
+            
+        except Exception as e:
+            raise Exception(f"Error generating PDF: {e}")
 
     """
     Generate a purchase request PDF.

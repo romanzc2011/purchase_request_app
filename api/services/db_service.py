@@ -1,6 +1,7 @@
+from __future__ import annotations
 from datetime import datetime, timezone
 from http.client import HTTPException
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from loguru import logger
 from aiocache import Cache, cached
 from sqlalchemy import select
@@ -29,12 +30,16 @@ from sqlalchemy.orm import declarative_base, selectinload, aliased
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.inspection import inspect
+from sqlalchemy import select
+from sqlalchemy.orm import aliased
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from typing import List, Optional
 from api.schemas.enums import ItemStatus, TaskStatus
 import uuid
 import os
+from sqlalchemy.pool import NullPool
+from dotenv import load_dotenv
 
 # Ensure database directory exists
 db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
@@ -53,7 +58,7 @@ AsyncSessionLocal = sessionmaker(bind=engine_async, class_=AsyncSession)
 async def get_async_session() -> AsyncSession:
     async with AsyncSessionLocal() as async_session:
         yield async_session
-
+# Context manager for database sessions
 @contextmanager
 def get_session():
     db = SessionLocal()
@@ -67,331 +72,271 @@ def utc_now_truncated() -> datetime:
     now = datetime.now(timezone.utc)
     return now.replace(microsecond=0)
 
-###################################################################################################
-## PURCHASE REQUEST
-#  one-to-many parent-child relationship: Purchase Request Data: ---------| PR Header & PR Line Items
+# ────────────────────────────────────────────────────────────────────────────────
+# PURCHASE REQUEST HEADER
+# ────────────────────────────────────────────────────────────────────────────────
+
 class PurchaseRequestHeader(Base):
     __tablename__ = "purchase_request_headers"
 
-    UUID:            Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID:              Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    requester:       Mapped[str] = mapped_column(String, nullable=False)
-    phoneext:        Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq:         Mapped[str] = mapped_column(String)      
-    dateneed:        Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    orderType:       Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    status        = mapped_column(
-        SQLEnum(
-            ItemStatus,
-            name="item_status",
-            native_enum=False,
-            values_callable=lambda enum: [e.value for e in enum]
-        ),
-        default=ItemStatus.NEW,
-        nullable=False
-    )
-    created_time  = mapped_column(
-        DateTime(timezone=True),
-        default=utc_now_truncated,
-        nullable=False
-    )
+    UUID               : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ID                 : Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    requester          : Mapped[str] = mapped_column(String, nullable=False)
+    phoneext           : Mapped[int] = mapped_column(Integer, nullable=False)
+    datereq            : Mapped[str] = mapped_column(String)
+    dateneed           : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    orderType          : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    status             = mapped_column(
+                            SQLEnum(ItemStatus, 
+                                   name="item_status", native_enum=False,
+                                   values_callable=lambda enum: [e.value for e in enum]
+                            ),
+                            default=ItemStatus.NEW_REQUEST,
+                            nullable=False
+                         )
+    created_time       = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
 
-	#---------------------------------------------------------------------
-	# Relationships
-	#---------------------------------------------------------------------
-    # 1️⃣ One-to-many: PurchaseRequestHeader → PurchaseRequestLineItem
-    pr_line_item_attr = relationship(
-		"PurchaseRequestLineItem",
-		back_populates="pr_header_attr",
-		cascade="all, delete-orphan",
-		foreign_keys=lambda: [PurchaseRequestLineItem.purchase_request_uuid]
-	)
-    
-    # 2️⃣ One-to-many: PurchaseRequestHeader → Approval
-    approval_attr = relationship(
-        "Approval",
-        back_populates="pr_header_attr",
-        cascade="all, delete-orphan",
-        foreign_keys=lambda: [Approval.purchase_request_uuid]
-    )
-    
-    # 3️⃣ One-to-many: PurchaseRequestHeader → PendingApproval
-    pending_approval_attr = relationship(
-		"PendingApproval",
-		back_populates="pr_header_attr",
-		cascade="all, delete-orphan",
-		foreign_keys=lambda: [PendingApproval.purchase_request_uuid]
-	)
+    # 1️⃣ headers → line‐items
+    pr_line_items      : Mapped[List[PurchaseRequestLineItem]] = relationship(
+                            "PurchaseRequestLineItem",
+                            back_populates="purchase_request_header",
+                            cascade="all, delete-orphan",
+                            foreign_keys="[PurchaseRequestLineItem.purchase_request_uuid]"
+                         )
 
-    __searchable__ = [
-        "ID",
-        "requester",
-        "status",
-        "createdTime",
-    ]
-    
-#--------------------------------------------------------------------------------------------------
-## PURCHASE REQUEST LINE ITEM TABLE
-#--------------------------------------------------------------------------------------------------
+    # 2️⃣ headers → approvals
+    approvals          : Mapped[List[Approval]] = relationship(
+                            "Approval",
+                            back_populates="purchase_request_header",
+                            cascade="all, delete-orphan",
+                            foreign_keys="[Approval.purchase_request_uuid]"
+                         )
+
+    # 3️⃣ headers → pending approvals
+    pending_approvals  : Mapped[List[PendingApproval]] = relationship(
+                            "PendingApproval",
+                            back_populates="purchase_request_header",
+                            cascade="all, delete-orphan",
+                            foreign_keys="[PendingApproval.purchase_request_uuid]"
+                         )
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# PURCHASE REQUEST LINE ITEM
+# ────────────────────────────────────────────────────────────────────────────────
+
 class PurchaseRequestLineItem(Base):
     __tablename__ = "pr_line_items"
-    UUID: 				Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    purchase_request_uuid: 	Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
-    itemDescription: 	Mapped[str] = mapped_column(Text)
-    justification: 		Mapped[str] = mapped_column(Text)
-    addComments:     	Mapped[Optional[str]] = mapped_column(Text) 
-    trainNotAval:    	Mapped[bool] = mapped_column(Boolean, nullable=True)
-    needsNotMeet:    	Mapped[bool] = mapped_column(Boolean, nullable=True)
-    budgetObjCode:   	Mapped[str] = mapped_column(String)
-    fund:            	Mapped[str] = mapped_column(String)
-    quantity: 			Mapped[int] = mapped_column(Integer)
-    priceEach: 			Mapped[float] = mapped_column(Float)
-    totalPrice: 		Mapped[float] = mapped_column(Float)
-    location: 			Mapped[str] = mapped_column(String)
-    status: 			Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
-                                                                name="item_status",
-                                                                native_enum=False,
-                                                                values_callable=lambda enum: [e.value for e in enum]
-                                                                ),
-                                                                default=ItemStatus.NEW
-                                                            )
-    createdTime: 		Mapped[datetime] = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
-    
-    #---------------------------------------------------------------------
-	# Relationships
-	#---------------------------------------------------------------------
-    # Relationship back to PurchaseRequestHeader
-    # 1️⃣ The header it belongs to
-    pr_header_attr = relationship(
-		"PurchaseRequestHeader",
-		back_populates="pr_line_item_attr",
-		foreign_keys=lambda: [PurchaseRequestLineItem.purchase_request_uuid]
-	)
-    
-    # All the approvals for this line item
-    approval_attr = relationship(
-		"Approval",
-		back_populates="pr_line_item_attr",
-		cascade="all, delete-orphan",
-		foreign_keys=lambda: [Approval.line_item_uuid]
-	)
-    
-    # Line item approvals (join table)
-    line_item_approval_attr = relationship(
-		"LineItemApproval",
-		back_populates="pr_line_item_attr",
-		cascade="all, delete-orphan",
-		foreign_keys=lambda: [LineItemApproval.line_item_uuid]
-	)
-    
-    # Workflow tasks (pending approvals)
-    pending_approval_attr = relationship(
-		"PendingApproval",
-		back_populates="pr_line_item_attr",
-		cascade="all, delete-orphan",
-		foreign_keys=lambda: [PendingApproval.line_item_uuid]
-	)
-    
-    __searchable__ = [
-        "ID",
-        "UUID",
-        "purchase_request_uuid",
-        "itemDescription",
-        "quantity",
-        "priceEach",
-        "totalPrice",
-        "status",
-        "location",
-    ]
 
-#--------------------------------------------------------------------------------------------------
-## PURCHASE REQUEST APPROVAL TABLE
-#--------------------------------------------------------------------------------------------------
-class Approval(Base):
-    __tablename__ =  "approvals"
-    __searchable__ = ['ID', 'IRQ1_ID', 'CO', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet',
-                      'quantity', 'totalPrice', 'priceEach', 'location', 'newRequest', 
-                      'approved', 'pendingApproval', 'status', 'createdTime', 'approvedTime', 'deniedTime']
+    UUID                   : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    purchase_request_uuid  : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
+    itemDescription        : Mapped[str] = mapped_column(Text)
+    justification          : Mapped[str] = mapped_column(Text)
+    addComments            : Mapped[Optional[str]] = mapped_column(Text)
+    trainNotAval           : Mapped[bool] = mapped_column(Boolean, nullable=True)
+    needsNotMeet           : Mapped[bool] = mapped_column(Boolean, nullable=True)
+    budgetObjCode          : Mapped[str] = mapped_column(String)
+    fund                   : Mapped[str] = mapped_column(String)
+    quantity               : Mapped[int] = mapped_column(Integer)
+    priceEach              : Mapped[float] = mapped_column(Float)
+    totalPrice             : Mapped[float] = mapped_column(Float)
+    location               : Mapped[str] = mapped_column(String)
+    status                 : Mapped[ItemStatus] = mapped_column(
+                                SQLEnum(ItemStatus,
+                                       name="item_status", native_enum=False,
+                                       values_callable=lambda enum: [e.value for e in enum]
+                                ),
+                                default=ItemStatus.NEW_REQUEST
+                              )
+    created_time           : Mapped[datetime] = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
 
-    # Sequential ID for user-facing operations
-    UUID:                   Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID:                     Mapped[str] = mapped_column(String, nullable=False)
-    IRQ1_ID:                Mapped[str] = mapped_column(String, nullable=True, unique=True)
-    purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
-    line_item_uuid:     Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=False)
-    requester:              Mapped[str] = mapped_column(String, nullable=False)
-    CO:                     Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    phoneext:               Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq:                Mapped[str] = mapped_column(String)      
-    dateneed:               Mapped[Optional[str]] = mapped_column(String, nullable=True)      
-    orderType:              Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    fileAttachments:        Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
-    itemDescription:        Mapped[str] = mapped_column(Text)
-    justification:          Mapped[str] = mapped_column(Text)
-    trainNotAval:           Mapped[bool] = mapped_column(Boolean, nullable=True)
-    needsNotMeet:           Mapped[bool] = mapped_column(Boolean, nullable=True)
-    budgetObjCode:          Mapped[str] = mapped_column(String)
-    fund:                   Mapped[str] = mapped_column(String)
-    priceEach:              Mapped[float] = mapped_column(Float)
-    totalPrice:             Mapped[float] = mapped_column(Float)
-    location:               Mapped[str] = mapped_column(String)
-    quantity:               Mapped[int] = mapped_column(Integer)
-    createdTime:            Mapped[datetime] = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
-    isCyberSecRelated:      Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)   
-    status:                 Mapped[ItemStatus] = mapped_column(SQLEnum(ItemStatus, 
-                                                                name="item_status",
-                                                                native_enum=False,
-                                                                values_callable=lambda enum: [e.value for e in enum]
-                                                                ),
-                                                                default=ItemStatus.NEW
-                                                            )
-    #---------------------------------------------------------------------
-    # Relationships
-    #---------------------------------------------------------------------
-    # 1️⃣ One-to-many: Approval → PurchaseRequestHeader
-    pr_header_attr = relationship(
-		"PurchaseRequestHeader",
-		back_populates="approval_attr",
-		foreign_keys=[purchase_request_uuid]
-	)
-    
-    # 1️⃣ One-to-many: Approval → PurchaseRequestLineItem
-    pr_line_item_attr = relationship(
-		"PurchaseRequestLineItem",
-		back_populates="approval_attr",
-		foreign_keys=[line_item_uuid]
-	)
-    
-    # 2️⃣ One-to-many: Approval → LineItemApproval
-    line_item_approval_attr = relationship(
-		"LineItemApproval",
-		back_populates="approval_attr",
-		cascade="all, delete-orphan",
-		foreign_keys=lambda: [LineItemApproval.approvals_uuid]
-	)
-    
-    # 3️⃣ One-to-many: Approval → PendingApproval
-    pending_approval_attr = relationship(
-		"PendingApproval",
-		back_populates="approval_attr",
-		cascade="all, delete-orphan",
-		foreign_keys=lambda: [PendingApproval.approvals_uuid]
-	)
-    
-    # 4️⃣ One-to-many: Approval → SonComment
-    son_comment_attr = relationship(
-		"SonComment",
-		back_populates="approval_attr",
-		cascade="all, delete-orphan",
-		foreign_keys=lambda: [SonComment.approvals_uuid]
-	)
+    # back to header
+    purchase_request_header: Mapped[PurchaseRequestHeader] = relationship(
+                                "PurchaseRequestHeader",
+                                back_populates="pr_line_items",
+                                foreign_keys=[purchase_request_uuid]
+                             )
 
-###################################################################################################
-## review TABLE
-class LineItemApproval(Base):
-    __tablename__ = "line_item_approvals"
-    # keep this as your PK so front-end code still sees one "approval UUID"
-    approvals_uuid:    Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True)
-    line_item_uuid:Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), primary_key=True)
-    approver      = mapped_column(String, nullable=False)
-    status        = mapped_column(SQLEnum(ItemStatus), nullable=False)
-    decision      = mapped_column(SQLEnum(ItemStatus), nullable=False)
-    created_at    = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
-    
-    # Relationships
-    approval_attr = relationship(
-        "Approval",
-        back_populates="line_item_approval_attr",
-        foreign_keys=[approvals_uuid]
-    )
-    pr_line_item_attr = relationship(
-        "PurchaseRequestLineItem",
-        back_populates="line_item_approval_attr",
-        foreign_keys=[line_item_uuid]
-    )
-    
-###################################################################################################
-## PENDING APPROVAL TABLE
-class PendingApproval(Base):
-    __tablename__ = "pending_approvals"
-    """
-    This is more of a workflow table, it tracks the status of the approval process for a single line item.
-    Decisions made with this table for example is what group based on fund etc...
-    """
-    task_id:           		Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    purchase_request_uuid:  Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False, index=True)
-    line_item_uuid: 		Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=True, index=True)
-    approvals_uuid:     		Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True, index=True)
-    # What group the approval is assigned to, IT, FINANCE, etc.
-    assigned_group:    		Mapped[str] = mapped_column(String, nullable=False)
+    # line-item → join‐table
+    line_item_approval_attr    : Mapped[List[LineItemApproval]] = relationship(
+                                "LineItemApproval",
+                                back_populates="line_item",
+                                cascade="all, delete-orphan",
+                                foreign_keys="[LineItemApproval.line_item_uuid]"
+                             )
 
-    # What the approver decided
-    action = mapped_column(
-        SQLEnum(
-            name="item_status",
-            native_enum=False, 
-            values_callable=lambda enum: [e.value for e in enum]
-            ),
-        default=ItemStatus.NEW,
-        nullable=False)
+    # line-item → pending approvals
+    pending_approvals      : Mapped[List[PendingApproval]] = relationship(
+                                "PendingApproval",
+                                back_populates="purchase_request_line_item",
+                                cascade="all, delete-orphan",
+                                foreign_keys="[PendingApproval.line_item_uuid]"
+                             )
     
-    # Task status
-    task_status:Mapped[TaskStatus] = mapped_column(
-        SQLEnum(TaskStatus),
-        name="task_status",
-        native_enum=False,
-        values_callable=lambda enum: [e.value for e in enum],
-        default=TaskStatus.NEW,
-        nullable=False)
-    
-    # Timestamps, error info, etc.
-    created_at                 = mapped_column(
-        DateTime(timezone=True),
-        default=utc_now_truncated,
-        nullable=False
-    )
-    processed_at               = mapped_column(
-        DateTime(timezone=True),
-        default=utc_now_truncated,
-        nullable=True
-    )
-    error_message              = mapped_column(Text, nullable=True)
-
-	#-------------------------------------------------------------------------------------
-    # relationships
-    #-------------------------------------------------------------------------------------
-    pr_header_attr: Mapped[PurchaseRequestHeader] = relationship(
-        "PurchaseRequestHeader",
-        back_populates="pending_approval_attr",
-        foreign_keys=lambda: [PendingApproval.purchase_request_uuid],
-    )
-    pr_line_item_attr:      Mapped[PurchaseRequestLineItem] = relationship(
-        "PurchaseRequestLineItem",
-        back_populates="pending_approval_attr",
-        foreign_keys=[line_item_uuid],
-    )
-    approval_attr:          Mapped[Approval] = relationship(
-        "Approval",
-        back_populates="pending_approval_attr",
-        foreign_keys=[approvals_uuid],
-    )
-
-###################################################################################################
-## LINE ITEM COMMENTS TABLE
 class SonComment(Base):
     __tablename__ = "son_comments"
-    
-    approvals_uuid:      Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True, nullable=False)
+    UUID:               Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    approvals_uuid:     Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
     comment_text:       Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at:         Mapped[Optional[datetime]] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+    created_at:         Mapped[Optional[datetime]] = mapped_column(DateTime, default=utc_now_truncated, nullable=True)
     son_requester:      Mapped[str] = mapped_column(String, nullable=False)
-    item_description:   Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    purchase_req_id:    Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    
-    # Relationships
-    approval_attr = relationship("Approval", back_populates="son_comment_attr",
-                                 foreign_keys=lambda: [SonComment.approvals_uuid])
+    item_description:   Mapped[Optional[str]] = mapped_column(String, nullable=True)	
 
+    approval: Mapped[Approval] = relationship(
+        "Approval",
+        back_populates="son_comments",
+        foreign_keys=[approvals_uuid]
+    )
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# APPROVAL (the master approval record)
+# ────────────────────────────────────────────────────────────────────────────────
+
+class Approval(Base):
+    __tablename__ = "approvals"
+
+    UUID                   : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ID                     : Mapped[str] = mapped_column(String, nullable=False)
+    IRQ1_ID                : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
+    purchase_request_uuid  : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
+    # note: dropped direct pr_line_item_uuid to avoid double‐join
+    requester              : Mapped[str] = mapped_column(String, nullable=False)
+    CO                     : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    phoneext               : Mapped[int] = mapped_column(Integer, nullable=False)
+    datereq                : Mapped[str] = mapped_column(String)
+    dateneed               : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    orderType              : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    fileAttachments        : Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    itemDescription        : Mapped[str] = mapped_column(Text)
+    justification          : Mapped[str] = mapped_column(Text)
+    trainNotAval           : Mapped[bool] = mapped_column(Boolean, nullable=True)
+    needsNotMeet           : Mapped[bool] = mapped_column(Boolean, nullable=True)
+    budgetObjCode          : Mapped[str] = mapped_column(String)
+    fund                   : Mapped[str] = mapped_column(String)
+    priceEach              : Mapped[float] = mapped_column(Float)
+    totalPrice             : Mapped[float] = mapped_column(Float)
+    location               : Mapped[str] = mapped_column(String)
+    quantity               : Mapped[int] = mapped_column(Integer)
+    created_time           : Mapped[datetime] = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
+    isCyberSecRelated      : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    status                 : Mapped[ItemStatus] = mapped_column(
+                                SQLEnum(ItemStatus,
+                                       name="item_status", native_enum=False,
+                                       values_callable=lambda enum: [e.value for e in enum]
+                                ),
+                                default=ItemStatus.NEW_REQUEST
+                              )
+
+    # back to header
+    purchase_request_header: Mapped[PurchaseRequestHeader] = relationship(
+                                "PurchaseRequestHeader",
+                                back_populates="approvals",
+                                foreign_keys=[purchase_request_uuid]
+                             )
+
+    # to join‐table
+    line_item_approval_attr    : Mapped[List[LineItemApproval]] = relationship(
+                                "LineItemApproval",
+                                back_populates="approval",
+                                cascade="all, delete-orphan",
+                                foreign_keys="[LineItemApproval.approvals_uuid]"
+                             )
+
+    # to pending
+    pending_approvals      : Mapped[List[PendingApproval]] = relationship(
+                                "PendingApproval",
+                                back_populates="approval",
+                                cascade="all, delete-orphan",
+                                foreign_keys="[PendingApproval.approvals_uuid]"
+                             )
+
+    # to SonComment
+    son_comments           : Mapped[List[SonComment]] = relationship(
+                                "SonComment",
+                                back_populates="approval",
+                                cascade="all, delete-orphan",
+                                foreign_keys="[SonComment.approvals_uuid]"
+                             )
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# JOIN TABLE: LineItemApproval
+# ────────────────────────────────────────────────────────────────────────────────
+
+class LineItemApproval(Base):
+    __tablename__ = "line_item_approvals"
+
+    approvals_uuid  : Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True)
+    line_item_uuid  : Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), primary_key=True)
+    approver        = mapped_column(String, nullable=False)
+    status          = mapped_column(SQLEnum(ItemStatus), nullable=False)
+    decision        = mapped_column(SQLEnum(ItemStatus), nullable=False)
+    created_at      = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
+
+    # back to Approval
+    approval        : Mapped[Approval] = relationship(
+                          "Approval",
+                          back_populates="line_item_approval_attr",
+                          foreign_keys=[approvals_uuid]
+                      )
+
+    # back to LineItem
+    line_item      : Mapped[PurchaseRequestLineItem] = relationship(
+                          "PurchaseRequestLineItem",
+                          back_populates="line_item_approval_attr",
+                          foreign_keys=[line_item_uuid]
+                      )
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# PENDING APPROVAL
+# ────────────────────────────────────────────────────────────────────────────────
+
+class PendingApproval(Base):
+    __tablename__ = "pending_approvals"
+
+    task_id                : Mapped[int]    = mapped_column(Integer, primary_key=True, autoincrement=True)
+    purchase_request_uuid  : Mapped[str]    = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
+    line_item_uuid         : Mapped[Optional[str]] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=True)
+    approvals_uuid         : Mapped[Optional[str]] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
+    assigned_group         : Mapped[str]    = mapped_column(String, nullable=False)
+    task_status            : Mapped[TaskStatus] = mapped_column(
+                                SQLEnum(TaskStatus),
+                                name="task_status", native_enum=False,
+                                values_callable=lambda enum: [e.value for e in enum],
+                                default=TaskStatus.NEW_REQUEST,
+                                nullable=False
+                             )
+    action                 = mapped_column(
+                                SQLEnum(ItemStatus, name="item_status", native_enum=False,
+                                       values_callable=lambda enum: [e.value for e in enum]
+                                ),
+                                nullable=True
+                             )
+    created_at             = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
+    processed_at           = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=True)
+
+    # back to header
+    purchase_request_header: Mapped[PurchaseRequestHeader] = relationship(
+                                "PurchaseRequestHeader",
+                                back_populates="pending_approvals",
+                                foreign_keys=[purchase_request_uuid]
+                             )
+
+    # back to line‐item
+    purchase_request_line_item: Mapped[PurchaseRequestLineItem] = relationship(
+                                "PurchaseRequestLineItem",
+                                back_populates="pending_approvals",
+                                foreign_keys=[line_item_uuid]
+                             )
+
+    # back to approval
+    approval                : Mapped[Approval] = relationship(
+                                "Approval",
+                                back_populates="pending_approvals",
+                                foreign_keys=[approvals_uuid]
+                             )
 ###################################################################################################
 ## SEEDING JUSTIFICATION TEMPLATES
 ###################################################################################################
@@ -447,6 +392,48 @@ def get_approval_by_id(db_session: Session, ID: str):
     return db_session.query(Approval).filter(Approval.ID == ID).first()
 
 ###################################################################################################
+# Get Purchase Request Header and Line Items
+###################################################################################################
+def get_pr_header_and_line_items(request_id: str):
+    with get_session() as session:
+        # 1) Load the header AND its .pr_line_items relationship in one query
+        pr_header = session.scalar(
+            select(PurchaseRequestHeader)
+            .options(selectinload(PurchaseRequestHeader.pr_line_item_attr))
+            .where(PurchaseRequestHeader.request_id == request_id)
+        )
+        if not pr_header:
+            raise HTTPException(status_code=404, detail=f"Purchase Request '{request_id}' not found")
+
+        # 2) The related items are now on pr_header.pr_line_items  
+        line_items = pr_header.pr_line_items
+        if not line_items:
+            raise HTTPException(status_code=404, detail=f"No line items for Purchase Request '{request_id}'")
+
+        return pr_header, line_items
+    
+###################################################################################################
+# Get all son comments by id
+###################################################################################################
+def fetch_just_flags_by_id(id: str):
+    with get_session() as session:
+        stmt = (
+            select(
+                PurchaseRequestLineItem.trainNotAval,
+                PurchaseRequestLineItem.needsNotMeet,
+            ).join(
+                PurchaseRequestHeader,
+                PurchaseRequestHeader.UUID == PurchaseRequestLineItem.purchase_request_uuid
+            ).where(
+                PurchaseRequestHeader.ID == id
+            )
+        )
+        results = session.execute(stmt).all()
+        if not results:
+            raise HTTPException(status_code=404, detail=f"No line items for Purchase Request '{id}'")
+        return results
+
+###################################################################################################
 # Insert data
 def insert_data(table=None, data=None):
     # Get last id if there is one 
@@ -488,6 +475,34 @@ def insert_data(table=None, data=None):
         session.refresh(obj)
         logger.info(f"Inserted data into {table}")
         return obj
+    
+###################################################################################################
+# Get next  request id
+###################################################################################################
+def set_purchase_req_id() -> str:
+    first_prefix = "LAWB"
+    try:
+        with get_session() as session:
+            # Get all existing IDs and find the highest numeric suffix
+            existing_ids = session.query(PurchaseRequestHeader.ID).all()
+            max_suffix = 0
+            
+            for (id_str,) in existing_ids:
+                if id_str and id_str.startswith(first_prefix):
+                    try:
+                        suffix = int(id_str[len(first_prefix):])
+                        max_suffix = max(max_suffix, suffix)
+                    except ValueError:
+                        continue
+            
+            next_suffix = max_suffix + 1
+            next_id = f"{first_prefix}{str(next_suffix).zfill(4)}"
+            logger.info(f"Next purchase request id: {next_id}")
+            return next_id
+    except Exception as e:
+        logger.error(f"Error setting purchase request id: {e}")
+        # Return a fallback ID instead of None
+        return f"{first_prefix}0001"
 
 ###################################################################################################
 # Get status of request from Approval table
@@ -563,168 +578,138 @@ def update_data_by_uuid(uuid: str, table: str, **kwargs):
         case _:
             raise ValueError(f"Unsupported table: {table}")
         
-    # Strip out keys (columns) that are not in model
+    # Strip out keys that are not in model
     valid_cols = set(inspect(model).columns.keys())
     filtered_data = {k: v for k, v in kwargs.items() if k in valid_cols}
     
     with get_session() as session:
         # Filters incoming data by UUID for the table
         #Line Item Statuses needs to use approve_uuid 
-        
         obj = session.query(model).filter(getattr(model, pk_field) == uuid).first()
-        logger.info(f"GETATTR test: {getattr(model, pk_field)}")
         if not obj:
-            raise ValueError(f"No record found with {pk_field} {uuid} in {table}")
-            
+            raise ValueError(f"Object with UUID {uuid} not found in {table}")
+        
+        # Update the object with the filtered data
         for key, value in filtered_data.items():
             setattr(obj, key, value)
-            
+        
         session.commit()
         session.refresh(obj)
         logger.info(f"Updated data in {table}")
         return obj
 
 ###################################################################################################
-# Get uuid by ID with caching
+# GET UUID BY ID (CACHED)
+###################################################################################################
 def get_uuid_by_id_cached(db_session: Session, ID: str):
     """
-    Get uuid by ID with caching for better performance.
+    Get UUID by ID with caching for performance.
+    Returns the UUID if found, None otherwise.
     """
     # Check cache first
     if ID in _uuid_cache:
-        logger.info(f"uuid cache hit for ID: {ID}")
+        logger.info(f"Cache hit for ID: {ID}")
         return _uuid_cache[ID]
     
-    # If not in cache, get from database
-    UUID = get_uuid_by_id(db_session, ID)
+    # Query database
+    result = db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
     
-    # Store in cache if found
-    if uuid:
-        _uuid_cache[ID] = uuid
-        logger.info(f"Added uuid to cache for ID: {ID}")
-    
-    return UUID
+    if result:
+        uuid_value = result[0]
+        # Cache the result
+        _uuid_cache[ID] = uuid_value
+        logger.info(f"Cache miss for ID: {ID}, cached UUID: {uuid_value}")
+        return uuid_value
+    else:
+        logger.warning(f"No UUID found for ID: {ID}")
+        return None
 
 ###################################################################################################
-# Get uuid by ID
+# GET UUID BY ID (UNCACHED)
 ###################################################################################################
 def get_uuid_by_id(db_session: Session, ID: str):
+    """
+    Get UUID by ID without caching.
+    Returns the UUID if found, None otherwise.
+    """
     result = db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
     return result[0] if result else None
-        
+
 ###################################################################################################
-# Retrieve data from single line
+# FETCH SINGLE ROW
 ###################################################################################################
 def fetch_single_row(self, model_class, columns: list, condition, params: dict):
     """
-    model_class: SQLAlchemy ORM model (e.g., PurchaseRequest)
-    columns: list of attributes (e.g., [PurchaseRequest.requester, PurchaseRequest.fund])
-    condition: SQLAlchemy filter expression (e.g., PurchaseRequest.IRQ1_ID == :req_id)
-    params: dictionary of bind parameters (e.g., {"req_id": "REQ-001"})
+    Fetch a single row from the database.
+    Returns the first row that matches the condition, or None if no match.
     """
-    
-    if not columns or not isinstance(columns, list):
+    if not columns:
         raise ValueError("Columns must be a non-empty list")
     
     with get_session() as session:
         result = session.query(*columns).filter(condition).params(params).first()
         return result
-    
+
 ###################################################################################################
-# Get last 4 digits of the ID from the database
+# GET LAST ID
 ###################################################################################################
 def _get_last_id() -> Optional[str]:
     """
-    Return the full most‐recent PurchaseRequest.ID (e.g. "20250414-0007"),
-    or None if the table is empty.
+    Get the last ID from the database.
+    Returns the last ID if found, or None if the table is empty.
     """
     with get_session() as session:
         # Query the Approval table instead of PurchaseRequest
         row = (
             session.query(Approval.ID)
             .order_by(Approval.ID.desc())
-            .limit(1)
             .first()
         )
-        # Return just the ID string, not the tuple
         return row[0] if row else None
-    
-###################################################################################################
-# Get next  request ID
-###################################################################################################
-def get_next_request_id() -> str:
-    """
-    Build the next ID in "YYYYMMDD-XXXX" format:
-    - If today's date ≠ last ID's date, start at 0001
-    - Otherwise increment the last 4‑digit suffix
-    """
-    first_section = "LAWB"
-    last_id = _get_last_id()
-    
-    if not last_id:
-        logger.info("No previous IDs found, starting with 0001")
-        next_suffix = 1
-    else:
-        try:
-           # Extract numeric suffix from last_id
-           raw_suffix = last_id.replace(first_section, "")
-           last_suffix = int(raw_suffix)
-           next_suffix = last_suffix + 1
-           logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
-        except ValueError:
-            logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
-            next_suffix = 1
-        except Exception as e:
-            logger.error(f"Error processing last ID: {e}, starting with 0001")
-            next_suffix = 1
-            
-    suffix_str = f"{next_suffix:04d}"
-    return first_section + suffix_str
-            
-            
+
 ###################################################################################################
 # Get status of request from Approval table by uuid
 ###################################################################################################
 def get_status_by_uuid(db_session: Session, UUID: str):
-    logger.info(f"Fetching status for uuid: {UUID}")
+    logger.info(f"Fetching status for UUID: {UUID}")
     
     if not UUID:
         raise ValueError("UUID must be a non-empty string")
     
+    # Query the Approval table to get the status field for the given uuid
     result = db_session.query(Approval.status).filter(Approval.UUID == UUID).first()
+    logger.info(f"Status: {result}")
     
     if result:
         return result[0]  # Return just the status string
     else:
-        logger.warning(f"No status found for UUID: {UUID}")
-        return None
+        logger.error(f"Object with UUID {UUID} not found in Approval table")
+        raise ValueError(f"Object with UUID {UUID} not found in Approval table")
 
 ###################################################################################################
-# Get uuids for multiple IDs
+# GET UUIDS BY IDS
 ###################################################################################################
 def get_uuids_by_ids(db_session: Session, IDs: list):
     """
-    Get uuids for multiple IDs.
-    Returns a dictionary mapping IDs to uuids.
+    Get UUIDs for a list of IDs.
+    Returns a dictionary mapping ID -> UUID.
     """
-    logger.info(f"Getting uuids for {len(IDs)} IDs")
+    if not IDs:
+        return {}
     
-    result = {}
-    for ID in IDs:
-        uuid = get_uuid_by_id(db_session, ID)
-        if uuid:
-            result[ID] = uuid
-    
-    return result
+    results = db_session.query(Approval.ID, Approval.UUID).filter(Approval.ID.in_(IDs)).all()
+    return {row[0]: row[1] for row in results}
 
 ###################################################################################################
 # GET USERNAMES
 ###################################################################################################
 def get_usernames(db_session: Session, prefix: str):
     """
-    Get usernames that start with the given prefix. FROM LDAPS NOT APPROVAL TABLE
+    Get usernames that start with the given prefix.
+    Returns a list of usernames.
     """
-    return db_session.query(Approval.requester).filter(Approval.requester.like(f"{prefix}%")).all()
+    results = db_session.query(Approval.requester).filter(Approval.requester.like(f"{prefix}%")).distinct().all()
+    return [row[0] for row in results]
 
 ###################################################################################################
 # CHECK STATUS VALUES
@@ -734,21 +719,35 @@ def check_status_values():
     with get_session() as session:
         # Check approvals table
         approval_statuses = session.query(Approval.status).distinct().all()
-        logger.info(f"Approval statuses: {approval_statuses}")
+        logger.info(f"Approval statuses: {[s[0] for s in approval_statuses]}")
         
-        # Check purchase_requests table
-        pr_statuses = session.query(PurchaseRequestHeader.status).distinct().all()
-        logger.info(f"Purchase Request statuses: {pr_statuses}")
+        # Check purchase request headers table
+        header_statuses = session.query(PurchaseRequestHeader.status).distinct().all()
+        logger.info(f"Header statuses: {[s[0] for s in header_statuses]}")
         
-        # Check line_item_statuses table
-        lis_statuses = session.query(LineItemStatus.status).distinct().all()
-        logger.info(f"Line Item Statuses: {lis_statuses}")
+        # Check line items table
+        line_item_statuses = session.query(PurchaseRequestLineItem.status).distinct().all()
+        logger.info(f"Line item statuses: {[s[0] for s in line_item_statuses]}")
+        
+        return {
+            "approvals": [s[0] for s in approval_statuses],
+            "headers": [s[0] for s in header_statuses],
+            "line_items": [s[0] for s in line_item_statuses]
+        }
+
+###################################################################################################
+# Get all son comments by id
+###################################################################################################
+def get_all_son_comments(db_session: Session, id: str):
+    """Get all son comments for a given ID"""
+    results = db_session.query(SonComment).filter(SonComment.purchase_req_id == id).all()
+    return results
 
 ###################################################################################################
 # Get all purchase requests
-###################################################################################################``
+###################################################################################################
 def get_all_purchase_requests(session):
-    """Get all purchase requests from the database"""
+    """Get all purchase requests"""
     return session.query(PurchaseRequestHeader).all()
 
 ###################################################################################################
@@ -759,56 +758,76 @@ def get_additional_comments_by_id(ID: str):
     with get_session() as session:
         stmt = (
             select(PurchaseRequestLineItem.addComments)
-            .join(Approval, PurchaseRequestHeader.ID == Approval.ID)
-            .where(PurchaseRequestLineItem.addComments.is_not(None))
-            .where(PurchaseRequestHeader.ID == ID)
+            .join(
+                PurchaseRequestHeader,
+                PurchaseRequestHeader.UUID == PurchaseRequestLineItem.purchase_request_uuid
+            ).where(
+                PurchaseRequestHeader.ID == ID
+            )
         )
-        additional_comments = session.scalars(stmt).all()
-    return additional_comments
+        results = session.execute(stmt).all()
+        return [row[0] for row in results if row[0]]
 
 ###################################################################################################
-# Get orderTypes
+# Get order types by ID
 ###################################################################################################
 def get_order_types(ID: str):
     """Get order types by ID"""
     with get_session() as session:
         stmt = (
             select(PurchaseRequestHeader.orderType)
-            .join(Approval, PurchaseRequestHeader.ID == Approval.ID)
-            .where(PurchaseRequestHeader.orderType.is_not(None))
             .where(PurchaseRequestHeader.ID == ID)
         )
-        order_types = session.scalars(stmt).first()
-    return order_types
+        results = session.execute(stmt).all()
+        return [row[0] for row in results if row[0]]
 
 ###################################################################################################
-# Get next  request id
+# Get next request ID
 ###################################################################################################
-def set_purchase_req_id() -> str:
+async def get_next_request_id() -> str:
+    """
+    Build the next ID in "YYYYMMDD-XXXX" format:
+    - If today's date ≠ last ID's date, start at 0001
+    - Otherwise increment the last 4‑digit suffix
+    """
+    first_section = "LAWB"
+    async with get_session() as session:
+        result = await session.execute(
+            select(PurchaseRequestHeader.ID)
+            .order_by(PurchaseRequestHeader.ID.desc())
+            .limit(1)
+        )
+        last_id = result.scalar_one_or_none()
     
-    first_prefix = "LAWB"
-    # Create next id for incoming purchase request
-    try:
-        with get_session() as session:
-            stmt = select(
-                (func.coalesce(func.max(PurchaseRequestHeader.ID), literal(0)) + 1).label("next_id")
-            ).select_from(PurchaseRequestHeader)
-            next_int_id = session.execute(stmt).scalar_one()
-            next_id = f"{first_prefix}{str(next_int_id).zfill(4)}"
-            logger.info(f"Next purchase request id: {next_id}")
-            return next_id
-    except Exception as e:
-        logger.error(f"Error setting purchase request id: {e}")
-        return None
+    if not last_id:
+        logger.info("No previous IDs found, starting with 0001")
+        next_suffix = 1
+    else:
+        try:
+            # Extract numeric suffix from last_id
+            raw_suffix = last_id.replace(first_section, "")
+            last_suffix = int(raw_suffix)
+            next_suffix = last_suffix + 1
+            logger.info(f"Last ID: {last_id}, next suffix: {next_suffix}")
+        except ValueError:
+            logger.warning(f"Invalid suffix in ID: {last_id}, starting with 0001")
+            next_suffix = 1
+        except Exception as e:
+            logger.error(f"Error processing last ID: {e}, starting with 0001")
+            next_suffix = 1
+            
+    suffix_str = f"{next_suffix:04d}"
+    return first_section + suffix_str
 
 ###################################################################################################
 # Get approval by ID
 ###################################################################################################
 def get_approval_by_id(session, ID):
-    """Get approval by ID"""
     return session.query(Approval).filter(Approval.ID == ID).first()
 
-# Call init_db to create tables on startup
+###################################################################################################
+# Initialize database
+###################################################################################################
 def init_db():
     """Initialize the database by creating all tables."""
     try:
@@ -834,6 +853,5 @@ def init_db():
     except Exception as e:
         logger.error(f"Error initializing database: {e}")
         raise
-    
-# Call init_db to create tables
+
 init_db()
