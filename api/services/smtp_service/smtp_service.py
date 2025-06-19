@@ -54,14 +54,14 @@ class SMTP_Service:
         # Get additional comments from cache
         additional_comments = cache_service.get_or_set(
             "comments",
-            payload.id,
-            lambda: dbas.get_additional_comments_by_id(payload.id)
+            payload.ID,
+            lambda: dbas.get_additional_comments_by_id(payload.ID)
         )
         
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
             context = {
-                "ID": payload.id,
+                "ID": payload.ID,
                 "requester": payload.requester,
                 "datereq": payload.datereq,
                 "dateneed": payload.dateneed,

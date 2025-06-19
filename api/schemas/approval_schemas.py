@@ -26,30 +26,31 @@ class LineItemStatusSchema(BaseModel):
     updated_by: Optional[str] = None
     
 class ApprovalSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     
-    ID: str
-    IRQ1_ID: Optional[str] = None
     UUID: str
-    CO: Optional[str] = None
+    purchase_request_id: str = Field(alias="ID")  # Map purchase_request_id to ID for backward compatibility
+    IRQ1_ID: Optional[str] = None
     requester: str
+    CO: Optional[str] = None
+    phoneext: int
     datereq: str
     dateneed: Optional[str] = None
     orderType: Optional[str] = None
-    budgetObjCode: str
-    fund: str
+    fileAttachments: Optional[bytes] = None
     itemDescription: str
     justification: str
-    addComments: Optional[List[str]] = None
     trainNotAval: Optional[bool] = False
     needsNotMeet: Optional[bool] = False
-    quantity: int
-    totalPrice: float
+    budgetObjCode: str
+    fund: str
     priceEach: float
+    totalPrice: float
     location: str
-    status: ItemStatus
-    createdTime: datetime
+    quantity: int
+    created_time: datetime = Field(alias="createdTime")  # Map created_time to createdTime for backward compatibility
     isCyberSecRelated: Optional[bool] = False
+    status: ItemStatus
 
 def to_camel(s: str) -> str:
     parts = s.split('_')

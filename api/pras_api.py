@@ -322,6 +322,10 @@ async def send_purchase_request(
             status_code=400,
             content={"message": "Invalid data"}
         )
+        
+    logger.info(f"PAYLOAD: {payload}")
+    logger.info(f"PAYLOAD.ITEMS: {payload.items}")
+    logger.info(f"PAYLOAD.ITEMS[0]: {payload.items[0]}")
     
     
     #################################################################################
@@ -369,14 +373,13 @@ async def send_purchase_request(
         db.add(orm_pr_header)
         await db.flush()  # makes ORM defaults (like pk/uuid) available
 
-        pr_line_item_ids: List[int] = []
+        pr_line_item_uuids: List[str] = []
         for item in payload.items:
             orm_pr_line_item = PurchaseRequestLineItem(
-                purchase_request_uuid=orm_pr_header.uuid,
-                ID=orm_pr_header.id,
+                purchase_request_id=orm_pr_header.ID,
                 itemDescription=item.item_description,
                 justification=item.justification,
-                addComments=item.additional_comments,
+                addComments="; ".join(item.additional_comments) if item.additional_comments else None,
                 trainNotAval=item.train_not_aval,
                 needsNotMeet=item.needs_not_meet,
                 budgetObjCode=item.budget_obj_code,
@@ -386,19 +389,17 @@ async def send_purchase_request(
                 totalPrice=item.total_price,
                 location=item.location,
                 status=item.status,
-                fileAttachments=item.file_attachments,
-                isCyberSecRelated=item.is_cyber_sec_related,
                 created_time=utc_now_truncated(),
             )
             db.add(orm_pr_line_item)
             await db.flush()
-            pr_line_item_ids.append(orm_pr_line_item.id)
+            pr_line_item_uuids.append(orm_pr_line_item.UUID)
 
         approvals: List[Approval] = []
-        for item, line_id in zip(payload.items, pr_line_item_ids):
+        for item, line_uuid in zip(payload.items, pr_line_item_uuids):
             appr = Approval(
                 UUID=str(uuid.uuid4()),
-                purchase_request_uuid=orm_pr_header.uuid,
+                purchase_request_id=orm_pr_header.ID,
                 requester=payload.requester,
                 phoneext=item.phoneext,
                 datereq=item.datereq,
@@ -414,7 +415,6 @@ async def send_purchase_request(
                 totalPrice=item.total_price,
                 location=item.location,
                 quantity=item.quantity,
-                isCyberSecRelated=item.is_cyber_sec_related,
                 status=item.status,
                 created_time=utc_now_truncated(),
             )
@@ -424,8 +424,8 @@ async def send_purchase_request(
 
             assigned_group = "IT" if item.fund.startswith("511") else "Finance"
             task = PendingApproval(
-                purchase_request_uuid=orm_pr_header.uuid,
-                pr_line_item_uuid=line_id,
+                purchase_request_id=orm_pr_header.ID,
+                line_item_uuid=line_uuid,
                 approvals_uuid=appr.UUID,
                 assigned_group=assigned_group,
                 task_status=TaskStatus.NEW_REQUEST,
@@ -476,7 +476,7 @@ async def send_purchase_request(
         requester_email=requester_email,
         datereq=payload.items[0].datereq,
         dateneed=payload.items[0].dateneed,
-        orderType=payload.items[0].orderType,
+        orderType=payload.items[0].order_type,
         subject=f"Purchase Request #{payload.id}",
         sender=settings.smtp_email_addr,
         to=None,   # Assign this in the smtp service

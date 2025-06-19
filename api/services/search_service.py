@@ -227,9 +227,9 @@ class SearchService:
         # Build the search query
         query = (
             select(header)
-            .outerjoin(line_item, header.UUID == line_item.purchase_request_uuid)
-            .outerjoin(approval, header.UUID == approval.purchase_request_uuid)
-            .outerjoin(pending, header.UUID == pending.purchase_request_uuid)
+            .outerjoin(line_item, header.ID == line_item.purchase_request_id)
+            .outerjoin(approval, header.ID == approval.purchase_request_id)
+            .outerjoin(pending, header.ID == pending.purchase_request_id)
             .where(
                 or_(
                     header.ID.ilike(f"%{search_term}%"),
@@ -256,7 +256,6 @@ class SearchService:
         """
         return {
             "id": header.ID,
-            "uuid": header.UUID,
             "requester": header.requester,
             "phoneext": header.phoneext,
             "datereq": header.datereq.isoformat() if header.datereq else None,

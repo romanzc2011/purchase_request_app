@@ -124,7 +124,7 @@ class PDFService:
             
             try:
                 # Get all approvals for this ID
-                approvals = session.query(dbas.Approval).filter(dbas.Approval.ID == ID).all()
+                approvals = session.query(dbas.Approval).filter(dbas.Approval.purchase_request_id == ID).all()
                 if not approvals:
                     raise HTTPException(status_code=404, detail="No approvals found for this ID")
                 
@@ -136,7 +136,14 @@ class PDFService:
                 is_cyber = any(row.get("isCyberSecRelated") for row in rows)
                 
                 comment_arr: list[str] = []
-                comments = session.query(dbas.SonComment).filter(dbas.SonComment.purchase_req_id == ID).all()
+                order_type = None  # Initialize order_type outside the conditional block
+                # Get SonComments by joining through Approval table
+                comments = session.query(dbas.SonComment).join(
+                    dbas.Approval, 
+                    dbas.SonComment.approvals_uuid == dbas.Approval.UUID
+                ).filter(
+                    dbas.Approval.purchase_request_id == ID
+                ).all()
                 if comments:
                     for c in comments:
                         comment_data = SonCommentSchema.model_validate(c)
@@ -168,7 +175,7 @@ class PDFService:
                 logger.info(f"comment_arr: {comment_arr}")
 
                 # Construct the output path with filename
-                output_path = self.pdf_path / f"statement_of_need-{ID}.pdf"
+                output_path = self.output_dir / f"statement_of_need-{ID}.pdf"
                                 
                 # Generate PDF
                 return self._make_purchase_request_pdf(rows=rows, output_path=output_path, is_cyber=is_cyber, comments=comment_arr, order_type=order_type)

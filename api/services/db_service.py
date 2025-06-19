@@ -79,8 +79,7 @@ def utc_now_truncated() -> datetime:
 class PurchaseRequestHeader(Base):
     __tablename__ = "purchase_request_headers"
 
-    UUID               : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID                 : Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    ID                 : Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     requester          : Mapped[str] = mapped_column(String, nullable=False)
     phoneext           : Mapped[int] = mapped_column(Integer, nullable=False)
     datereq            : Mapped[str] = mapped_column(String)
@@ -101,7 +100,7 @@ class PurchaseRequestHeader(Base):
                             "PurchaseRequestLineItem",
                             back_populates="purchase_request_header",
                             cascade="all, delete-orphan",
-                            foreign_keys="[PurchaseRequestLineItem.purchase_request_uuid]"
+                            foreign_keys="[PurchaseRequestLineItem.purchase_request_id]"
                          )
 
     # 2️⃣ headers → approvals
@@ -109,7 +108,7 @@ class PurchaseRequestHeader(Base):
                             "Approval",
                             back_populates="purchase_request_header",
                             cascade="all, delete-orphan",
-                            foreign_keys="[Approval.purchase_request_uuid]"
+                            foreign_keys="[Approval.purchase_request_id]"
                          )
 
     # 3️⃣ headers → pending approvals
@@ -117,7 +116,7 @@ class PurchaseRequestHeader(Base):
                             "PendingApproval",
                             back_populates="purchase_request_header",
                             cascade="all, delete-orphan",
-                            foreign_keys="[PendingApproval.purchase_request_uuid]"
+                            foreign_keys="[PendingApproval.purchase_request_id]"
                          )
 
 
@@ -129,7 +128,7 @@ class PurchaseRequestLineItem(Base):
     __tablename__ = "pr_line_items"
 
     UUID                   : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    purchase_request_uuid  : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
+    purchase_request_id  : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=False)
     itemDescription        : Mapped[str] = mapped_column(Text)
     justification          : Mapped[str] = mapped_column(Text)
     addComments            : Mapped[Optional[str]] = mapped_column(Text)
@@ -154,7 +153,7 @@ class PurchaseRequestLineItem(Base):
     purchase_request_header: Mapped[PurchaseRequestHeader] = relationship(
                                 "PurchaseRequestHeader",
                                 back_populates="pr_line_items",
-                                foreign_keys=[purchase_request_uuid]
+                                foreign_keys=[purchase_request_id]
                              )
 
     # line-item → join‐table
@@ -197,10 +196,8 @@ class Approval(Base):
     __tablename__ = "approvals"
 
     UUID                   : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    ID                     : Mapped[str] = mapped_column(String, nullable=False)
+    purchase_request_id    : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=False)
     IRQ1_ID                : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
-    purchase_request_uuid  : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
-    # note: dropped direct pr_line_item_uuid to avoid double‐join
     requester              : Mapped[str] = mapped_column(String, nullable=False)
     CO                     : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     phoneext               : Mapped[int] = mapped_column(Integer, nullable=False)
@@ -232,7 +229,7 @@ class Approval(Base):
     purchase_request_header: Mapped[PurchaseRequestHeader] = relationship(
                                 "PurchaseRequestHeader",
                                 back_populates="approvals",
-                                foreign_keys=[purchase_request_uuid]
+                                foreign_keys=[purchase_request_id]
                              )
 
     # to join‐table
@@ -297,7 +294,7 @@ class PendingApproval(Base):
     __tablename__ = "pending_approvals"
 
     task_id                : Mapped[int]    = mapped_column(Integer, primary_key=True, autoincrement=True)
-    purchase_request_uuid  : Mapped[str]    = mapped_column(String, ForeignKey("purchase_request_headers.UUID"), nullable=False)
+    purchase_request_id    : Mapped[str]    = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=False)
     line_item_uuid         : Mapped[Optional[str]] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=True)
     approvals_uuid         : Mapped[Optional[str]] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
     assigned_group         : Mapped[str]    = mapped_column(String, nullable=False)
@@ -321,7 +318,7 @@ class PendingApproval(Base):
     purchase_request_header: Mapped[PurchaseRequestHeader] = relationship(
                                 "PurchaseRequestHeader",
                                 back_populates="pending_approvals",
-                                foreign_keys=[purchase_request_uuid]
+                                foreign_keys=[purchase_request_id]
                              )
 
     # back to line‐item
@@ -388,8 +385,8 @@ async def get_justification_templates(async_session: AsyncSession) -> dict[str, 
 def get_all_approval(db_session: Session):
     return db_session.query(Approval).all()
 
-def get_approval_by_id(db_session: Session, ID: str):
-    return db_session.query(Approval).filter(Approval.ID == ID).first()
+def get_approval_by_id(session, ID):
+    return session.query(Approval).filter(Approval.purchase_request_id == ID).first()
 
 ###################################################################################################
 # Get Purchase Request Header and Line Items
@@ -423,7 +420,7 @@ def fetch_just_flags_by_id(id: str):
                 PurchaseRequestLineItem.needsNotMeet,
             ).join(
                 PurchaseRequestHeader,
-                PurchaseRequestHeader.UUID == PurchaseRequestLineItem.purchase_request_uuid
+                PurchaseRequestHeader.ID == PurchaseRequestLineItem.purchase_request_id
             ).where(
                 PurchaseRequestHeader.ID == id
             )
@@ -514,7 +511,7 @@ def get_status_by_id(db_session: Session, ID: str):
         raise ValueError("ID must be a non-empty string")
     
     # First try to find by sequential ID
-    result = db_session.query(Approval).filter(Approval.ID == ID).first()
+    result = db_session.query(Approval).filter(Approval.purchase_request_id == ID).first()
     if not result:
         # If not found, try uuid
         result = db_session.query(Approval).filter(Approval.uuid == ID).first()
@@ -612,7 +609,7 @@ def get_uuid_by_id_cached(db_session: Session, ID: str):
         return _uuid_cache[ID]
     
     # Query database
-    result = db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
+    result = db_session.query(Approval.UUID).filter(Approval.purchase_request_id == ID).first()
     
     if result:
         uuid_value = result[0]
@@ -632,7 +629,7 @@ def get_uuid_by_id(db_session: Session, ID: str):
     Get UUID by ID without caching.
     Returns the UUID if found, None otherwise.
     """
-    result = db_session.query(Approval.UUID).filter(Approval.ID == ID).first()
+    result = db_session.query(Approval.UUID).filter(Approval.purchase_request_id == ID).first()
     return result[0] if result else None
 
 ###################################################################################################
@@ -661,8 +658,8 @@ def _get_last_id() -> Optional[str]:
     with get_session() as session:
         # Query the Approval table instead of PurchaseRequest
         row = (
-            session.query(Approval.ID)
-            .order_by(Approval.ID.desc())
+            session.query(Approval.purchase_request_id)
+            .order_by(Approval.purchase_request_id.desc())
             .first()
         )
         return row[0] if row else None
@@ -697,7 +694,7 @@ def get_uuids_by_ids(db_session: Session, IDs: list):
     if not IDs:
         return {}
     
-    results = db_session.query(Approval.ID, Approval.UUID).filter(Approval.ID.in_(IDs)).all()
+    results = db_session.query(Approval.purchase_request_id, Approval.UUID).filter(Approval.purchase_request_id.in_(IDs)).all()
     return {row[0]: row[1] for row in results}
 
 ###################################################################################################
@@ -760,7 +757,7 @@ def get_additional_comments_by_id(ID: str):
             select(PurchaseRequestLineItem.addComments)
             .join(
                 PurchaseRequestHeader,
-                PurchaseRequestHeader.UUID == PurchaseRequestLineItem.purchase_request_uuid
+                PurchaseRequestHeader.ID == PurchaseRequestLineItem.purchase_request_id
             ).where(
                 PurchaseRequestHeader.ID == ID
             )
@@ -818,12 +815,6 @@ async def get_next_request_id() -> str:
             
     suffix_str = f"{next_suffix:04d}"
     return first_section + suffix_str
-
-###################################################################################################
-# Get approval by ID
-###################################################################################################
-def get_approval_by_id(session, ID):
-    return session.query(Approval).filter(Approval.ID == ID).first()
 
 ###################################################################################################
 # Initialize database
