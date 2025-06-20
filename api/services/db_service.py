@@ -362,14 +362,6 @@ async def get_justification_templates(async_session: AsyncSession) -> dict[str, 
     rows = result.scalars().all()
     return {r.code: r.description for r in rows}
 
-##############################################################################   
-## Get all data from Approval
-def get_all_approval(db_session: Session):
-    return db_session.query(Approval).all()
-
-def get_approval_by_id(session, ID):
-    return session.query(Approval).filter(Approval.purchase_request_id == ID).first()
-
 ###################################################################################################
 # Get Purchase Request Header and Line Items
 ###################################################################################################
