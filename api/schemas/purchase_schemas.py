@@ -1,33 +1,36 @@
 # ────────────────────────────────────────────────
-# Pydantic Models
+# Pydantic Models for Purchase Request API
 # ────────────────────────────────────────────────
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
 from api.schemas.enums import ItemStatus
-import re
+from api.utils.pydantic_utils import to_camel_case
 
-def to_camel_case(string: str) -> str:
-    parts = string.split('_')
-    return parts[0] + ''.join(word.capitalize() for word in parts[1:])
-
-
+# ────────────────────────────────────────────────
+# FILE ATTACHMENT SCHEMA
+# Used for file uploads in purchase requests
+# ────────────────────────────────────────────────
 class FileAttachment(BaseModel):
     attachment: Optional[bytes] = None
     name: Optional[str] = None
     type: Optional[str] = None
     size: Optional[int] = None
 
-class PurchaseLineItem(BaseModel):
-    uuid: Optional[str] = Field(alias="UUID")
-    id: Optional[str] = Field(alias="ID")
-    irq1_id: Optional[str] = Field(alias="IRQ1_ID")
-    purchase_request_uuid: Optional[str] = None
+# ────────────────────────────────────────────────
+# BASE PURCHASE ITEM SCHEMA
+# Common fields shared between different purchase item representations
+# ────────────────────────────────────────────────
+class BasePurchaseItem(BaseModel):
+    uuid: Optional[str] = Field(alias="UUID", default=None)
+    id: Optional[str] = Field(alias="ID", default=None)
+    irq1_id: Optional[str] = Field(alias="IRQ1_ID", default=None)
+    co: Optional[str] = Field(alias="CO", default=None)
     requester: str
     phoneext: str
     datereq: str
     dateneed: Optional[str] = None
-    order_type: Optional[str] = Field(alias="orderType")
+    order_type: Optional[str] = Field(alias="orderType", default=None)
     item_description: str = Field(alias="itemDescription")
     justification: str
     add_comments: Optional[str] = Field(alias="addComments", default=None)
@@ -43,40 +46,30 @@ class PurchaseLineItem(BaseModel):
     file_attachments: Optional[List[dict]] = Field(alias="fileAttachments", default=None)
     is_cyber_sec_related: Optional[bool] = Field(alias="isCyberSecRelated", default=None)
     created_time: Optional[datetime] = Field(alias="createdTime", default=None)
+
+    class Config:
+        populate_by_name = True
+        from_attributes = True
+
+# ────────────────────────────────────────────────
+# PURCHASE LINE ITEM SCHEMA
+# Used for individual items within a purchase request
+# Maps to PurchaseRequestLineItem ORM model
+# ────────────────────────────────────────────────
+class PurchaseLineItem(BasePurchaseItem):
+    purchase_request_uuid: Optional[str] = None
     additional_comments: Optional[str] = None
 
-    class Config:
-        populate_by_name = True
-        from_attributes = True
+# ────────────────────────────────────────────────
+# API REQUEST/RESPONSE SCHEMAS
+# ────────────────────────────────────────────────
 
-class PurchaseRequestSchema(BaseModel):
-    uuid: Optional[str] = Field(alias="UUID")
-    id: str = Field(alias="ID")
-    irq1_id: Optional[str] = Field(alias="IRQ1_ID")
-    co: Optional[str]
-    requester: str
-    phoneext: int
-    datereq: str
-    dateneed: Optional[str]
-    order_type: Optional[str]
-    status: ItemStatus
-    created_time: datetime
-    line_items: List[PurchaseLineItem]
-
-    class Config:
-        alias_generator = to_camel_case
-        populate_by_name = True
-        from_attributes = True
-
-class PurchaseResponse(BaseModel):
-    message: str
-    request_id: Optional[str]
-
+# Used for incoming purchase request data from frontend
 class PurchaseRequestPayload(BaseModel):
     requester: str
     id: Optional[str] = Field(alias="ID", default=None)
     irq1_id: Optional[str] = Field(alias="IRQ1_ID", default=None)
-    co: Optional[str] = None
+    co: Optional[str] = Field(alias="CO", default=None)
     items: List[PurchaseLineItem]
     item_count: int = Field(alias="itemCount")
 
@@ -84,30 +77,36 @@ class PurchaseRequestPayload(BaseModel):
         populate_by_name = True
         from_attributes = True
 
-class PurchaseItem(BaseModel):
-    uuid: Optional[str] = Field(alias="UUID", default=None)
-    id: Optional[str] = Field(alias="ID", default=None)
-    irq1_id: Optional[str] = Field(alias="IRQ1_ID", default=None)
+# Used for API responses after creating purchase requests
+class PurchaseResponse(BaseModel):
+    message: str
+    request_id: Optional[str]
+
+# ────────────────────────────────────────────────
+# INDIVIDUAL ITEM SCHEMA (ALIAS FOR BACKWARD COMPATIBILITY)
+# Used for processing individual purchase items
+# Now inherits from BasePurchaseItem for consistency
+# ────────────────────────────────────────────────
+class PurchaseItem(BasePurchaseItem):
+    # This is now just an alias for backward compatibility
+    # All functionality is inherited from BasePurchaseItem
+    pass
+
+# ────────────────────────────────────────────────
+# PDF SERVICE SCHEMA
+# Used specifically for PDF generation service
+# ────────────────────────────────────────────────
+class PurchaseRequestHeader(BaseModel):
+    uuid: str 
+    irq1_id: Optional[str] = None
+    co: Optional[str] = None
     requester: str
-    phoneext: str
+    phoneext: Optional[int] = None
     datereq: str
     dateneed: Optional[str] = None
     order_type: Optional[str] = None
-    file_attachments: Optional[List[dict]] = None
-    item_description: str
-    justification: str
-    train_not_aval: Optional[bool] = None
-    needs_not_meet: Optional[bool] = None
-    budget_obj_code: str
-    fund: str
-    location: str
-    price_each: float
-    quantity: int
-    total_price: Optional[float] = None
-    status: Optional[str] = None
-    is_cyber_sec_related: Optional[bool] = None
-
+    status: ItemStatus
+    created_time: Optional[datetime] = None
+    
     class Config:
-        alias_generator = to_camel_case
-        populate_by_name = True
         from_attributes = True

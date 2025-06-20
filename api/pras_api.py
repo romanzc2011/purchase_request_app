@@ -11,6 +11,7 @@ uvicorn pras_api:app --port 5004
 
 from datetime import datetime, timezone
 import json
+from api.schemas.approval_schemas import ApprovalSchema
 from api.schemas.comment_schemas import CommentItem
 from pydantic import ValidationError
 from fastapi import (
@@ -133,35 +134,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 ##########################################################################
 ## GET APPROVAL DATA
 ##########################################################################
-@api_router.get("/get_approval_data", response_model=List[ApprovalSchema])
+@api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
 async def get_approval_data(
-    ID: Optional[str] = Query(None),
-    current_user: LDAPUser = Depends(auth_service.get_current_user)):
+	ID: Optional[str] = Query(None),
+	db: AsyncSession = Depends(get_async_session),
+	current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    return await dbas.fetch_flat_approvals(db, ID=ID)
     
-    # Check if user is in IT group or CUE group
-    logger.info(f"CURRENT USER: {current_user}")
-    
-    with get_session() as session:
-        try:
-            if ID:
-                approval = dbas.get_approval_by_id(session, ID)
-                if approval:
-                    # Ensure the purchase_request relationship is loaded
-                    session.refresh(approval)
-                    approval_data = [ApprovalSchema.model_validate(approval)]
-                else:
-                    approval_data = []
-            else:
-                approvals = dbas.get_all_approval(session)
-                # Ensure all relationships are loaded
-                for approval in approvals:
-                    session.refresh(approval)
-                approval_data = [ApprovalSchema.model_validate(approval) for approval in approvals]
-        
-            return approval_data
-        finally:
-            session.close()
-        
 ##########################################################################
 ## GET STATEMENT OF NEED FORM
 ##########################################################################
@@ -363,12 +343,13 @@ async def send_purchase_request(
         # Create the purchase request header
         orm_pr_header = PurchaseRequestHeader(
             ID=purchase_req_id,  # Set the ID explicitly
+            IRQ1_ID=payload.irq1_id,
+            CO=payload.co,
             requester=current_user.username,
             phoneext=payload.items[0].phoneext,
             datereq=payload.items[0].datereq,
             dateneed=payload.items[0].dateneed,
             orderType=payload.items[0].order_type,
-            status=ItemStatus.NEW_REQUEST
         )
         db.add(orm_pr_header)
         await db.flush()  # makes ORM defaults (like pk/uuid) available
@@ -388,6 +369,7 @@ async def send_purchase_request(
                 priceEach=item.price_each,
                 totalPrice=item.total_price,
                 location=item.location,
+                isCyberSecRelated=item.is_cyber_sec_related,
                 status=item.status,
                 created_time=utc_now_truncated(),
             )

@@ -57,9 +57,6 @@ async def notify_approvers(
     #approvers = ldap_service.get_approvers_email("CUE-APPROVERS-GROUP")
     approvers = ["roman_campbell@lawb.uscourts.gov"]
     
-    # Construct subject for email payload for approvers
-    
-    
     # Build payload
     items, email_payload = build_email_payload(payload=payload, payload_type="request", subject=subject)
     logger.info(f"EMAIL PAYLOAD IN NOTIFY APPROVERS: {email_payload}")

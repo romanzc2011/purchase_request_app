@@ -1,31 +1,13 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from http.client import HTTPException
+from api.schemas.approval_schemas import ApprovalSchema, ApprovalView
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from loguru import logger
 from aiocache import Cache, cached
 from sqlalchemy import select
-from sqlalchemy import (
-    create_engine, 
-    String, 
-    Integer, 
-    Date, 
-    Float, 
-    Boolean, 
-    Text, 
-    LargeBinary, 
-    ForeignKey, 
-    DateTime, 
-    Enum as SAEnum, 
-    JSON, 
-    func,
-    Enum as SQLEnum,
-    literal,
-    func,
-    select,
-    text,
-    )
-from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy import (create_engine, String, Integer, Float, Boolean, Text, LargeBinary, ForeignKey, DateTime,
+                        Enum as SAEnum, JSON, func, Enum as SQLEnum, literal, func, select, text)
 from sqlalchemy.orm import declarative_base, selectinload, aliased
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
@@ -58,6 +40,10 @@ AsyncSessionLocal = sessionmaker(bind=engine_async, class_=AsyncSession)
 async def get_async_session() -> AsyncSession:
     async with AsyncSessionLocal() as async_session:
         yield async_session
+
+# ────────────────────────────────────────────────────────────────────────────────
+# DATABASE SESSIONS
+# ────────────────────────────────────────────────────────────────────────────────
 # Context manager for database sessions
 @contextmanager
 def get_session():
@@ -75,24 +61,17 @@ def utc_now_truncated() -> datetime:
 # ────────────────────────────────────────────────────────────────────────────────
 # PURCHASE REQUEST HEADER
 # ────────────────────────────────────────────────────────────────────────────────
-
 class PurchaseRequestHeader(Base):
     __tablename__ = "purchase_request_headers"
 
     ID                 : Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    IRQ1_ID      	   : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
+    CO           	   : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     requester          : Mapped[str] = mapped_column(String, nullable=False)
     phoneext           : Mapped[int] = mapped_column(Integer, nullable=False)
     datereq            : Mapped[str] = mapped_column(String)
     dateneed           : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     orderType          : Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    status             = mapped_column(
-                            SQLEnum(ItemStatus, 
-                                   name="item_status", native_enum=False,
-                                   values_callable=lambda enum: [e.value for e in enum]
-                            ),
-                            default=ItemStatus.NEW_REQUEST,
-                            nullable=False
-                         )
     created_time       = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
 
     # 1️⃣ headers → line‐items
@@ -140,6 +119,8 @@ class PurchaseRequestLineItem(Base):
     priceEach              : Mapped[float] = mapped_column(Float)
     totalPrice             : Mapped[float] = mapped_column(Float)
     location               : Mapped[str] = mapped_column(String)
+    isCyberSecRelated	   : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+
     status                 : Mapped[ItemStatus] = mapped_column(
                                 SQLEnum(ItemStatus,
                                        name="item_status", native_enum=False,
@@ -431,49 +412,6 @@ def fetch_just_flags_by_id(id: str):
         return results
 
 ###################################################################################################
-# Insert data
-def insert_data(table=None, data=None):
-    # Get last id if there is one 
-    logger.info(f"Inserting data into {table}: {data}")
-    table = table.strip().lower() 
-    
-    if not data:
-        raise ValueError("Data must be a non-empty dictionary")
-    
-    # Pick the right table
-    match table:
-        case "purchase_requests":
-            model = PurchaseRequestHeader
-            pk_field = "UUID"
-            
-        case "approvals":
-            model = Approval
-            pk_field = "UUID"
-            
-        case "line_item_statuses":
-            model = LineItemStatus
-            pk_field = "UUID"
-            
-        case "son_comments":
-            model = SonComment
-            pk_field = "UUID"
-            
-        case _:
-            raise ValueError(f"Unsupported table: {table}")
-        
-    # Strip out keys that are not in model
-    valid_cols = set(inspect(model).columns.keys())
-    filtered_data = {k: v for k, v in data.items() if k in valid_cols}
-    
-    with get_session() as session:
-        obj = model(**filtered_data)
-        session.add(obj)
-        session.commit()
-        session.refresh(obj)
-        logger.info(f"Inserted data into {table}")
-        return obj
-    
-###################################################################################################
 # Get next  request id
 ###################################################################################################
 def set_purchase_req_id() -> str:
@@ -648,23 +586,6 @@ def fetch_single_row(self, model_class, columns: list, condition, params: dict):
         return result
 
 ###################################################################################################
-# GET LAST ID
-###################################################################################################
-def _get_last_id() -> Optional[str]:
-    """
-    Get the last ID from the database.
-    Returns the last ID if found, or None if the table is empty.
-    """
-    with get_session() as session:
-        # Query the Approval table instead of PurchaseRequest
-        row = (
-            session.query(Approval.purchase_request_id)
-            .order_by(Approval.purchase_request_id.desc())
-            .first()
-        )
-        return row[0] if row else None
-
-###################################################################################################
 # Get status of request from Approval table by uuid
 ###################################################################################################
 def get_status_by_uuid(db_session: Session, UUID: str):
@@ -815,6 +736,68 @@ async def get_next_request_id() -> str:
             
     suffix_str = f"{next_suffix:04d}"
     return first_section + suffix_str
+
+# ────────────────────────────────────────────────────────────────────────────────
+# ORM Approval Flattening to match previous approval view
+# This has become required because of the substantial backend refactoring
+# and database normalization. This way we can view the Approval table without issue
+# ────────────────────────────────────────────────────────────────────────────────
+ORM_Approval = (
+	PurchaseRequestHeader,
+	PurchaseRequestLineItem,
+	Approval
+)
+
+async def fetch_flat_approvals(
+	db: AsyncSession,
+	ID: Optional[str] = None,
+) -> List[ApprovalSchema]:
+    
+    # alias each table for clarity
+    hdr = aliased(PurchaseRequestHeader)
+    li = aliased(PurchaseRequestLineItem)
+    
+    # build the statement to match ApprovalSchema structure
+    stmt = (
+        select(
+            # ApprovalSchema fields
+            li.UUID.label("UUID"),
+            hdr.ID.label("purchase_request_id"),  # This will be aliased to "ID"
+            hdr.IRQ1_ID.label("IRQ1_ID"),
+            hdr.requester.label("requester"),
+            hdr.CO.label("CO"),
+            hdr.phoneext.label("phoneext"),
+            hdr.datereq.label("datereq"),
+            hdr.dateneed.label("dateneed"),
+            hdr.orderType.label("orderType"),
+            literal(None).label("fileAttachments"),  # Set to None for now
+            li.itemDescription.label("itemDescription"),
+            li.justification.label("justification"),
+            li.trainNotAval.label("trainNotAval"),
+            li.needsNotMeet.label("needsNotMeet"),
+            li.budgetObjCode.label("budgetObjCode"),
+            li.fund.label("fund"),
+            li.priceEach.label("priceEach"),
+            li.totalPrice.label("totalPrice"),
+            li.location.label("location"),
+            li.quantity.label("quantity"),
+            li.created_time.label("created_time"),  # This will be aliased to "createdTime"
+            li.isCyberSecRelated.label("isCyberSecRelated"),
+            li.status.label("status"),
+        )
+        .select_from(li)
+        .join(hdr, li.purchase_request_id == hdr.ID)
+    )
+
+    if ID:
+        stmt = stmt.where(hdr.ID == ID)
+    
+    # execute the statement
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    # Map each row to the ApprovalSchema
+    return [ApprovalSchema(**r._asdict()) for r in rows]
 
 ###################################################################################################
 # Initialize database

@@ -8,7 +8,7 @@ class ItemStatus(enum.Enum):
     ON_HOLD = "ON HOLD"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
-    
+
 class TaskStatus(enum.Enum):
     NEW_REQUEST = "NEW REQUEST"
     PENDING     = "PENDING"

@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from api.schemas.purchase_schemas import ItemStatus
+from api.utils.pydantic_utils import to_camel_case
+
 
 # --------------------------------------------------------------
 #  REQUEST APPROVAL PAYLOAD SCHEMAS
@@ -52,13 +54,16 @@ class ApprovalSchema(BaseModel):
     isCyberSecRelated: Optional[bool] = False
     status: ItemStatus
 
-def to_camel(s: str) -> str:
-    parts = s.split('_')
-    return parts[0] + ''.join(w.title() for w in parts[1:])
-
-
 #------------------------------------------------
 #  APPROVAL VIEW SCHEMAS
+"""
+This schema will be used as part of a backend API that will be used to
+display the approval view. Because of the substantial backend refactoring
+and database normalization, it is necessary to still meet the requirements
+of the previous approval view. The way the approval flowed was great so
+we will flatten the data we have into a single approval view that meets
+the requirements of the previous approval view.
+"""
 #------------------------------------------------
 class ApprovalView(BaseModel):
     # header fields
@@ -93,7 +98,6 @@ class ApprovalView(BaseModel):
     quantity:          int
 
     class Config:
-        alias_generator    = to_camel
+        alias_generator    = to_camel_case
         populate_by_name   = True
-        # if you want JSON out in camelCase by default:
         by_alias           = True
