@@ -36,6 +36,7 @@ from fastapi.security import (
 )
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import update, select
 from api.services.db_service import get_async_session
 from api.schemas.enums import ItemStatus, TaskStatus
 import asyncio
@@ -574,7 +575,11 @@ async def log_requests(request: Request, call_next):
 ## ASSIGN REQUISITION ID
 ##########################################################################
 @api_router.post("/assignIRQ1_ID")
-async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_service.get_current_user)):
+async def assign_IRQ1_ID(
+	data: dict,
+	db: AsyncSession = Depends(get_async_session),
+	current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
     """
     This is called from the frontend to assign a requisition ID
     to the purchase request. It also updates the UUID in the approval table.
@@ -583,24 +588,28 @@ async def assign_IRQ1_ID(data: dict, current_user: LDAPUser = Depends(auth_servi
     logger.info(f"Assigning requisition ID: {data.get('IRQ1_ID')}")
     
     # Get the original ID from the request
+    irq1_id = data.get('IRQ1_ID')
     original_id = data.get('ID')
-    if not original_id:
+    if not original_id or not irq1_id:
         raise HTTPException(status_code=400, detail="Missing ID in request")
     
-    # Get the UUID using the UUID service
-    with get_session() as session:
-        uuid = uuid_service.get_uuid_by_id(session, original_id)
+    # Verify PurchaseRequestHeader exists
+    stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.ID == original_id)
+    result = await db.execute(stmt)
+    pr_header = result.scalar_one_or_none()
     
-    # update all tables with the new IRQ1_ID
-    dbas.update_data_by_uuid(uuid=uuid, table="approvals", IRQ1_ID=data.get('IRQ1_ID'))
-    dbas.update_data_by_uuid(uuid=uuid, table="line_item_statuses", IRQ1_ID=data.get('IRQ1_ID'))
-    dbas.update_data_by_uuid(uuid=uuid, table="son_comments", IRQ1_ID=data.get('IRQ1_ID'))
+    if not pr_header:
+        raise HTTPException(status_code=400, detail="PurchaseRequestHeader not found")
     
-    if not uuid:
-        raise HTTPException(status_code=400, detail="Missing UUID in request")
+    # Update the IRQ1_ID
+    await db.execute(
+		update(PurchaseRequestHeader)
+		.where(PurchaseRequestHeader.ID == original_id)
+		.values(IRQ1_ID=irq1_id)
+	)
+    await db.commit()
+    await db.refresh(pr_header)
     
-    # Update the database with the requisition ID using the UUID
-    dbas.update_data_by_uuid(uuid, "approvals", IRQ1_ID=data.get('IRQ1_ID'))
     return {"IRQ1_ID_ASSIGNED": True}
 
 ##########################################################################

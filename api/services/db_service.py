@@ -170,11 +170,12 @@ class SonComment(Base):
 
 
 # ────────────────────────────────────────────────────────────────────────────────
-# APPROVAL (the master approval record)
+# APPROVAL (the master approval record) VIEW
 # ────────────────────────────────────────────────────────────────────────────────
 
 class Approval(Base):
     __tablename__ = "approvals"
+    __table_args__ = {'info': {'read_only': True}}
 
     UUID                   : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     purchase_request_id    : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=False)
