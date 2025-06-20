@@ -30,11 +30,11 @@ documentation
 *.njsproj
 *.sln
 *.sw?
-api/indexdir*
+indexdir/*
 api/web.config
 api/rendered_templates
 api/pdf_output
 indexdir/*
 pdf_output/*
 db/*
-
+output/*
