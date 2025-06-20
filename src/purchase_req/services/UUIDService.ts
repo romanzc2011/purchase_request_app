@@ -90,5 +90,13 @@ export const useUUIDStore = () => {
         }
     };
 
-    return { UUIDs, setUUID, getUUID };
+    // Clear all cached UUIDs
+    const clearCache = () => {
+        console.log('Clearing UUID cache...');
+        localStorage.removeItem(STORAGE_KEY);
+        queryClient.setQueryData(['UUIDs'], {});
+        console.log('UUID cache cleared');
+    };
+
+    return { UUIDs, setUUID, getUUID, clearCache };
 };

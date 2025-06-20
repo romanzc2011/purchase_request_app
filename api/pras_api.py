@@ -764,14 +764,30 @@ async def add_comments(payload: GroupCommentPayload):
 ## CYBER SECURITY RELATED
 ##########################################################################
 @api_router.put("/cyberSecRelated/{UUID}")
-async def cyber_sec_related(UUID: str, payload: CyberSecRelatedPayload):
+async def cyber_sec_related(
+	UUID: str,
+	payload: CyberSecRelatedPayload,
+	db: AsyncSession = Depends(get_async_session),
+	current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
     """
-    Update the isCyberSecRelated field for a purchase request.
+    Update the isCyberSecRelated field for an Approval row.
     """
-    logger.info(f"Updating isCyberSecRelated for UUID: {UUID} to {payload.isCyberSecRelated}")
-    with get_session() as session:
-        success = dbas.update_data_by_uuid(uuid=UUID, table="approvals", isCyberSecRelated=payload.isCyberSecRelated)
-        return {"message": "Cybersec related field updated successfully"}
+    # Fetch Approval row
+    stmt = select(PurchaseRequestLineItem).where(PurchaseRequestLineItem.UUID == UUID)
+    result = await db.execute(stmt)
+    line_item = result.scalar_one_or_none()
+    
+    if line_item is None:
+        raise HTTPException(status_code=404, detail="Line item not found")
+    
+    # Apply only field that is being updated
+    line_item.isCyberSecRelated = payload.isCyberSecRelated
+    await db.commit()
+    await db.refresh(line_item)
+    
+    return line_item
+    
 
 ##########################################################################
 ##########################################################################

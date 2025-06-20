@@ -5,7 +5,7 @@ from api.schemas.approval_schemas import ApprovalSchema, ApprovalView
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from loguru import logger
 from aiocache import Cache, cached
-from sqlalchemy import select
+from sqlalchemy import select, update, inspect
 from sqlalchemy import (create_engine, String, Integer, Float, Boolean, Text, LargeBinary, ForeignKey, DateTime,
                         Enum as SAEnum, JSON, func, Enum as SQLEnum, literal, func, select, text)
 from sqlalchemy.orm import declarative_base, selectinload, aliased
@@ -477,54 +477,77 @@ _uuid_cache = {}
 ###################################################################################################
 # UPDATE DATA BY UUID
 ###################################################################################################
-def update_data_by_uuid(uuid: str, table: str, **kwargs):
-    # Get last id if there is one 
+async def update_data_by_uuid(
+	db: AsyncSession,
+	uuid: str,
+	table: str,
+	**kwargs
+):
+    table = table.strip().lower()
     logger.info(f"Updating data in {table}: {kwargs}")
-    table = table.strip().lower() 
     
     if not kwargs:
         raise ValueError("Data must be a non-empty dictionary")
     
     # Pick the right table
     match table:
-        case "purchase_requests":
-            model = PurchaseRequestHeader
+        case "pr_line_items":
+            model = PurchaseRequestLineItem
             pk_field = "UUID"
-            
-        case "approvals":
-            model = Approval
-            pk_field = "UUID"
-            
-        case "line_item_statuses":
-            model = LineItemStatus
-            pk_field = "UUID"
-            
+        case "line_item_approvals":
+            model = LineItemApproval
+            pk_field = "line_item_uuid"
+        case "pending_approvals":
+            model = PendingApproval
+            pk_field = "line_item_uuid"
         case "son_comments":
             model = SonComment
-            pk_field = "UUID"
-            
+            pk_field = "approvals_uuid"
         case _:
             raise ValueError(f"Unsupported table: {table}")
-        
-    # Strip out keys that are not in model
+    
+    # Remove invalid fields
     valid_cols = set(inspect(model).columns.keys())
     filtered_data = {k: v for k, v in kwargs.items() if k in valid_cols}
     
-    with get_session() as session:
-        # Filters incoming data by UUID for the table
-        #Line Item Statuses needs to use approve_uuid 
-        obj = session.query(model).filter(getattr(model, pk_field) == uuid).first()
-        if not obj:
-            raise ValueError(f"Object with UUID {uuid} not found in {table}")
+    if not filtered_data:
+        raise ValueError(f"No valid fields to update in {table}")
+    
+    # Update the object
+    stmt = (
+		update(model)
+		.where(getattr(model, pk_field) == uuid)
+		.values(**filtered_data)
+		.execution_options(synchronize_session="fetch")
+	)
+    
+    await db.execute(stmt)
+    
+    # Get the updated object BEFORE committing
+    result = await db.execute(select(model).where(getattr(model, pk_field) == uuid))
+    updated_obj = result.scalar_one_or_none()
+    
+    if not updated_obj:
+        # Check if any records exist in the table to help with debugging
+        count_result = await db.execute(select(func.count()).select_from(model))
+        total_count = count_result.scalar()
         
-        # Update the object with the filtered data
-        for key, value in filtered_data.items():
-            setattr(obj, key, value)
+        # Get a few existing UUIDs for reference
+        sample_result = await db.execute(select(getattr(model, pk_field)).limit(3))
+        sample_uuids = [row[0] for row in sample_result.all()]
         
-        session.commit()
-        session.refresh(obj)
-        logger.info(f"Updated data in {table}")
-        return obj
+        error_msg = f"Object with UUID {uuid} not found in {table}. "
+        error_msg += f"Table has {total_count} total records. "
+        if sample_uuids:
+            error_msg += f"Sample UUIDs: {', '.join(sample_uuids)}"
+        
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    # Now commit the transaction
+    await db.commit()
+    logger.info(f"Updated object: {updated_obj}")
+    return updated_obj
 
 ###################################################################################################
 # GET UUID BY ID (CACHED)
@@ -555,14 +578,16 @@ def get_uuid_by_id_cached(db_session: Session, ID: str):
 ###################################################################################################
 # GET UUID BY ID (UNCACHED)
 ###################################################################################################
-def get_uuid_by_id(db_session: Session, ID: str):
+async def get_uuid_by_id(db_session: AsyncSession, ID: str) -> Optional[str]:
     """
-    Get UUID by ID without caching.
-    Returns the UUID if found, None otherwise.
+    This works with IDs so users will have the ability to take actions
+    on individual line items.
     """
-    result = db_session.query(Approval.UUID).filter(Approval.purchase_request_id == ID).first()
-    return result[0] if result else None
-
+    stmt = select(PurchaseRequestLineItem.UUID).where(PurchaseRequestLineItem.purchase_request_id == ID)
+    result = await db_session.execute(stmt)
+    uuid_row = result.first()
+    return uuid_row[0] if uuid_row else None
+ 
 ###################################################################################################
 # FETCH SINGLE ROW
 ###################################################################################################
@@ -660,6 +685,13 @@ def get_all_son_comments(db_session: Session, id: str):
 def get_all_purchase_requests(session):
     """Get all purchase requests"""
     return session.query(PurchaseRequestHeader).all()
+
+###################################################################################################
+# Get approval by purchase request ID -- FOR SEARCHING ON APPROVAL "VIEW"
+###################################################################################################
+def get_approval_by_id(session, purchase_request_id: str):
+    """Get approval for a given purchase request ID"""
+    return session.query(Approval).filter(Approval.purchase_request_id == purchase_request_id).first()
 
 ###################################################################################################
 # Get additional comments by ID
