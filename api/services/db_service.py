@@ -98,16 +98,14 @@ class PurchaseRequestHeader(Base):
                             foreign_keys="[PendingApproval.purchase_request_id]"
                          )
 
-
 # ────────────────────────────────────────────────────────────────────────────────
 # PURCHASE REQUEST LINE ITEM
 # ────────────────────────────────────────────────────────────────────────────────
-
 class PurchaseRequestLineItem(Base):
     __tablename__ = "pr_line_items"
 
     UUID                   : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    purchase_request_id  : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=False)
+    purchase_request_id    : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=False)
     itemDescription        : Mapped[str] = mapped_column(Text)
     justification          : Mapped[str] = mapped_column(Text)
     addComments            : Mapped[Optional[str]] = mapped_column(Text)
@@ -152,10 +150,20 @@ class PurchaseRequestLineItem(Base):
                                 cascade="all, delete-orphan",
                                 foreign_keys="[PendingApproval.line_item_uuid]"
                              )
-    
+    son_comments           : Mapped[List[SonComment]] = relationship(
+                                "SonComment",
+                                back_populates="line_item",
+                                cascade="all, delete-orphan",
+                                foreign_keys="[SonComment.line_item_uuid]"
+                             )
+
+# ────────────────────────────────────────────────────────────────────────────────
+# SON COMMENT
+# ────────────────────────────────────────────────────────────────────────────────
 class SonComment(Base):
     __tablename__ = "son_comments"
     UUID:               Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    line_item_uuid:     Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=True)
     approvals_uuid:     Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
     comment_text:       Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at:         Mapped[Optional[datetime]] = mapped_column(DateTime, default=utc_now_truncated, nullable=True)
@@ -167,12 +175,17 @@ class SonComment(Base):
         back_populates="son_comments",
         foreign_keys=[approvals_uuid]
     )
+    
+    line_item: Mapped[PurchaseRequestLineItem] = relationship(
+				"PurchaseRequestLineItem",
+				back_populates="son_comments",
+				foreign_keys=[line_item_uuid]
+	)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
 # APPROVAL (the master approval record) VIEW
 # ────────────────────────────────────────────────────────────────────────────────
-
 class Approval(Base):
     __tablename__ = "approvals"
     __table_args__ = {'info': {'read_only': True}}
@@ -238,11 +251,9 @@ class Approval(Base):
                                 foreign_keys="[SonComment.approvals_uuid]"
                              )
 
-
 # ────────────────────────────────────────────────────────────────────────────────
 # JOIN TABLE: LineItemApproval
 # ────────────────────────────────────────────────────────────────────────────────
-
 class LineItemApproval(Base):
     __tablename__ = "line_item_approvals"
 
@@ -266,8 +277,7 @@ class LineItemApproval(Base):
                           back_populates="line_item_approval_attr",
                           foreign_keys=[line_item_uuid]
                       )
-
-
+    
 # ────────────────────────────────────────────────────────────────────────────────
 # PENDING APPROVAL
 # ────────────────────────────────────────────────────────────────────────────────
@@ -502,7 +512,7 @@ async def update_data_by_uuid(
             pk_field = "line_item_uuid"
         case "son_comments":
             model = SonComment
-            pk_field = "approvals_uuid"
+            pk_field = "UUID"
         case _:
             raise ValueError(f"Unsupported table: {table}")
     

@@ -81,7 +81,7 @@ class SMTP_Service:
                     items.append((desc, comment))
             logger.warning(f"CONTEXT EMAIL PAYLOAD COMMENT: {payload}")
             context = {
-                "groupKey": payload.id,
+                "groupKey": payload.ID,
                 "requestor_name": payload.requester,
                 "items": items,
             }

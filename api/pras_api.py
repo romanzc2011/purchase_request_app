@@ -61,7 +61,8 @@ from api.services.db_service import (
     PurchaseRequestHeader,
     PurchaseRequestLineItem,
     Approval,
-    PendingApproval
+    PendingApproval,
+    SonComment
 )
 
 # Schemas
@@ -297,6 +298,8 @@ async def send_purchase_request(
             status_code=400,
             content={"message": "Invalid requester"}
         )
+    else:
+        logger.info(f"Requester email: {requester_email}")
     
     if not payload:
         return JSONResponse(
@@ -715,29 +718,84 @@ async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to
 ## ADD COMMENTS BULK
 ##########################################################################
 @api_router.post("/add_comments")
-async def add_comments(payload: GroupCommentPayload):
+async def add_comments(
+    payload: GroupCommentPayload,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
     """
     Add multiple comments to purchase requests.
 
     Args:
-        uuids: List of UUIDs of the purchase requests
-        comments: List of comments to add
+        payload: Contains list of comments with line_item UUIDs to update
     """
-    with get_session() as session:
-        # Get the number of elements in the comment list
-        logger.info(f"PAYLOAD: {payload}")
+    logger.info(f"PAYLOAD: {payload}")
+    
+    updated_comments = []
+    
+    for comment in payload.comment:
+        logger.info(f"COMMENT: {comment}")
         
-        for comment in payload.comment:
-            logger.info(f"COMMENT: {comment}")
-            success = dbas.update_data_by_uuid(uuid=comment.uuid, table="son_comments", comment_text=comment.comment)
-            if not success:
-                raise HTTPException(status_code=404, detail="Failed to add comment")
+        # First, check if a SonComment already exists for this line_item_uuid
+        existing_comment_stmt = select(SonComment).where(SonComment.line_item_uuid == comment.uuid)
+        result = await db.execute(existing_comment_stmt)
+        existing_comment = result.scalar_one_or_none()
+        
+        if existing_comment:
+            # Update existing comment
+            logger.info(f"Updating existing SonComment with UUID: {existing_comment.UUID}")
+            stmt = (
+                update(SonComment)
+                .where(SonComment.UUID == existing_comment.UUID)
+                .values(comment_text=comment.comment)
+                .execution_options(synchronize_session="fetch")
+            )
+            await db.execute(stmt)
+            updated_comments.append(existing_comment)
             
-            # Get requester and lookup email address
-            requester_email = await ldap_service.get_email_address(success.son_requester)
-            requester_info = await ldap_service.fetch_user(success.son_requester)
-            requester_name = requester_info.username
-
+        else:
+            # Create new SonComment record
+            logger.info(f"Creating new SonComment for line_item_uuid: {comment.uuid}")
+            
+            # Get the line item to get additional info
+            line_item_stmt = select(PurchaseRequestLineItem).where(PurchaseRequestLineItem.UUID == comment.uuid)
+            result = await db.execute(line_item_stmt)
+            line_item = result.scalar_one_or_none()
+            
+            if not line_item:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"PurchaseRequestLineItem with UUID {comment.uuid} not found"
+                )
+            
+            # Create new SonComment
+            new_son_comment = SonComment(
+                UUID=str(uuid.uuid4()),  # Generate new UUID for SonComment
+                line_item_uuid=comment.uuid,
+                comment_text=comment.comment,
+                son_requester=current_user.username,
+                item_description=line_item.itemDescription,
+                created_at=utc_now_truncated()
+            )
+            
+            db.add(new_son_comment)
+            await db.flush()  # Get the generated UUID
+            updated_comments.append(new_son_comment)
+    
+    # Commit all changes
+    await db.commit()
+    
+    # Get requester info from the current user
+    # Strip domain prefix if present (e.g., "ADU\romancampbell" -> "romancampbell")
+    username_for_email = current_user.username
+    if '\\' in username_for_email:
+        username_for_email = username_for_email.split('\\')[-1]
+    
+    requester_email = await ldap_service.get_email_address(username_for_email)
+    requester_name = current_user.username
+    
+    # Only send email if we can find the user's email address
+    if requester_email:
         # Build email payload
         email_comments_payload = EmailPayloadComment(
             model_type      = "email_comments",
@@ -754,11 +812,13 @@ async def add_comments(payload: GroupCommentPayload):
             comment_data    = [payload], 
         )
         
-        # Get data about the request from Approvals table
+        # Send email notification
         await smtp_service.send_comments_email(payload=email_comments_payload)
+        logger.info(f"Email notification sent to {requester_email}")
+    else:
+        logger.warning(f"Could not find email for user {username_for_email}, skipping email notification")
 
-    
-    return {"message": "Comments added successfully"}
+    return {"message": "Comments added successfully", "updated_count": len(updated_comments)}
 
 ##########################################################################
 ## CYBER SECURITY RELATED
