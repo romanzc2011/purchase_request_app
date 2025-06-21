@@ -1,4 +1,5 @@
 import { GroupCommentPayload, CommentEntry } from "../types/approvalTypes";
+import { authFetch } from "../utils/authFetch";
 
 const API_URL_ADD_COMMENTS_BULK = `${import.meta.env.VITE_API_URL}/api/add_comments`
 
@@ -6,7 +7,7 @@ const API_URL_ADD_COMMENTS_BULK = `${import.meta.env.VITE_API_URL}/api/add_comme
 // Add comments
 // #########################################################################################
 export async function addComments(payload: GroupCommentPayload) {
-    const response = await fetch(API_URL_ADD_COMMENTS_BULK, {
+    const response = await authFetch(API_URL_ADD_COMMENTS_BULK, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

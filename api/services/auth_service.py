@@ -47,7 +47,13 @@ class AuthService:
             "email": user.email,
             "groups": user.groups
         }
-        
+        logger.info("########################################################")
+        logger.info(f"LDAP_USER: {user}")
+        logger.info(f"LDAP_USER username: {user.username}")
+        logger.info(f"LDAP_USER email: {user.email}")
+        logger.info(f"LDAP_USER groups: {user.groups}")
+        logger.info("########################################################")
+
         expire = (
             datetime.now(timezone.utc) + expires_delta
             if expires_delta

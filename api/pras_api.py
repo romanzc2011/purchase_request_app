@@ -11,30 +11,17 @@ uvicorn pras_api:app --port 5004
 
 from datetime import datetime, timezone
 import json
-from api.schemas.approval_schemas import ApprovalSchema
+from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema
+from api.services.approval_router.approval_router import ApprovalRouter
 from api.schemas.comment_schemas import CommentItem
 from pydantic import ValidationError
-from fastapi import (
-    FastAPI,
-    APIRouter,
-    Depends,
-    BackgroundTasks,
-    Form,
-    File,
-    UploadFile,
-    HTTPException,
-    Request,
-    Query,
-    status
-)
+from fastapi import (FastAPI, APIRouter, Depends, Form, File, UploadFile, HTTPException, Request, Query, status)
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import (
-    OAuth2PasswordBearer,
-    OAuth2PasswordRequestForm,
-)
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
+# SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update, select
 from api.services.db_service import get_async_session
@@ -58,11 +45,11 @@ from api.services.db_service import utc_now_truncated
 
 # Database ORM Model Imports
 from api.services.db_service import (
-    PurchaseRequestHeader,
-    PurchaseRequestLineItem,
-    Approval,
-    PendingApproval,
-    SonComment
+	PurchaseRequestHeader,
+	PurchaseRequestLineItem,
+	Approval,
+	PendingApproval,
+	SonComment
 )
 
 # Schemas
@@ -622,14 +609,52 @@ async def assign_IRQ1_ID(
 @api_router.post("/approveDenyRequest")
 async def approve_deny_request(
     payload: RequestPayload,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_session),
+    db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     try:
-        logger.info(f"INCOMING PAYLOAD: {payload}")
         final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
-        return print("HELLO FROM BACKEND")
+        # Process each item in the payload
+        results = []
+        for i, (item_uuid, item_fund, total_price, target_status) in enumerate(zip(
+            payload.UUID, payload.item_funds, payload.totalPrice, payload.target_status
+        )):
+            # Get assigned group from pending_approvals via line_item_uuid/purchase_request_id
+            stmt = select(
+                PendingApproval.task_id,
+                PendingApproval.assigned_group
+            ).where(
+                PendingApproval.line_item_uuid == item_uuid,
+                PendingApproval.purchase_request_id == payload.ID
+            )
+            result = await db.execute(stmt)
+            row = result.first()
+            task_id = row.task_id
+            assigned_group = row.assigned_group
+            
+            logger.info(f"Assigned group: {assigned_group}")
+            logger.info(f"Task ID: {task_id}")
+            
+            # Create approval request for the router
+            approval_request = ApprovalRequest(
+                id=payload.ID,
+                uuid=item_uuid,
+                task_id=task_id,
+                fund=item_fund,
+                assigned_group=assigned_group,
+                status=target_status,
+                total_price=total_price,
+                action=payload.action,
+                approver=current_user.username
+            )
+            router = ApprovalRouter()
+            result = router.route(approval_request)
+            results.append({
+                "uuid": item_uuid,
+                "status": result.status.value if hasattr(result, 'status') else "processed",
+                "action": payload.action
+            })
+        return results
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
         raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")
@@ -690,20 +715,23 @@ async def create_new_id(request: Request):
 ## GET UUID BY ID
 ##########################################################################
 @api_router.get("/getUUID/{ID}")
-async def get_uuid_by_id_endpoint(ID: str, current_user: LDAPUser = Depends(auth_service.get_current_user)):
+async def get_uuid_by_id_endpoint(
+    ID: str,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
     """
     Get the UUID for a given ID.
     This endpoint can be used by other programs to retrieve the UUID.
     """
     logger.info(f"Getting UUID for ID: {ID}")
     
-    with get_session() as session:
-        UUID = dbas.get_uuid_by_id(session, ID)
+    UUID = await dbas.get_uuid_by_id(db, ID)
+    
+    if not UUID:
+        raise HTTPException(status_code=404, detail=f"No UUID found for ID: {ID}")
         
-        if not UUID:
-            raise HTTPException(status_code=404, detail=f"No UUID found for ID: {ID}")
-            
-        return {"UUID": UUID}
+    return {"UUID": UUID}
 ##########################################################################
 ## FETCH USERNAMES
 ##########################################################################
@@ -847,7 +875,6 @@ async def cyber_sec_related(
     await db.refresh(line_item)
     
     return line_item
-    
 
 ##########################################################################
 ##########################################################################
@@ -856,144 +883,6 @@ async def cyber_sec_related(
 ##########################################################################
 
 app.include_router(api_router)
-
-##########################################################################
-## PROCESS PURCHASE DATA
-def process_purchase_data(item: PurchaseItem) -> dict:
-    with lock:
-        local_purchase_cols = {
-            col.name: None
-            for col in dbas.PurchaseRequest.__table__.columns
-        }
-        
-        try:
-            for k, v in item.model_dump().items():
-                if k in local_purchase_cols:
-                    local_purchase_cols[k] = v
-                    logger.info(f"LOCAL PURCHASE COLS: {k} = {v}")
-                    
-            # Handle comments based on trainNotAval and needsNotMeet
-            comments_list = []
-            
-            if local_purchase_cols['trainNotAval'] == True:
-                comments_list.append("Training not available")
-                
-            if local_purchase_cols['needsNotMeet'] == True:
-                comments_list.append("Does not meet employee needs")
-                
-            if comments_list:
-                local_purchase_cols['addComments'] = ";".join(comments_list)
-            else: 
-                local_purchase_cols['addComments'] = None
-                
-            # Recalculate total price
-            price_each = local_purchase_cols['priceEach']
-            quantity = local_purchase_cols['quantity']
-            
-            if price_each is not None and quantity is not None:
-                try:
-                    price_each = float(price_each)
-                    quantity = int(quantity)
-                    
-                    if price_each < 0 or quantity <= 0:
-                        raise ValueError("Invalid values")
-                    
-                    local_purchase_cols['totalPrice'] = round(price_each * quantity, 2)
-                    
-                except ValueError as e:
-                    logger.error(f"Invalid price or quantity: {e}")
-                    local_purchase_cols['totalPrice'] = 0
-                    
-        except Exception as e:
-            logger.error(f"Error in process_purchase_data: {e}")
-            raise
-       
-            
-    return local_purchase_cols
-
-##########################################################################
-## PROCESS APPROVAL DATA --- send new request to approval
-def process_approval_data(processed_data):
-    logger.info(f"Processing approval data: {processed_data}")
-    
-    approval_data = {}
-    
-    if not isinstance(processed_data, dict):
-        raise ValueError("Data must be a dictionary")
-    
-    logger.info(f"processed_data: {processed_data}")
-    # Define allowed keys that correspond to the Approval model's columns.
-    allowed_keys = [
-        'UUID', 'purchase_request_uuid',
-        'ID', 'requester', 'budgetObjCode', 'fund', 'trainNotAval', 'needsNotMeet',
-        'itemDescription', 'justification', 'quantity', 'totalPrice', 'priceEach', 'location',
-        'phoneext', 'datereq', 'dateneed', 'orderType'
-]
-    
-    # Populate approval_data from processed_data
-    for key, value in processed_data.items():
-        # Handle the UUID field from the frontend
-        if key == "UUID":
-            approval_data["UUID"] = value
-        elif key in allowed_keys:
-            approval_data[key] = value
-    
-    # Set default values for required fields if not present
-    # Handle IRQ1_ID - convert empty string to None to avoid unique constraint violation
-    irq1_id = processed_data.get('IRQ1_ID', '')
-    approval_data['IRQ1_ID'] = None if irq1_id == '' else irq1_id
-
-    return approval_data
-
-##########################################################################
-## BACKGROUND PROCESS FOR PROCESSING PURCHASE REQ DATA
-##########################################################################
-def purchase_req_commit(processed_data: dict, current_user: LDAPUser):
-    with lock:
-        try:
-            logger.info(f"Inserting purchase request data for ID: {processed_data['ID']}")
-            
-            if isinstance(processed_data.get('fileAttachments'), list):
-                processed_data['fileAttachments'] = None
-                
-            # First create purchase request
-            purchase_request = dbas.insert_data(table="purchase_requests", data=processed_data)
-            
-            # Process and create approval data
-            approval_data = process_approval_data(processed_data)
-            approval_data['status'] = dbas.ItemStatus.NEW
-            approval_data['purchase_request_uuid'] = purchase_request.UUID
-            approval = dbas.insert_data(table="approvals", data=approval_data)
-            
-            logger.info(f"Approval object: {approval}")
-            logger.info(f"Approval UUID: {getattr(approval, 'UUID', None)}")
-            
-            # Create line item status with required IDs and current user
-            line_item_data = {
-                'UUID': approval.UUID,
-                'status': dbas.ItemStatus.NEW,
-                'updated_by': current_user.username
-            }
-            line_item_status = dbas.insert_data(table="line_item_statuses", data=line_item_data)
-            
-            # Create son comment with required IDs
-            son_comment_data = {
-                'UUID': approval.UUID,
-                'purchase_req_id': approval.ID,
-                'son_requester': current_user.username,
-                'item_description': processed_data['itemDescription'],
-            }
-            son_comment = dbas.insert_data(table="son_comments", data=son_comment_data)
-            
-            # Log the created objects
-            logger.info(f"Created purchase request: {purchase_request}")
-            logger.info(f"Created approval: {approval}")
-            logger.info(f"Created line item status: {line_item_status}")
-            logger.info(f"Created son comment: {son_comment}")
-                
-        except Exception as e:
-            logger.error(f"Exception occurred: {e}")
-            raise
         
 ##########################################################################
 ## HANDLE FILE UPLOAD

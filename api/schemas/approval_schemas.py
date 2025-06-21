@@ -27,6 +27,19 @@ class LineItemStatusSchema(BaseModel):
     last_updated: datetime
     updated_by: Optional[str] = None
     
+# --------------------------------------------------------------
+#  APPROVAL REQUEST SCHEMA (for approval router)
+# --------------------------------------------------------------
+class ApprovalRequest(BaseModel):
+    id: str
+    uuid: str
+    task_id: str
+    fund: str
+    status: ItemStatus
+    total_price: float
+    action: str
+    approver: Optional[str] = None
+
 class ApprovalSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     

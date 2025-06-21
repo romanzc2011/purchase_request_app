@@ -2,7 +2,7 @@ import enum
 
 class ItemStatus(enum.Enum):
     NEW_REQUEST = "NEW REQUEST"  # This matches what's in your database
-    PENDING = "PENDING"
+    PENDING_APPROVAL = "PENDING APPROVAL"  # Added to match frontend expectations
     APPROVED = "APPROVED"
     DENIED = "DENIED"
     ON_HOLD = "ON HOLD"

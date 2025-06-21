@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from loguru import logger
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
-from api.services.database_service import DatabaseService as dbas
+import api.services.db_service as dbas
 
 # Approval Router to determine the routing of requests
 class Handler(ABC):
@@ -29,40 +29,19 @@ class Handler(ABC):
 class ITHandler(Handler):
     def handle(self, request: ApprovalRequest) -> ApprovalRequest:
         # IT can only approve requests from fund 511***
-        logger.info(f"ITHandler: Checking if request is from fund 511*** and status is NEW_REQUEST")
-        if request.fund.startswith("511") and request.status == ItemStatus.NEW_REQUEST:
-            logger.info(f"ITHandler: Request is from fund 511*** and status is NEW_REQUEST")
-            request.status = ItemStatus.PENDING_APPROVAL
-            logger.info(f"ITHandler: Request status updated to {request.status}")
+        logger.info("Assigned group was handled in db but this is IT Handler")
+
             
             # Update the Approval Table to Pending Approval
-            dbas.update_data_by_uuid(request.uuid, "approvals", status=ItemStatus.PENDING_APPROVAL)
-            
-            # Send email to final approvers (Ted and Edmund) and CC finance department (Roman for testing)
-            
-            pass
-            # Update approval tables status
-            pass
-        
-            logger.info(f"IT approved request {request.id}, forward to clerk admin for final approval")
-            return super().handle(request)
-        # Send to finance department
+            #dbas.update_data_by_uuid(request.uuid, "approvals", status=ItemStatus.PENDING_APPROVAL)
+	
+		# Send email to final approvers (Ted and Edmund) and CC finance department (Roman for testing)
         return super().handle(request)
     
 class FinanceHandler(Handler):
     def handle(self, request: ApprovalRequest) -> ApprovalRequest:
         # Finance can approve any request
-        if request.status == ItemStatus.NEW_REQUEST and not request.fund.startswith("511"):
-            request.status = ItemStatus.PENDING_APPROVAL
-            
-            # Send email to final approvers (Ted and Edmund) and CC finance department
-            pass
-            
-            # Update approval tables status
-            pass
-            logger.info(f"Finance approved request {request.id}")
-            return super().handle(request)
-        # Send to clerk admin
+        logger.info("Assigned group was handled in db but this is Finance Handler")
         return super().handle(request)
     
 class ClerkAdminHandler(Handler):
