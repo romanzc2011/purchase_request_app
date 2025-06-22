@@ -28,12 +28,12 @@ db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
 os.makedirs(db_dir, exist_ok=True)
 
 # Create engine and base
-engine = create_engine('sqlite:///api/db/pras.db', echo=True)  # PRAS = Purchase Request Approval System
+engine = create_engine('sqlite:///api/db/pras.db', echo=False)  # PRAS = Purchase Request Approval System
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
 
 DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
-engine_async = create_async_engine(DATABASE_URL_ASYNC, echo=True)
+engine_async = create_async_engine(DATABASE_URL_ASYNC, echo=False)
 AsyncSessionLocal = sessionmaker(bind=engine_async, class_=AsyncSession)
 
 # dependency to hand out AsyncSession instances

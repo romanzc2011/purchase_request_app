@@ -1,5 +1,6 @@
 # api/services/ldap_service.py
 
+from dataclasses import dataclass
 import os
 import asyncio
 import re
@@ -13,7 +14,7 @@ from ldap3.core.exceptions import LDAPExceptionError
 from aiocache import cached, Cache
 from loguru import logger
 
-from api.schemas.auth_schemas import LDAPUser
+from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings 
 
 def run_in_thread(fn):
@@ -41,10 +42,16 @@ class LDAPService:
         self.group_dns    = group_dns
         self._service_conn = self._bind(self.bind_dn, self.bind_password, use_tls=True)
 
+    #-------------------------------------------------------------------------------------
+    # TLS CONFIG
+    #-------------------------------------------------------------------------------------
     def tls_config(self) -> Tls:
         # Skip certificate verification; for production use CERT_REQUIRED + ca_certs_file
         return Tls(validate=ssl.CERT_NONE, version=ssl.PROTOCOL_TLSv1_2)
     
+    #-------------------------------------------------------------------------------------
+    # PARSE HOST PORT
+    #-------------------------------------------------------------------------------------
     def _parse_host_port(self, url: str) -> tuple[str, int, bool]:
         parsed = urlparse(url)
         host = parsed.hostname or parsed.path
@@ -52,6 +59,9 @@ class LDAPService:
         use_ssl = parsed.scheme == "ldaps"
         return host, port, use_ssl
     
+    #-------------------------------------------------------------------------------------
+    # BIND
+    #-------------------------------------------------------------------------------------
     def _bind(self, user_dn: str, password: str, *, use_tls: bool=False) -> Connection:
         host, port, use_ssl = self._parse_host_port(self.ldap_url)
         server = Server(host, port=port, use_ssl=use_ssl, get_info=ALL, tls=self.tls_config() if use_tls else None)
@@ -59,8 +69,12 @@ class LDAPService:
         logger.info(f"LDAP BOUND: {conn.bound}")
         return conn
     
+    #-------------------------------------------------------------------------------------
+    # GET SERVICE CONNECTION
+    #-------------------------------------------------------------------------------------
     def get_service_connection(self) -> Connection:
-        if not self._service_conn.bound:
+        if not self._service_conn or not self._service_conn.bound:
+            logger.info("LDAP connection is not bound. Rebinding...")
             self._service_conn = self._bind(self.bind_dn, self.bind_password, use_tls=True)
         return self._service_conn
     
@@ -76,6 +90,9 @@ class LDAPService:
                 return False
         return await asyncio.to_thread(_test_bind)
 
+    #-------------------------------------------------------------------------------------
+    # SEARCH
+    #-------------------------------------------------------------------------------------
     def _search(
     self,
     conn: Connection,
@@ -97,11 +114,19 @@ class LDAPService:
             **params,
         )
     
+    #-------------------------------------------------------------------------------------
+    # GET EMAIL
+    #-------------------------------------------------------------------------------------
     def _get_email_sync(self, raw_name: str) -> str|None:
         """
         Get email address from LDAP.
         """
         try:
+            raw_name = raw_name.lower()
+            if "adu\\" in raw_name:
+                raw_name = raw_name.replace("adu\\", "")
+                logger.debug(f"Removed ADU\\ from username: {raw_name}")
+            
             conn = self.get_service_connection()
             conn.search(
                 search_base=settings.search_base,
@@ -114,31 +139,82 @@ class LDAPService:
         except LDAPExceptionError as e:
             logger.error(f"LDAP error fetching email for {raw_name}: {e}")
             return None
+        
+    #-------------------------------------------------------------------------------------
+    # SUBTREE USER SEARCH
+    #-------------------------------------------------------------------------------------
+    def _subtree_user_search(self, username: str) -> str | None:
+        """
+        Sync method to fetch full DN of user
+        """
+        try:
+            username = username.lower()
+            if "adu\\" in username:
+                username = username.replace("adu\\", "")
+                logger.debug(f"Removed ADU\\ from username: {username}")
+            
+            conn = self.get_service_connection()
+            conn.search(
+                search_base=settings.search_base,
+                search_filter=f"(sAMAccountName={username})",
+                attributes=["distinguishedName"],
+            )
+            if conn.entries:
+                return conn.entries[0].entry_dn  # Gives full DN string
+            
+        except LDAPExceptionError as e:
+            logger.error(f"LDAP error fetching DN for {username}: {e}")
+        return None
     
+    #-------------------------------------------------------------------------------------
+    # GET MEMBERSHIP
+    #-------------------------------------------------------------------------------------
     def _get_membership_sync(self, username: str) -> Dict[str, bool]:
-        conn = self.get_service_connection()
-        results = {"IT_GROUP": False, "CUE_GROUP": False, "ACCESS_GROUP": False}
-
-        for group_dn, key in zip(self.group_dns, results):
-            success = self._search(conn, group_dn, "(objectClass=group)", ["member"])
-            if not success:
-                logger.error(f"LDAP search for group {group_dn} failed")
-                continue
-
-            entries = conn.entries
-            logger.debug(f"LDAP membership search in {group_dn} returned {len(entries)} entries")
-
-            # if any of the 'member' values matches our user DN, mark True
-            for entry in entries:
-                members = entry.member.values  # could be a list of DNs
-                if any(username.lower() in m.lower() for m in members):
-                    results[key] = True
-                    break
-
-        conn.unbind()
-        return results
+        """
+        Sync method to fetch membership of user
+        """
+        try:
+            # String ADU\\ from username if present
+            username = username.lower()
+            if "adu\\" in username:
+                username = username.replace("adu\\", "")
+                logger.debug(f"Removed ADU\\ from username: {username}")
+            
+            user_dn = self._subtree_user_search(username)
+            if not user_dn:
+                logger.error(f"No user DN found for {username}")
+                return {"IT_GROUP": False, "CUE_GROUP": False, "ACCESS_GROUP": False}
+            
+            conn = self.get_service_connection()
+            
+            # Set results dictionary
+            results = {"IT_GROUP": False, "CUE_GROUP": False, "ACCESS_GROUP": False} 
+            
+            for group_dn, key in zip(self.group_dns, results):
+                success = self._search(conn, group_dn, "(objectClass=group)", ["member"])
+                if not success:
+                    logger.error(f"LDAP search for group {group_dn} failed")
+                    continue
+                
+                entries = conn.entries
+                logger.debug(f"LDAP membership search in {group_dn} returned {len(entries)} entries")
+                
+                for entry in entries:
+                    members = entry.member.values
+                    if user_dn.lower() in [m.lower() for m in members]:
+                        results[key] = True
+                        break
+            
+            logger.info(f"RESULTS OF MEMBERSHIP SEARCH: {results}")
+            return results
     
+        except Exception as e:
+            logger.error(f"Error getting membership: {e}")
+            return {"IT_GROUP": False, "CUE_GROUP": False, "ACCESS_GROUP": False}
+        
+    #-------------------------------------------------------------------------------------
     # FETCH USERNAMES SYNCHRONOUSLY
+    #-------------------------------------------------------------------------------------
     def _fetch_usernames_sync(self, query: str) -> List[str]:
         # LDAP structure to search for
         # OU=LAWB,OU=USCOURTS,DC=ADU,DC=DCN
@@ -170,8 +246,6 @@ class LDAPService:
     ########################################################################################
     # FETCH USERNAMES SYNCHRONOUSLY
     ########################################################################################
-    @cached(ttl=300, cache=Cache.MEMORY,
-            key_builder=lambda fn, self, username: f"ldap_email:{username}")
     @run_in_thread
     def get_email_address(self, username: str) -> str|None:
         return self._get_email_sync(username)
@@ -187,26 +261,18 @@ class LDAPService:
     ########################################################################################
     # FETCH USERNAMES ASYNCHRONOUSLY
     ########################################################################################
-    @cached(ttl=300, cache=Cache.MEMORY,
-            key_builder=lambda fn, self, username: f"ldap_email:{username}")
     async def fetch_user_email(self, username: str) -> LDAPUser:
         groups = await self.check_user_membership(username)
-        email = await self.get_user_email(username)
-        approved = [g for g,ok in groups.items() if ok]
-        return LDAPUser(username=username, email=email, approved=approved)
+        email = await self.get_email_address(username)
+        user_groups = [g for g,ok in groups.items() if ok]
+        return LDAPUser(username=username, email=email, groups=user_groups)
     
     #####################################################################################
     ## FETCH USER ASYNCHRONOUSLY
-    @cached(
-        ttl=300,
-        cache=Cache.MEMORY,
-        key_builder=lambda fn, self, username: f"ldap_user:{username.lower()}"
-    )
     @run_in_thread
     def fetch_user(self, username: str) -> LDAPUser:
         """Blocking under the hood, but exposed async and cached"""
         groups = self._get_membership_sync(username)
         email = self._get_email_sync(username)
-        approved = [g for g,ok in groups.items() if ok]
-        return LDAPUser(username=username, email=email, approved=approved)
-    
+        user_groups = [g for g,ok in groups.items() if ok]
+        return LDAPUser(username=username, email=email, groups=user_groups)

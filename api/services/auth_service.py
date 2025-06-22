@@ -1,4 +1,5 @@
 from asyncio import Server
+from api.schemas.ldap_schema import LDAPUser
 from api.services.cache_service import cache_service
 import os, jwt, asyncio
 from urllib.parse import urlparse
@@ -12,11 +13,9 @@ from loguru import logger
 from ldap3.core.exceptions import LDAPBindError
 from ldap3 import Server, Connection, ALL, SUBTREE, Tls
 from aiocache import cached, Cache
-from api.schemas.auth_schemas import LDAPUser
 
 from api.services.ldap_service import LDAPService
 from api.settings import settings 
-from api.schemas.auth_schemas import LDAPUser
 """
 AUTHOR: ROMAN CAMPBELL
 DATE: 04/10/2025
@@ -31,36 +30,36 @@ def run_in_thread(fn):
 
 class AuthService:
     def __init__(self, ldap_service: LDAPService):
-        self.ldap_service = ldap_service
         self.JWT_SECRET_KEY = settings.jwt_secret_key
         self.ALGORITHM = "HS256"
+        self.expire_minutes = 60
+        self.ldap_service = ldap_service
 
     #####################################################################################
     ## CREATE ACCESS TOKEN
-    def create_access_token(
+    async def create_access_token(
         self,
         user: LDAPUser,
         expires_delta: timedelta | None = None
     ) -> str:
-        to_encode = {
-            "sub": user.username,
-            "email": user.email,
-            "groups": user.groups
-        }
+
         logger.info("########################################################")
         logger.info(f"LDAP_USER: {user}")
         logger.info(f"LDAP_USER username: {user.username}")
         logger.info(f"LDAP_USER email: {user.email}")
         logger.info(f"LDAP_USER groups: {user.groups}")
         logger.info("########################################################")
-
-        expire = (
-            datetime.now(timezone.utc) + expires_delta
-            if expires_delta
-            else datetime.now(timezone.utc) + timedelta(minutes=15)
-        )
-        to_encode["exp"] = expire
+        
+        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=self.expire_minutes))
+        
+        to_encode = {
+            "sub": user.username,
+            "email": user.email,
+            "groups": user.groups,
+            "exp": expire
+        }
         return jwt.encode(to_encode, self.JWT_SECRET_KEY, algorithm=self.ALGORITHM)
+
         
     #####################################################################################
     ## AUTHENTICATE USER
@@ -85,31 +84,22 @@ class AuthService:
             logger.error(f"Failed to bind user: {username}")
             return None
         
-        return await self.ldap_service.fetch_user(username)
+        return await LDAPUser.from_ldap(username, self.ldap_service)
             
     #####################################################################################
     ## Get Current LDAPUser
-    async def get_current_user(
-        self,
-        token: str = Depends(oauth2_scheme)
-    ) -> LDAPUser:
-        credentials_exception = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
+    async def get_current_user(self, token: str = Depends(oauth2_scheme)) -> LDAPUser:
         try:
             payload = jwt.decode(token, self.JWT_SECRET_KEY, algorithms=[self.ALGORITHM])
-            username: str = payload.get("sub")
-            user = await self.ldap_service.fetch_user(username)
-            logger.info(f"CURRENT USER VALIDATED: {user}")
-            
-            if not user:
-                raise credentials_exception
-            return user
-        
+            return LDAPUser(
+                username=payload["sub"],
+                email=payload.get("email"),
+                groups=payload.get("groups", [])
+            )
         except InvalidTokenError:
-            raise credentials_exception
-        
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
   

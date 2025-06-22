@@ -26,7 +26,7 @@ import pytest
 from fastapi.testclient import TestClient
 from api.pras_api import app
 from api.dependencies.pras_dependencies import *
-from api.schemas.auth_schemas import LDAPUser
+from api.schemas.ldap_schema import LDAPUser
 from api.schemas.purchase_schemas import PurchaseItem, ItemStatus, FileAttachment
 
 ldap_service = LDAPService(

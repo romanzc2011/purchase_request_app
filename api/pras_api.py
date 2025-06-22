@@ -111,7 +111,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
         
     # 2. Create JWT token
-    token = auth_service.create_access_token(user)
+    token = await auth_service.create_access_token(user)
     
     # 3. Return token and user details
     return {
@@ -274,10 +274,14 @@ async def send_purchase_request(
             }
         )
 
+    logger.info("###########################################################")
+    logger.info(f"CURRENT USER: {current_user}")
+    logger.info("###########################################################")
     ################################################################3
     ## VALIDATE REQUESTER
     requester = payload.requester
-    requester_email = await ldap_service.get_email_address(requester)
+    # Use current_user's email instead of doing another LDAP lookup
+    requester_email = current_user.email
     
     if not requester_email: 
         logger.error(f"Could not find email for user {requester}")
@@ -672,8 +676,16 @@ async def refresh_token(refresh_token: str):
                 detail="Invalid refresh token"
             )
             
+        # Fetch user data from LDAP
+        user = await ldap_service.fetch_user(username)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+            
         # Create new access token
-        new_access_token = auth_service.create_access_token(identity=username)
+        new_access_token = await auth_service.create_access_token(user)
         
         return {
             "access_token": new_access_token
