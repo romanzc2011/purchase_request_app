@@ -60,7 +60,7 @@ class AuthService:
         }
         return jwt.encode(to_encode, self.JWT_SECRET_KEY, algorithm=self.ALGORITHM)
 
-        
+        XS
     #####################################################################################
     ## AUTHENTICATE USER
     async def authenticate_user(
