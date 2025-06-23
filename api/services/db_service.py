@@ -28,12 +28,12 @@ db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
 os.makedirs(db_dir, exist_ok=True)
 
 # Create engine and base
-engine = create_engine('sqlite:///api/db/pras.db', echo=False)  # PRAS = Purchase Request Approval System
+engine = create_engine('sqlite:///api/db/pras.db', echo=True)  # PRAS = Purchase Request Approval System
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
 
 DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
-engine_async = create_async_engine(DATABASE_URL_ASYNC, echo=False)
+engine_async = create_async_engine(DATABASE_URL_ASYNC, echo=True)
 AsyncSessionLocal = sessionmaker(bind=engine_async, class_=AsyncSession)
 
 # dependency to hand out AsyncSession instances
@@ -118,6 +118,8 @@ class PurchaseRequestLineItem(Base):
     totalPrice             : Mapped[float] = mapped_column(Float)
     location               : Mapped[str] = mapped_column(String)
     isCyberSecRelated	   : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    pdf_output_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    uploaded_file_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     status                 : Mapped[ItemStatus] = mapped_column(
                                 SQLEnum(ItemStatus,
@@ -325,7 +327,6 @@ class FinalApproval(Base):
     approver        = mapped_column(String, nullable=False)
     status          = mapped_column(SQLEnum(ItemStatus), nullable=False)
     created_at      = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
-    pending_approval_status = mapped_column(SQLEnum(ItemStatus), nullable=False)
     deputy_can_approve = mapped_column(Boolean, nullable=False)  # total 00price must be equal to or less than $250
 
     # back to Approval

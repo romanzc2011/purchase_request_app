@@ -214,16 +214,17 @@ async def _save_files(ID: str, file: UploadFile) -> str:
 async def generate_pdf(
     payload: PurchaseRequestPayload, 
     ID: str, 
+    db: AsyncSession,
     uploaded_files: Optional[List[str]] = None) -> str:
     try:
         # Make sure dir exists
         pdf_output_dir = settings.PDF_OUTPUT_FOLDER
         os.makedirs(pdf_output_dir, exist_ok=True)
         
-        # Create PDF on thread
-        pdf_path = await asyncio.to_thread(
-            pdf_service.create_pdf,
+        # Use the asynchronous create_pdf method
+        pdf_path = await pdf_service.create_pdf(
             ID=ID,
+            db=db,
             payload=jsonable_encoder(payload)
         )
         
@@ -435,7 +436,7 @@ async def send_purchase_request(
     
     # Generate PDF
     logger.info("Generating PDF document")
-    pdf_path: str = await generate_pdf(payload, payload.id, uploaded_files)
+    pdf_path: str = await generate_pdf(payload, payload.id, db, uploaded_files)
     
     #################################################################################
     ## EMAIL PAYLOADS

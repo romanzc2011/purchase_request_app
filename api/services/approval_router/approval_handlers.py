@@ -1,10 +1,12 @@
 from __future__ import annotations
+import asyncio
+from http.client import HTTPException
 from typing import Optional
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from api import settings
 from api.schemas.email_schemas import EmailPayloadRequest, LineItemsPayload
-from api.services import cache_service
+from api.services import cache_service, smtp_service
 from loguru import logger
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
@@ -261,8 +263,25 @@ class ClerkAdminHandler(Handler):
         db: AsyncSession,
         current_user: LDAPUser
     ) -> ApprovalRequest:
+        
+	
+			
         # ClerkAdmin is the final handler - they can approve based on price
         logger.info("ClerkAdmin Handler processing request")
+        
+        # Get current status ItemStatus
+        stmt = select(dbas.PendingApproval.pending_approval_status).where(dbas.PendingApproval.line_item_uuid == request.uuid)
+        result = await db.execute(stmt)
+        row = result.first()
+        current_status = row[0]
+        
+        if current_status == ItemStatus.PENDING_APPROVAL:
+            pass
+        
+        # Ensure user is in the CUE group
+        if "CUE_GROUP" not in current_user.groups:
+            logger.warning(f"User {current_user.username} is not in the CUE group")
+            raise HTTPException(status_code=403, detail="User is not in the CUE group")
         
         # This variable determines if Edmund can approve the request
         if request.total_price < 250:
@@ -271,9 +290,34 @@ class ClerkAdminHandler(Handler):
         else:
             edmund_can_approve = False
             logger.info("ClerkAdmin Handler: Edmund cannot approve (price >= $250)")
+            
+        # Update all statuses to APPROVED
+        # Update pr_line_items using line_item_uuid
+        await dbas.update_status_by_uuid(
+            db=db,
+            uuid=request.uuid,  # line_item_uuid
+            status=ItemStatus.APPROVED,
+            table="pr_line_items"
+        )
         
-        # Only insert if this is a final approval (price < $250) or if no other handler has processed it
-        # For now, let's just log the deputy approval status
+        # Update approvals using approvals_uuid
+        await dbas.update_status_by_uuid(
+            db=db,
+            uuid=request.uuid,
+            status=ItemStatus.APPROVED,
+            table="approvals"
+        )
+        
+        # Update pending_approvals using approvals_uuid
+        await dbas.update_status_by_uuid(
+            db=db,
+            uuid=request.uuid,
+            status=ItemStatus.APPROVED,
+            table="pending_approvals"
+        )
+        
+        #TODO: Send email to requester that their request has been approved
+        
         logger.info(f"ClerkAdmin Handler: Deputy can approve: {edmund_can_approve} for request {request.uuid}")
         
         if self._next:
