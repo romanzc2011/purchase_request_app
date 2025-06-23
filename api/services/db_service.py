@@ -136,11 +136,11 @@ class PurchaseRequestLineItem(Base):
                              )
 
     # line-item → join‐table
-    line_item_approval_attr    : Mapped[List[LineItemApproval]] = relationship(
-                                "LineItemApproval",
+    final_approval_attr    : Mapped[List[FinalApproval]] = relationship(
+                                "FinalApproval",
                                 back_populates="line_item",
                                 cascade="all, delete-orphan",
-                                foreign_keys="[LineItemApproval.line_item_uuid]"
+                                foreign_keys="[FinalApproval.line_item_uuid]"
                              )
 
     # line-item → pending approvals
@@ -228,11 +228,11 @@ class Approval(Base):
                              )
 
     # to join‐table
-    line_item_approval_attr    : Mapped[List[LineItemApproval]] = relationship(
-                                "LineItemApproval",
+    final_approval_attr    : Mapped[List[FinalApproval]] = relationship(
+                                "FinalApproval",
                                 back_populates="approval",
                                 cascade="all, delete-orphan",
-                                foreign_keys="[LineItemApproval.approvals_uuid]"
+                                foreign_keys="[FinalApproval.approvals_uuid]"
                              )
 
     # to pending
@@ -252,36 +252,12 @@ class Approval(Base):
                              )
 
 # ────────────────────────────────────────────────────────────────────────────────
-# JOIN TABLE: LineItemApproval
+# PENDING APPROVAL 
 # ────────────────────────────────────────────────────────────────────────────────
-class LineItemApproval(Base):
-    __tablename__ = "line_item_approvals"
-
-    approvals_uuid  : Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), primary_key=True)
-    line_item_uuid  : Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), primary_key=True)
-    approver        = mapped_column(String, nullable=False)
-    status          = mapped_column(SQLEnum(ItemStatus), nullable=False)
-    decision        = mapped_column(SQLEnum(ItemStatus), nullable=False)
-    created_at      = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
-
-    # back to Approval
-    approval        : Mapped[Approval] = relationship(
-                          "Approval",
-                          back_populates="line_item_approval_attr",
-                          foreign_keys=[approvals_uuid]
-                      )
-
-    # back to LineItem
-    line_item      : Mapped[PurchaseRequestLineItem] = relationship(
-                          "PurchaseRequestLineItem",
-                          back_populates="line_item_approval_attr",
-                          foreign_keys=[line_item_uuid]
-                      )
-    
-# ────────────────────────────────────────────────────────────────────────────────
-# PENDING APPROVAL
-# ────────────────────────────────────────────────────────────────────────────────
-
+"""
+These approvals will be completed by the IT or Finance supervisors, then they will
+go to FinalApproval where the Deputy Clerk or Clerk Admin will approve or deny the request.
+"""
 class PendingApproval(Base):
     __tablename__ = "pending_approvals"
 
@@ -296,6 +272,12 @@ class PendingApproval(Base):
                                 values_callable=lambda enum: [e.value for e in enum],
                                 default=TaskStatus.NEW_REQUEST,
                                 nullable=False
+                             )
+    final_approval_attr: Mapped[List[FinalApproval]] = relationship(
+                                "FinalApproval",
+                                back_populates="pending_approval",
+                                cascade="all, delete-orphan",
+                                foreign_keys="[FinalApproval.task_id]"
                              )
     action                 = mapped_column(
                                 SQLEnum(ItemStatus, name="item_status", native_enum=False,
@@ -326,6 +308,46 @@ class PendingApproval(Base):
                                 back_populates="pending_approvals",
                                 foreign_keys=[approvals_uuid]
                              )
+
+# ────────────────────────────────────────────────────────────────────────────────
+# JOIN TABLE: FinalApproval
+# ────────────────────────────────────────────────────────────────────────────────
+class FinalApproval(Base):
+    """
+    The final say so on whether a request is approved or denied.
+    """
+    __tablename__ = "final_approvals"
+	
+    UUID            : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    task_id         : Mapped[int] = mapped_column(Integer, ForeignKey("pending_approvals.task_id"), nullable=False)
+    approvals_uuid  : Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
+    line_item_uuid  : Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=False)
+    approver        = mapped_column(String, nullable=False)
+    status          = mapped_column(SQLEnum(ItemStatus), nullable=False)
+    created_at      = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
+    pending_approval_status = mapped_column(SQLEnum(ItemStatus), nullable=False)
+    deputy_can_approve = mapped_column(Boolean, nullable=False)  # total 00price must be equal to or less than $250
+
+    # back to Approval
+    approval        : Mapped[Approval] = relationship(
+                          "Approval",
+                          back_populates="final_approval_attr",
+                          foreign_keys=[approvals_uuid]
+                      )
+
+    # back to LineItem
+    line_item      : Mapped[PurchaseRequestLineItem] = relationship(
+                          "PurchaseRequestLineItem",
+                          back_populates="final_approval_attr",
+                          foreign_keys=[line_item_uuid]
+                      )
+    
+    # back to PendingApproval
+    pending_approval: Mapped[PendingApproval] = relationship(
+                          "PendingApproval",
+                          back_populates="final_approval_attr",
+                          foreign_keys=[task_id]
+                      )
 ###################################################################################################
 ## SEEDING JUSTIFICATION TEMPLATES
 ###################################################################################################
@@ -485,13 +507,75 @@ def get_requester_by_UUID(db_session: Session, UUID: str):
 _uuid_cache = {}
 
 ###################################################################################################
+# UPDATE STATUS BY UUID
+###################################################################################################
+async def update_status_by_uuid(
+    db: AsyncSession,
+    uuid: str,
+    status: ItemStatus,
+    table: str
+):
+    table = table.strip().lower()
+    logger.info(f"Updating status in {table}: {uuid}, {status}")
+    
+    if not status:
+        raise ValueError("Status must be a non-empty string")
+    
+    # Pick the right table
+    match table:
+        case "approvals":
+            model = Approval
+            pk_field = "UUID"
+            status_field = "status"
+            status_value = status
+            
+        case "final_approvals":
+            model = FinalApproval
+            pk_field = "UUID"
+            status_field = "status"
+            status_value = status
+            
+        case "pr_line_items":
+            model = PurchaseRequestLineItem
+            pk_field = "UUID"
+            status_field = "status"
+            status_value = status
+            
+        case "pending_approvals":
+            model = PendingApproval
+            pk_field = "approvals_uuid"  # Use approvals_uuid as the field to match on
+            status_field = "task_status"  # PendingApproval uses task_status, not status
+            # Convert ItemStatus to TaskStatus
+            if status == ItemStatus.PENDING_APPROVAL:
+                status_value = TaskStatus.PENDING
+            elif status == ItemStatus.APPROVED:
+                status_value = TaskStatus.PROCESSED
+            elif status == ItemStatus.DENIED:
+                status_value = TaskStatus.PROCESSED
+            else:
+                status_value = TaskStatus.NEW_REQUEST
+        case _:
+            raise ValueError(f"Unsupported table: {table}")
+    
+    stmt = (
+        update(model)
+        .where(getattr(model, pk_field) == uuid)
+        .values(**{status_field: status_value})
+        .execution_options(synchronize_session="fetch")
+    )
+    await db.execute(stmt)
+    await db.commit()
+    logger.info(f"Updated status in {table}: {uuid}, {status_value}")
+    return True
+
+###################################################################################################
 # UPDATE DATA BY UUID
 ###################################################################################################
 async def update_data_by_uuid(
-	db: AsyncSession,
-	uuid: str,
-	table: str,
-	**kwargs
+    db: AsyncSession,
+    uuid: str,
+    table: str,
+    **kwargs
 ):
     table = table.strip().lower()
     logger.info(f"Updating data in {table}: {kwargs}")
@@ -504,9 +588,9 @@ async def update_data_by_uuid(
         case "pr_line_items":
             model = PurchaseRequestLineItem
             pk_field = "UUID"
-        case "line_item_approvals":
-            model = LineItemApproval
-            pk_field = "line_item_uuid"
+        case "final_approvals":
+            model = FinalApproval
+            pk_field = "UUID"
         case "pending_approvals":
             model = PendingApproval
             pk_field = "line_item_uuid"
@@ -525,11 +609,11 @@ async def update_data_by_uuid(
     
     # Update the object
     stmt = (
-		update(model)
-		.where(getattr(model, pk_field) == uuid)
-		.values(**filtered_data)
-		.execution_options(synchronize_session="fetch")
-	)
+        update(model)
+        .where(getattr(model, pk_field) == uuid)
+        .values(**filtered_data)
+        .execution_options(synchronize_session="fetch")
+    )
     
     await db.execute(stmt)
     
@@ -833,6 +917,179 @@ async def fetch_flat_approvals(
     
     # Map each row to the ApprovalSchema
     return [ApprovalSchema(**r._asdict()) for r in rows]
+
+###################################################################################################
+# INSERT LINE ITEM FINAL APPROVAL
+###################################################################################################
+async def insert_final_approval(
+    db: AsyncSession,
+    approvals_uuid: str,
+    line_item_uuid: str,
+    task_id: int,
+    approver: str,
+    status: ItemStatus,
+    pending_approval_status: ItemStatus,
+    deputy_can_approve: bool = False
+) -> FinalApproval:
+    """
+    Insert a new record into the line_item_final_approvals table.
+    
+    Args:
+        db: Database session
+        approvals_uuid: UUID from the approvals table
+        line_item_uuid: UUID from the pr_line_items table
+        task_id: Task ID from the pending_approvals table
+        approver: Username of the approver
+        status: Current approval status
+        pending_approval_status: Status of the pending approval
+        deputy_can_approve: Whether deputy can approve (based on price <= $250)
+    
+    Returns:
+        The created FinalApproval object
+    """
+    logger.info(f"Inserting line item final approval: {approvals_uuid}, {line_item_uuid}, {task_id}")
+    
+    # Create the new approval record
+    final_approval = FinalApproval(
+        approvals_uuid=approvals_uuid,
+        line_item_uuid=line_item_uuid,
+        task_id=task_id,
+        approver=approver,
+        status=status,
+        created_at=utc_now_truncated(),
+        pending_approval_status=pending_approval_status,
+        deputy_can_approve=deputy_can_approve
+    )
+    
+    db.add(final_approval)
+    await db.flush()
+    await db.refresh(final_approval)
+    await db.commit()  # Commit the transaction to persist the record
+    
+    logger.info(f"Successfully inserted line item final approval: {final_approval}")
+    return final_approval
+
+###################################################################################################
+# GET LINE ITEM FINAL APPROVALS BY LINE ITEM UUID
+###################################################################################################
+async def get_final_approvals_by_line_item_uuid(
+    db: AsyncSession,
+    line_item_uuid: str
+) -> List[FinalApproval]:
+    """
+    Get all final approval records for a specific line item.
+    
+    Args:
+        db: Database session
+        line_item_uuid: UUID of the line item
+    
+    Returns:
+        List of FinalApproval objects
+    """
+    stmt = select(FinalApproval).where(
+        FinalApproval.line_item_uuid == line_item_uuid
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+###################################################################################################
+# GET LINE ITEM FINAL APPROVALS BY APPROVAL UUID
+###################################################################################################
+async def get_final_approvals_by_approval_uuid(
+    db: AsyncSession,
+    approvals_uuid: str
+) -> List[FinalApproval]:
+    """
+    Get all final approval records for a specific approval.
+    
+    Args:
+        db: Database session
+        approvals_uuid: UUID of the approval
+    
+    Returns:
+        List of FinalApproval objects
+    """
+    stmt = select(FinalApproval).where(
+        FinalApproval.approvals_uuid == approvals_uuid
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+###################################################################################################
+# UPDATE LINE ITEM FINAL APPROVAL STATUS
+###################################################################################################
+async def update_final_approval_status(
+    db: AsyncSession,
+    approvals_uuid: str,
+    line_item_uuid: str,
+    task_id: int,
+    new_status: ItemStatus,
+    approver: str
+) -> FinalApproval:
+    """
+    Update the status of a specific line item final approval.
+    
+    Args:
+        db: Database session
+        approvals_uuid: UUID from the approvals table
+        line_item_uuid: UUID from the pr_line_items table
+        task_id: Task ID from the pending_approvals table
+        new_status: New approval status
+        approver: Username of the approver
+    
+    Returns:
+        The updated FinalApproval object
+    """
+    logger.info(f"Updating line item final approval status: {approvals_uuid}, {line_item_uuid}, {task_id}")
+    
+    stmt = (
+        update(FinalApproval)
+        .where(
+            FinalApproval.approvals_uuid == approvals_uuid,
+            FinalApproval.line_item_uuid == line_item_uuid,
+            FinalApproval.task_id == task_id
+        )
+        .values(
+            status=new_status,
+            approver=approver,
+            created_at=utc_now_truncated()
+        )
+    )
+    
+    await db.execute(stmt)
+    
+    # Get the updated object
+    result = await db.execute(
+        select(FinalApproval).where(
+            FinalApproval.approvals_uuid == approvals_uuid,
+            FinalApproval.line_item_uuid == line_item_uuid,
+            FinalApproval.task_id == task_id
+        )
+    )
+    updated_obj = result.scalar_one_or_none()
+    
+    if not updated_obj:
+        raise ValueError(f"Line item final approval not found: {approvals_uuid}, {line_item_uuid}, {task_id}")
+    
+    await db.commit()
+    logger.info(f"Successfully updated line item final approval: {updated_obj}")
+    return updated_obj
+
+###################################################################################################
+# DETERMINE DEPUTY APPROVAL ELIGIBILITY
+###################################################################################################
+def can_deputy_approve(total_price: float) -> bool:
+    """
+    Determine if a deputy can approve based on the total price.
+    Deputies can approve requests with total price <= $250.
+    
+    Args:
+        total_price: Total price of the line item
+    
+    Returns:
+        True if deputy can approve, False otherwise
+    """
+    return total_price <= 250.0
 
 ###################################################################################################
 # Initialize database

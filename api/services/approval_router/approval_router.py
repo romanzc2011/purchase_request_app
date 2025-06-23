@@ -1,5 +1,6 @@
 from api.services.approval_router.approval_handlers import ITHandler, FinanceHandler, ClerkAdminHandler
 from api.schemas.approval_schemas import ApprovalRequest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 class ApprovalRouter:
     def __init__(self):
@@ -14,5 +15,5 @@ class ApprovalRouter:
         
         self._head = self.it_handler
         
-    def route(self, request: ApprovalRequest) -> ApprovalRequest:
-        return self._head.handle(request)
+    async def route(self, request: ApprovalRequest, db: AsyncSession) -> ApprovalRequest:
+        return await self._head.handle(request, db)

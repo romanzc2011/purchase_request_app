@@ -37,7 +37,6 @@ from api.dependencies.pras_dependencies import ldap_service
 from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
-from api.dependencies.pras_dependencies import uuid_service
 from api.dependencies.pras_dependencies import settings
 from api.services.cache_service import cache_service
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
@@ -49,15 +48,12 @@ from api.services.db_service import (
 	PurchaseRequestLineItem,
 	Approval,
 	PendingApproval,
-	SonComment
+	SonComment,
+	FinalApproval
 )
 
 # Schemas
 from api.dependencies.pras_schemas import *
-
-# Singleton Services
-from api.services.db_service import get_session
-
 import api.services.db_service as dbas
 
 # TODO: Investigate why rendering approval data is taking so long,
@@ -312,7 +308,7 @@ async def send_purchase_request(
         payload.id,
         lambda: dbas.get_additional_comments_by_id(payload.id)
     )
-    
+
     for item in payload.items:
         item.additional_comments = additional_comments
     
@@ -335,7 +331,7 @@ async def send_purchase_request(
         # Generate the purchase request ID
         purchase_req_id = dbas.set_purchase_req_id()
         
-        # Create the purchase request header
+        # PURCHASE REQUEST HEADER TABLE
         orm_pr_header = PurchaseRequestHeader(
             ID=purchase_req_id,  # Set the ID explicitly
             IRQ1_ID=payload.irq1_id,
@@ -372,6 +368,7 @@ async def send_purchase_request(
             await db.flush()
             pr_line_item_uuids.append(orm_pr_line_item.UUID)
 
+        # APPROVAL TABLE
         approvals: List[Approval] = []
         for item, line_uuid in zip(payload.items, pr_line_item_uuids):
             appr = Approval(
@@ -618,6 +615,7 @@ async def approve_deny_request(
 ):
     try:
         final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
+        
         # Process each item in the payload
         results = []
         for i, (item_uuid, item_fund, total_price, target_status) in enumerate(zip(
@@ -652,7 +650,7 @@ async def approve_deny_request(
                 approver=current_user.username
             )
             router = ApprovalRouter()
-            result = router.route(approval_request)
+            result = await router.route(approval_request, db)
             results.append({
                 "uuid": item_uuid,
                 "status": result.status.value if hasattr(result, 'status') else "processed",

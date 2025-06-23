@@ -26,14 +26,14 @@ class LineItemStatusSchema(BaseModel):
     status: str
     last_updated: datetime
     updated_by: Optional[str] = None
-    
+
 # --------------------------------------------------------------
 #  APPROVAL REQUEST SCHEMA (for approval router)
 # --------------------------------------------------------------
 class ApprovalRequest(BaseModel):
     id: str
     uuid: str
-    task_id: str
+    task_id: int
     fund: str
     status: ItemStatus
     total_price: float
@@ -114,3 +114,21 @@ class ApprovalView(BaseModel):
         alias_generator    = to_camel_case
         populate_by_name   = True
         by_alias           = True
+        
+
+# --------------------------------------------------------------
+# FINAL APPROVAL Line Items Schema
+class FinalApprovalLineItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    
+    # Primary keys
+    approvals_uuid: str
+    line_item_uuid: str
+    task_id: int
+    
+    # Approval fields
+    approver: str
+    status: ItemStatus
+    created_at: datetime
+    pending_approval_status: ItemStatus
+    deputy_can_approve: bool  # total price must be                                                                mmmmmmmmm/, equal to or less than $250
