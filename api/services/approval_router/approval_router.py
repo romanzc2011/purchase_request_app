@@ -1,4 +1,4 @@
-from api.services.approval_router.approval_handlers import ITHandler, FinanceHandler, ClerkAdminHandler
+from api.services.approval_router.approval_handlers import ITHandler, FinanceHandler, ClerkAdminHandler, Handler
 from api.schemas.approval_schemas import ApprovalRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.schemas.ldap_schema import LDAPUser
@@ -16,6 +16,13 @@ class ApprovalRouter:
         self.finance_handler.set_next(self.clerk_admin_handler)
         
         self._head = self.it_handler
+    
+    def start_handler(self, handler: Handler):
+        """
+        Allow manual override of the starting handler
+        """
+        self._head = handler
+        return self
         
     async def route(
         self, 

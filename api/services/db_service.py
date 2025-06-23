@@ -2,6 +2,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from http.client import HTTPException
 from api.schemas.approval_schemas import ApprovalSchema, ApprovalView
+from api.schemas.ldap_schema import LDAPUser
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from loguru import logger
 from aiocache import Cache, cached
@@ -13,7 +14,7 @@ from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.inspection import inspect
 from sqlalchemy import select
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, joinedload
 from datetime import datetime, timezone
 from contextlib import contextmanager
 from typing import List, Optional
@@ -65,8 +66,8 @@ class PurchaseRequestHeader(Base):
     __tablename__ = "purchase_request_headers"
 
     ID                 : Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    IRQ1_ID      	   : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
-    CO           	   : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    IRQ1_ID            : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
+    CO                 : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     requester          : Mapped[str] = mapped_column(String, nullable=False)
     phoneext           : Mapped[int] = mapped_column(Integer, nullable=False)
     datereq            : Mapped[str] = mapped_column(String)
@@ -117,7 +118,7 @@ class PurchaseRequestLineItem(Base):
     priceEach              : Mapped[float] = mapped_column(Float)
     totalPrice             : Mapped[float] = mapped_column(Float)
     location               : Mapped[str] = mapped_column(String)
-    isCyberSecRelated	   : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    isCyberSecRelated      : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     pdf_output_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     uploaded_file_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
@@ -159,30 +160,6 @@ class PurchaseRequestLineItem(Base):
                                 foreign_keys="[SonComment.line_item_uuid]"
                              )
 
-# ────────────────────────────────────────────────────────────────────────────────
-# SON COMMENT
-# ────────────────────────────────────────────────────────────────────────────────
-class SonComment(Base):
-    __tablename__ = "son_comments"
-    UUID:               Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    line_item_uuid:     Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=True)
-    approvals_uuid:     Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
-    comment_text:       Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at:         Mapped[Optional[datetime]] = mapped_column(DateTime, default=utc_now_truncated, nullable=True)
-    son_requester:      Mapped[str] = mapped_column(String, nullable=False)
-    item_description:   Mapped[Optional[str]] = mapped_column(String, nullable=True)	
-
-    approval: Mapped[Approval] = relationship(
-        "Approval",
-        back_populates="son_comments",
-        foreign_keys=[approvals_uuid]
-    )
-    
-    line_item: Mapped[PurchaseRequestLineItem] = relationship(
-				"PurchaseRequestLineItem",
-				back_populates="son_comments",
-				foreign_keys=[line_item_uuid]
-	)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -269,7 +246,7 @@ class PendingApproval(Base):
     approvals_uuid         : Mapped[Optional[str]] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
     assigned_group         : Mapped[str]    = mapped_column(String, nullable=False)
     
-    approval_status        : Mapped[ItemStatus] = mapped_column(
+    status                 : Mapped[ItemStatus] = mapped_column(
                                 SQLEnum(ItemStatus,
                                        name="item_status", native_enum=False,
                                        values_callable=lambda enum: [e.value for e in enum]
@@ -315,7 +292,7 @@ class FinalApproval(Base):
     The final say so on whether a request is approved or denied.
     """
     __tablename__ = "final_approvals"
-	
+    
     UUID            : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     pending_approval_id         : Mapped[int] = mapped_column(Integer, ForeignKey("pending_approvals.pending_approval_id"), nullable=False)
     approvals_uuid  : Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
@@ -345,6 +322,32 @@ class FinalApproval(Base):
                           back_populates="final_approval_attr",
                           foreign_keys=[pending_approval_id]
                       )
+    
+# ────────────────────────────────────────────────────────────────────────────────
+# SON COMMENT
+# ────────────────────────────────────────────────────────────────────────────────
+class SonComment(Base):
+    __tablename__ = "son_comments"
+    UUID:               Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    line_item_uuid:     Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=True)
+    approvals_uuid:     Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
+    comment_text:       Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at:         Mapped[Optional[datetime]] = mapped_column(DateTime, default=utc_now_truncated, nullable=True)
+    son_requester:      Mapped[str] = mapped_column(String, nullable=False)
+    item_description:   Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    approval: Mapped[Approval] = relationship(
+        "Approval",
+        back_populates="son_comments",
+        foreign_keys=[approvals_uuid]
+    )
+    
+    line_item: Mapped[PurchaseRequestLineItem] = relationship(
+        "PurchaseRequestLineItem",
+        back_populates="son_comments",
+        foreign_keys=[line_item_uuid]
+    )
+
 ###################################################################################################
 ## SEEDING JUSTIFICATION TEMPLATES
 ###################################################################################################
@@ -364,15 +367,15 @@ async def seed_justification_templates(async_session: AsyncSession):
         return
     
     templates = [
-		JustificationTemplate(
-			code="NOT_AVAILABLE",
-			description="No comparable programs listed on approved sites."
-		),
-		JustificationTemplate(
-			code="DOESNT_MEET_NEEDS",
-			description="Current offerings do not meet the needs of the requester."
-		),
-	]
+        JustificationTemplate(
+            code="NOT_AVAILABLE",
+            description="No comparable programs listed on approved sites."
+        ),
+        JustificationTemplate(
+            code="DOESNT_MEET_NEEDS",
+            description="Current offerings do not meet the needs of the requester."
+        ),
+    ]
     async_session.add_all(templates)
     await async_session.commit()
 
@@ -921,10 +924,9 @@ async def insert_final_approval(
     db: AsyncSession,
     approvals_uuid: str,
     line_item_uuid: str,
-    task_id: int,
+    pending_approval_id: int,
     approver: str,
     status: ItemStatus,
-    pending_approval_status: ItemStatus,
     deputy_can_approve: bool = False
 ) -> FinalApproval:
     """
@@ -934,26 +936,24 @@ async def insert_final_approval(
         db: Database session
         approvals_uuid: UUID from the approvals table
         line_item_uuid: UUID from the pr_line_items table
-        task_id: Task ID from the pending_approvals table
+        pending_approval_id: Pending approval ID from the pending_approvals table
         approver: Username of the approver
         status: Current approval status
-        pending_approval_status: Status of the pending approval
         deputy_can_approve: Whether deputy can approve (based on price <= $250)
     
     Returns:
         The created FinalApproval object
     """
-    logger.info(f"Inserting line item final approval: {approvals_uuid}, {line_item_uuid}, {task_id}")
+    logger.info(f"Inserting line item final approval: {approvals_uuid}, {line_item_uuid}, {pending_approval_id}")
     
     # Create the new approval record
     final_approval = FinalApproval(
         approvals_uuid=approvals_uuid,
         line_item_uuid=line_item_uuid,
-        task_id=task_id,
+        pending_approval_id=pending_approval_id,
         approver=approver,
         status=status,
         created_at=utc_now_truncated(),
-        pending_approval_status=pending_approval_status,
         deputy_can_approve=deputy_can_approve
     )
     
@@ -1018,8 +1018,8 @@ async def update_final_approval_status(
     db: AsyncSession,
     approvals_uuid: str,
     line_item_uuid: str,
-    task_id: int,
-    new_status: ItemStatus,
+    pending_approval_id: int,
+    status: ItemStatus,
     approver: str
 ) -> FinalApproval:
     """
@@ -1029,24 +1029,24 @@ async def update_final_approval_status(
         db: Database session
         approvals_uuid: UUID from the approvals table
         line_item_uuid: UUID from the pr_line_items table
-        task_id: Task ID from the pending_approvals table
+        pending_approval_id: Pending approval ID from the pending_approvals table
         new_status: New approval status
         approver: Username of the approver
     
     Returns:
         The updated FinalApproval object
     """
-    logger.info(f"Updating line item final approval status: {approvals_uuid}, {line_item_uuid}, {task_id}")
+    logger.info(f"Updating line item final approval status: {approvals_uuid}, {line_item_uuid}, {pending_approval_id}")
     
     stmt = (
         update(FinalApproval)
         .where(
             FinalApproval.approvals_uuid == approvals_uuid,
             FinalApproval.line_item_uuid == line_item_uuid,
-            FinalApproval.task_id == task_id
+            FinalApproval.pending_approval_id == pending_approval_id
         )
         .values(
-            status=new_status,
+            status=status,
             approver=approver,
             created_at=utc_now_truncated()
         )
@@ -1059,13 +1059,13 @@ async def update_final_approval_status(
         select(FinalApproval).where(
             FinalApproval.approvals_uuid == approvals_uuid,
             FinalApproval.line_item_uuid == line_item_uuid,
-            FinalApproval.task_id == task_id
+            FinalApproval.pending_approval_id == pending_approval_id
         )
     )
     updated_obj = result.scalar_one_or_none()
     
     if not updated_obj:
-        raise ValueError(f"Line item final approval not found: {approvals_uuid}, {line_item_uuid}, {task_id}")
+        raise ValueError(f"Line item final approval not found: {approvals_uuid}, {line_item_uuid}, {pending_approval_id}")
     
     await db.commit()
     logger.info(f"Successfully updated line item final approval: {updated_obj}")
@@ -1096,6 +1096,29 @@ async def get_assigned_group(db: AsyncSession, line_item_uuid: str) -> str:
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
+###################################################################################################
+# CHECK FINAL APPROVAL STATUS
+###################################################################################################
+async def final_approval_check(
+    db: AsyncSession, 
+    line_item_uuid: str,
+    LDAP_user: LDAPUser
+):
+    """Check the final approval status for a pending approval"""
+    if LDAP_user.has_group("CUE"):
+        stmt = select(
+            FinalApproval.status,
+            FinalApproval.deputy_can_approve
+        ).where(
+            FinalApproval.line_item_uuid == line_item_uuid
+        )
+        result = await db.execute(stmt)
+        logger.info(f"Final approval check result: {result.scalar_one_or_none()}")
+        return result.scalar_one_or_none()
+        
+    else:
+        return False
+		
 ###################################################################################################
 # Initialize database
 ###################################################################################################

@@ -33,7 +33,7 @@ class LineItemStatusSchema(BaseModel):
 class ApprovalRequest(BaseModel):
     id: str
     uuid: str
-    task_id: int
+    pending_approval_id: int
     fund: str
     status: ItemStatus
     total_price: float
@@ -130,5 +130,5 @@ class FinalApprovalLineItem(BaseModel):
     approver: str
     status: ItemStatus
     created_at: datetime
-    pending_approval_status: ItemStatus
-    deputy_can_approve: bool  # total price must be                                                                mmmmmmmmm/, equal to or less than $250
+    status: ItemStatus
+    deputy_can_approve: bool  # total price must be equal to or less than $250

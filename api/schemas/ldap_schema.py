@@ -16,6 +16,9 @@ class LDAPUser(BaseModel):
     email: Optional[str] = None
     groups: List[str]
     
+    def has_group(self, group_name: str) -> bool:
+        return group_name in self.groups
+    
     @classmethod
     async def from_ldap(cls, username: str, ldap_service) -> "LDAPUser":
         cache_key = f"ldap:{username.lower()}"

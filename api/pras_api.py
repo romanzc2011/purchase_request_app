@@ -12,6 +12,7 @@ uvicorn pras_api:app --port 5004
 from datetime import datetime, timezone
 import json
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema
+from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
 from api.schemas.comment_schemas import CommentItem
 from pydantic import ValidationError
@@ -44,12 +45,12 @@ from api.services.db_service import utc_now_truncated
 
 # Database ORM Model Imports
 from api.services.db_service import (
-	PurchaseRequestHeader,
-	PurchaseRequestLineItem,
-	Approval,
-	PendingApproval,
-	SonComment,
-	FinalApproval
+    PurchaseRequestHeader,
+    PurchaseRequestLineItem,
+    Approval,
+    PendingApproval,
+    SonComment,
+    FinalApproval
 )
 
 # Schemas
@@ -121,9 +122,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 ##########################################################################
 @api_router.get("/getApprovalData", response_model=List[ApprovalSchema])
 async def get_approval_data(
-	ID: Optional[str] = Query(None),
-	db: AsyncSession = Depends(get_async_session),
-	current_user: LDAPUser = Depends(auth_service.get_current_user)
+    ID: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     return await dbas.fetch_flat_approvals(db, ID=ID)
     
@@ -393,14 +394,18 @@ async def send_purchase_request(
             db.add(appr)
             await db.flush()
             approvals.append(appr)
+            
+            if item.fund.startswith("511"):
+                assigned_group = "IT"
+            elif item.fund.startswith("092"):
+                assigned_group = "FINANCE"
 
-            assigned_group = "IT" if item.fund.startswith("511") else "Finance"
             task = PendingApproval(
                 purchase_request_id=orm_pr_header.ID,
                 line_item_uuid=line_uuid,
                 approvals_uuid=appr.UUID,
                 assigned_group=assigned_group,
-                approval_status=ItemStatus.NEW_REQUEST,
+                status=ItemStatus.NEW_REQUEST,
             )
             db.add(task)
             await db.flush()
@@ -565,9 +570,9 @@ async def log_requests(request: Request, call_next):
 ##########################################################################
 @api_router.post("/assignIRQ1_ID")
 async def assign_IRQ1_ID(
-	data: dict,
-	db: AsyncSession = Depends(get_async_session),
-	current_user: LDAPUser = Depends(auth_service.get_current_user)
+    data: dict,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     """
     This is called from the frontend to assign a requisition ID
@@ -592,10 +597,10 @@ async def assign_IRQ1_ID(
     
     # Update the IRQ1_ID
     await db.execute(
-		update(PurchaseRequestHeader)
-		.where(PurchaseRequestHeader.ID == original_id)
-		.values(IRQ1_ID=irq1_id)
-	)
+        update(PurchaseRequestHeader)
+        .where(PurchaseRequestHeader.ID == original_id)
+        .values(IRQ1_ID=irq1_id)
+    )
     await db.commit()
     await db.refresh(pr_header)
     
@@ -611,6 +616,8 @@ async def approve_deny_request(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
+    
+    
     try:
         final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
         
@@ -619,6 +626,22 @@ async def approve_deny_request(
         for i, (item_uuid, item_fund, total_price, target_status) in enumerate(zip(
             payload.UUID, payload.item_funds, payload.totalPrice, payload.target_status
         )):
+            # Check if item is already in the chain
+            stmt = select(PendingApproval.status).where(
+				PendingApproval.line_item_uuid == item_uuid,
+				PendingApproval.purchase_request_id == payload.ID
+			)
+            result = await db.execute(stmt)
+            status_row = result.scalar_one_or_none()
+            already_in_chain = status_row == ItemStatus.PENDING_APPROVAL
+            
+            # Decide which chain to use
+            if already_in_chain:
+                router = ApprovalRouter().start_handler(ClerkAdminHandler())
+            else:
+                router = ApprovalRouter() # Defaults to full chain: IT -> Finance -> ClerkAdmin
+            #################################################################################################
+			# START CHAIN
             # Get assigned group from pending_approvals via line_item_uuid/purchase_request_id
             stmt = select(
                 PendingApproval.pending_approval_id,
@@ -647,8 +670,11 @@ async def approve_deny_request(
                 action=payload.action,
                 approver=current_user.username
             )
-            router = ApprovalRouter()
             result = await router.route(approval_request, db, current_user)
+            logger.info(f"Result: {result}")
+            #################################################################################################
+			# END CHAIN
+            #################################################################################################
             results.append({
                 "uuid": item_uuid,
                 "status": result.status.value if hasattr(result, 'status') else "processed",
@@ -861,10 +887,10 @@ async def add_comments(
 ##########################################################################
 @api_router.put("/cyberSecRelated/{UUID}")
 async def cyber_sec_related(
-	UUID: str,
-	payload: CyberSecRelatedPayload,
-	db: AsyncSession = Depends(get_async_session),
-	current_user: LDAPUser = Depends(auth_service.get_current_user)
+    UUID: str,
+    payload: CyberSecRelatedPayload,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     """
     Update the isCyberSecRelated field for an Approval row.
