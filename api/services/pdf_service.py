@@ -123,16 +123,30 @@ class PDFService:
                 raise HTTPException(status_code=400, detail="ID is required")
             
             try:
-                # Get all approvals for this ID
-                approvals = session.query(dbas.Approval).filter(dbas.Approval.purchase_request_id == ID).all()
-                if not approvals:
+                # Use fetch_flat_approvals to get current data from normalized tables
+                # This includes updated IRQ1_ID and isCyberSecRelated from the current tables
+                import asyncio
+                
+                # Create async session for fetch_flat_approvals
+                async def get_approval_data():
+                    from sqlalchemy.ext.asyncio import AsyncSession
+                    from sqlalchemy.orm import sessionmaker
+                    from api.services.db_service import AsyncSessionLocal
+                    
+                    async with AsyncSessionLocal() as db:
+                        return await dbas.fetch_flat_approvals(db, ID=ID)
+                
+                # Run the async function
+                rows = asyncio.run(get_approval_data())
+                
+                if not rows:
                     raise HTTPException(status_code=404, detail="No approvals found for this ID")
                 
                 # Convert to list of dicts
-                rows = [ApprovalSchema.model_validate(a).model_dump() for a in approvals]
+                rows = [row.model_dump() for row in rows]
                 logger.info(f"rows: {rows}")
                 
-                # Check if any line items as marked as cyber security related
+                # Check if any line items are marked as cyber security related
                 is_cyber = any(row.get("isCyberSecRelated") for row in rows)
                 
                 comment_arr: list[str] = []
