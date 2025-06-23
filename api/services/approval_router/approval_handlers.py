@@ -65,7 +65,7 @@ class ITHandler(Handler):
             logger.info(f"IT Handler approving IT request: {request.uuid}")
 	
             # Get the approval UUID and task_id for this line item
-            stmt = select(dbas.Approval.UUID, dbas.PendingApproval.task_id).join(
+            stmt = select(dbas.Approval.UUID, dbas.PendingApproval.pending_approval_id).join(
                 dbas.PendingApproval,
                 dbas.PendingApproval.approvals_uuid == dbas.Approval.UUID
             ).where(
@@ -75,44 +75,20 @@ class ITHandler(Handler):
             row = result.first()
             
             if row:
-                approvals_uuid, task_id = row
+                approvals_uuid, pending_approval_id = row
                 # --------------------------------------------------------
                 # Use the insert_final_approval function
                 await dbas.insert_final_approval(
                     db=db,
                     approvals_uuid=approvals_uuid,
                     line_item_uuid=request.uuid,
-                    task_id=task_id,
+                    pending_approval_id=pending_approval_id,
                     approver=request.approver,
                     status=request.status,
-                    pending_approval_status=ItemStatus.PENDING_APPROVAL,
+                    approval_status=ItemStatus.PENDING_APPROVAL,
                     deputy_can_approve=dbas.can_deputy_approve(request.total_price)
                 )
-                # --------------------------------------------------------
-                # Update status in different tables using their correct primary keys
-                # Update pr_line_items using line_item_uuid
-                await dbas.update_status_by_uuid(
-                    db=db,
-                    uuid=request.uuid,  # line_item_uuid
-                    status=ItemStatus.PENDING_APPROVAL,
-                    table="pr_line_items"
-                )
-                # --------------------------------------------------------
-                # Update approvals using approvals_uuid
-                await dbas.update_status_by_uuid(
-                    db=db,
-                    uuid=approvals_uuid,
-                    status=ItemStatus.PENDING_APPROVAL,
-                    table="approvals"
-                )
-                # --------------------------------------------------------
-                # Update pending_approvals using approvals_uuid
-                await dbas.update_status_by_uuid(
-                    db=db,
-                    uuid=approvals_uuid,
-                    status=ItemStatus.PENDING_APPROVAL,
-                    table="pending_approvals"
-                )
+                
                 #################################################################################
                 ## BUILD EMAIL PAYLOADS
                 #################################################################################
@@ -197,7 +173,7 @@ class FinanceHandler(Handler):
             logger.info(f"Finance Handler approving non-IT request: {request.uuid}")
             
             # Get the approval UUID and task_id for this line item
-            stmt = select(dbas.Approval.UUID, dbas.PendingApproval.task_id).join(
+            stmt = select(dbas.Approval.UUID, dbas.PendingApproval.pending_approval_id).join(
                 dbas.PendingApproval,
                 dbas.PendingApproval.approvals_uuid == dbas.Approval.UUID
             ).where(
@@ -208,14 +184,14 @@ class FinanceHandler(Handler):
             logger.info(f"Finance Handler: Row: {row}")
             
             if row:
-                approvals_uuid, task_id = row
+                approvals_uuid, pending_approval_id = row
                 
                 # Use the insert_final_approval function, this is just a table, its not making it final approved
                 await dbas.insert_final_approval(
                     db=db,
                     approvals_uuid=approvals_uuid,
                     line_item_uuid=request.uuid,
-                    task_id=task_id,
+                    pending_approval_id=pending_approval_id,
                     approver=request.approver,
                     status=request.status,
                     pending_approval_status=ItemStatus.PENDING_APPROVAL,
@@ -264,19 +240,25 @@ class ClerkAdminHandler(Handler):
         current_user: LDAPUser
     ) -> ApprovalRequest:
         
-	
-			
         # ClerkAdmin is the final handler - they can approve based on price
         logger.info("ClerkAdmin Handler processing request")
         
-        # Get current status ItemStatus
-        stmt = select(dbas.PendingApproval.pending_approval_status).where(dbas.PendingApproval.line_item_uuid == request.uuid)
+        # Get current status from pending_approvals table
+        stmt = select(dbas.PendingApproval.task_status).where(dbas.PendingApproval.line_item_uuid == request.uuid)
         result = await db.execute(stmt)
         row = result.first()
-        current_status = row[0]
         
-        if current_status == ItemStatus.PENDING_APPROVAL:
-            pass
+        if not row:
+            logger.warning(f"ClerkAdmin Handler: No pending approval found for {request.uuid}")
+            return await super().handle(request, db, current_user)
+            
+        current_status = row[0]
+        logger.info(f"CURRENT STATUS: {current_status}")
+        
+        # ClerkAdmin should only process requests that are already in PENDING_APPROVAL
+        if current_status != ItemStatus.PENDING_APPROVAL:
+            logger.info(f"ClerkAdmin Handler: Request {request.uuid} is not in PENDING_APPROVAL status ({current_status}), skipping")
+            return await super().handle(request, db, current_user)
         
         # Ensure user is in the CUE group
         if "CUE_GROUP" not in current_user.groups:
@@ -291,6 +273,22 @@ class ClerkAdminHandler(Handler):
             edmund_can_approve = False
             logger.info("ClerkAdmin Handler: Edmund cannot approve (price >= $250)")
             
+        # Get the approval UUID for this line item
+        stmt = select(dbas.Approval.UUID).join(
+            dbas.PendingApproval,
+            dbas.PendingApproval.approvals_uuid == dbas.Approval.UUID
+        ).where(
+            dbas.PendingApproval.line_item_uuid == request.uuid
+        )
+        result = await db.execute(stmt)
+        row = result.first()
+        
+        if not row:
+            logger.error(f"ClerkAdmin Handler: Could not find approval UUID for {request.uuid}")
+            return await super().handle(request, db, current_user)
+            
+        approvals_uuid = row[0]
+        
         # Update all statuses to APPROVED
         # Update pr_line_items using line_item_uuid
         await dbas.update_status_by_uuid(
@@ -303,7 +301,7 @@ class ClerkAdminHandler(Handler):
         # Update approvals using approvals_uuid
         await dbas.update_status_by_uuid(
             db=db,
-            uuid=request.uuid,
+            uuid=approvals_uuid,
             status=ItemStatus.APPROVED,
             table="approvals"
         )
@@ -311,7 +309,7 @@ class ClerkAdminHandler(Handler):
         # Update pending_approvals using approvals_uuid
         await dbas.update_status_by_uuid(
             db=db,
-            uuid=request.uuid,
+            uuid=approvals_uuid,
             status=ItemStatus.APPROVED,
             table="pending_approvals"
         )

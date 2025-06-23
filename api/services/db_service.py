@@ -263,29 +263,25 @@ go to FinalApproval where the Deputy Clerk or Clerk Admin will approve or deny t
 class PendingApproval(Base):
     __tablename__ = "pending_approvals"
 
-    task_id                : Mapped[int]    = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pending_approval_id    : Mapped[int]    = mapped_column(Integer, primary_key=True, autoincrement=True)
     purchase_request_id    : Mapped[str]    = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=False)
     line_item_uuid         : Mapped[Optional[str]] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=True)
     approvals_uuid         : Mapped[Optional[str]] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
     assigned_group         : Mapped[str]    = mapped_column(String, nullable=False)
-    task_status            : Mapped[TaskStatus] = mapped_column(
-                                SQLEnum(TaskStatus),
-                                name="task_status", native_enum=False,
-                                values_callable=lambda enum: [e.value for e in enum],
-                                default=TaskStatus.NEW_REQUEST,
-                                nullable=False
-                             )
+    
+    approval_status        : Mapped[ItemStatus] = mapped_column(
+                                SQLEnum(ItemStatus,
+                                       name="item_status", native_enum=False,
+                                       values_callable=lambda enum: [e.value for e in enum]
+                                ),
+                                default=ItemStatus.NEW_REQUEST
+                              )
+    
     final_approval_attr: Mapped[List[FinalApproval]] = relationship(
                                 "FinalApproval",
                                 back_populates="pending_approval",
                                 cascade="all, delete-orphan",
-                                foreign_keys="[FinalApproval.task_id]"
-                             )
-    action                 = mapped_column(
-                                SQLEnum(ItemStatus, name="item_status", native_enum=False,
-                                       values_callable=lambda enum: [e.value for e in enum]
-                                ),
-                                nullable=True
+                                foreign_keys="[FinalApproval.pending_approval_id]"
                              )
     created_at             = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
     processed_at           = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=True)
@@ -321,7 +317,7 @@ class FinalApproval(Base):
     __tablename__ = "final_approvals"
 	
     UUID            : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    task_id         : Mapped[int] = mapped_column(Integer, ForeignKey("pending_approvals.task_id"), nullable=False)
+    pending_approval_id         : Mapped[int] = mapped_column(Integer, ForeignKey("pending_approvals.pending_approval_id"), nullable=False)
     approvals_uuid  : Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
     line_item_uuid  : Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=False)
     approver        = mapped_column(String, nullable=False)
@@ -347,7 +343,7 @@ class FinalApproval(Base):
     pending_approval: Mapped[PendingApproval] = relationship(
                           "PendingApproval",
                           back_populates="final_approval_attr",
-                          foreign_keys=[task_id]
+                          foreign_keys=[pending_approval_id]
                       )
 ###################################################################################################
 ## SEEDING JUSTIFICATION TEMPLATES
@@ -565,7 +561,7 @@ async def update_status_by_uuid(
         .execution_options(synchronize_session="fetch")
     )
     await db.execute(stmt)
-    await db.commit()
+    # Remove individual commit - let the calling function handle the transaction
     logger.info(f"Updated status in {table}: {uuid}, {status_value}")
     return True
 
@@ -639,8 +635,7 @@ async def update_data_by_uuid(
         logger.error(error_msg)
         raise ValueError(error_msg)
     
-    # Now commit the transaction
-    await db.commit()
+    # Remove individual commit - let the calling function handle the transaction
     logger.info(f"Updated object: {updated_obj}")
     return updated_obj
 

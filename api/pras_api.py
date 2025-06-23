@@ -400,7 +400,7 @@ async def send_purchase_request(
                 line_item_uuid=line_uuid,
                 approvals_uuid=appr.UUID,
                 assigned_group=assigned_group,
-                task_status=TaskStatus.NEW_REQUEST,
+                approval_status=ItemStatus.NEW_REQUEST,
             )
             db.add(task)
             await db.flush()
@@ -621,7 +621,7 @@ async def approve_deny_request(
         )):
             # Get assigned group from pending_approvals via line_item_uuid/purchase_request_id
             stmt = select(
-                PendingApproval.task_id,
+                PendingApproval.pending_approval_id,
                 PendingApproval.assigned_group
             ).where(
                 PendingApproval.line_item_uuid == item_uuid,
@@ -629,17 +629,17 @@ async def approve_deny_request(
             )
             result = await db.execute(stmt)
             row = result.first()
-            task_id = row.task_id
+            pending_approval_id = row.pending_approval_id
             assigned_group = row.assigned_group
             
             logger.info(f"Assigned group: {assigned_group}")
-            logger.info(f"Task ID: {task_id}")
+            logger.info(f"Pending approval ID: {pending_approval_id}")
             
             # Create approval request for the router
             approval_request = ApprovalRequest(
                 id=payload.ID,
                 uuid=item_uuid,
-                task_id=task_id,
+                pending_approval_id=pending_approval_id,
                 fund=item_fund,
                 assigned_group=assigned_group,
                 status=target_status,
