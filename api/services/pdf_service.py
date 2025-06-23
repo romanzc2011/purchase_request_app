@@ -17,7 +17,7 @@ from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
 from api.settings import settings
-from api.services.db_service import get_session
+from api.services.db_service import get_async_session
 from api.schemas.approval_schemas import ApprovalSchema
 from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
@@ -27,6 +27,8 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from api.utils.misc_utils import format_username
+from sqlalchemy.ext.asyncio import AsyncSession
 from .db_service import PurchaseRequestHeader, PurchaseRequestLineItem, Approval, PendingApproval
 
 class PDFService:
@@ -40,7 +42,7 @@ class PDFService:
         """
         try:
             # Get the purchase request data
-            with get_session() as session:
+            with get_async_session() as session:
                 result = session.execute(
                     select(PurchaseRequestHeader)
                     .where(PurchaseRequestHeader.ID == ID)
@@ -74,7 +76,6 @@ class PDFService:
             # Create the PDF
             output_path = self.output_dir / f"{ID}.pdf"
             
-            # TODO: Implement PDF generation
             # For now, just create an empty file
             output_path.touch()
             
@@ -110,93 +111,67 @@ class PDFService:
     Returns:
         Path: The path to the generated PDF.
     """
-    def create_pdf(
+    async def create_pdf(
         self,
-        ID: str, 
-        is_cyber: bool=False,   
-        payload: dict=None,
-        comments: list[str]=None,
-        ) -> Path:
-        with get_session() as session:
-        
-            if not ID:
-                raise HTTPException(status_code=400, detail="ID is required")
-            
-            try:
-                # Use fetch_flat_approvals to get current data from normalized tables
-                # This includes updated IRQ1_ID and isCyberSecRelated from the current tables
-                import asyncio
-                
-                # Create async session for fetch_flat_approvals
-                async def get_approval_data():
-                    from sqlalchemy.ext.asyncio import AsyncSession
-                    from sqlalchemy.orm import sessionmaker
-                    from api.services.db_service import AsyncSessionLocal
-                    
-                    async with AsyncSessionLocal() as db:
-                        return await dbas.fetch_flat_approvals(db, ID=ID)
-                
-                # Run the async function
-                rows = asyncio.run(get_approval_data())
-                
-                if not rows:
-                    raise HTTPException(status_code=404, detail="No approvals found for this ID")
-                
-                # Convert to list of dicts
-                rows = [row.model_dump() for row in rows]
-                logger.info(f"rows: {rows}")
-                
-                # Check if any line items are marked as cyber security related
-                is_cyber = any(row.get("isCyberSecRelated") for row in rows)
-                
-                comment_arr: list[str] = []
-                order_type = None  # Initialize order_type outside the conditional block
-                # Get SonComments by joining through Approval table
-                comments = session.query(dbas.SonComment).join(
-                    dbas.Approval, 
-                    dbas.SonComment.approvals_uuid == dbas.Approval.UUID
-                ).filter(
-                    dbas.Approval.purchase_request_id == ID
-                ).all()
-                if comments:
-                    for c in comments:
-                        comment_data = SonCommentSchema.model_validate(c)
-                        # Only add non-empty comments
-                        if comment_data.comment_text is not None:
-                            comment_arr.append(comment_data.comment_text)
-                                
-                    # Check if there are any additional comments in the addComments field in purchase_requests
-                    additional_comments = cache_service.get_or_set(
-                        "comments",
-                        ID, 
-                        lambda: dbas.get_additional_comments_by_id(ID))
-                    
-                    order_type = cache_service.get_or_set(
-                        "order_types",
-                        ID, 
-                        lambda: dbas.get_order_types(ID))
-                    
-                    # Cache the additional comments
-                    cache_service.set("comments", ID, additional_comments)
-                    cache_service.set("order_types", ID, order_type)
-                    
-                    if additional_comments:
-                        # Split comments by semicolon and add each part to the array
-                        for comment in additional_comments:
-                            if comment:
-                                comment_arr.extend(comment.split(', '))
-                
-                logger.info(f"comment_arr: {comment_arr}")
+        ID: str,
+        db: AsyncSession,                         # ← Injected session
+        payload: dict | None = None,
+        comments: list[str] | None = None,
+        is_cyber: bool = False,
+    ) -> Path:
+        if not ID:
+            raise HTTPException(status_code=400, detail="ID is required")
 
-                # Construct the output path with filename
-                output_path = self.output_dir / f"statement_of_need-{ID}.pdf"
-                                
-                # Generate PDF
-                return self._make_purchase_request_pdf(rows=rows, output_path=output_path, is_cyber=is_cyber, comments=comment_arr, order_type=order_type)
-            
-            except Exception as e:
-                logger.error(f"Error creating PDF: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+        # 1️⃣ Fetch the flattened approval rows
+        rows = await dbas.fetch_flat_approvals(db, ID=ID)
+        if not rows:
+            raise HTTPException(status_code=404, detail="No approvals found for this ID")
+
+        # Turn Pydantic models into dicts
+        rows = [row.model_dump() for row in rows]
+        logger.info(f"rows: {rows}")
+
+        # 2️⃣ Determine if any line items are cyber‐related
+        is_cyber = any(r.get("isCyberSecRelated") for r in rows)
+
+        # 3️⃣ Load SonComments via async select
+        stmt = (
+            select(dbas.SonComment)
+            .join(dbas.Approval, dbas.SonComment.approvals_uuid == dbas.Approval.UUID)
+            .where(dbas.Approval.purchase_request_id == ID)
+        )
+        result = await db.execute(stmt)
+        son_comments = result.scalars().all()
+
+        # Build your comment array
+        comment_arr: list[str] = []
+        for c in son_comments:
+            cdata = SonCommentSchema.model_validate(c)
+            if cdata.comment_text:
+                comment_arr.append(cdata.comment_text)
+
+        # 4️⃣ Pull in any “additional comments” or order types (synchronously—
+        #    if they hit the DB, you could wrap them in to_thread as needed)
+        additional = cache_service.get_or_set(
+            "comments", ID, lambda: dbas.get_additional_comments_by_id(ID)
+        )
+        order_type = cache_service.get_or_set(
+            "order_types", ID, lambda: dbas.get_order_types(ID)
+        )
+        for extra in additional or []:
+            comment_arr.extend(extra.split(", "))
+
+        logger.info(f"comment_arr: {comment_arr}")
+
+        # 5️⃣ Render the PDF
+        output_path = self.output_dir / f"statement_of_need-{ID}.pdf"
+        return self._make_purchase_request_pdf(
+            rows=rows,
+            output_path=output_path,
+            is_cyber=is_cyber,
+            comments=comment_arr,
+            order_type=order_type,
+        )
             
     """
         Generate a purchase request PDF.
@@ -318,7 +293,7 @@ class PDFService:
             items = [
                 ("Purchase Req ID:", first.get("ID","")),
                 ("IRQ1:", first.get("IRQ1_ID","")),
-                ("Requester:", first.get("requester","")),
+                ("Requester:", format_username(first.get("requester","") or "")),
                 ("CO:", first.get("CO","")),
                 ("Date Needed:", date_str),
                 

@@ -1092,6 +1092,15 @@ def can_deputy_approve(total_price: float) -> bool:
     return total_price <= 250.0
 
 ###################################################################################################
+# GET ASSIGNED GROUP
+###################################################################################################
+async def get_assigned_group(db: AsyncSession, line_item_uuid: str) -> str:
+    """Get the assigned group for a line item"""
+    stmt = select(PendingApproval.assigned_group).where(PendingApproval.line_item_uuid == line_item_uuid)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+###################################################################################################
 # Initialize database
 ###################################################################################################
 def init_db():

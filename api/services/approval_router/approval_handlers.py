@@ -2,12 +2,17 @@ from __future__ import annotations
 from typing import Optional
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from api import settings
+from api.schemas.email_schemas import EmailPayloadRequest, LineItemsPayload
+from api.services import cache_service
 from loguru import logger
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
 import api.services.db_service as dbas
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from fastapi import Depends
+from api.schemas.ldap_schema import LDAPUser
 
 # Approval Router to determine the routing of requests
 class Handler(ABC):
@@ -21,25 +26,42 @@ class Handler(ABC):
         return handler
     
     @abstractmethod
-    async def handle(self, request: ApprovalRequest, db: AsyncSession) -> ApprovalRequest:
+    async def handle(
+        self, 
+        request: ApprovalRequest, 
+        db: AsyncSession,
+        current_user: LDAPUser
+    ) -> ApprovalRequest:
+        
+        logger.debug(f"User: {current_user}")
         logger.info(f"Handling request: {request}")
         if self._next:
             logger.info(f"Passing request to next handler: {self._next}")
-            return await self._next.handle(request, db)
+            return await self._next.handle(request, db, current_user)
         return "No handler could process the request."
 
 # ----------------------------------------------------------------------------------------
 # IT HANDLER
 # ----------------------------------------------------------------------------------------
 class ITHandler(Handler):
-    async def handle(self, request: ApprovalRequest, db: AsyncSession) -> ApprovalRequest:
+    async def handle(
+        self, 
+        request: ApprovalRequest, 
+        db: AsyncSession,
+        current_user: LDAPUser
+    ) -> ApprovalRequest:
+        
+        logger.debug(f"User: {current_user.groups}")
         # IT can only approve requests from fund 511***
         logger.info("IT Handler processing request")
         
-        if request.fund.startswith("511"):
+        # Query the assigned_group column in pending_approvals table
+        assigned_group = await dbas.get_assigned_group(db, request.uuid)
+        
+        if assigned_group == "IT":
             # IT can approve IT-related requests
             logger.info(f"IT Handler approving IT request: {request.uuid}")
-            
+	
             # Get the approval UUID and task_id for this line item
             stmt = select(dbas.Approval.UUID, dbas.PendingApproval.task_id).join(
                 dbas.PendingApproval,
@@ -52,7 +74,7 @@ class ITHandler(Handler):
             
             if row:
                 approvals_uuid, task_id = row
-                
+                # --------------------------------------------------------
                 # Use the insert_final_approval function
                 await dbas.insert_final_approval(
                     db=db,
@@ -64,7 +86,7 @@ class ITHandler(Handler):
                     pending_approval_status=ItemStatus.PENDING_APPROVAL,
                     deputy_can_approve=dbas.can_deputy_approve(request.total_price)
                 )
-                
+                # --------------------------------------------------------
                 # Update status in different tables using their correct primary keys
                 # Update pr_line_items using line_item_uuid
                 await dbas.update_status_by_uuid(
@@ -73,7 +95,7 @@ class ITHandler(Handler):
                     status=ItemStatus.PENDING_APPROVAL,
                     table="pr_line_items"
                 )
-                
+                # --------------------------------------------------------
                 # Update approvals using approvals_uuid
                 await dbas.update_status_by_uuid(
                     db=db,
@@ -81,7 +103,7 @@ class ITHandler(Handler):
                     status=ItemStatus.PENDING_APPROVAL,
                     table="approvals"
                 )
-                
+                # --------------------------------------------------------
                 # Update pending_approvals using approvals_uuid
                 await dbas.update_status_by_uuid(
                     db=db,
@@ -89,15 +111,82 @@ class ITHandler(Handler):
                     status=ItemStatus.PENDING_APPROVAL,
                     table="pending_approvals"
                 )
+                #################################################################################
+                ## BUILD EMAIL PAYLOADS
+                #################################################################################
+                # Get additional comments
+                additional_comments = cache_service.get_or_set(
+                    "comments",
+                    request.id,
+                    lambda: dbas.get_additional_comments_by_id(request.id)
+                )
+
+                for item in request.items:
+                    item.additional_comments = additional_comments
+                
+                items_for_email = [
+                    LineItemsPayload(
+                        budgetObjCode=item.budget_obj_code,
+                        itemDescription=item.item_description,
+                        location=item.location,
+                        justification=item.justification,
+                        quantity=item.quantity,
+                        priceEach=item.price_each,
+                        totalPrice=item.total_price,
+                        fund=item.fund
+                    )
+                    for item in request.items
+                ]
+                # --------------------------------------------------------
+                # Send notification to final_approvers that they have a request to approve/deny
+                email_request_payload = EmailPayloadRequest(
+                    model_type="email_request",
+                    ID=request.id,
+                    requester=request.requester,
+                    requester_email=request.requester_email,
+                    datereq=request.items[0].datereq,
+                    dateneed=request.items[0].dateneed,
+                    orderType=request.items[0].order_type,
+                    subject=f"Purchase Request #{request.id}",
+                    sender=settings.smtp_email_addr,
+                    to=None,   # Assign this in the smtp service
+                    cc=None,
+                    bcc=None,
+                    text_body=None,
+                    approval_link=f"{settings.link_to_request}",
+                    items=items_for_email,
+                    attachments=[pdf_path, *uploaded_files]
+                )
+                
+                """
+                # Make the to a condition, if this is a request from a requester, then we need to send it to the approvers
+                # But we need to also send a confirmation to requester that is has been sent to the approvers
+                """
+
+                logger.info(f"EMAIL PAYLOAD REQUEST: {email_request_payload}")
+                
+                # Notify requester and approvers
+                logger.info("Notifying requester and approvers")
+                
+                # Send request to approvers and requester
+                async with asyncio.TaskGroup() as tg:
+                    tg.create_task(smtp_service.send_approver_email(email_request_payload))
                 
                 logger.info(f"IT Handler: Inserted final approval for {request.uuid}")
             else:
                 logger.error(f"IT Handler: Could not find approval/task data for {request.uuid}")
         
-        return await super().handle(request, db)
+        return await super().handle(request, db, current_user)
     
 class FinanceHandler(Handler):
-    async def handle(self, request: ApprovalRequest, db: AsyncSession) -> ApprovalRequest:
+    async def handle(
+        self, 
+        request: ApprovalRequest, 
+        db: AsyncSession,
+        current_user: LDAPUser
+    ) -> ApprovalRequest:
+        
+        logger.debug(f"User: {current_user}")
         # Finance can approve any request that doesn't start with 511
         logger.info("Finance Handler processing request")
         
@@ -119,7 +208,7 @@ class FinanceHandler(Handler):
             if row:
                 approvals_uuid, task_id = row
                 
-                # Use the insert_final_approval function
+                # Use the insert_final_approval function, this is just a table, its not making it final approved
                 await dbas.insert_final_approval(
                     db=db,
                     approvals_uuid=approvals_uuid,
@@ -160,13 +249,18 @@ class FinanceHandler(Handler):
             else:
                 logger.error(f"Finance Handler: Could not find approval/task data for {request.uuid}")
         
-        return await super().handle(request, db)
+        return await super().handle(request, db, current_user)
     
 class ClerkAdminHandler(Handler):
     def __init__(self):
         self._next: Optional[Handler] = None
         
-    async def handle(self, request: ApprovalRequest, db: AsyncSession) -> ApprovalRequest:
+    async def handle(
+        self, 
+        request: ApprovalRequest, 
+        db: AsyncSession,
+        current_user: LDAPUser
+    ) -> ApprovalRequest:
         # ClerkAdmin is the final handler - they can approve based on price
         logger.info("ClerkAdmin Handler processing request")
         
@@ -183,5 +277,5 @@ class ClerkAdminHandler(Handler):
         logger.info(f"ClerkAdmin Handler: Deputy can approve: {edmund_can_approve} for request {request.uuid}")
         
         if self._next:
-            return await self._next.handle(request, db)
+            return await self._next.handle(request, db, current_user)
         return request

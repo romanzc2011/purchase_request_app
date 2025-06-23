@@ -1,18 +1,12 @@
-from asyncio import Server
 from api.schemas.ldap_schema import LDAPUser
-from api.services.cache_service import cache_service
-import os, jwt, asyncio
+import jwt, asyncio
 from urllib.parse import urlparse
-from sqlite3 import Connection
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jwt.exceptions import InvalidTokenError
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from loguru import logger
-from ldap3.core.exceptions import LDAPBindError
-from ldap3 import Server, Connection, ALL, SUBTREE, Tls
-from aiocache import cached, Cache
 
 from api.services.ldap_service import LDAPService
 from api.settings import settings 

@@ -134,6 +134,7 @@ async def get_approval_data(
 async def download_statement_of_need_form(
     payload: dict,
     current_user: LDAPUser = Depends(auth_service.get_current_user),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     This endpoint is used to download the statement of need form for a given ID.
@@ -143,8 +144,9 @@ async def download_statement_of_need_form(
         raise HTTPException(status_code=400, detail="ID is required")
 
     try:
-        output_path = pdf_service.create_pdf(
+        output_path = await pdf_service.create_pdf(
             ID=ID,
+            db=db,
             payload=payload
         )
         
@@ -293,11 +295,6 @@ async def send_purchase_request(
             status_code=400,
             content={"message": "Invalid data"}
         )
-        
-    logger.info(f"PAYLOAD: {payload}")
-    logger.info(f"PAYLOAD.ITEMS: {payload.items}")
-    logger.info(f"PAYLOAD.ITEMS[0]: {payload.items[0]}")
-    
     
     #################################################################################
     ## BUILD EMAIL PAYLOADS
@@ -650,7 +647,7 @@ async def approve_deny_request(
                 approver=current_user.username
             )
             router = ApprovalRouter()
-            result = await router.route(approval_request, db)
+            result = await router.route(approval_request, db, current_user)
             results.append({
                 "uuid": item_uuid,
                 "status": result.status.value if hasattr(result, 'status') else "processed",

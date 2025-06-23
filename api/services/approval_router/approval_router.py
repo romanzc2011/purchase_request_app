@@ -1,6 +1,8 @@
 from api.services.approval_router.approval_handlers import ITHandler, FinanceHandler, ClerkAdminHandler
 from api.schemas.approval_schemas import ApprovalRequest
 from sqlalchemy.ext.asyncio import AsyncSession
+from api.schemas.ldap_schema import LDAPUser
+from api.dependencies.pras_dependencies import auth_service
 
 class ApprovalRouter:
     def __init__(self):
@@ -15,5 +17,10 @@ class ApprovalRouter:
         
         self._head = self.it_handler
         
-    async def route(self, request: ApprovalRequest, db: AsyncSession) -> ApprovalRequest:
-        return await self._head.handle(request, db)
+    async def route(
+        self, 
+        request: ApprovalRequest, 
+        db: AsyncSession,
+        current_user: LDAPUser
+    ) -> ApprovalRequest:
+        return await self._head.handle(request, db, current_user)
