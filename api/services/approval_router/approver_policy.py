@@ -3,84 +3,67 @@ from api.utils.misc_utils import format_username
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
 from loguru import logger
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+import api.services.db_service as dbas
 
 class ApproverPolicy:
     def __init__(self, user: LDAPUser):
         self.user = user
-    
-    #######################################################
-    # DEFINE APPROVER GROUPS
-    #######################################################
-    def is_clerk_admin(self) -> bool:
-        return self.user.has_group("CUE")
-    
-    def is_finance_approver(self) -> bool:
-        return self.user.has_group("ACCESS_GROUP")
-    
-    def is_it_approver(self) -> bool:
-        return self.user.has_group("IT_GROUP")
-    
-    #######################################################
-    # DEFINE APPROVER POLICIES
-    #######################################################
-    def deputy_clerk(self, total_price: float) -> bool: # PROD ONLY
-        username = format_username(self.user.username)
-        if self.is_clerk_admin() and total_price < 250 and username == "edmundbrown":
-            return True
-        else:
-            return False
         
-    def clerk_admin(self) -> bool: # PROD ONLY
-        username = format_username(self.user.username)
-        if self.is_clerk_admin() and username == "edwardtakara":
-            return True
-        else:
-            return False
-        
-    # Flow to determine if to proceed with approval
-    def is_clerk_admin(self) -> bool:
-        return self.user.has_group("CUE")
-
-    def is_deputy_clerk(self) -> bool:
-        return self.is_clerk_admin() and format_username(self.user.username) == "edmundbrown"
-
-    def is_clerk_admin_final(self) -> bool:
-        return self.is_clerk_admin() and format_username(self.user.username) == "edwardtakara"
-
-    def can_proceed_with_approval(self, total_price: float, current_status: str, request: ApprovalRequest) -> bool:
+    async def can_clerk_admin_approve(
+        self, 
+        total_price: float, 
+        current_status: str, 
+        request: ApprovalRequest,
+        db: AsyncSession
+    ) -> bool:
+        """
+        - Clerk Admin (edwardtakara) can always approve.
+        - Deputy Clerk (edmundbrown) can only approve if deputy_can_approve = True in DB.
+        """
         if current_status != ItemStatus.PENDING_APPROVAL:
-            logger.info(f"ClerkAdmin Handler: Request {request.uuid} is not in PENDING_APPROVAL status ({current_status}), skipping")
+            logger.info(f"Request {request.uuid} is not in PENDING_APPROVAL status ({current_status}), skipping")
             return False
 
-        if total_price < 250:
-            if self.is_deputy_clerk():
-                logger.info("CUE Policy: Deputy Clerk (Edmund) can approve (price < $250)")
+        if not self.user.has_group("CUE_GROUP"):
+            logger.info("User is not in CUE group, skipping")
+            return False
+
+        username = format_username(self.user.username)
+
+        # Clerk Admin can always approve
+        if username == "edwardtakara" or username == "romancampbell":  # TESTING
+            logger.info("Clerk Admin can approve request")
+            return True
+
+        # Deputy Clerk logic
+        if username == "edmundbrown" or username == "romancampbell":  # TESTING
+            stmt = select(dbas.FinalApproval.deputy_can_approve).where(
+                dbas.FinalApproval.line_item_uuid == request.uuid
+            )
+            result = await db.execute(stmt)
+            row = result.first()
+            deputy_can_approve = row and row.deputy_can_approve
+
+            if deputy_can_approve:
+                logger.info("Deputy Clerk can approve request under $250")
                 return True
             else:
-                logger.info("CUE Policy: Only Deputy Clerk can approve requests under $250")
+                logger.info("Deputy Clerk not allowed to approve this request")
                 return False
-        else:
-            if self.is_clerk_admin_final():
-                logger.info("CUE Policy: Clerk Admin (Edward) can approve (price >= $250)")
-                return True
-            else:
-                logger.info("CUE Policy: Only Clerk Admin can approve requests over $250")
-                return False
-        
-    def finance_approver(self, fund: str) -> bool:
-        if self.is_finance_approver() and fund.startswith("092"):
-            return True
-        
-    def it_approver(self, fund: str) -> bool:
-        if self.is_it_approver() and fund.startswith("511"):
-            return True
-        else:
+
+        logger.info("Only Deputy Clerk and Clerk Admin can approve requests")
+        return False
+
+    def can_finance_approve(self, fund: str, current_status: ItemStatus) -> bool:
+        if current_status != ItemStatus.NEW_REQUEST:
+            logger.info(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False
-        
-	# TESTING POLICY
-    def TEST_MASTER_POLICY(self) -> bool:
-        if self.clerk_admin() and self.finance_approver("092") and self.it_approver("511"):
-            return True
-        else:
+        return self.user.has_group("ACCESS_GROUP") and fund.startswith("092")
+
+    def can_it_approve(self, fund: str, current_status: ItemStatus) -> bool:
+        if current_status != ItemStatus.NEW_REQUEST:
+            logger.info(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False
-        
+        return self.user.has_group("IT_GROUP") and fund.startswith("511")

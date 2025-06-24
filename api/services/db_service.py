@@ -1118,6 +1118,20 @@ async def final_approval_check(
         
     else:
         return False
+    
+###################################################################################################
+# MARK FINAL APPROVAL AS APPROVED
+###################################################################################################
+async def mark_final_approval_as_approved(
+	db: AsyncSession,
+	approvals_uuid: str,
+):
+    await db.execute(
+		update(FinalApproval)
+		.where(FinalApproval.approvals_uuid == approvals_uuid)
+		.values(status=ItemStatus.APPROVED)
+	)
+    await db.commit()
 		
 ###################################################################################################
 # Initialize database
