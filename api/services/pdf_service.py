@@ -119,6 +119,13 @@ class PDFService:
         comments: list[str] | None = None,
         is_cyber: bool = False,
     ) -> Path:
+        logger.info(f"#####################################################")
+        logger.info("create_pdf()")
+        logger.info(f"#####################################################")
+        logger.info(f"ID: {ID}")
+        logger.info(f"payload: {payload}")
+        logger.info(f"comments: {comments}")
+        logger.info(f"is_cyber: {is_cyber}")
         if not ID:
             raise HTTPException(status_code=400, detail="ID is required")
 
@@ -133,7 +140,29 @@ class PDFService:
 
         # 2️⃣ Determine if any line items are cyber‐related
         is_cyber = any(r.get("isCyberSecRelated") for r in rows)
+        
+        # ------------------------------------------------------------------------
+        # Build justifcation template if true for trainNotAval or needsNotMeet
+        # Fetch additional comment from database if present
+        codes = await dbas.get_justifications_by_id(db, ID)
+        templates = await dbas.get_justification_templates(db)
+        
+        justification_codes = []
+        for train_not_aval, needs_not_meet in codes:
+            if train_not_aval:
+                justification_codes.append("NOT_AVAILABLE")
+            if needs_not_meet:
+                justification_codes.append("NEEDS_NOT_MEET")
+                
+        # Remove duplicates
+        justification_codes = list(set(justification_codes))
+        additional_comments = [
+			templates.get(code, f"<no template for {code}>")
+			for code in justification_codes
+		]
+        logger.info(f"Justifications: {additional_comments}")
 
+		# ------------------------------------------------------------------------
         # 3️⃣ Load SonComments via async select
         stmt = (
             select(dbas.SonComment)
@@ -149,20 +178,12 @@ class PDFService:
             cdata = SonCommentSchema.model_validate(c)
             if cdata.comment_text:
                 comment_arr.append(cdata.comment_text)
+                
+        if additional_comments:
+            comment_arr.extend(additional_comments)
 
-        # 4️⃣ Pull in any “additional comments” or order types (synchronously—
-        #    if they hit the DB, you could wrap them in to_thread as needed)
-        additional = cache_service.get_or_set(
-            "comments", ID, lambda: dbas.get_additional_comments_by_id(ID)
-        )
-        order_type = cache_service.get_or_set(
-            "order_types", ID, lambda: dbas.get_order_types(ID)
-        )
-        for extra in additional or []:
-            comment_arr.extend(extra.split(", "))
-
-        logger.info(f"comment_arr: {comment_arr}")
-
+        order_type = dbas.get_order_types(ID)
+       
         # 5️⃣ Render the PDF
         output_path = self.output_dir / f"statement_of_need-{ID}.pdf"
         return self._make_purchase_request_pdf(
@@ -192,7 +213,7 @@ class PDFService:
         """
     @staticmethod
     def _make_purchase_request_pdf(rows: list[dict], 
-                                   output_path: Path, 
+                                   output_path: Path,
                                    is_cyber: bool, 
                                    comments: list[str]=None, 
                                    order_type: str=None
@@ -231,7 +252,7 @@ class PDFService:
         comment_style = ParagraphStyle(
             "CommentStyle",
             parent=cell_style,
-            fontName="Play",
+            fontName="Play-Bold",
             fontSize=9,
             alignment=TA_LEFT,
             allowWidows=1,
@@ -291,7 +312,7 @@ class PDFService:
                 date_str = "Not specified"
             
             items = [
-                ("Purchase Req ID:", first.get("ID","")),
+                ("Purchase Request ID:", first.get("purchase_request_id","")),
                 ("IRQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", format_username(first.get("requester","") or "")),
                 ("CO:", first.get("CO","")),
@@ -355,16 +376,19 @@ class PDFService:
         use_cyber = "Yes" if is_cyber else "No"
         # Cybersecurity line with inline checkmark
         cyber_para = Paragraph(
-            f"Cybersecurity related - consider funding: <font name='Play-Bold'>{use_cyber}</font>", 
-            comment_style
+            '<font name="Play-Bold">Cybersecurity related - consider funding:</font> <font name="Play">{}</font>'.format(use_cyber),
+            cell_style
         )
         elements.append(cyber_para)
         elements.append(Spacer(1, 6))
 
         # Comments paragraph with all collected comments
         if comments:
-            comments_text = "<b>Comments/Additional Information Requested:</b><br/>" + "<br/>".join([str(c) for c in comments])
-            comments_para = Paragraph(comments_text, comment_style)
+            comments_html = (
+                '<font name="Play-Bold">Comments/Additional Information Requested:</font><br/>' +
+                "<br/>".join(f'<font name="Play">{c}</font>' for c in comments)
+            )
+            comments_para = Paragraph(comments_html, cell_style)
             elements.append(comments_para)
             elements.append(Spacer(1, 6))
 

@@ -26,7 +26,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update, select
 from api.services.db_service import get_async_session
-from api.schemas.enums import ItemStatus, TaskStatus
+from api.schemas.enums import ItemStatus
 import asyncio
 
 # PRAS Miscellaneous Dependencies
@@ -39,7 +39,6 @@ from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import settings
-from api.services.cache_service import cache_service
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
 
@@ -301,16 +300,7 @@ async def send_purchase_request(
     #################################################################################
     ## BUILD EMAIL PAYLOADS
     #################################################################################
-    # Get additional comments
-    additional_comments = cache_service.get_or_set(
-        "comments",
-        payload.id,
-        lambda: dbas.get_additional_comments_by_id(payload.id)
-    )
 
-    for item in payload.items:
-        item.additional_comments = additional_comments
-    
     items_for_email = [
         LineItemsPayload(
             budgetObjCode=item.budget_obj_code,
@@ -477,8 +467,8 @@ async def send_purchase_request(
     
     # Send request to approvers and requester
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(smtp_service.send_approver_email(email_request_payload))
-        tg.create_task(smtp_service.send_requester_email(email_request_payload))
+        tg.create_task(smtp_service.send_approver_email(email_request_payload, db))
+        tg.create_task(smtp_service.send_requester_email(email_request_payload, db))
     
     return JSONResponse({"message": "All work completed"})
 
@@ -824,12 +814,15 @@ async def add_comments(
             result = await db.execute(line_item_stmt)
             line_item = result.scalar_one_or_none()
             
+            logger.info(f"Line item: {line_item}")
+            
             if not line_item:
                 raise HTTPException(
                     status_code=404,
                     detail=f"PurchaseRequestLineItem with UUID {comment.uuid} not found"
                 )
-            
+                
+            # Get the approval uuid
             # Create new SonComment
             new_son_comment = SonComment(
                 UUID=str(uuid.uuid4()),  # Generate new UUID for SonComment
@@ -875,7 +868,7 @@ async def add_comments(
         )
         
         # Send email notification
-        await smtp_service.send_comments_email(payload=email_comments_payload)
+        await smtp_service.send_comments_email(payload=email_comments_payload, db=db)
         logger.info(f"Email notification sent to {requester_email}")
     else:
         logger.warning(f"Could not find email for user {username_for_email}, skipping email notification")

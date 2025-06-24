@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from typing import List, Tuple
 from pathlib import Path
 from email.mime.application import MIMEApplication
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from api.services.cache_service import cache_service
@@ -19,6 +20,7 @@ from api.schemas.comment_schemas import GroupCommentPayload
 from api.services.smtp_service.renderer import TemplateRenderer
 from api.settings import settings
 import api.services.db_service as dbas
+from api.services.db_service import get_async_session
 
 class SMTP_Service:
     def __init__(
@@ -37,12 +39,13 @@ class SMTP_Service:
     # SEND EMAIL - async
     #-------------------------------------------------------------------------------
     async def _send_mail_async(
-        self, 
-        payload: ValidModel, 
-        use_approver_template: Optional[bool] = False,
-        use_requester_template: Optional[bool] = False,
-        use_comment_template: Optional[bool] = False,
-        use_approved_template: Optional[bool] = False,
+			self, 
+			payload: ValidModel,
+			db: AsyncSession,
+			use_approver_template: Optional[bool] = False,
+			use_requester_template: Optional[bool] = False,
+			use_comment_template: Optional[bool] = False,
+			use_approved_template: Optional[bool] = False,
         ):
         """
         Send email with asyncio, using Jinja to render the html body
@@ -52,12 +55,18 @@ class SMTP_Service:
         logger.info("_SEND_MAIL_ASYNC")
         logger.info("#############################################################")
         
-        # Get additional comments from cache
-        additional_comments = cache_service.get_or_set(
-            "comments",
-            payload.ID,
-            lambda: dbas.get_additional_comments_by_id(payload.ID)
-        )
+        # Fetch additional comment from database if present
+        codes: list[str] = await dbas.get_justifications_by_id(db, payload.ID)
+        
+        # Pull cached mapping of codes to templates
+        templates: dict[str, str] = await dbas.get_justification_templates(db)
+        
+        #map codes to descriptions
+        additional_comments = [
+			templates.get(code, f"<no template for {code}>")
+			for code in codes
+		]
+        logger.info(f"Justifications: {additional_comments}")
         
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
@@ -182,36 +191,39 @@ class SMTP_Service:
         
     #-------------------------------------------------------------------------------
     # Email Wrappers
-    async def send_approver_email(self, payload: EmailPayloadRequest):
+    async def send_approver_email(self, payload: EmailPayloadRequest, db: AsyncSession):
         """
         Send email to approvers
         """
         await self._send_mail_async(
             payload,
+            db=db,
             use_approver_template=True,
             use_requester_template=False,
             use_comment_template=False,
             use_approved_template=False
         )   
 
-    async def send_requester_email(self, payload: EmailPayloadRequest):
+    async def send_requester_email(self, payload: EmailPayloadRequest, db: AsyncSession):
         """
         Send email to requester
         """
         await self._send_mail_async(
             payload,
+            db=db,
             use_approver_template=False,
             use_requester_template=True,
             use_comment_template=False,
             use_approved_template=False
         )
         
-    async def send_request_approved_email(self, payload: EmailPayloadRequest):
+    async def send_request_approved_email(self, payload: EmailPayloadRequest, db: AsyncSession):
         """
         Send email to requester that their request has been approved
         """
         await self._send_mail_async(
             payload=payload,
+            db=db,
             use_approver_template=False,
             use_requester_template=False,
             use_comment_template=False,
@@ -220,12 +232,13 @@ class SMTP_Service:
         
     #-------------------------------------------------------------------------------
     # Email Wrappers - COMMENTS
-    async def send_comments_email(self, payload: EmailPayloadComment):
+    async def send_comments_email(self, payload: EmailPayloadComment, db: AsyncSession):
         """
         Send comments
         """
         await self._send_mail_async(
             payload=payload,
+            db=db,
             use_approver_template=False,
             use_requester_template=False,
             use_comment_template=True
