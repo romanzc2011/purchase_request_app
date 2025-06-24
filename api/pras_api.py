@@ -467,8 +467,8 @@ async def send_purchase_request(
     
     # Send request to approvers and requester
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(smtp_service.send_approver_email(email_request_payload, db))
-        tg.create_task(smtp_service.send_requester_email(email_request_payload, db))
+        tg.create_task(smtp_service.send_approver_email(email_request_payload, db=db))
+        tg.create_task(smtp_service.send_requester_email(email_request_payload, db=db))
     
     return JSONResponse({"message": "All work completed"})
 

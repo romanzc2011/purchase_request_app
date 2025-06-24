@@ -20,7 +20,7 @@ from api.schemas.comment_schemas import GroupCommentPayload
 from api.services.smtp_service.renderer import TemplateRenderer
 from api.settings import settings
 import api.services.db_service as dbas
-from api.services.db_service import get_async_session
+from api.utils.misc_utils import get_justifications
 
 class SMTP_Service:
     def __init__(
@@ -55,18 +55,7 @@ class SMTP_Service:
         logger.info("_SEND_MAIL_ASYNC")
         logger.info("#############################################################")
         
-        # Fetch additional comment from database if present
-        codes: list[str] = await dbas.get_justifications_by_id(db, payload.ID)
-        
-        # Pull cached mapping of codes to templates
-        templates: dict[str, str] = await dbas.get_justification_templates(db)
-        
-        #map codes to descriptions
-        additional_comments = [
-			templates.get(code, f"<no template for {code}>")
-			for code in codes
-		]
-        logger.info(f"Justifications: {additional_comments}")
+        additional_comments = await get_justifications(db, payload.ID)
         
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):

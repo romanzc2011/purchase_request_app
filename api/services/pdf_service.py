@@ -1,4 +1,3 @@
-from api.services.cache_service import cache_service
 from fastapi import HTTPException
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib import colors
@@ -10,23 +9,19 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_RIGHT, TA_LEFT
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.graphics.shapes import Drawing, PolyLine
 from reportlab.lib.units import inch
 
 from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
-from api.settings import settings
 from api.services.db_service import get_async_session
-from api.schemas.approval_schemas import ApprovalSchema
 from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
 from datetime import datetime
-import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from api.utils.misc_utils import get_justifications
 from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import AsyncSession
 from .db_service import PurchaseRequestHeader, PurchaseRequestLineItem, Approval, PendingApproval
@@ -144,23 +139,7 @@ class PDFService:
         # ------------------------------------------------------------------------
         # Build justifcation template if true for trainNotAval or needsNotMeet
         # Fetch additional comment from database if present
-        codes = await dbas.get_justifications_by_id(db, ID)
-        templates = await dbas.get_justification_templates(db)
-        
-        justification_codes = []
-        for train_not_aval, needs_not_meet in codes:
-            if train_not_aval:
-                justification_codes.append("NOT_AVAILABLE")
-            if needs_not_meet:
-                justification_codes.append("NEEDS_NOT_MEET")
-                
-        # Remove duplicates
-        justification_codes = list(set(justification_codes))
-        additional_comments = [
-			templates.get(code, f"<no template for {code}>")
-			for code in justification_codes
-		]
-        logger.info(f"Justifications: {additional_comments}")
+        additional_comments = await get_justifications(db, ID)
 
 		# ------------------------------------------------------------------------
         # 3️⃣ Load SonComments via async select

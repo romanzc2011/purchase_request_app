@@ -100,7 +100,7 @@ class ITHandler(Handler):
                 logger.info(f"IT Handler: Sending email to clerk admins requesting approval for {request.uuid}")
                 approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
                 email_payload = await approver_email_builder.build_email_payload()
-                await smtp_service.send_approver_email(email_payload)
+                await smtp_service.send_approver_email(email_payload,db=db)
                 
                 logger.info(f"IT Handler: Inserted final approval for {request.uuid}")
             else:
@@ -158,7 +158,7 @@ class FinanceHandler(Handler):
                 logger.info(f"Finance Handler: Sending email to clerk admins requesting approval for {request.uuid}")
                 approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
                 email_payload = await approver_email_builder.build_email_payload()
-                await smtp_service.send_approver_email(email_payload)
+                await smtp_service.send_approver_email(email_payload,db=db)
                 
                 logger.info(f"Finance Handler: Inserted final approval for {request.uuid}")
             else:
@@ -231,9 +231,10 @@ class ClerkAdminHandler(Handler):
             
         # Send email to requester that their request has been approved
         logger.info(f"ClerkAdmin Handler: Sending email to requester that their request has been approved for {request.uuid}")
+        
         approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
         email_payload = await approver_email_builder.build_email_payload()
-        await smtp_service.send_request_approved_email(email_payload)
+        await smtp_service.send_request_approved_email(email_payload,db=db)
         logger.info(f"ClerkAdmin Handler: Inserted final approval for {request.uuid}")
         
         # Pass the request to the next handler
