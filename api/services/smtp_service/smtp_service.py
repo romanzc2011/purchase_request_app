@@ -42,10 +42,11 @@ class SMTP_Service:
         use_approver_template: Optional[bool] = False,
         use_requester_template: Optional[bool] = False,
         use_comment_template: Optional[bool] = False,
+        use_approved_template: Optional[bool] = False,
         ):
         """
         Send email with asyncio, using Jinja to render the html body
-        Determine the template to use based on the use_approver_template and use_requester_template parameters
+        Determine the template to use based on the template parameters
         """
         logger.info("#############################################################")
         logger.info("_SEND_MAIL_ASYNC")
@@ -96,16 +97,20 @@ class SMTP_Service:
         msg_root['From'] = "romanzc2011@gmail.com"  # TESTING ONLY
         
         # Determine the template to use
-        if use_approver_template and not use_requester_template and not use_comment_template:
+        if use_approver_template and not use_requester_template and not use_comment_template and not use_approved_template:
             msg_root['To'] = "roman_campbell@lawb.uscourts.gov"  # TODO: This will be the approvers in prod
             #if to: msg['To'] = ', '.join(to) 
             html_body = self.renderer.render_approver_request_template(context)
             
-        elif use_requester_template and not use_approver_template and not use_comment_template:
+        elif use_requester_template and not use_approver_template and not use_comment_template and not use_approved_template:
             msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_requester_request_template(context)
             
-        elif use_comment_template and not use_approver_template and not use_requester_template:
+        elif use_approved_template and not use_approver_template and not use_requester_template and not use_comment_template:
+            msg_root['To'] = payload.requester_email
+            html_body = self.renderer.render_requester_approved_template(context)
+            
+        elif use_comment_template and not use_approver_template and not use_requester_template and not use_approved_template:
             msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_comment_template(context)
             
@@ -185,7 +190,8 @@ class SMTP_Service:
             payload,
             use_approver_template=True,
             use_requester_template=False,
-            use_comment_template=False
+            use_comment_template=False,
+            use_approved_template=False
         )   
 
     async def send_requester_email(self, payload: EmailPayloadRequest):
@@ -196,7 +202,20 @@ class SMTP_Service:
             payload,
             use_approver_template=False,
             use_requester_template=True,
-            use_comment_template=False
+            use_comment_template=False,
+            use_approved_template=False
+        )
+        
+    async def send_request_approved_email(self, payload: EmailPayloadRequest):
+        """
+        Send email to requester that their request has been approved
+        """
+        await self._send_mail_async(
+            payload=payload,
+            use_approver_template=False,
+            use_requester_template=False,
+            use_comment_template=False,
+            use_approved_template=True
         )
         
     #-------------------------------------------------------------------------------

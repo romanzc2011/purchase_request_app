@@ -5,7 +5,8 @@ from typing import Optional
 from abc import ABC, abstractmethod
 from api import settings
 from api.schemas.email_schemas import EmailPayloadRequest, LineItemsPayload
-from api.services import cache_service, smtp_service
+from api.services import cache_service
+from api.dependencies.pras_dependencies import smtp_service
 from api.utils.misc_utils import format_username
 from loguru import logger
 from api.schemas.misc_schemas import ItemStatus
@@ -16,13 +17,15 @@ from sqlalchemy import select
 from fastapi import Depends
 from api.schemas.ldap_schema import LDAPUser
 from api.services.approval_router.approver_policy import ApproverPolicy
+from api.services.smtp_service.email_builder import ApproverEmailBuilder
+from api.services.ldap_service import LDAPService
 
 
 # Approval Router to determine the routing of requests
 class Handler(ABC):
     def __init__(self):
         logger.info(f"Handler initialized")
-        self._next = None
+        self._next: Optional["Handler"] = None
         
     def set_next(self, handler: "Handler") -> "Handler":
         logger.info(f"Setting next handler: {handler}")
@@ -34,14 +37,15 @@ class Handler(ABC):
         self, 
         request: ApprovalRequest, 
         db: AsyncSession,
-        current_user: LDAPUser
+        current_user: LDAPUser,
+        ldap_service: LDAPService
     ) -> ApprovalRequest:
         
         logger.debug(f"User: {current_user}")
         logger.info(f"Handling request: {request}")
         if self._next:
             logger.info(f"Passing request to next handler: {self._next}")
-            return await self._next.handle(request, db, current_user)
+            return await self._next.handle(request, db, current_user, ldap_service)
         return "No handler could process the request."
 
 # ----------------------------------------------------------------------------------------
@@ -52,7 +56,8 @@ class ITHandler(Handler):
         self, 
         request: ApprovalRequest, 
         db: AsyncSession,
-        current_user: LDAPUser
+        current_user: LDAPUser,
+        ldap_service: LDAPService
     ) -> ApprovalRequest:
         approver_policy = ApproverPolicy(current_user)
         
@@ -91,13 +96,17 @@ class ITHandler(Handler):
                     deputy_can_approve=dbas.can_deputy_approve(request.total_price)
                 )
                 
-                #TODO: Send email to requester that their request has been approved
+                # Send email to clerk admins requesting approval
+                logger.info(f"IT Handler: Sending email to clerk admins requesting approval for {request.uuid}")
+                approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
+                email_payload = await approver_email_builder.build_email_payload()
+                await smtp_service.send_approver_email(email_payload)
                 
                 logger.info(f"IT Handler: Inserted final approval for {request.uuid}")
             else:
                 logger.error(f"IT Handler: Could not find approval/task data for {request.uuid}")
         
-        return await super().handle(request, db, current_user)
+        return await super().handle(request, db, current_user, ldap_service)
 
 # ----------------------------------------------------------------------------------------
 # FINANCE HANDLER
@@ -107,7 +116,8 @@ class FinanceHandler(Handler):
         self, 
         request: ApprovalRequest, 
         db: AsyncSession,
-        current_user: LDAPUser
+        current_user: LDAPUser,
+        ldap_service: LDAPService
     ) -> ApprovalRequest:
         approver_policy = ApproverPolicy(current_user)
         
@@ -144,11 +154,17 @@ class FinanceHandler(Handler):
                     deputy_can_approve=dbas.can_deputy_approve(request.total_price)
                 )
                 
+                # Send email to clerk admins requesting approval
+                logger.info(f"Finance Handler: Sending email to clerk admins requesting approval for {request.uuid}")
+                approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
+                email_payload = await approver_email_builder.build_email_payload()
+                await smtp_service.send_approver_email(email_payload)
+                
                 logger.info(f"Finance Handler: Inserted final approval for {request.uuid}")
             else:
                 logger.error(f"Finance Handler: Could not find approval/task data for {request.uuid}")
         
-        return await super().handle(request, db, current_user)
+        return await super().handle(request, db, current_user, ldap_service)
     
 ###############################################################################################
 # CLERK ADMIN HANDLER
@@ -161,7 +177,8 @@ class ClerkAdminHandler(Handler):
         self, 
         request: ApprovalRequest, 
         db: AsyncSession,
-        current_user: LDAPUser
+        current_user: LDAPUser,
+        ldap_service: LDAPService
     ) -> ApprovalRequest:
         
         approver_policy = ApproverPolicy(current_user)
@@ -176,7 +193,7 @@ class ClerkAdminHandler(Handler):
         
         if not row:
             logger.warning(f"ClerkAdmin Handler: No pending approval found for {request.uuid}")
-            return await super().handle(request, db, current_user)
+            return await super().handle(request, db, current_user, ldap_service)
             
         current_status = row[0]
         logger.info(f"CURRENT STATUS: {current_status}")
@@ -205,17 +222,21 @@ class ClerkAdminHandler(Handler):
 
         if not row:
             logger.error(f"ClerkAdmin Handler: Could not find approval UUID for {request.uuid}")
-            return await super().handle(request, db, current_user)
+            return await super().handle(request, db, current_user, ldap_service)
             
         approvals_uuid = row[0]
         
-        # Mark request a APPROVED
+        # Mark request as APPROVED
         await dbas.mark_final_approval_as_approved(db, approvals_uuid)
             
-        #TODO: Send email to requester that their request has been approved
+        # Send email to requester that their request has been approved
+        logger.info(f"ClerkAdmin Handler: Sending email to requester that their request has been approved for {request.uuid}")
+        approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
+        email_payload = await approver_email_builder.build_email_payload()
+        await smtp_service.send_request_approved_email(email_payload)
         logger.info(f"ClerkAdmin Handler: Inserted final approval for {request.uuid}")
         
         # Pass the request to the next handler
         if self._next:
-            return await self._next.handle(request, db, current_user)
+            return await self._next.handle(request, db, current_user, ldap_service)
         return request

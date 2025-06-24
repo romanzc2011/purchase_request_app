@@ -670,7 +670,7 @@ async def approve_deny_request(
                 action=payload.action,
                 approver=current_user.username
             )
-            result = await router.route(approval_request, db, current_user)
+            result = await router.route(approval_request, db, current_user, ldap_service)
             logger.info(f"Result: {result}")
             #################################################################################################
 			# END CHAIN

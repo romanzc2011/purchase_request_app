@@ -3,6 +3,7 @@ from api.schemas.approval_schemas import ApprovalRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.schemas.ldap_schema import LDAPUser
 from api.dependencies.pras_dependencies import auth_service
+from api.services.ldap_service import LDAPService
 
 class ApprovalRouter:
     def __init__(self):
@@ -28,6 +29,7 @@ class ApprovalRouter:
         self, 
         request: ApprovalRequest, 
         db: AsyncSession,
-        current_user: LDAPUser
+        current_user: LDAPUser,
+        ldap_service: LDAPService
     ) -> ApprovalRequest:
-        return await self._head.handle(request, db, current_user)
+        return await self._head.handle(request, db, current_user, ldap_service)

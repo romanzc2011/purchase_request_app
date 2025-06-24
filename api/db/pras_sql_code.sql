@@ -38,3 +38,11 @@ BEGIN
 END;
 COMMIT;
 
+-- DELETE FROM final_approvals;
+-- DELETE FROM pending_approvals;
+-- DELETE FROM approvals;
+-- DELETE FROM pr_line_items;
+-- DELETE FROM purchase_request_headers;
+
+
+

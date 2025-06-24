@@ -22,3 +22,7 @@ class TemplateRenderer:
     
     def render_comment_template(self, context: dict) -> str:
         return self.render("requesters_comment_template.html", context)
+    
+    def render_requester_approved_template(self, context: dict) -> str:
+        logger.info(f"RENDERING REQUESTER APPROVED TEMPLATE: {context}")
+        return self.render("requester_approved_request.html", context)
