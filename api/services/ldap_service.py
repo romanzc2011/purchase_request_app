@@ -10,7 +10,7 @@ from functools import lru_cache
 from urllib.parse import urlparse
 
 from ldap3 import Server, Connection, ALL, SUBTREE, Tls
-from ldap3.core.exceptions import LDAPExceptionError
+from ldap3.core.exceptions import LDAPExceptionError, LDAPSocketOpenError
 from aiocache import cached, Cache
 from loguru import logger
 
@@ -73,10 +73,27 @@ class LDAPService:
     # GET SERVICE CONNECTION
     #-------------------------------------------------------------------------------------
     def get_service_connection(self) -> Connection:
-        if not self._service_conn or not self._service_conn.bound:
-            logger.info("LDAP connection is not bound. Rebinding...")
-            self._service_conn = self._bind(self.bind_dn, self.bind_password, use_tls=True)
-        return self._service_conn
+        try:
+            if not self._service_conn or not self._service_conn.bound:
+                logger.info("LDAP connection is not bound. Rebinding...")
+                self._service_conn = self._bind(self.bind_dn, self.bind_password, use_tls=True)
+            else:
+                # Force socket use to check health of connection
+                self._service_conn.search(
+                search_base=settings.search_base,
+                search_filter="(objectClass=*)",
+                attributes=["cn"],
+                size_limit=1
+            )
+            return self._service_conn
+        except (LDAPSocketOpenError, LDAPExceptionError, ssl.SSLError, OSError) as e:
+            logger.warning(f"LDAP socket error or SSL failure detected: {e}. Rebinding...")
+            try:
+                self._service_conn = self._bind(self.bind_dn, self.bind_password, use_tls=True)
+                return self._service_conn
+            except Exception as ex:
+                logger.error(f"Failed to rebind LDAP connection: {ex}")
+                raise
     
     async def verify_credentials(self, username: str, password: str) -> bool:
         """Async helper to test bind as an end user"""

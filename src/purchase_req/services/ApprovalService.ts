@@ -1,11 +1,11 @@
-import { ApprovalData } from "../types/approvalTypes";
+import { ApprovalData, DenialData } from "../types/approvalTypes";
 
 const API_URL_APPROVE_DENY_REQUEST = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`
 
 // ##############################################################
 // Approve/Deny request
 // ##############################################################
-export async function approveDenyRequest(payload: ApprovalData): Promise<any> {
+export async function approveDenyRequest(payload: ApprovalData | DenialData): Promise<any> {
     const token = localStorage.getItem("access_token");
     if (!token) {
         throw new Error("No token found");

@@ -20,7 +20,7 @@ import ScheduleIcon from "@mui/icons-material/Schedule";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 
-import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow, ApprovalData, ItemStatus } from "../../../types/approvalTypes";
+import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow, ApprovalData, ItemStatus, DenialData } from "../../../types/approvalTypes";
 import { addComments, cleanPayload } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { useUUIDStore } from "../../../services/UUIDService";
@@ -334,7 +334,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	} = useCommentModal();
 
 	/***********************************************************************************/
-	// HANDLE APPROVE/DENY
+	// HANDLE APPROVE
 	/***********************************************************************************/
 
 	// HANDLE APPROVE CLICK
@@ -434,6 +434,56 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		await addComments(payloadToSend);
 		toast.success("Comments added successfully");
 	};
+
+	// ------------------------------------------------------------------
+	// HANDLE DENY
+	// ------------------------------------------------------------------
+	async function handleDenyClick(): Promise<void> {
+		const selectedItemUuids = Array.from(rowSelectionModel.ids).filter(
+			id => !String(id).startsWith("header-")
+		);
+
+		if (selectedItemUuids.length === 0) {
+			toast.error("No items selected");
+			console.error("No items selected");
+			return;
+		}
+
+		const itemsToProcessForDenial = approvalData.filter(item =>
+			selectedItemUuids.includes(item.UUID) &&
+			(item.status === ItemStatus.NEW_REQUEST || item.status === ItemStatus.PENDING_APPROVAL)
+		);
+
+		if (itemsToProcessForDenial.length === 0) {
+			toast.error("No items selected for denial");
+			console.log("No items selected for denial")
+		}
+
+		// Construct small payload of uuids to deny
+		const apiPayload: DenialData = {
+			ID: itemsToProcessForDenial[0].ID,
+			item_uuids: itemsToProcessForDenial.map(item => item.UUID),
+			target_status: itemsToProcessForDenial.map(item => ItemStatus.DENIED),
+			action: "DENY"
+		}
+		console.log("Submitting payload to backend for denial: ", apiPayload);
+
+		// Calling the processPayload function to send the payload to the backend
+		try {
+			await processPayload(apiPayload);
+			toast.success("Batch denial successful");
+
+			// Invalidate the query to refresh the data, updates local
+			// state and re-renders the table
+			queryClient.invalidateQueries({ queryKey: ["approvalData"] });
+		} catch (error) {
+			console.error("Batch denial failed: ", error);
+			toast.error("Batch denial failed");
+		}
+		// Deselect all rows
+		setRowSelectionModel({ ids: new Set(), type: 'include' });
+	}
+
 
 	//####################################################################
 	// HANDLE CYBERSECURITY RELATED
@@ -866,7 +916,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 					startIcon={<CloseIcon />}
 					variant="contained"
 					color="error"
-				//onClick={handleBulkDeny}
+					onClick={handleDenyClick}
 				>
 					Deny Selected ({getTotalSelectedItems()})
 				</Button>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ApprovalData } from "../types/approvalTypes";
+import { ApprovalData, DenialData } from "../types/approvalTypes";
 import { approveDenyRequest } from "../services/ApprovalService";
 
 export function useApprovalService() {
@@ -14,9 +14,12 @@ export function useApprovalService() {
     // This function is called when the user clicks on the approve/deny button
     // It takes the payload as an argument and sends it to the server
     // processPayload --> approveDenyRequest (ApprovalService.ts)
-    const processPayload = async (payload: ApprovalData) => {
+
+    const processPayload = async (payload: ApprovalData | DenialData) => {
+		
         setIsLoading(true);
         setError(null);
+
         try {
             const response = await approveDenyRequest(payload);
             console.log("🔥 APPROVE/DENY RESPONSE", response);
