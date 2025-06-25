@@ -1,7 +1,11 @@
--- TRIGGERS
+----------------------------------------------------------
+-- TRIGGERS ----------------------------------------------
+----------------------------------------------------------
 
+----------------------------------------------------------
 /* Trigger for auto updating pr_line_items, approvals, pending_approvals when 
 a request is approved by IT/ACCESS and goes to final_approvals  ---> PENDING_APPROVAL */
+----------------------------------------------------------
 CREATE TRIGGER IF NOT EXISTS sync_status_on_final_approval_insert
 AFTER INSERT ON final_approvals
 BEGIN
@@ -17,9 +21,10 @@ BEGIN
     SET status = 'PENDING APPROVAL'
     WHERE pending_approval_id = NEW.pending_approval_id;
 END;
-COMMIT;
 
-/* UPDATE */
+----------------------------------------------------------
+/* UPDATE all statuses to APPROVED, DENIED */
+----------------------------------------------------------
 CREATE TRIGGER IF NOT EXISTS sync_status_on_final_approval_update
 AFTER UPDATE ON final_approvals
 WHEN NEW.status IN ('APPROVED', 'DENIED')
@@ -36,13 +41,40 @@ BEGIN
 	SET status = NEW.status
 	WHERE pending_approval_id = NEW.pending_approval_id;
 END;
-COMMIT;
+
+----------------------------------------------------------
+/* Trigger to auto insert approvals uuid after 
+the inital add comment is run */
+----------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS sync_approvals_uuid_on_first_insert
+AFTER INSERT ON son_comments
+FOR EACH ROW
+BEGIN
+	UPDATE son_comments
+	SET approvals_uuid = (
+		SELECT approvals.UUID
+		FROM pr_line_items
+		JOIN approvals
+			ON approvals.purchase_request_id = pr_line_items.purchase_request_id
+		WHERE pr_line_items.UUID = son_comments.line_item_uuid
+	)
+	WHERE line_item_uuid = NEW.line_item_uuid;
+END;
+
+
+
+
+
+
+
 
 -- DELETE FROM final_approvals;
 -- DELETE FROM pending_approvals;
 -- DELETE FROM approvals;
 -- DELETE FROM pr_line_items;
 -- DELETE FROM purchase_request_headers;
+-- DELETE FROM son_comments
+-- DELETE FROM justification_templates;
 
-
+--RELEASE "UNDOPOINT";
 

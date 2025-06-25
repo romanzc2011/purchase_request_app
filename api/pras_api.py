@@ -249,8 +249,6 @@ async def send_purchase_request(
     current_user: LDAPUser = Depends(auth_service.get_current_user),
     db: AsyncSession = Depends(get_async_session)
 ):
-    logger.info(f"Type of current_user: {type(current_user)}")
-
     """
     This endpoint:
       - Parses the incoming payload
@@ -777,7 +775,6 @@ async def add_comments(
 ):
     """
     Add multiple comments to purchase requests.
-
     Args:
         payload: Contains list of comments with line_item UUIDs to update
     """
@@ -785,6 +782,7 @@ async def add_comments(
     
     updated_comments = []
     
+    # Get approvals 
     for comment in payload.comment:
         logger.info(f"COMMENT: {comment}")
         

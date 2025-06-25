@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from sqlalchemy import select
-from api.utils.misc_utils import get_justifications
+from api.utils.misc_utils import get_justifications_and_comments
 from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import AsyncSession
 from .db_service import PurchaseRequestHeader, PurchaseRequestLineItem, Approval, PendingApproval
@@ -139,7 +139,7 @@ class PDFService:
         # ------------------------------------------------------------------------
         # Build justifcation template if true for trainNotAval or needsNotMeet
         # Fetch additional comment from database if present
-        additional_comments = await get_justifications(db, ID)
+        additional_comments = await get_justifications_and_comments(db, ID)
 
 		# ------------------------------------------------------------------------
         # 3️⃣ Load SonComments via async select

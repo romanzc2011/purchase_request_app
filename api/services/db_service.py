@@ -6,7 +6,7 @@ from api.schemas.ldap_schema import LDAPUser
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from loguru import logger
 from aiocache import Cache, cached
-from sqlalchemy import select, update, inspect
+from sqlalchemy import select, update
 from sqlalchemy import (create_engine, String, Integer, Float, Boolean, Text, LargeBinary, ForeignKey, DateTime,
                         Enum as SAEnum, JSON, func, Enum as SQLEnum, literal, func, select, text)
 from sqlalchemy.orm import declarative_base, selectinload, aliased
@@ -395,48 +395,6 @@ async def get_justification_templates(db: AsyncSession) -> dict[str, str]:
     return {r.code: r.description for r in rows}
 
 ###################################################################################################
-# Get Purchase Request Header and Line Items
-###################################################################################################
-def get_pr_header_and_line_items(request_id: str):
-    with get_session() as session:
-        # 1) Load the header AND its .pr_line_items relationship in one query
-        pr_header = session.scalar(
-            select(PurchaseRequestHeader)
-            .options(selectinload(PurchaseRequestHeader.pr_line_item_attr))
-            .where(PurchaseRequestHeader.request_id == request_id)
-        )
-        if not pr_header:
-            raise HTTPException(status_code=404, detail=f"Purchase Request '{request_id}' not found")
-
-        # 2) The related items are now on pr_header.pr_line_items  
-        line_items = pr_header.pr_line_items
-        if not line_items:
-            raise HTTPException(status_code=404, detail=f"No line items for Purchase Request '{request_id}'")
-
-        return pr_header, line_items
-    
-###################################################################################################
-# Get all son comments by id
-###################################################################################################
-def fetch_just_flags_by_id(id: str):
-    with get_session() as session:
-        stmt = (
-            select(
-                PurchaseRequestLineItem.trainNotAval,
-                PurchaseRequestLineItem.needsNotMeet,
-            ).join(
-                PurchaseRequestHeader,
-                PurchaseRequestHeader.ID == PurchaseRequestLineItem.purchase_request_id
-            ).where(
-                PurchaseRequestHeader.ID == id
-            )
-        )
-        results = session.execute(stmt).all()
-        if not results:
-            raise HTTPException(status_code=404, detail=f"No line items for Purchase Request '{id}'")
-        return results
-
-###################################################################################################
 # Get next  request id
 ###################################################################################################
 def set_purchase_req_id() -> str:
@@ -495,6 +453,18 @@ async def get_justifications_by_id(db: AsyncSession, ID: str) -> list[tuple[bool
 	rows = result.all()
 	logger.info(f"Rows: {rows}")
 	return rows
+
+###################################################################################################
+# Get son comments by ID
+###################################################################################################
+async def get_son_comments_by_id(
+	db: AsyncSession,
+	ID: str
+) -> list[SonComment]:
+    pass
+    
+
+
 
 ###################################################################################################
 # Get order types by ID

@@ -33,7 +33,7 @@ def run_in_thread(fn):
 """
 Utility function to get justifications from the database for PDFs and emails
 """
-async def get_justifications(db: AsyncSession, ID: str) -> list[str]:
+async def get_justifications_and_comments(db: AsyncSession, ID: str) -> list[str]:
     codes = await dbas.get_justifications_by_id(db, ID)
     templates = await dbas.get_justification_templates(db)
     
@@ -51,4 +51,12 @@ async def get_justifications(db: AsyncSession, ID: str) -> list[str]:
         for code in justification_codes
     ]
     logger.info(f"Justifications: {additional_comments}")
+    
+    # -------------------------------------------------------
+    # Get SonComments
+    # -------------------------------------------------------
+    
+    
+    
+    
     return additional_comments

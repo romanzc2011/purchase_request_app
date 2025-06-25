@@ -20,7 +20,7 @@ from api.schemas.comment_schemas import GroupCommentPayload
 from api.services.smtp_service.renderer import TemplateRenderer
 from api.settings import settings
 import api.services.db_service as dbas
-from api.utils.misc_utils import get_justifications
+from api.utils.misc_utils import get_justifications_and_comments
 
 class SMTP_Service:
     def __init__(
@@ -55,7 +55,7 @@ class SMTP_Service:
         logger.info("_SEND_MAIL_ASYNC")
         logger.info("#############################################################")
         
-        additional_comments = await get_justifications(db, payload.ID)
+        additional_comments = await get_justifications_and_comments(db, payload.ID)
         
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
