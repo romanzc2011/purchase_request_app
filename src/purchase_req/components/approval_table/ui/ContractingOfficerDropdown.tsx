@@ -1,5 +1,5 @@
 import { FormControl, InputLabel, Select, MenuItem, Typography, Box } from '@mui/material';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 /* API URLs */
 const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_contracting_officer`;

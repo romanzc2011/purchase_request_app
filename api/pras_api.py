@@ -978,9 +978,20 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
     except Exception as e:
         logger.error(f"Error during file upload: {e}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {e}")
-    
-    
-    
+
+##########################################################################
+## ASSIGN CONTRACTING OFFICER
+##########################################################################
+@api_router.post("/assign_contracting_officer")
+async def assign_contracting_officer(
+    payload: AssignContractingOfficerPayload,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    """
+    Assign a contracting officer to a purchase request.
+    """
+    pass
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params
 ##########################################################################

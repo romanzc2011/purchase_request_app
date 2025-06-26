@@ -80,9 +80,6 @@ BEGIN
     WHERE UUID = NEW.line_item_uuid;
 END;
 
-
-
-
 -- DELETE FROM final_approvals;
 -- DELETE FROM pending_approvals;
 -- DELETE FROM approvals;
@@ -90,6 +87,7 @@ END;
 -- DELETE FROM purchase_request_headers;
 -- DELETE FROM son_comments
 -- DELETE FROM justification_templates;
+-- DELETE FROM contracting_officers;
 
 --RELEASE "UNDOPOINT";
 

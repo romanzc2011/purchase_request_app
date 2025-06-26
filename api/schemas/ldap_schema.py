@@ -4,6 +4,12 @@ from loguru import logger
 from typing import List, Optional
 from api.services.cache_service import cache_service
 
+class ContractingOfficerPayload(BaseModel):
+    ID: str
+    CO: str
+    username: str
+    email: str
+
 class Token(BaseModel):
     access_token: str
 

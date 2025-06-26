@@ -167,7 +167,6 @@ class PurchaseRequestLineItem(Base):
 # ────────────────────────────────────────────────────────────────────────────────
 class Approval(Base):
     __tablename__ = "approvals"
-    __table_args__ = {'info': {'read_only': True}}
 
     UUID                   : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     purchase_request_id    : Mapped[str] = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=False)
@@ -347,6 +346,29 @@ class SonComment(Base):
         back_populates="son_comments",
         foreign_keys=[line_item_uuid]
     )
+
+# ────────────────────────────────────────────────────────────────────────────────
+# CONTRACTING OFFICER
+# ────────────────────────────────────────────────────────────────────────────────
+class ContractingOfficer(Base):
+    __tablename__ = "contracting_officers"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    purchase_request_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=True)
+    approvals_uuid: Mapped[Optional[str]] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
+    CO: Mapped[Optional[str]] = mapped_column(String)
+    username: Mapped[Optional[str]] = mapped_column(String)
+    email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    
+# SEED CONTRACTING OFFICER
+async def seed_contracting_officer(async_session: AsyncSession):
+    existing = await async_session.execute(select(ContractingOfficer).limit(1))
+    if existing.scalars().first():
+        return
+    
+    async_session.add(ContractingOfficer(
+        CO="romancampbell", username="romancampbell", email="roman_campbell@lawb.uscourts.gov"
+	))
+    await async_session.commit()
 
 ###################################################################################################
 ## SEEDING JUSTIFICATION TEMPLATES
