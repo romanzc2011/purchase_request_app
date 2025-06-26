@@ -31,7 +31,7 @@ class EmailPayloadRequest(BaseModel):
     additional_comments: Optional[List[str]] = None
     subject: str
     sender: str
-    to: Optional[List[str]] = None  # TODO: This will be the approvers in prod
+    to: Optional[List[str]] = None
     cc: Optional[List[str]] = None
     bcc: Optional[List[str]] = None
     attachments: Optional[List[str]] = None

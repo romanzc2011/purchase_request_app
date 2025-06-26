@@ -54,6 +54,7 @@ class SMTP_Service:
         logger.info("#############################################################")
         logger.info("_SEND_MAIL_ASYNC")
         logger.info("#############################################################")
+        logger.info(f"EMAIL PAYLOAD: {payload}")
         
         additional_comments = await get_justifications_and_comments(db, payload.ID)
         
@@ -91,23 +92,24 @@ class SMTP_Service:
         logger.info("Building MIME..")
         msg_root = MIMEMultipart("related")
         msg_root['Subject'] = payload.subject
-        #msg['From'] = self.smtp_email_addr
-        msg_root['From'] = "romanzc2011@gmail.com"  # TESTING ONLY
+        msg_root['From'] = "it@lawb.uscourts.gov"
         
-        # Determine the template to use
+        # APPROVER TEMPLATE
         if use_approver_template and not use_requester_template and not use_comment_template and not use_approved_template:
-            msg_root['To'] = "roman_campbell@lawb.uscourts.gov"  # TODO: This will be the approvers in prod
-            #if to: msg['To'] = ', '.join(to) 
+            msg_root['To'] = "roman_campbell@lawb.uscourts.gov"
             html_body = self.renderer.render_approver_request_template(context)
-            
+        
+        # REQUESTER TEMPLATE
         elif use_requester_template and not use_approver_template and not use_comment_template and not use_approved_template:
             msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_requester_request_template(context)
             
+        # APPROVED TEMPLATE
         elif use_approved_template and not use_approver_template and not use_requester_template and not use_comment_template:
             msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_requester_approved_template(context)
             
+        # COMMENT TEMPLATE
         elif use_comment_template and not use_approver_template and not use_requester_template and not use_approved_template:
             msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_comment_template(context)

@@ -228,6 +228,16 @@ class LDAPService:
         except Exception as e:
             logger.error(f"Error getting membership: {e}")
             return {"IT_GROUP": False, "CUE_GROUP": False, "ACCESS_GROUP": False}
+    
+    #-------------------------------------------------------------------------------------
+    # GET APPROVERS
+    #-------------------------------------------------------------------------------------
+    def _get_approvers_sync(self, group_name: str) -> List[str]:
+        """
+        Sync method to fetch all members of group
+        """
+        pass
+        
         
     #-------------------------------------------------------------------------------------
     # FETCH USERNAMES SYNCHRONOUSLY

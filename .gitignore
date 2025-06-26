@@ -38,3 +38,4 @@ indexdir/*
 pdf_output/*
 db/*
 output/*
+api/db/pras.db
