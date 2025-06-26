@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
+import ContractingOfficerDropdown from "./ContractingOfficerDropdown";
 import { DataGrid, DataGridProps, GridColDef, GridRowId, GridRowSelectionModel } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -297,7 +298,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	/***********************************************************************************/
 	// MODALS
 	/***********************************************************************************/
-
 	/***********************************************************************************/
 	// ITEM DESCRIPTION MODAL
 	const handleOpenDesc = (desc: string) => {
@@ -896,11 +896,16 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			width: "100%",
 			height: "100%",
 			display: "flex",
-			flexDirection: "column"
+			flexDirection: "column",
+
 		}}>
-			<Box sx={{ mb: 2 }}>
+			<Box sx={{ mb: 2, fontSize: '1.2rem', fontWeight: 'bold' }}>
 				COMMAND TOOLBAR
 			</Box>
+
+			{/* CONTRACTING OFFICER DROPDOWN */}
+			<ContractingOfficerDropdown />
+
 			{/* COMMAND TOOLBAR */}
 			<Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
 				{/* Approve Selected Button */}
@@ -951,14 +956,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 					}}
 				>
 					CyberSec Related ({getTotalSelectedItems()})
-				</Button>
-
-				{/* Follow Up Selected Button */}
-				<Button
-					variant="outlined" startIcon={<ScheduleIcon />}
-				//onClick={handleBulkFollowUp}
-				>
-					Schedule Follow-Up
 				</Button>
 			</Box>
 
