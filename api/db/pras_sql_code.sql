@@ -39,7 +39,7 @@ BEGIN
 	
 	UPDATE pending_approvals
 	SET status = NEW.status
-	WHERE pending_approval_id = NEW.pending_approval_id;
+	WHERE line_item_uuid = NEW.line_item_uuid;
 END;
 
 ----------------------------------------------------------
@@ -61,9 +61,24 @@ BEGIN
 	WHERE line_item_uuid = NEW.line_item_uuid;
 END;
 
+----------------------------------------------------------
+/* Trigger to auto update status to denied AFTER pr_line_items
+is set to DENIED */
+----------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS sync_status_on_update_pr_line_items
+AFTER UPDATE ON pending_approvals
+WHEN NEW.status = 'DENIED'
+BEGIN
+    -- Update approvals table
+    UPDATE approvals
+    SET status = 'DENIED'
+    WHERE UUID = NEW.approvals_uuid;
 
-
-
+    -- Update pr_line_items table
+    UPDATE pr_line_items
+    SET status = 'DENIED'
+    WHERE UUID = NEW.line_item_uuid;
+END;
 
 
 

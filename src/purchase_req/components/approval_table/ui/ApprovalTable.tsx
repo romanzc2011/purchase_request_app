@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
@@ -47,7 +47,8 @@ let groupCommentPayload: GroupCommentPayload = {
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-const API_URL_APPROVE_DENY = `${import.meta.env.VITE_API_URL}/api/approveDenyRequest`;
+const API_URL_APPROVE = `${import.meta.env.VITE_API_URL}/api/approveRequest`;
+const API_URL_DENY = `${import.meta.env.VITE_API_URL}/api/denyRequest`;
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 
 // Define a type for the DataGrid sx prop
@@ -323,7 +324,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
 	const {
 		processPayload,
-		setApprovalPayload
+		setApprovalPayload,
+		setDenialPayload
 	} = useApprovalService();
 
 	const {
@@ -460,17 +462,17 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		}
 
 		// Construct small payload of uuids to deny
-		const apiPayload: DenialData = {
+		const apiDenyPayload: DenialData = {
 			ID: itemsToProcessForDenial[0].ID,
 			item_uuids: itemsToProcessForDenial.map(item => item.UUID),
 			target_status: itemsToProcessForDenial.map(item => ItemStatus.DENIED),
 			action: "DENY"
 		}
-		console.log("Submitting payload to backend for denial: ", apiPayload);
+		console.log("Submitting payload to backend for denial: ", apiDenyPayload);
 
 		// Calling the processPayload function to send the payload to the backend
 		try {
-			await processPayload(apiPayload);
+			await processPayload(apiDenyPayload);
 			toast.success("Batch denial successful");
 
 			// Invalidate the query to refresh the data, updates local
@@ -1030,12 +1032,22 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 						item_funds: selectedRows.map(r => r.fund),
 						totalPrice: selectedRows.map(r => r.totalPrice),
 						target_status: selectedRows.map(r => r.status),
-						action: selectedRows[0].status === ItemStatus.APPROVED ? "APPROVE" : "DENY"
+						action: "APPROVE" // Default to APPROVE, will be overridden by specific button clicks
 					};
 
 					// Process the approval payload in hook
 					setApprovalPayload(approvalPayload)
 
+					// Prepare Denial data
+					const denyPayload: DenialData = {
+						ID: selectedRows[0].ID,
+						item_uuids: selectedRows.map(r => r.UUID),
+						target_status: selectedRows.map(r => r.status),
+						action: "DENY"
+					}
+
+					// Process the denial payload in hook
+					setDenialPayload(denyPayload)
 				}}
 
 				initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}

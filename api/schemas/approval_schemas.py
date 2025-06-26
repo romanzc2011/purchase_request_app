@@ -10,9 +10,9 @@ from api.utils.pydantic_utils import to_camel_case
 # --------------------------------------------------------------
 class RequestPayload(BaseModel):
     ID: str
-    UUID: List[str] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
+    UUID: Optional[List[str]] = Field(alias="item_uuids") # Renamed to UUID, expects "item_uuids" in JSON
     item_funds: List[str]
-    totalPrice: List[float]
+    totalPrice: Optional[List[float]]
     target_status: List[ItemStatus] # Changed to use your ItemStatus enum for better validation
     action: str
     co: Optional[str] = None
@@ -132,3 +132,12 @@ class FinalApprovalLineItem(BaseModel):
     created_at: datetime
     status: ItemStatus
     deputy_can_approve: bool  # total price must be equal to or less than $250
+    
+
+class DenyPayload(BaseModel):
+    ID: str
+    item_uuids: List[str]
+    target_status: List[ItemStatus]  # Changed to List to match frontend
+    action: str
+    
+    

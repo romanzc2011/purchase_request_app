@@ -11,7 +11,7 @@ uvicorn pras_api:app --port 5004
 
 from datetime import datetime, timezone
 import json
-from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema
+from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
 from api.schemas.comment_schemas import CommentItem
@@ -594,21 +594,45 @@ async def assign_IRQ1_ID(
     
     return {"IRQ1_ID_ASSIGNED": True}
 
+@api_router.post("/denyRequest")
+async def deny_request(
+    payload: DenyPayload,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    logger.info(f"DENY PAYLOAD: {payload}")
+    
+    try:
+        for ID, item_uuids, target_status, action in zip(
+			payload.ID, payload.item_uuids, payload.target_status, payload.action
+		):
+            # Update the status to DENIED
+            stmt = (update(
+                PurchaseRequestLineItem)
+                    .where(PurchaseRequestLineItem.UUID == item_uuids)
+                    .values(status=target_status))
+            await db.execute(stmt)
+            await db.commit()
+            
+        # Process each item in the payload
+        logger.info("REQUEST DENIED")
+    except Exception as e:
+        logger.error(f"Error denying request: {e}")
+        raise HTTPException(status_code=500, detail=f"Error denying request: {e}")
+
 ##########################################################################
 ## APPROVE/DENY PURCHASE REQUEST
 # This endpoint will deal with all actions on a purchase request
 ##########################################################################
-@api_router.post("/approveDenyRequest")
+@api_router.post("/approveRequest")
 async def approve_deny_request(
     payload: RequestPayload,
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     
-    
     try:
-        final_approvers = ["EdwardTakara", "EdmundBrown"]   # TESTING ONLY, prod use CUE groups
-        
+        logger.info(f"PAYLOAD: {payload}")
         # Process each item in the payload
         results = []
         for i, (item_uuid, item_fund, total_price, target_status) in enumerate(zip(
@@ -616,9 +640,9 @@ async def approve_deny_request(
         )):
             # Check if item is already in the chain
             stmt = select(PendingApproval.status).where(
-				PendingApproval.line_item_uuid == item_uuid,
-				PendingApproval.purchase_request_id == payload.ID
-			)
+                PendingApproval.line_item_uuid == item_uuid,
+                PendingApproval.purchase_request_id == payload.ID
+            )
             result = await db.execute(stmt)
             status_row = result.scalar_one_or_none()
             already_in_chain = status_row == ItemStatus.PENDING_APPROVAL
@@ -629,7 +653,7 @@ async def approve_deny_request(
             else:
                 router = ApprovalRouter() # Defaults to full chain: IT -> Finance -> ClerkAdmin
             #################################################################################################
-			# START CHAIN
+            # START CHAIN
             # Get assigned group from pending_approvals via line_item_uuid/purchase_request_id
             stmt = select(
                 PendingApproval.pending_approval_id,
@@ -661,7 +685,7 @@ async def approve_deny_request(
             result = await router.route(approval_request, db, current_user, ldap_service)
             logger.info(f"Result: {result}")
             #################################################################################################
-			# END CHAIN
+            # END CHAIN
             #################################################################################################
             results.append({
                 "uuid": item_uuid,
