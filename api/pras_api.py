@@ -221,6 +221,8 @@ async def generate_pdf(
         pdf_output_dir = settings.PDF_OUTPUT_FOLDER
         os.makedirs(pdf_output_dir, exist_ok=True)
         
+        
+        
         # Use the asynchronous create_pdf method
         pdf_path = await pdf_service.create_pdf(
             ID=ID,
@@ -298,7 +300,6 @@ async def send_purchase_request(
     #################################################################################
     ## BUILD EMAIL PAYLOADS
     #################################################################################
-
     items_for_email = [
         LineItemsPayload(
             budgetObjCode=item.budget_obj_code,
@@ -332,8 +333,12 @@ async def send_purchase_request(
         db.add(orm_pr_header)
         await db.flush()  # makes ORM defaults (like pk/uuid) available
 
+  
         pr_line_item_uuids: List[str] = []
-        for item in payload.items:
+        uploaded_files: List[str] = []
+        
+        for item, file in zip(payload.items, files):
+            # Create line item
             orm_pr_line_item = PurchaseRequestLineItem(
                 purchase_request_id=orm_pr_header.ID,
                 itemDescription=item.item_description,
@@ -352,7 +357,31 @@ async def send_purchase_request(
                 created_time=utc_now_truncated(),
             )
             db.add(orm_pr_line_item)
-            await db.flush()
+            await db.flush() # UUID is now available
+            
+            # Save uploaded file if exists
+            if file and file.filename:
+                upload_dir = Path("uploads")
+                upload_dir.mkdir(exist_ok=True)
+                
+                filename = f"{orm_pr_line_item.UUID}_{file.filename}"
+                full_path = upload_dir / filename
+                
+                with open(full_path, "wb") as f:
+                    f.write(await file.read())
+                    
+                # Save file path to table in ORM model
+                orm_pr_line_item.uploaded_file_path = str(full_path.resolve())
+                uploaded_files.append(str(full_path.resolve()))
+                
+            # Generate PDF
+            logger.info("Generating PDF document")
+            pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
+            
+            # Save pdf path to purchase request header table
+            orm_pr_header.pdf_output_path = pdf_path
+            
+            # UUID tracking
             pr_line_item_uuids.append(orm_pr_line_item.UUID)
 
         # APPROVAL TABLE
@@ -419,17 +448,8 @@ async def send_purchase_request(
     if not payload.id:
         logger.error("No ID found in request data")
         raise HTTPException(status_code=400, detail="ID is required")
-    
-    # Create tasks list for files
-    uploaded_files = []
-    if files:
-        for file in files:
-            logger.info(f"Saving uploaded file: {file.filename}")
-            uploaded_files.append(await _save_files(payload.id, file))
-    
-    # Generate PDF
-    logger.info("Generating PDF document")
-    pdf_path: str = await generate_pdf(payload, payload.id, db, uploaded_files)
+
+
     
     #################################################################################
     ## EMAIL PAYLOADS

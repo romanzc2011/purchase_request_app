@@ -73,6 +73,7 @@ class PurchaseRequestHeader(Base):
     datereq            : Mapped[str] = mapped_column(String)
     dateneed           : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     orderType          : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    pdf_output_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_time       = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
 
     # 1️⃣ headers → line‐items
@@ -119,7 +120,6 @@ class PurchaseRequestLineItem(Base):
     totalPrice             : Mapped[float] = mapped_column(Float)
     location               : Mapped[str] = mapped_column(String)
     isCyberSecRelated      : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
-    pdf_output_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     uploaded_file_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     status                 : Mapped[ItemStatus] = mapped_column(
