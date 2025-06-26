@@ -24,7 +24,9 @@ function ContractingOfficerDropdown() {
 				throw new Error('Failed to fetch contracting officers');
 			}
 			const data = await response.json();
-			setOptions(data);
+
+
+			console.log(data);
 		} catch (error) {
 			console.error('Error fetching contracting officers:', error);
 		}

@@ -49,7 +49,7 @@ from api.services.db_service import (
     Approval,
     PendingApproval,
     SonComment,
-    FinalApproval
+    ContractingOfficer
 )
 
 # Schemas
@@ -946,11 +946,36 @@ async def cyber_sec_related(
     return line_item
 
 ##########################################################################
+## GET CONTRACTING OFFICER
+##########################################################################
+@api_router.get("/get_contracting_officer")
+async def get_contracting_officer(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    """
+    Get a list of contracting officers.
+    """
+    stmt = select(ContractingOfficer)
+    result = await db.execute(stmt)
+    contracting_officers = result.scalars().all()
+    
+    return [
+        {
+            "id": co.id,
+            "username": co.username,
+            "email": co.email
+        }
+        for co in contracting_officers
+    ]
+
+##########################################################################
 ##########################################################################
 ## PROGRAM FUNCTIONS -- non API
 ##########################################################################
 ##########################################################################
 
+# Register routes -- routes must be above this to be visible
 app.include_router(api_router)
         
 ##########################################################################
@@ -979,19 +1004,6 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
         logger.error(f"Error during file upload: {e}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {e}")
 
-##########################################################################
-## ASSIGN CONTRACTING OFFICER
-##########################################################################
-@api_router.post("/assign_contracting_officer")
-async def assign_contracting_officer(
-    payload: AssignContractingOfficerPayload,
-    db: AsyncSession = Depends(get_async_session),
-    current_user: LDAPUser = Depends(auth_service.get_current_user)
-):
-    """
-    Assign a contracting officer to a purchase request.
-    """
-    pass
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params
 ##########################################################################

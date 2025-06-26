@@ -65,16 +65,17 @@ def utc_now_truncated() -> datetime:
 class PurchaseRequestHeader(Base):
     __tablename__ = "purchase_request_headers"
 
-    ID                 : Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    IRQ1_ID            : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
-    CO                 : Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    requester          : Mapped[str] = mapped_column(String, nullable=False)
-    phoneext           : Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq            : Mapped[str] = mapped_column(String)
-    dateneed           : Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    orderType          : Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    pdf_output_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    created_time       = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
+    ID                 		: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    IRQ1_ID            		: Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
+    CO                 		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    requester          		: Mapped[str] = mapped_column(String, nullable=False)
+    phoneext           		: Mapped[int] = mapped_column(Integer, nullable=False)
+    datereq            		: Mapped[str] = mapped_column(String)
+    dateneed           		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    orderType          		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    pdf_output_path    		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    contracting_officer_id	: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("contracting_officers.id"), nullable=True)
+    created_time = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
 
     # 1️⃣ headers → line‐items
     pr_line_items      : Mapped[List[PurchaseRequestLineItem]] = relationship(
@@ -99,6 +100,12 @@ class PurchaseRequestHeader(Base):
                             cascade="all, delete-orphan",
                             foreign_keys="[PendingApproval.purchase_request_id]"
                          )
+    
+    # headers -> contracting_officers
+    contracting_officer	: Mapped["ContractingOfficer"] = relationship(
+		"ContractingOfficer",
+		backref="purchase_request_header"
+	)
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PURCHASE REQUEST LINE ITEM
@@ -353,22 +360,9 @@ class SonComment(Base):
 class ContractingOfficer(Base):
     __tablename__ = "contracting_officers"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    purchase_request_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("purchase_request_headers.ID"), nullable=True)
-    approvals_uuid: Mapped[Optional[str]] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=True)
-    CO: Mapped[Optional[str]] = mapped_column(String)
     username: Mapped[Optional[str]] = mapped_column(String)
     email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
-# SEED CONTRACTING OFFICER
-async def seed_contracting_officer(async_session: AsyncSession):
-    existing = await async_session.execute(select(ContractingOfficer).limit(1))
-    if existing.scalars().first():
-        return
-    
-    async_session.add(ContractingOfficer(
-        CO="romancampbell", username="romancampbell", email="roman_campbell@lawb.uscourts.gov"
-	))
-    await async_session.commit()
 
 ###################################################################################################
 ## SEEDING JUSTIFICATION TEMPLATES
@@ -378,30 +372,9 @@ class JustificationTemplate(Base):
     __tablename__ = "justification_templates"
     code        = mapped_column(String, primary_key=True)
     description = mapped_column(
-        Text, 
+        Text,
         nullable=False)
     
-# Seed justification templates
-async def seed_justification_templates(async_session: AsyncSession):
-    # Only insert if empty
-    existing = await async_session.execute(select(JustificationTemplate).limit(1))
-    if existing.scalars().first():
-        return
-    
-    templates = [
-        JustificationTemplate(
-            code="NOT_AVAILABLE",
-            description="No comparable programs listed on approved sites."
-        ),
-        JustificationTemplate(
-            code="DOESNT_MEET_NEEDS",
-            description="Current offerings do not meet the needs of the requester."
-        ),
-    ]
-    async_session.add_all(templates)
-    await async_session.commit()
-
-# After table creation, seed the table with the following data:
 # Create cache to store justification text
 cache = Cache(Cache.MEMORY)
 
@@ -484,9 +457,6 @@ async def get_son_comments_by_id(
 	ID: str
 ) -> list[SonComment]:
     pass
-    
-
-
 
 ###################################################################################################
 # Get order types by ID
@@ -840,8 +810,21 @@ def init_db():
                         description="Current offerings do not meet the needs of the requester."
                     ),
                 ])
+                
+                session.commit()
+                
+            if not session.query(ContractingOfficer).first():
+                logger.info("Seeding Contracting Officers")
+                session.add_all([
+					ContractingOfficer(
+						username="romancampbell",
+						email="roman_campbell@lawb.uscourts.gov"
+					)
+				])
+                
                 session.commit()
         logger.info("Database initialized successfully")
+        
     except Exception as e:
         logger.error(f"Error initializing database: {e}")
         raise
