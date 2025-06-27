@@ -230,7 +230,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	const [fullJust, setFullJust] = useState<string>("");
 
 	// SELECTED CONTRACTING OFFICER
-	const [selectedCO, setSelectedCO] = useState<string>("");
+	const [selectedCO, setSelectedCO] = useState<number | "">("");
 
 	// track which groups are expanded
 	const toggleRow = (key: string) => setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
@@ -541,8 +541,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	//####################################################################
 	// HANDLE CONTRACTING OFFICER
 	//####################################################################
-	async function handleAssignCO() {
-		console.log("Assigning CO to selected items", selectedCO);
+	async function handleAssignCO(officerId: number, username: string) {
+		console.log("Assigning CO to selected items", { officerId, username });
 
 		// Get selected Rows
 		const selectedItemUUIDs = Array.from(rowSelectionModel.ids)
@@ -570,7 +570,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 				},
 				body: JSON.stringify({
 					request_ids: requestIDs,
-					contracting_officer: selectedCO
+					contracting_officer_id: officerId,
+					contracting_officer: username
 				})
 			});
 

@@ -12,6 +12,7 @@ uvicorn pras_api:app --port 5004
 from datetime import datetime, timezone
 import json
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload
+from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
 from api.schemas.comment_schemas import CommentItem
@@ -643,7 +644,18 @@ async def assign_contracting_officer(
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     logger.info(f"ASSIGN CO PAYLOAD: {payload}")
-    pass
+    try:
+        for ID in payload.request_ids:
+            # Update the contracting officer
+            stmt = (update(PurchaseRequestHeader)
+                    .where(PurchaseRequestHeader.ID == ID)
+                    .values(contracting_officer_id=payload.contracting_officer_id))
+            await db.execute(stmt)
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Error assigning CO: {e}")
+        raise HTTPException(status_code=500, detail=f"Error assigning CO: {e}")
+    return {"message": "CO assigned successfully"}
 
 #########################################################################
 ## DENY PURCHASE REQUEST

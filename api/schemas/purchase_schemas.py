@@ -113,4 +113,5 @@ class PurchaseRequestHeader(BaseModel):
         
 class AssignCOPayload(BaseModel):
     request_ids: List[str]
+    contracting_officer_id: int
     contracting_officer: str

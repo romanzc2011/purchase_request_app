@@ -80,7 +80,24 @@ BEGIN
     WHERE UUID = NEW.line_item_uuid;
 END;
 
--- DELETE FROM final_approvals;
+----------------------------------------------------------
+/* Trigger to auto update CO in approvals
+on contracting_officer_id update in pr header */
+----------------------------------------------------------
+CREATE TRIGGER sync_co_on_update_prhdr
+AFTER UPDATE ON purchase_request_headers
+WHEN NEW.contracting_officer_id IS NOT NULL
+BEGIN
+  UPDATE approvals
+     SET CO = (
+       SELECT username
+         FROM contracting_officers
+        WHERE id = NEW.contracting_officer_id
+     )
+   WHERE purchase_request_id = NEW.id;
+END;
+
+-- DELETE FROM final_approvals;	1
 -- DELETE FROM pending_approvals;
 -- DELETE FROM approvals;
 -- DELETE FROM pr_line_items;
