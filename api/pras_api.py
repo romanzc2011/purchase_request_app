@@ -311,16 +311,17 @@ async def send_purchase_request(
         )
         for item in payload.items
     ]
-    
+    logger.debug(f"THIS IS PAYLOAD: {payload}")
     # Build header & line items inside a single transaction
-    purchase_req_id = None  # Need this for generation of pdf 
+    pdf_path: str | None = None
     async with db.begin():
         # Generate the purchase request ID
         purchase_req_id = dbas.set_purchase_req_id()
+        logger.debug(f"PURCHASE REQUEST ID: {purchase_req_id}")
         
         # PURCHASE REQUEST HEADER TABLE
         orm_pr_header = PurchaseRequestHeader(
-            ID=purchase_req_id,  # Set the ID explicitly
+            ID=purchase_req_id,
             IRQ1_ID=payload.irq1_id,
             CO=payload.co,
             requester=current_user.username,
@@ -331,7 +332,6 @@ async def send_purchase_request(
         )
         db.add(orm_pr_header)
         await db.flush()  # makes ORM defaults (like pk/uuid) available
-
   
         pr_line_item_uuids: List[str] = []
         uploaded_files: List[str] = []
@@ -339,7 +339,9 @@ async def send_purchase_request(
         # Handle case where no files are provided
         files_list = files or []
         
-        for item, file in zip(payload.items, files_list):
+        for idx, item in enumerate(payload.items):
+            file = files_list[idx] if idx < len(files_list) else None
+            
             # Create line item
             orm_pr_line_item = PurchaseRequestLineItem(
                 purchase_request_id=orm_pr_header.ID,
@@ -378,6 +380,8 @@ async def send_purchase_request(
             
             # UUID tracking
             pr_line_item_uuids.append(orm_pr_line_item.UUID)
+        
+        
 
         # APPROVAL TABLE
         approvals: List[Approval] = []
@@ -421,10 +425,13 @@ async def send_purchase_request(
             )
             db.add(task)
             await db.flush()
+            
+            # Generate PDF once for the entire purchase request
+            logger.info("Generating PDF document")
+            pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
+            
+            orm_pr_header.pdf_output_path = pdf_path
     # <--- transaction is committed here
-    
-    # Add a small delay to ensure transaction is fully committed
-    await asyncio.sleep(0.1)
     
     ################################################################3
     ## VALIDATE/PROCESS PAYLOAD
@@ -446,46 +453,44 @@ async def send_purchase_request(
     if not payload.id:
         logger.error("No ID found in request data")
         raise HTTPException(status_code=400, detail="ID is required")
-
-    # Generate PDF once for the entire purchase request
-    logger.info("Generating PDF document")
-    logger.info(f"Using purchase request ID: {purchase_req_id}")
     
-    try:
-        pdf_path: str = await generate_pdf(payload, purchase_req_id, db, uploaded_files)
-        logger.info(f"PDF generated successfully at: {pdf_path}")
-    except Exception as e:
-        logger.error(f"PDF generation failed: {e}")
-        # Continue without PDF - don't fail the entire request
-        pdf_path = None
-    
-    #################################################################################
+    ##########################################################################
     ## EMAIL PAYLOADS
-    #################################################################################
-    # Prepare attachments list - only include PDF if it was generated successfully
-    attachments = []
-    if pdf_path:
-        attachments.append(pdf_path)
-    attachments.extend(uploaded_files)
+    ##########################################################################
+    attachments_list = []
     
-    email_request_payload = EmailPayloadRequest(
-        model_type="email_request",
-        ID=payload.id,
-        requester=payload.requester,
-        requester_email=requester_email,
-        datereq=payload.items[0].datereq,
-        dateneed=payload.items[0].dateneed,
-        orderType=payload.items[0].order_type,
-        subject=f"Purchase Request #{payload.id}",
-        sender=settings.smtp_email_addr,
-        to=None,   # Assign this in the smtp service
-        cc=None,
-        bcc=None,
-        text_body=None,
-        approval_link=f"{settings.link_to_request}",
-        items=items_for_email,
-        attachments=attachments
-    )
+    if pdf_path is not None:
+        attachments_list.append(pdf_path)
+        
+    for path in uploaded_files:
+        if path is not None:
+            attachments_list.append(path)
+            
+    # Build kwargs dict for Pydantic, omitting attachments until confirmed present
+    payload_kwargs = {
+        "model_type": "email_request",
+        "ID": payload.id,
+        "requester": payload.requester,
+        "requester_email": requester_email,
+        "datereq": payload.items[0].datereq,
+        "dateneed": payload.items[0].dateneed,
+        "orderType": payload.items[0].order_type,
+        "subject": f"Purchase Request #{payload.id}",
+        "sender": settings.smtp_email_addr,
+        "to": None,
+        "cc": None,
+        "bcc": None,
+        "text_body": None,
+        "approval_link": settings.link_to_request,
+        "items": items_for_email,
+    }
+    
+    # Add attachments only if there are attachments to add
+    if len(attachments_list) > 0:
+        payload_kwargs["attachments"] = attachments_list
+        
+    # Now instatiate the email pydantic model
+    email_request_payload = EmailPayloadRequest(**payload_kwargs)
     
     """
     # Make the to a condition, if this is a request from a requester, then we need to send it to the approvers
@@ -638,8 +643,8 @@ async def deny_request(
     
     try:
         for ID, item_uuids, target_status, action in zip(
-            payload.ID, payload.item_uuids, payload.target_status, payload.action
-        ):
+			payload.ID, payload.item_uuids, payload.target_status, payload.action
+		):
             # Update the status to DENIED
             stmt = (update(
                 PurchaseRequestLineItem)

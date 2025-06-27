@@ -50,6 +50,7 @@ class ApproverEmailBuilder(EmailBuilder):
 				PurchaseRequestHeader.datereq,
 				PurchaseRequestHeader.dateneed,
 				PurchaseRequestHeader.orderType,
+				PurchaseRequestHeader.pdf_output_path,
 				PurchaseRequestLineItem.budgetObjCode,
 				PurchaseRequestLineItem.itemDescription,
 				PurchaseRequestLineItem.justification,
@@ -59,7 +60,6 @@ class ApproverEmailBuilder(EmailBuilder):
 				PurchaseRequestLineItem.totalPrice,
 				PurchaseRequestLineItem.fund,
 				PurchaseRequestLineItem.isCyberSecRelated,
-				PurchaseRequestLineItem.pdf_output_path,
 				PurchaseRequestLineItem.uploaded_file_path
 			)
 			.join(PurchaseRequestLineItem, PurchaseRequestLineItem.purchase_request_id == PurchaseRequestHeader.ID)
@@ -93,8 +93,6 @@ class ApproverEmailBuilder(EmailBuilder):
         # Build flat list of attachments from every row
         attachments: list[str] = []
         for r in rows:
-            if r.pdf_output_path:
-                attachments.append(r.pdf_output_path)
             if r.uploaded_file_path:
                 if isinstance(r.uploaded_file_path, (list, tuple)):
                     attachments.extend(r.uploaded_file_path)

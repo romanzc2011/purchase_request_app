@@ -51,15 +51,23 @@ function ContractingOfficerDropdown() {
 					value={selectValue}
 					label="Select Option"
 					onChange={(e) => setSelectValue(e.target.value)}
-					sx={{
-						color: 'white',
-						'& .MuiOutlinedInput-notchedOutline': {
-							borderColor: 'white',
-						},
+					sx={{ color: 'white' }}
+					MenuProps={{
+						PaperProps: {
+							sx: {
+								backgroundColor: '#2c2c2c',
+								color: 'white'
+							}
+						}
 					}}
 				>
+					<MenuItem value="" sx={{ color: 'white' }}>
+						<em>None</em>
+					</MenuItem>
 					{officers.map((officer) => (
-						<MenuItem>{officer.username}</MenuItem>
+						<MenuItem key={officer.id} value={officer.username} sx={{ color: 'white' }}>
+							{officer.username}
+						</MenuItem>
 					))}
 				</Select>
 			</FormControl>
