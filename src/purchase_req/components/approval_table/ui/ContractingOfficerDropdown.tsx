@@ -1,5 +1,6 @@
 import { FormControl, InputLabel, Select, MenuItem, Typography, Box } from '@mui/material';
 import { useState, useEffect } from 'react';
+import { ContractingOfficer } from '../../../types/approvalTypes';
 
 /* API URLs */
 const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_contracting_officer`;
@@ -9,7 +10,7 @@ const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_con
 // ------------------------------------------------------------
 function ContractingOfficerDropdown() {
 	const [selectValue, setSelectValue] = useState('');
-	const [options, setOptions] = useState([]);
+	const [officers, setContractingOfficers] = useState<ContractingOfficer[]>([]);
 
 	// Fetch contracting officers from PRAS backend
 	const fetchContractingOfficers = async () => {
@@ -23,8 +24,8 @@ function ContractingOfficerDropdown() {
 			if (!response.ok) {
 				throw new Error('Failed to fetch contracting officers');
 			}
-			const data = await response.json();
-
+			const data: ContractingOfficer[] = await response.json();
+			setContractingOfficers(data);
 
 			console.log(data);
 		} catch (error) {
@@ -57,8 +58,8 @@ function ContractingOfficerDropdown() {
 						},
 					}}
 				>
-					{options.map((option: any) => (
-						<MenuItem key={option.id} value={option.id}>{option.name}</MenuItem>
+					{officers.map((officer) => (
+						<MenuItem>{officer.username}</MenuItem>
 					))}
 				</Select>
 			</FormControl>

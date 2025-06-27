@@ -221,8 +221,6 @@ async def generate_pdf(
         pdf_output_dir = settings.PDF_OUTPUT_FOLDER
         os.makedirs(pdf_output_dir, exist_ok=True)
         
-        
-        
         # Use the asynchronous create_pdf method
         pdf_path = await pdf_service.create_pdf(
             ID=ID,
@@ -315,6 +313,7 @@ async def send_purchase_request(
     ]
     
     # Build header & line items inside a single transaction
+    purchase_req_id = None  # Need this for generation of pdf 
     async with db.begin():
         # Generate the purchase request ID
         purchase_req_id = dbas.set_purchase_req_id()
@@ -337,7 +336,10 @@ async def send_purchase_request(
         pr_line_item_uuids: List[str] = []
         uploaded_files: List[str] = []
         
-        for item, file in zip(payload.items, files):
+        # Handle case where no files are provided
+        files_list = files or []
+        
+        for item, file in zip(payload.items, files_list):
             # Create line item
             orm_pr_line_item = PurchaseRequestLineItem(
                 purchase_request_id=orm_pr_header.ID,
@@ -373,13 +375,6 @@ async def send_purchase_request(
                 # Save file path to table in ORM model
                 orm_pr_line_item.uploaded_file_path = str(full_path.resolve())
                 uploaded_files.append(str(full_path.resolve()))
-                
-            # Generate PDF
-            logger.info("Generating PDF document")
-            pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
-            
-            # Save pdf path to purchase request header table
-            orm_pr_header.pdf_output_path = pdf_path
             
             # UUID tracking
             pr_line_item_uuids.append(orm_pr_line_item.UUID)
@@ -428,6 +423,9 @@ async def send_purchase_request(
             await db.flush()
     # <--- transaction is committed here
     
+    # Add a small delay to ensure transaction is fully committed
+    await asyncio.sleep(0.1)
+    
     ################################################################3
     ## VALIDATE/PROCESS PAYLOAD
     logger.debug(f"DATA: {payload}")
@@ -449,11 +447,27 @@ async def send_purchase_request(
         logger.error("No ID found in request data")
         raise HTTPException(status_code=400, detail="ID is required")
 
-
+    # Generate PDF once for the entire purchase request
+    logger.info("Generating PDF document")
+    logger.info(f"Using purchase request ID: {purchase_req_id}")
+    
+    try:
+        pdf_path: str = await generate_pdf(payload, purchase_req_id, db, uploaded_files)
+        logger.info(f"PDF generated successfully at: {pdf_path}")
+    except Exception as e:
+        logger.error(f"PDF generation failed: {e}")
+        # Continue without PDF - don't fail the entire request
+        pdf_path = None
     
     #################################################################################
     ## EMAIL PAYLOADS
     #################################################################################
+    # Prepare attachments list - only include PDF if it was generated successfully
+    attachments = []
+    if pdf_path:
+        attachments.append(pdf_path)
+    attachments.extend(uploaded_files)
+    
     email_request_payload = EmailPayloadRequest(
         model_type="email_request",
         ID=payload.id,
@@ -470,7 +484,7 @@ async def send_purchase_request(
         text_body=None,
         approval_link=f"{settings.link_to_request}",
         items=items_for_email,
-        attachments=[pdf_path, *uploaded_files]
+        attachments=attachments
     )
     
     """
@@ -624,8 +638,8 @@ async def deny_request(
     
     try:
         for ID, item_uuids, target_status, action in zip(
-			payload.ID, payload.item_uuids, payload.target_status, payload.action
-		):
+            payload.ID, payload.item_uuids, payload.target_status, payload.action
+        ):
             # Update the status to DENIED
             stmt = (update(
                 PurchaseRequestLineItem)
