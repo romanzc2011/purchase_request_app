@@ -511,7 +511,7 @@ async def send_purchase_request(
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
-##########################################################################
+#########################################################################
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     request_id = str(uuid.uuid4())
@@ -633,6 +633,21 @@ async def assign_IRQ1_ID(
     
     return {"IRQ1_ID_ASSIGNED": True}
 
+#########################################################################
+## ASSIGN CONTRACTING OFFICER
+#########################################################################
+@api_router.post("/assignCO")
+async def assign_contracting_officer(
+    payload: AssignCOPayload,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    logger.info(f"ASSIGN CO PAYLOAD: {payload}")
+    pass
+
+#########################################################################
+## DENY PURCHASE REQUEST
+#########################################################################
 @api_router.post("/denyRequest")
 async def deny_request(
     payload: DenyPayload,

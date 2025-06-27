@@ -1,6 +1,13 @@
 import { FormControl, InputLabel, Select, MenuItem, Typography, Box } from '@mui/material';
 import { useState, useEffect } from 'react';
 import { ContractingOfficer } from '../../../types/approvalTypes';
+import Buttons from '../../purchase_req_table/Buttons';
+
+type Props = {
+	value: string;
+	onChange: (username: string) => void;
+	onClickOK: () => void;
+}
 
 /* API URLs */
 const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_contracting_officer`;
@@ -8,8 +15,7 @@ const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_con
 // ------------------------------------------------------------
 // CONTRACTING OFFICER DROPDOWN COMPONENT
 // ------------------------------------------------------------
-function ContractingOfficerDropdown() {
-	const [selectValue, setSelectValue] = useState('');
+function ContractingOfficerDropdown({ value, onChange, onClickOK }: Props) {
 	const [officers, setContractingOfficers] = useState<ContractingOfficer[]>([]);
 
 	// Fetch contracting officers from PRAS backend
@@ -48,9 +54,9 @@ function ContractingOfficerDropdown() {
 				<Select
 					labelId="contracting-officer-select-label"
 					id="contracting-officer-select"
-					value={selectValue}
+					value={value}
 					label="Select Option"
-					onChange={(e) => setSelectValue(e.target.value)}
+					onChange={(e) => onChange(e.target.value)}
 					sx={{ color: 'white' }}
 					MenuProps={{
 						PaperProps: {
@@ -71,7 +77,15 @@ function ContractingOfficerDropdown() {
 					))}
 				</Select>
 			</FormControl>
+			<Buttons
+				className="btn btn-maroon assign-button"
+				label={"OK"}
+				onClick={() => {
+					onClickOK();
+				}}
+			/>
 		</Box>
+
 	)
 }
 export default ContractingOfficerDropdown;

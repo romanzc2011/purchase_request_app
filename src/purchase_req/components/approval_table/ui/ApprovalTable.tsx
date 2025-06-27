@@ -50,6 +50,7 @@ const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalDa
 const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
 const API_URL_APPROVE = `${import.meta.env.VITE_API_URL}/api/approveRequest`;
 const API_URL_DENY = `${import.meta.env.VITE_API_URL}/api/denyRequest`;
+const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 
 // Define a type for the DataGrid sx prop
@@ -227,6 +228,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	// JUSTIFICATION MODAL - for when length is too long
 	const [openJust, setOpenJust] = useState<boolean>(false);
 	const [fullJust, setFullJust] = useState<string>("");
+
+	// SELECTED CONTRACTING OFFICER
+	const [selectedCO, setSelectedCO] = useState<string>("");
 
 	// track which groups are expanded
 	const toggleRow = (key: string) => setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
@@ -534,7 +538,53 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		setRowSelectionModel({ ids: new Set(), type: 'include' });
 	}
 
+	//####################################################################
+	// HANDLE CONTRACTING OFFICER
+	//####################################################################
+	async function handleAssignCO() {
+		console.log("Assigning CO to selected items", selectedCO);
 
+		// Get selected Rows
+		const selectedItemUUIDs = Array.from(rowSelectionModel.ids)
+			.filter(id => !String(id).startsWith("header-"));
+
+		if (selectedItemUUIDs.length === 0) {
+			toast.error("No items selected");
+			console.log("No items selected");
+			return;
+		}
+
+		const requestIDs = [
+			...new Set(approvalData
+				.filter(item => selectedItemUUIDs.includes(item.UUID))
+				.map(item => item.ID)
+			)
+		];
+
+		try {
+			const response = await fetch(API_URL_ASSIGN_CO, {
+				method: "POST",
+				headers: {
+					"Authorization": `Bearer ${localStorage.getItem("access_token")}`,
+					"Content-Type": "application/json"
+				},
+				body: JSON.stringify({
+					request_ids: requestIDs,
+					contracting_officer: selectedCO
+				})
+			});
+
+			if (!response.ok) {
+				throw new Error("Failed to assign CO");
+			}
+
+			toast.success("CO assigned successfully");
+			queryClient.invalidateQueries({ queryKey: ["approvalData"] });
+		} catch (error) {
+			console.error("Failed to assign CO:", error);
+			toast.error("Failed to assign CO");
+		}
+	}
 
 	// the "toggle" column for group headers
 	const toggleColumn: GridColDef = {
@@ -874,8 +924,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			renderCell: params => (
 				<Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
 
-
-
 					{/* Download Button */}
 					<Button startIcon={<DownloadOutlinedIcon />} variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
 						Download
@@ -904,7 +952,11 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			</Box>
 
 			{/* CONTRACTING OFFICER DROPDOWN */}
-			<ContractingOfficerDropdown />
+			<ContractingOfficerDropdown
+				value={selectedCO}
+				onChange={setSelectedCO}
+				onClickOK={handleAssignCO}
+			/>
 
 			{/* COMMAND TOOLBAR */}
 			<Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>

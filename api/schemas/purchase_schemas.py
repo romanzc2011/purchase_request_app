@@ -110,3 +110,7 @@ class PurchaseRequestHeader(BaseModel):
     
     class Config:
         from_attributes = True
+        
+class AssignCOPayload(BaseModel):
+    request_ids: List[str]
+    contracting_officer: str
