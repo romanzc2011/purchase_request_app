@@ -140,7 +140,9 @@ class PDFService:
         # Build justifcation template if true for trainNotAval or needsNotMeet
         # Fetch additional comment from database if present
         additional_comments = await get_justifications_and_comments(db, ID)
-
+        contracting_officer = await dbas.get_contracting_officer_by_id(db, ID)
+        logger.info(f"contracting_officer: {contracting_officer}")
+        
 		# ------------------------------------------------------------------------
         # 3️⃣ Load SonComments via async select
         stmt = (
@@ -171,6 +173,7 @@ class PDFService:
             is_cyber=is_cyber,
             comments=comment_arr,
             order_type=order_type,
+            contracting_officer=contracting_officer,
         )
             
     """
@@ -195,7 +198,8 @@ class PDFService:
                                    output_path: Path,
                                    is_cyber: bool, 
                                    comments: list[str]=None, 
-                                   order_type: str=None
+                                   order_type: str=None,
+                                   contracting_officer: str=None
                                    ) -> Path: 
         logger.info(f"#####################################################")
         logger.info("make_purchase_request_pdf()")
@@ -294,7 +298,7 @@ class PDFService:
                 ("Purchase Request ID:", first.get("purchase_request_id","")),
                 ("IRQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", format_username(first.get("requester","") or "")),
-                ("CO:", first.get("CO","")),
+                ("CO:", contracting_officer or "None"),
                 ("Date Needed:", date_str),
                 
             ]

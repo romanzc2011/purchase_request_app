@@ -786,6 +786,19 @@ async def mark_final_approval_as_approved(
 		.values(status=ItemStatus.APPROVED)
 	)
     await db.commit()
+    
+###################################################################################################
+# GET CONTRACTING OFFICER BY ID
+###################################################################################################
+async def get_contracting_officer_by_id(db: AsyncSession, ID: str) -> str:
+    """Get the contracting officer by LAWB ID"""
+    try:
+        stmt = select(Approval.CO).where(Approval.purchase_request_id == ID).limit(1)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
+    except Exception as e:
+        logger.error(f"Error getting contracting officer by ID: {e}")
+        return None
 		
 ###################################################################################################
 # Initialize database
