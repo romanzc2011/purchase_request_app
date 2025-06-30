@@ -587,6 +587,13 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		}
 	}
 
+	//####################################################################
+	// HANDLE UPDATE PROCESS ROW (PRICE EACH)
+	//####################################################################
+	const handleProcessRowUpdate = async (newRow: DataRow, oldRow: DataRow) => {
+		console.log("Processing row update", { newRow, oldRow });
+	}
+
 	// the "toggle" column for group headers
 	const toggleColumn: GridColDef = {
 		field: "__groupToggle",
@@ -779,6 +786,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			align: "center",
 			sortable: true,
 			width: 120,
+			editable: true,
 			renderCell: params => {
 				if (params.row.isGroup && expandedRows[params.row.groupKey]) { return null; }
 				return typeof params.value === "number" ? params.value.toFixed(2) : "0.00";
