@@ -5,6 +5,7 @@ import "./LearningDev";
 import { Box, Snackbar, Alert } from "@mui/material";
 import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
+import ContractingOfficerDropdown from "./ContractingOfficerDropdown";
 import BudgetCodePicker from "./BudgetCodePicker";
 import { useEffect } from "react";
 import { TextField, Typography } from "@mui/material";
@@ -49,9 +50,21 @@ function AddItemsForm({
 }: AddItemsProps) {
 	const { setUUID } = useUUIDStore();
 	const form = usePurchaseForm();
-	const { register, control, handleSubmit, formState, watch, reset, trigger } = form;
+	const {
+		register,
+		control,
+		handleSubmit,
+		formState,
+		watch,
+		reset,
+		trigger,
+		handleAssignCO,
+	} = form;
 	const { errors, isValid, isSubmitted } = formState;
 	const [showSuccess, setShowSuccess] = useState(false);
+	const [selectedCO, setSelectedCO] = useState<number | "">("");
+
+
 
 	// Reserve the ID for the request
 	useEffect(() => {
@@ -359,6 +372,12 @@ function AddItemsForm({
 					<Grid size={{ xs: 12 }}>
 						<p className="error">{errors.dateneed?.message}</p>
 					</Grid>
+					{/* CONTRACTING OFFICER DROPDOWN */}
+					<ContractingOfficerDropdown
+						value={selectedCO}
+						onChange={setSelectedCO}
+						onClickOK={handleAssignCO}
+					/>
 					<hr />
 
 					{/******************************************************************************************* */}

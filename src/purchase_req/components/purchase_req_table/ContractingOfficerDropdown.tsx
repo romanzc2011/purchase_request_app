@@ -1,7 +1,7 @@
 import { FormControl, InputLabel, Select, MenuItem, Typography, Box } from '@mui/material';
 import { useState, useEffect } from 'react';
-import { ContractingOfficer } from '../../../types/approvalTypes';
-import Buttons from '../../purchase_req_table/Buttons';
+import { ContractingOfficer } from '../../types/approvalTypes';
+import Buttons from './Buttons';
 import { toast } from "react-toastify";
 
 type Props = {
@@ -18,6 +18,7 @@ const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_con
 // ------------------------------------------------------------
 function ContractingOfficerDropdown({ value, onChange, onClickOK }: Props) {
 	const [officers, setContractingOfficers] = useState<ContractingOfficer[]>([]);
+	const [selectedCO, setSelectedCO] = useState<number | "">("");
 
 	// Fetch contracting officers from PRAS backend
 	const fetchContractingOfficers = async () => {

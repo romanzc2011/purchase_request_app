@@ -966,12 +966,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 				COMMAND TOOLBAR
 			</Box>
 
-			{/* CONTRACTING OFFICER DROPDOWN */}
-			<ContractingOfficerDropdown
-				value={selectedCO}
-				onChange={setSelectedCO}
-				onClickOK={handleAssignCO}
-			/>
+
 
 			{/* COMMAND TOOLBAR */}
 			<Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
