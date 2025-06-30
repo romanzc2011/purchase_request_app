@@ -48,8 +48,6 @@ let groupCommentPayload: GroupCommentPayload = {
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-const API_URL_APPROVE = `${import.meta.env.VITE_API_URL}/api/approveRequest`;
-const API_URL_DENY = `${import.meta.env.VITE_API_URL}/api/denyRequest`;
 const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 
@@ -587,6 +585,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		}
 	}
 
+
 	//####################################################################
 	// HANDLE UPDATE PROCESS ROW (PRICE EACH)
 	//####################################################################
@@ -594,7 +593,11 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		console.log("Processing row update", { newRow, oldRow });
 	}
 
-	// the "toggle" column for group headers
+
+	//####################################################################
+	// RENDER ROW/COLUMNS FOR APPROVAL TABLE
+	//####################################################################
+	// This handles the "toggle" column for group headers, adds the row icon to expand or collapse group
 	const toggleColumn: GridColDef = {
 		field: "__groupToggle",
 		headerName: "ID",
@@ -607,7 +610,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 				// Render an empty icon placeholder for alignment
 				return (
 					<Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-						<Box sx={{ width: 24 /* or whatever your icon's width is */ }} />
+						<Box sx={{ width: 24 }} />
 						<Box component="span" sx={{ ml: 1, fontWeight: "bold", color: "#FFFFFF" }}>
 							{`${row.groupKey} (${row.rowCount} items)`}
 						</Box>

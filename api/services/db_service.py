@@ -726,22 +726,6 @@ async def update_final_approval_status(
     return updated_obj
 
 ###################################################################################################
-# DETERMINE DEPUTY APPROVAL ELIGIBILITY
-###################################################################################################
-def can_deputy_approve(total_price: float) -> bool:
-    """
-    Determine if a deputy can approve based on the total price.
-    Deputies can approve requests with total price <= $250.
-    
-    Args:
-        total_price: Total price of the line item
-    
-    Returns:
-        True if deputy can approve, False otherwise
-    """
-    return total_price <= 250.0
-
-###################################################################################################
 # GET ASSIGNED GROUP
 ###################################################################################################
 async def get_assigned_group(db: AsyncSession, line_item_uuid: str) -> str:
