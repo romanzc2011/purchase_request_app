@@ -458,11 +458,6 @@ function AddItemsForm({
 					{/******************************************************************************************* */}
 					<Justification register={register} errors={errors} />
 
-					{/** FOR LEARNING OR DEV? ****************************************************************** */}
-					<Grid container>
-						<LearningDev control={control} />
-					</Grid>
-
 					<hr />
 					<Grid container spacing={2}>
 						{/* Column for the Select Pickers */}

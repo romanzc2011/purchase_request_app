@@ -97,7 +97,15 @@ BEGIN
    WHERE purchase_request_id = NEW.id;
 END;
 
--- DELETE FROM final_approvals;	1
+----------------------------------------------------------
+/* INSERT CONTRACTING OFFICERS */
+----------------------------------------------------------
+-- INSERT INTO contracting_officers
+-- (username, email)
+-- VALUES
+-- ("rydercampbell", "ryder@example.com");
+
+-- DELETE FROM final_approvals;
 -- DELETE FROM pending_approvals;
 -- DELETE FROM approvals;
 -- DELETE FROM pr_line_items;
@@ -105,6 +113,3 @@ END;
 -- DELETE FROM son_comments
 -- DELETE FROM justification_templates;
 -- DELETE FROM contracting_officers;
-
---RELEASE "UNDOPOINT";
-

@@ -490,7 +490,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		setRowSelectionModel({ ids: new Set(), type: 'include' });
 	}
 
-
 	//####################################################################
 	// HANDLE CYBERSECURITY RELATED
 	//####################################################################
@@ -639,6 +638,13 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			);
 		}
 	};
+
+	//####################################################################
+	// HANDLE EDIT PRICE EACH ROW
+	//####################################################################
+	const handleEditPriceEach = async (newRow: DataRow, oldRow: DataRow) => {
+		console.log("Processing row update", { newRow, oldRow });
+	}
 
 	/***********************************************************************************/
 	// IRQ1 COLUMN
