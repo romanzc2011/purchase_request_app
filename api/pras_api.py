@@ -643,15 +643,16 @@ async def assign_contracting_officer(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
+    request_id = dbas.set_purchase_req_id()
     logger.info(f"ASSIGN CO PAYLOAD: {payload}")
     try:
-        for ID in payload.request_ids:
-            # Update the contracting officer
-            stmt = (update(PurchaseRequestHeader)
-                    .where(PurchaseRequestHeader.ID == ID)
-                    .values(contracting_officer_id=payload.contracting_officer_id))
-            await db.execute(stmt)
-            await db.commit()
+        # Update the contracting officer
+        stmt = (update(PurchaseRequestHeader)
+                .where(PurchaseRequestHeader.ID == request_id)
+                .values(contracting_officer_id=payload.contracting_officer_id))
+        await db.execute(stmt)
+        await db.commit()
+        
     except Exception as e:
         logger.error(f"Error assigning CO: {e}")
         raise HTTPException(status_code=500, detail=f"Error assigning CO: {e}")

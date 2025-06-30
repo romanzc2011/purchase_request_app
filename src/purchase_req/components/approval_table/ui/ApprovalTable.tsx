@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
-import ContractingOfficerDropdown from "./ContractingOfficerDropdown";
+import ContractingOfficerDropdown from "../../purchase_req_table/ContractingOfficerDropdown";
 import { DataGrid, DataGridProps, GridColDef, GridRowId, GridRowSelectionModel } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";

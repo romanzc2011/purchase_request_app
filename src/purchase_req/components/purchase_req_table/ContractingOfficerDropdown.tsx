@@ -1,4 +1,5 @@
-import { FormControl, InputLabel, Select, MenuItem, Typography, Box } from '@mui/material';
+import * as React from 'react';
+import { FormControl, InputLabel, Select, MenuItem, Typography, Box, Input } from '@mui/material';
 import { useState, useEffect } from 'react';
 import { ContractingOfficer } from '../../types/approvalTypes';
 import Buttons from './Buttons';
@@ -6,8 +7,9 @@ import { toast } from "react-toastify";
 
 type Props = {
 	value: number | "";
+	requestID?: string;
 	onChange: (id: number | "") => void;
-	onClickOK: (officerId: number, username: string) => void;
+	onClickOK: (requestId: string, officerId: number, username: string) => void;
 }
 
 /* API URLs */
@@ -16,9 +18,8 @@ const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_con
 // ------------------------------------------------------------
 // CONTRACTING OFFICER DROPDOWN COMPONENT
 // ------------------------------------------------------------
-function ContractingOfficerDropdown({ value, onChange, onClickOK }: Props) {
+function ContractingOfficerDropdown({ value, requestID, onChange, onClickOK }: Props) {
 	const [officers, setContractingOfficers] = useState<ContractingOfficer[]>([]);
-	const [selectedCO, setSelectedCO] = useState<number | "">("");
 
 	// Fetch contracting officers from PRAS backend
 	const fetchContractingOfficers = async () => {
@@ -59,12 +60,35 @@ function ContractingOfficerDropdown({ value, onChange, onClickOK }: Props) {
 					value={value}
 					label="Select Option"
 					onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
-					sx={{ color: 'white' }}
+					sx={{
+						color: 'white',
+						'& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': {
+							borderColor: 'white',
+							borderWidth: '2px',
+						},
+						'& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+							borderColor: 'white',
+							borderWidth: '2px',
+						},
+						'& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
+							borderColor: 'white',
+							borderWidth: '2px',
+						},
+						'& .MuiSvgIcon-root': {
+							color: 'white',
+						},
+					}}
 					MenuProps={{
 						PaperProps: {
 							sx: {
 								backgroundColor: '#2c2c2c',
-								color: 'white'
+								color: 'white',
+								'& .MuiMenuItem-root': {
+									color: 'white',
+									'&:hover': {
+										backgroundColor: '#404040',
+									},
+								},
 							}
 						}
 					}}
@@ -91,8 +115,8 @@ function ContractingOfficerDropdown({ value, onChange, onClickOK }: Props) {
 					console.log("Selected officer:", selectedOfficer);
 
 					if (selectedOfficer && selectedOfficer.id !== undefined) {
-						console.log("Calling onClickOK with:", selectedOfficer.id, selectedOfficer.username);
-						onClickOK(selectedOfficer.id, selectedOfficer.username);
+						console.log("Calling onClickOK with:", requestID, selectedOfficer.id, selectedOfficer.username);
+						onClickOK(requestID || "", selectedOfficer.id, selectedOfficer.username);
 					} else {
 						console.log("No officer selected or officer not found");
 						toast.error("Please select a contracting officer");

@@ -32,31 +32,32 @@ export const usePurchaseForm = () => {
 
 	const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
 
-	async function handleAssignCO(officerId: number, username: string) {
+	async function handleAssignCO(requestId: string, officerId: number, username: string) {
+		const payload = {
+			request_id: requestId,
+			contracting_officer_id: officerId,
+			contracting_officer: username,
+		};
 		try {
-			console.log("🔥 handleAssignCO fired with:", officerId, username);
 			const response = await fetch(API_URL_ASSIGN_CO, {
 				method: "POST",
 				headers: {
 					"Authorization": `Bearer ${localStorage.getItem("access_token")}`,
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({
-					contracting_officer_id: officerId,
-					contracting_officer: username,
-				}),
+				body: JSON.stringify(payload),
 			});
-
 			if (!response.ok) {
-				throw new Error("Failed to assign contracting officer");
+				throw new Error("Failed to assign CO");
 			}
-			console.log("✅ Contracting officer assigned successfully");
+			const data = await response.json();
+			console.log("🔥 CO assigned successfully:", data);
+			toast.success("CO assigned successfully");
 		} catch (error) {
-			console.error("❌ handleAssignCO failed:", error);
-			throw error;
+			console.error("❌ Error assigning CO:", error);
+			toast.error("Failed to assign CO");
 		}
 	}
-
 	return {
 		...form,
 		handleAssignCO,

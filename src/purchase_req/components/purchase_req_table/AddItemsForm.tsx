@@ -3,7 +3,6 @@ import { DevTool } from "@hookform/devtools";
 import React, { useState } from "react";
 import "./LearningDev";
 import { Box, Snackbar, Alert } from "@mui/material";
-import LearningDev from "./LearningDev";
 import Buttons from "./Buttons";
 import ContractingOfficerDropdown from "./ContractingOfficerDropdown";
 import BudgetCodePicker from "./BudgetCodePicker";
@@ -24,6 +23,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useUUIDStore } from "../../services/UUIDService";
 import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
+import { toast } from "react-toastify";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -63,8 +63,6 @@ function AddItemsForm({
 	const { errors, isValid, isSubmitted } = formState;
 	const [showSuccess, setShowSuccess] = useState(false);
 	const [selectedCO, setSelectedCO] = useState<number | "">("");
-
-
 
 	// Reserve the ID for the request
 	useEffect(() => {
@@ -375,8 +373,21 @@ function AddItemsForm({
 					{/* CONTRACTING OFFICER DROPDOWN */}
 					<ContractingOfficerDropdown
 						value={selectedCO}
+						requestID={ID}
 						onChange={setSelectedCO}
-						onClickOK={handleAssignCO}
+						onClickOK={async (ID, officerId, username) => {
+							if (!ID) {
+								console.error("❌ No request ID available to assign CO");
+								toast.error("No request ID available to assign CO");
+								return;
+							}
+							try {
+								await handleAssignCO(ID, officerId, username);
+							} catch (error) {
+								console.error("❌ Error assigning CO:", error);
+								toast.error("Failed to assign CO");
+							}
+						}}
 					/>
 					<hr />
 

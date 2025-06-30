@@ -112,6 +112,6 @@ class PurchaseRequestHeader(BaseModel):
         from_attributes = True
         
 class AssignCOPayload(BaseModel):
-    request_ids: List[str]
+    request_id: str
     contracting_officer_id: int
     contracting_officer: str
