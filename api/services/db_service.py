@@ -64,8 +64,8 @@ def utc_now_truncated() -> datetime:
 # ────────────────────────────────────────────────────────────────────────────────
 class PurchaseRequestHeader(Base):
     __tablename__ = "purchase_request_headers"
-
-    ID                 		: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    purchase_request_seq_id : Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ID                 		: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     IRQ1_ID            		: Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
     CO                 		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     requester          		: Mapped[str] = mapped_column(String, nullable=False)
@@ -75,6 +75,9 @@ class PurchaseRequestHeader(Base):
     orderType          		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     pdf_output_path    		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     contracting_officer_id	: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("contracting_officers.id"), nullable=True)
+    submission_status       : Mapped[str] = mapped_column(Enum("IN_PROGRESS", "SUBMITTED", "CANCELLED", name="submission_status_enum"),
+                                                          nullable=False,
+                                                          server_default="IN_PROGRESS")
     created_time = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
 
     # 1️⃣ headers → line‐items

@@ -812,14 +812,37 @@ async def refresh_token(refresh_token: str):
 ## CREATE NEW id
 ##########################################################################
 @api_router.post("/createNewID")
-async def create_new_id(request: Request):
+async def create_new_id(
+    request: Request,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
     """
     Create a new id for a purchase request.
+        # insert into purchase request to start id creation, obtain the incremented id
+        from purchase_request_seq_id
+    
     """
     try:
-        purchase_req_id = dbas.set_purchase_req_id()
-        logger.info(f"New purchase request id: {purchase_req_id}")
-        return {"ID": purchase_req_id}
+        async with db.begin() as session:
+            # Insert placeholders to get the next id
+            new_req = PurchaseRequestHeader(
+				requester="PENDING",
+				phoneext=0,
+				datereq=utc_now_truncated(),
+			)
+            session.add(new_req)
+            await session.flush # this forces the database to generate the ID
+            
+            # Build the actual ID from sequential id
+            purchase_request_id = f"LAWB{new_req.purchase_request_seq_id:04d}"
+            
+            # Update record with final ID
+            new_req.ID = purchase_request_id
+            await session.commit()
+            
+            logger.info(f"New purchase request id: {purchase_request_id}")
+            return {"ID": purchase_request_id}
     except Exception as e:
         logger.error(f"Error creating new id: {e}")
         raise HTTPException(status_code=500, detail=str(e))
