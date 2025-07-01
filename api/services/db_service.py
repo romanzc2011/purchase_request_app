@@ -8,7 +8,7 @@ from loguru import logger
 from aiocache import Cache, cached
 from sqlalchemy import select, update
 from sqlalchemy import (create_engine, String, Integer, Float, Boolean, Text, LargeBinary, ForeignKey, DateTime,
-                        Enum as SAEnum, JSON, func, Enum as SQLEnum, literal, func, select, text)
+                        Enum , JSON, func, Enum as SQLEnum, literal, func, select, text)
 from sqlalchemy.orm import declarative_base, selectinload, aliased
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
@@ -23,6 +23,7 @@ import uuid
 import os
 from sqlalchemy.pool import NullPool
 from dotenv import load_dotenv
+from multiprocessing import Lock
 
 # Ensure database directory exists
 db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
@@ -34,7 +35,10 @@ Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
 
 DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
-engine_async = create_async_engine(DATABASE_URL_ASYNC, echo=True)
+engine_async = create_async_engine(
+    DATABASE_URL_ASYNC, 
+    echo=True)
+
 AsyncSessionLocal = sessionmaker(bind=engine_async, class_=AsyncSession)
 
 # dependency to hand out AsyncSession instances
@@ -65,16 +69,16 @@ def utc_now_truncated() -> datetime:
 class PurchaseRequestHeader(Base):
     __tablename__ = "purchase_request_headers"
     purchase_request_seq_id : Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    ID                 		: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    IRQ1_ID            		: Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
-    CO                 		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    requester          		: Mapped[str] = mapped_column(String, nullable=False)
-    phoneext           		: Mapped[int] = mapped_column(Integer, nullable=False)
-    datereq            		: Mapped[str] = mapped_column(String)
-    dateneed           		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    orderType          		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    pdf_output_path    		: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    contracting_officer_id	: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("contracting_officers.id"), nullable=True)
+    ID                     : Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    IRQ1_ID                : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
+    CO                     : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    requester              : Mapped[str] = mapped_column(String, nullable=False)
+    phoneext               : Mapped[int] = mapped_column(Integer, nullable=False)
+    datereq                : Mapped[str] = mapped_column(String)
+    dateneed               : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    orderType              : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    pdf_output_path        : Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    contracting_officer_id : Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("contracting_officers.id"), nullable=True)
     submission_status       : Mapped[str] = mapped_column(Enum("IN_PROGRESS", "SUBMITTED", "CANCELLED", name="submission_status_enum"),
                                                           nullable=False,
                                                           server_default="IN_PROGRESS")
@@ -105,10 +109,10 @@ class PurchaseRequestHeader(Base):
                          )
     
     # headers -> contracting_officers
-    contracting_officer	: Mapped["ContractingOfficer"] = relationship(
-		"ContractingOfficer",
-		backref="purchase_request_header"
-	)
+    contracting_officer : Mapped["ContractingOfficer"] = relationship(
+        "ContractingOfficer",
+        backref="purchase_request_header"
+    )
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PURCHASE REQUEST LINE ITEM
@@ -395,30 +399,60 @@ async def get_justification_templates(db: AsyncSession) -> dict[str, str]:
 ###################################################################################################
 # Get next  request id
 ###################################################################################################
-def set_purchase_req_id() -> str:
-    first_prefix = "LAWB"
-    try:
-        with get_session() as session:
-            # Get all existing IDs and find the highest numeric suffix
-            existing_ids = session.query(PurchaseRequestHeader.ID).all()
-            max_suffix = 0
-            
-            for (id_str,) in existing_ids:
-                if id_str and id_str.startswith(first_prefix):
-                    try:
-                        suffix = int(id_str[len(first_prefix):])
-                        max_suffix = max(max_suffix, suffix)
-                    except ValueError:
-                        continue
-            
-            next_suffix = max_suffix + 1
-            next_id = f"{first_prefix}{str(next_suffix).zfill(4)}"
-            logger.info(f"Next purchase request id: {next_id}")
-            return next_id
-    except Exception as e:
-        logger.error(f"Error setting purchase request id: {e}")
-        # Return a fallback ID instead of None
-        return f"{first_prefix}0001"
+async def set_purchase_req_id(db: AsyncSession) -> str:
+    new_req = PurchaseRequestHeader(
+        ID="",
+        requester="PENDING",
+        phoneext=0,
+        datereq=utc_now_truncated().strftime("%Y-%m-%d"),
+    )
+    db.add(new_req)
+    await db.flush()
+    
+    purchase_request_id = f"LAWB{new_req.purchase_request_seq_id:04d}"
+    new_req.ID = purchase_request_id
+    
+    # Do not commit here, allow transaction to commit
+    return purchase_request_id
+
+###################################################################################################
+# Get last row in purchase_request_headers
+###################################################################################################
+"""
+Grab last row purchase request id and status, we only want to assign/do anything if the last row is IN_PROGRESS,
+for assigning CO
+"""
+async def get_last_row_purchase_request_id(db: AsyncSession) -> tuple[str, str] | None:
+    stmt = (select(
+            PurchaseRequestHeader.submission_status,
+            PurchaseRequestHeader.ID
+        )
+        .order_by(PurchaseRequestHeader.purchase_request_seq_id.desc())  # get the last row
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    return result.first()
+
+###################################################################################################
+# Get last row in purchase_request_headers
+###################################################################################################
+async def get_last_row_submission_status(db: AsyncSession) -> str:
+    stmt = (select(PurchaseRequestHeader.submission_status)
+            .order_by(PurchaseRequestHeader.purchase_request_seq_id.desc())  # get the last row
+            .limit(1)
+            .where(PurchaseRequestHeader.submission_status == "SUBMITTED"))  # only get the last row that is submitted
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+###################################################################################################
+# Check if there's already a pending/in-progress request
+###################################################################################################
+async def get_last_row_any_status(db: AsyncSession) -> str:
+    stmt = (select(PurchaseRequestHeader.submission_status)
+            .order_by(PurchaseRequestHeader.purchase_request_seq_id.desc())  # get the last row
+            .limit(1))
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
 
 ###################################################################################################
 # Get all purchase requests
@@ -438,26 +472,26 @@ def get_approval_by_id(session, purchase_request_id: str):
 # Get justifications by ID
 ###################################################################################################
 async def get_justifications_by_id(db: AsyncSession, ID: str) -> list[tuple[bool, bool]]:
-	# These are the comments from justification, if trainNotAval or needsNotMeet is true, 
-	# then we need to get the additional comments
-	stmt = select(
-		PurchaseRequestLineItem.trainNotAval,
-		PurchaseRequestLineItem.needsNotMeet,
-	).where(
-		PurchaseRequestLineItem.purchase_request_id == ID
-	)
-	result = await db.execute(stmt)
-	logger.info(f"Result: {result}")
-	rows = result.all()
-	logger.info(f"Rows: {rows}")
-	return rows
+    # These are the comments from justification, if trainNotAval or needsNotMeet is true, 
+    # then we need to get the additional comments
+    stmt = select(
+        PurchaseRequestLineItem.trainNotAval,
+        PurchaseRequestLineItem.needsNotMeet,
+    ).where(
+        PurchaseRequestLineItem.purchase_request_id == ID
+    )
+    result = await db.execute(stmt)
+    logger.info(f"Result: {result}")
+    rows = result.all()
+    logger.info(f"Rows: {rows}")
+    return rows
 
 ###################################################################################################
 # Get son comments by ID
 ###################################################################################################
 async def get_son_comments_by_id(
-	db: AsyncSession,
-	ID: str
+    db: AsyncSession,
+    ID: str
 ) -> list[SonComment]:
     pass
 
@@ -518,14 +552,14 @@ async def get_next_request_id() -> str:
 # and database normalization. This way we can view the Approval table without issue
 # ────────────────────────────────────────────────────────────────────────────────
 ORM_Approval = (
-	PurchaseRequestHeader,
-	PurchaseRequestLineItem,
-	Approval
+    PurchaseRequestHeader,
+    PurchaseRequestLineItem,
+    Approval
 )
 
 async def fetch_flat_approvals(
-	db: AsyncSession,
-	ID: Optional[str] = None,
+    db: AsyncSession,
+    ID: Optional[str] = None,
 ) -> List[ApprovalSchema]:
     
     # alias each table for clarity
@@ -780,14 +814,14 @@ async def final_approval_check(
 # MARK FINAL APPROVAL AS APPROVED
 ###################################################################################################
 async def mark_final_approval_as_approved(
-	db: AsyncSession,
-	approvals_uuid: str,
+    db: AsyncSession,
+    approvals_uuid: str,
 ):
     await db.execute(
-		update(FinalApproval)
-		.where(FinalApproval.approvals_uuid == approvals_uuid)
-		.values(status=ItemStatus.APPROVED)
-	)
+        update(FinalApproval)
+        .where(FinalApproval.approvals_uuid == approvals_uuid)
+        .values(status=ItemStatus.APPROVED)
+    )
     await db.commit()
     
 ###################################################################################################

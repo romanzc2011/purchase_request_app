@@ -88,13 +88,13 @@ CREATE TRIGGER sync_co_on_update_prhdr
 AFTER UPDATE ON purchase_request_headers
 WHEN NEW.contracting_officer_id IS NOT NULL
 BEGIN
-  UPDATE approvals
+  UPDATE purchase_request_headers
      SET CO = (
        SELECT username
          FROM contracting_officers
         WHERE id = NEW.contracting_officer_id
      )
-   WHERE purchase_request_id = NEW.id;
+   WHERE ID = NEW.id;
 END;
 
 ----------------------------------------------------------

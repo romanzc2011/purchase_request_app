@@ -25,7 +25,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 # SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update, select
+from sqlalchemy import update, select, text
 from api.services.db_service import get_async_session
 from api.schemas.enums import ItemStatus
 import asyncio
@@ -636,22 +636,24 @@ async def assign_IRQ1_ID(
 
 #########################################################################
 ## ASSIGN CONTRACTING OFFICER
-#########################################################################
+##########################################################################
 @api_router.post("/assignCO")
 async def assign_contracting_officer(
     payload: AssignCOPayload,
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
-    request_id = dbas.set_purchase_req_id()
-    logger.info(f"ASSIGN CO PAYLOAD: {payload}")
     try:
-        # Update the contracting officer
-        stmt = (update(PurchaseRequestHeader)
-                .where(PurchaseRequestHeader.ID == request_id)
-                .values(contracting_officer_id=payload.contracting_officer_id))
-        await db.execute(stmt)
-        await db.commit()
+        row = await dbas.get_last_row_purchase_request_id(db=db)
+        logger.info(f"ROW: {row}")
+        if row.submission_status == "IN_PROGRESS":
+            # Update the contracting officer
+            stmt = (update(PurchaseRequestHeader)
+                    .where(PurchaseRequestHeader.ID == row.ID)
+                    .values(contracting_officer_id=payload.contracting_officer_id))
+            await db.execute(stmt)
+            await db.commit()
+        logger.info(f"ASSIGN CO PAYLOAD: {payload}")
         
     except Exception as e:
         logger.error(f"Error assigning CO: {e}")
@@ -660,7 +662,7 @@ async def assign_contracting_officer(
 
 #########################################################################
 ## DENY PURCHASE REQUEST
-#########################################################################
+##########################################################################
 @api_router.post("/denyRequest")
 async def deny_request(
     payload: DenyPayload,
@@ -820,29 +822,29 @@ async def create_new_id(
     """
     Create a new id for a purchase request.
         # insert into purchase request to start id creation, obtain the incremented id
-        from purchase_request_seq_id
+        from purchase_request_seq_id, only allow the creation if the last row is submitted
     
     """
     try:
-        async with db.begin() as session:
-            # Insert placeholders to get the next id
-            new_req = PurchaseRequestHeader(
-				requester="PENDING",
-				phoneext=0,
-				datereq=utc_now_truncated(),
-			)
-            session.add(new_req)
-            await session.flush # this forces the database to generate the ID
+        # Start explicit transaction
+        async with db.begin():
+            # Grab explicit lock
+            await db.execute(text("BEGIN EXCLUSIVE"))
             
-            # Build the actual ID from sequential id
-            purchase_request_id = f"LAWB{new_req.purchase_request_seq_id:04d}"
+            # Check last row status inside transaction
+            last_row_status = await dbas.get_last_row_any_status(db=db)
+            logger.info(f"Last row status: {last_row_status}")
             
-            # Update record with final ID
-            new_req.ID = purchase_request_id
-            await session.commit()
+            if last_row_status == "IN_PROGRESS":
+                return {"ID": "PENDING"}
             
-            logger.info(f"New purchase request id: {purchase_request_id}")
-            return {"ID": purchase_request_id}
+            if last_row_status == "SUBMITTED" or last_row_status is None:
+                purchase_req_id = await dbas.set_purchase_req_id(db=db)
+                logger.info(f"New purchase request id: {purchase_req_id}")
+                return {"ID": purchase_req_id}
+        
+        raise HTTPException(status_code=400, detail="Could not create new ID due to race condition")
+            
     except Exception as e:
         logger.error(f"Error creating new id: {e}")
         raise HTTPException(status_code=500, detail=str(e))
