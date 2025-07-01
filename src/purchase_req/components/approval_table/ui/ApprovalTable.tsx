@@ -644,7 +644,14 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	//####################################################################
 	const handleEditPriceEach = async (newRow: DataRow, oldRow: DataRow) => {
 		console.log("Processing row update", { newRow, oldRow });
-	}
+		const newPriceEach = newRow.priceEach;
+		const totalPrice = newRow.totalPrice;
+		const quantity = newRow.quantity;
+
+		const newTotalPrice = newPriceEach * quantity;
+
+		return { priceEach: newPriceEach, totalPrice: newTotalPrice }; // <-- return the updated row
+	};
 
 	/***********************************************************************************/
 	// IRQ1 COLUMN
@@ -1023,14 +1030,19 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 
 			<DataGrid
 				rows={flatRows}
-				getRowId={r => r.isGroup ? `header-${r.groupKey}` : r.UUID}
-				columns={allColumns}
+				getRowId={r => {
+					const row = r as FlatRow;
+					return row.isGroup ? `header-${row.groupKey}` : row.UUID;
+				}}
 				getRowClassName={(params) => {
-					if (params.row.hidden) return 'hidden-row';
-					if (params.row.isGroup && expandedRows[params.row.groupKey]) return 'expanded-group-row';
+					const row = params.row as FlatRow;
+					if (row.hidden) return 'hidden-row';
+					if (row.isGroup && expandedRows[row.groupKey]) return 'expanded-group-row';
 					return '';
 				}}
 				checkboxSelection
+				columns={allColumns}
+				// processRowUpdate={handleEditPriceEach}
 				rowSelectionModel={rowSelectionModel}
 				onRowSelectionModelChange={(newModel) => {
 					const newSelection = new Set<GridRowId>();
