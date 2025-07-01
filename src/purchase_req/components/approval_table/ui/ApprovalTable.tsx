@@ -645,12 +645,10 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	const handleEditPriceEach = async (newRow: DataRow, oldRow: DataRow) => {
 		console.log("Processing row update", { newRow, oldRow });
 		const newPriceEach = newRow.priceEach;
-		const totalPrice = newRow.totalPrice;
 		const quantity = newRow.quantity;
-
 		const newTotalPrice = newPriceEach * quantity;
 
-		return { priceEach: newPriceEach, totalPrice: newTotalPrice }; // <-- return the updated row
+		return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
 	};
 
 	/***********************************************************************************/
@@ -1042,7 +1040,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 				}}
 				checkboxSelection
 				columns={allColumns}
-				// processRowUpdate={handleEditPriceEach}
+				processRowUpdate={handleEditPriceEach}
 				rowSelectionModel={rowSelectionModel}
 				onRowSelectionModelChange={(newModel) => {
 					const newSelection = new Set<GridRowId>();

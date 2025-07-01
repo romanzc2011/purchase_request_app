@@ -9,14 +9,17 @@ a request is approved by IT/ACCESS and goes to final_approvals  ---> PENDING_APP
 CREATE TRIGGER IF NOT EXISTS sync_status_on_final_approval_insert
 AFTER INSERT ON final_approvals
 BEGIN
+	-- PR LINE ITEMS
     UPDATE pr_line_items
     SET status = 'PENDING APPROVAL'
     WHERE UUID = NEW.line_item_uuid;
 
+	-- APPROVALS
     UPDATE approvals
     SET status = 'PENDING APPROVAL'
     WHERE UUID = NEW.approvals_uuid;
 
+	-- PENDING APPROVALS
     UPDATE pending_approvals
     SET status = 'PENDING APPROVAL'
     WHERE pending_approval_id = NEW.pending_approval_id;
@@ -29,14 +32,17 @@ CREATE TRIGGER IF NOT EXISTS sync_status_on_final_approval_update
 AFTER UPDATE ON final_approvals
 WHEN NEW.status IN ('APPROVED', 'DENIED')
 BEGIN
+	-- PR LINE ITEMS
 	UPDATE pr_line_items
 	SET status = NEW.status
 	WHERE UUID = NEW.line_item_uuid;
 	
+	-- APPROVALS
 	UPDATE approvals
 	SET status = NEW.status
 	WHERE UUID = NEW.approvals_uuid;
 	
+	-- PENDING APPROVALS
 	UPDATE pending_approvals
 	SET status = NEW.status
 	WHERE line_item_uuid = NEW.line_item_uuid;
@@ -50,6 +56,7 @@ CREATE TRIGGER IF NOT EXISTS sync_approvals_uuid_on_first_insert
 AFTER INSERT ON son_comments
 FOR EACH ROW
 BEGIN
+	-- SON COMMENTS
 	UPDATE son_comments
 	SET approvals_uuid = (
 		SELECT approvals.UUID
@@ -69,12 +76,12 @@ CREATE TRIGGER IF NOT EXISTS sync_status_on_update_pr_line_items
 AFTER UPDATE ON pending_approvals
 WHEN NEW.status = 'DENIED'
 BEGIN
-    -- Update approvals table
+    -- APPROVALS
     UPDATE approvals
     SET status = 'DENIED'
     WHERE UUID = NEW.approvals_uuid;
 
-    -- Update pr_line_items table
+    -- PR LINE ITEMS
     UPDATE pr_line_items
     SET status = 'DENIED'
     WHERE UUID = NEW.line_item_uuid;
@@ -84,10 +91,11 @@ END;
 /* Trigger to auto update CO in approvals
 on contracting_officer_id update in pr header */
 ----------------------------------------------------------
-CREATE TRIGGER sync_co_on_update_prhdr
+CREATE TRIGGER IF NOT EXISTS sync_co_on_update_prhdr
 AFTER UPDATE ON purchase_request_headers
 WHEN NEW.contracting_officer_id IS NOT NULL
 BEGIN
+  -- PURCHASE REQUEST HEADERS
   UPDATE purchase_request_headers
      SET CO = (
        SELECT username
@@ -95,7 +103,31 @@ BEGIN
         WHERE id = NEW.contracting_officer_id
      )
    WHERE ID = NEW.id;
+   
+   -- APPROVALS
+   UPDATE approvals
+   SET CO = (
+		SELECT username
+		FROM contracting_officers
+		WHERE id = NEW.contracting_officer_id
+   )
+   WHERE purchase_request_id = NEW.id;
 END;
+
+----------------------------------------------------------
+/* Trigger to auto update IRQ1 number in approvals
+	after inserting into purchase_request_headers */
+----------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS sync_irq1_on_update_irq1_prhdr
+AFTER UPDATE ON purchase_request_headers
+WHEN NEW.IRQ1_ID IS NOT NULL
+BEGIN
+	-- APPROVALS
+	UPDATE approvals
+	SET IRQ1_ID = NEW.IRQ1_ID
+	WHERE purchase_request_id = NEW.ID;
+END;
+		
 
 ----------------------------------------------------------
 /* INSERT CONTRACTING OFFICERS */

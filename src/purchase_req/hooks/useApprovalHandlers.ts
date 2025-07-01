@@ -92,14 +92,25 @@ try {
 }
 
 export function useApprovalHandlers() {
-	
+	const queryClient = useQueryClient();
+	const assignIRQ1Mutation = useAssignIRQ1();
+	const {
+		processPayload,
+		setApprovalPayload,
+		setDenialPayload
+	} = useApprovalService();
+	const {
+		isOpen,
+		openCommentModal,
+		close,
+		handleSubmit
+	} = useCommentModal();
 
 	const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 	const [openDesc, setOpenDesc] = useState(false);
 	const [fullDesc, setFullDesc] = useState("");
 	const [openJust, setOpenJust] = useState(false);
 	const [fullJust, setFullJust] = useState("");
-	const [isOpen, setIsOpen] = useState(false);
 	const [rowSelectionModel, setRowSelectionModel] = useState<{ ids: Set<GridRowId>, type: 'include' | 'exclude' }>({
 		ids: new Set(),
 		type: 'include',
@@ -127,7 +138,17 @@ export function useApprovalHandlers() {
 
 	const handleDownload = (ID: string) => downloadStatementOfNeedForm(ID);
 
-	
+	//####################################################################
+	// HANDLE EDIT PRICE EACH ROW
+	//####################################################################
+	const handleEditPriceEach = async (newRow: DataRow, oldRow: DataRow) => {
+		console.log("Processing row update", { newRow, oldRow });
+		const newPriceEach = newRow.priceEach;
+		const quantity = newRow.quantity;
+		const newTotalPrice = newPriceEach * quantity;
+
+		return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
+	};
 
 	//####################################################################
 	// HANDLE CONTRACTING OFFICER
@@ -174,6 +195,7 @@ export function useApprovalHandlers() {
 		handleOpenJust,
 		handleCloseJust,
 		handleDownload,
+		handleEditPriceEach,
 		assignIRQ1Mutation,
 		processPayload,
 		setApprovalPayload,
@@ -183,7 +205,6 @@ export function useApprovalHandlers() {
 		handleSubmit,
 		rowSelectionModel,
 		setRowSelectionModel,
-		handleProcessRowUpdate,
 		handleAssignCO,
 	};
 }

@@ -398,8 +398,15 @@ async def send_purchase_request(
             # UUID tracking
             pr_line_item_uuids.append(orm_pr_line_item.UUID)
         
+        # Get CO from purchase request headers
+        #TODO: Look up CO username and put in Approval schema
+        stmt = select(PurchaseRequestHeader.contracting_officer_id).where(PurchaseRequestHeader.ID == purchase_req_id)
+        result = await db.execute(stmt)
+        contracting_officer_id = result.scalar_one_or_none()
+        logger.info(f"Contracting officer ID: {contracting_officer_id}")
         
-
+        # Get approvers from approvers table
+        
         # APPROVAL TABLE
         approvals: List[Approval] = []
         for item, line_uuid in zip(payload.items, pr_line_item_uuids):
@@ -885,6 +892,7 @@ async def get_uuid_by_id_endpoint(
         raise HTTPException(status_code=404, detail=f"No UUID found for ID: {ID}")
         
     return {"UUID": UUID}
+
 ##########################################################################
 ## FETCH USERNAMES
 ##########################################################################
