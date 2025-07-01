@@ -25,7 +25,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 # SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update, select, text
+from sqlalchemy import update, select, text, func
 from api.services.db_service import get_async_session
 from api.schemas.enums import ItemStatus
 import asyncio
@@ -317,23 +317,39 @@ async def send_purchase_request(
     pdf_path: str | None = None
     async with db.begin():
         # Generate the purchase request ID
-        purchase_req_id = dbas.set_purchase_req_id()
+        # Subquery to find the maximum purchase_request_seq_id
+        subq = (
+            select(func.max(PurchaseRequestHeader.purchase_request_seq_id))
+            .scalar_subquery()
+        )
+
+        # Outer query to get the row with that max seq ID
+        stmt = (
+            select(PurchaseRequestHeader.ID)
+            .where(PurchaseRequestHeader.purchase_request_seq_id == subq)
+        )
+        result = await db.execute(stmt)
+        purchase_req_id = result.scalar_one_or_none()
         logger.debug(f"PURCHASE REQUEST ID: {purchase_req_id}")
         
-        # PURCHASE REQUEST HEADER TABLE
-        orm_pr_header = PurchaseRequestHeader(
-            ID=purchase_req_id,
-            IRQ1_ID=payload.irq1_id,
-            CO=payload.co,
-            requester=current_user.username,
-            phoneext=payload.items[0].phoneext,
-            datereq=payload.items[0].datereq,
-            dateneed=payload.items[0].dateneed,
-            orderType=payload.items[0].order_type,
-        )
-        db.add(orm_pr_header)
-        await db.flush()  # makes ORM defaults (like pk/uuid) available
-  
+        # Update Header table with rest of data
+        stmt = (
+			update(PurchaseRequestHeader)
+			.where(PurchaseRequestHeader.ID == purchase_req_id)
+			.values(
+				IRQ1_ID=payload.irq1_id,
+				requester=current_user.username,
+				phoneext=payload.items[0].phoneext,
+				datereq=payload.items[0].datereq,
+				dateneed=payload.items[0].dateneed,
+				orderType=payload.items[0].order_type,
+				submission_status="SUBMITTED",
+				created_time=utc_now_truncated()
+			)
+		)
+        await db.execute(stmt)
+        await db.flush()
+        
         pr_line_item_uuids: List[str] = []
         uploaded_files: List[str] = []
         
@@ -345,7 +361,7 @@ async def send_purchase_request(
             
             # Create line item
             orm_pr_line_item = PurchaseRequestLineItem(
-                purchase_request_id=orm_pr_header.ID,
+                purchase_request_id=purchase_req_id,
                 itemDescription=item.item_description,
                 justification=item.justification,
                 addComments="; ".join(item.additional_comments) if item.additional_comments else None,
@@ -389,7 +405,7 @@ async def send_purchase_request(
         for item, line_uuid in zip(payload.items, pr_line_item_uuids):
             appr = Approval(
                 UUID=str(uuid.uuid4()),
-                purchase_request_id=orm_pr_header.ID,
+                purchase_request_id=purchase_req_id,
                 requester=payload.requester,
                 phoneext=item.phoneext,
                 datereq=item.datereq,
@@ -418,7 +434,7 @@ async def send_purchase_request(
                 assigned_group = "FINANCE"
 
             task = PendingApproval(
-                purchase_request_id=orm_pr_header.ID,
+                purchase_request_id=purchase_req_id,
                 line_item_uuid=line_uuid,
                 approvals_uuid=appr.UUID,
                 assigned_group=assigned_group,
@@ -426,6 +442,10 @@ async def send_purchase_request(
             )
             db.add(task)
             await db.flush()
+            
+            stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.ID == purchase_req_id)
+            result = await db.execute(stmt)
+            orm_pr_header = result.scalar_one_or_none()
             
             # Generate PDF once for the entire purchase request
             logger.info("Generating PDF document")
@@ -442,19 +462,6 @@ async def send_purchase_request(
     requester = payload.requester
     items = payload.items
     
-    # Process each item in the items array
-    if not items:
-        logger.error("No items found in request data")
-        raise HTTPException(status_code=400, detail="No items found in request data")
-    
-    # Get ID from first item if not in payload
-    if not payload.id and items:
-        payload.id = items[0].id
-    
-    if not payload.id:
-        logger.error("No ID found in request data")
-        raise HTTPException(status_code=400, detail="ID is required")
-    
     ##########################################################################
     ## EMAIL PAYLOADS
     ##########################################################################
@@ -470,13 +477,13 @@ async def send_purchase_request(
     # Build kwargs dict for Pydantic, omitting attachments until confirmed present
     payload_kwargs = {
         "model_type": "email_request",
-        "ID": payload.id,
+        "ID": purchase_req_id,
         "requester": payload.requester,
         "requester_email": requester_email,
         "datereq": payload.items[0].datereq,
         "dateneed": payload.items[0].dateneed,
         "orderType": payload.items[0].order_type,
-        "subject": f"Purchase Request #{payload.id}",
+        "subject": f"Purchase Request #{purchase_req_id}",
         "sender": settings.smtp_email_addr,
         "to": None,
         "cc": None,
@@ -643,6 +650,8 @@ async def assign_contracting_officer(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
+    # Add a create NEW ID call here, there could be instance where user
+    # wants to send another request right after one
     try:
         row = await dbas.get_last_row_purchase_request_id(db=db)
         logger.info(f"ROW: {row}")
@@ -653,6 +662,11 @@ async def assign_contracting_officer(
                     .values(contracting_officer_id=payload.contracting_officer_id))
             await db.execute(stmt)
             await db.commit()
+            
+        elif row.submission_status == "SUBMITTED":
+            purchase_req_id = await dbas.set_purchase_req_id(db=db)
+            logger.info(f"New purchase request id: {purchase_req_id}")
+            return {"ID": purchase_req_id}
         logger.info(f"ASSIGN CO PAYLOAD: {payload}")
         
     except Exception as e:
@@ -673,8 +687,8 @@ async def deny_request(
     
     try:
         for ID, item_uuids, target_status, action in zip(
-			payload.ID, payload.item_uuids, payload.target_status, payload.action
-		):
+            payload.ID, payload.item_uuids, payload.target_status, payload.action
+        ):
             # Update the status to DENIED
             stmt = (update(
                 PurchaseRequestLineItem)
@@ -819,6 +833,7 @@ async def create_new_id(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
+    #TODO: Minor bug multiple items on AddItem are not collapsed into group despite being in same order, only on frontend, fixes once submitted
     """
     Create a new id for a purchase request.
         # insert into purchase request to start id creation, obtain the incremented id
