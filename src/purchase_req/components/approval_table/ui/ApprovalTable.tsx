@@ -648,6 +648,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		const quantity = newRow.quantity;
 		const newTotalPrice = newPriceEach * quantity;
 
+		const purchase_request_id = newRow.ID;
+		const item_uuid = newRow.UUID;
+
 		return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
 	};
 

@@ -11,6 +11,7 @@ import { DataRow } from "../types/approvalTypes";
 // API URLs
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
+const API_URL_UPDATE_PRICES = `${import.meta.env.VITE_API_URL}/api/updatePrices`;
 
 // #########################################################################################
 // FETCH APPROVAL DATA
@@ -91,6 +92,35 @@ try {
 	}
 }
 
+// #########################################################################################
+// UPDATE PRICE EACH/ TOTAL PRICE
+// #########################################################################################
+async function updatePriceEachTotalPrice(
+	purchase_request_id: string, 
+	item_uuid: string, 
+	newPriceEach: number, 
+	newTotalPrice: number) {
+	const response = await fetch(API_URL_UPDATE_PRICES, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${localStorage.getItem("access_token")}`
+		},
+		body: JSON.stringify({
+			purchase_request_id,
+			item_uuid,
+			newPriceEach,
+			newTotalPrice
+		})
+	});
+	if (!response.ok) throw new Error(`HTTP ${response.status}`);
+	
+	return response.json();
+}
+
+// #########################################################################################
+// APPROVAL HANDLERS HOOK
+// #########################################################################################
 export function useApprovalHandlers() {
 	const queryClient = useQueryClient();
 	const assignIRQ1Mutation = useAssignIRQ1();
@@ -99,6 +129,7 @@ export function useApprovalHandlers() {
 		setApprovalPayload,
 		setDenialPayload
 	} = useApprovalService();
+
 	const {
 		isOpen,
 		openCommentModal,
@@ -206,5 +237,6 @@ export function useApprovalHandlers() {
 		rowSelectionModel,
 		setRowSelectionModel,
 		handleAssignCO,
+		updatePriceEachTotalPrice,
 	};
 }

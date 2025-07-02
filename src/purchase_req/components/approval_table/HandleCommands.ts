@@ -34,6 +34,9 @@ export const createHandleCommands = ({
         approveDenyMutation.mutate({ ID: row.ID, UUID: uuid, fund: row.fund, action: "approve" });
     }
 
+	/*************************************************************************************** */
+	/* APPROVE -- approve the request */
+	/*************************************************************************************** */
     const handleBulkApprove = async () => {
         let toApprove: DataRow[] = [];
 
@@ -68,6 +71,9 @@ export const createHandleCommands = ({
         });
     };
 
+	/*************************************************************************************** */
+	/* DENY -- deny the request */
+	/*************************************************************************************** */
     const handleBulkDeny = () => {
         Array.from(rowSelectionModel.ids).forEach(uuid => {
             const row = flatRows.find(r => r.UUID === uuid);
@@ -88,7 +94,10 @@ export const createHandleCommands = ({
         }
         openCommentModal(row.ID);
     }
-
+	
+	/*************************************************************************************** */
+	/* COMMENT -- open the comment modal */
+	/*************************************************************************************** */
     const handleBulkComment = async () => {
         let commentRows: DataRow[] = [];
 
@@ -114,6 +123,9 @@ export const createHandleCommands = ({
         setRowSelectionModel({ ids: new Set(), type: 'include' });
     };
 
+	/*************************************************************************************** */
+	/* CYBERSECURITY RELATED -- update the cybersecurity related field */
+	/*************************************************************************************** */
     // Handle CyberSec
     async function handleCyberSecRow(row: DataRow) {
         const uuid = await getUUID(row.ID);
