@@ -191,6 +191,8 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	// ADD THIS: assignIRQ1Mutation from useAssignIRQ1
 	const assignIRQ1Mutation = useAssignIRQ1();
 
+	const [selectedCO, setSelectedCO] = useState<number | "">(1); // Change 1 to default CO's ID
+
 	// ADD THIS: Get handleEditPriceEach from useApprovalHandlers
 	const { handleEditPriceEach } = useApprovalHandlers(rowSelectionModel);
 
@@ -306,11 +308,18 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		approvalData.forEach(r => {
 			if (r.IRQ1_ID) map[r.ID] = r.IRQ1_ID;
 		});
+		console.log("🔍 assignedIRQ1s updated:", map);
+		console.log("🔍 approvalData IRQ1_IDs:", approvalData.map(r => ({ ID: r.ID, IRQ1_ID: r.IRQ1_ID })));
 		return map;
 	}, [approvalData]);
 
-	// User edit live in draftIRQ1
-	const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>(() => ({ ...assignedIRQ1s }));
+	// User edit live in draftIRQ1 - update when assignedIRQ1s changes
+	const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
+
+	// Update draftIRQ1 when assignedIRQ1s changes
+	useEffect(() => {
+		setDraftIRQ1(prev => ({ ...prev, ...assignedIRQ1s }));
+	}, [assignedIRQ1s]);
 
 	/***********************************************************************************/
 	// MODALS
@@ -667,16 +676,19 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 							disabled={!!assignedIRQ1s[id]}
 							label={assignedIRQ1s[id] ? "Assigned" : "Assign"}
 							onClick={() => {
+								console.log("🚀 Assigning IRQ1:", { ID: id, newIRQ1ID: currentDraftIRQ1 });
 								assignIRQ1Mutation.mutate({
 									ID: id,
 									newIRQ1ID: currentDraftIRQ1
 								}, {
 									onSuccess: (data) => {
+										console.log("✅ IRQ1 assignment successful:", data);
 										// Invalidate the query to refresh the data
 										queryClient.invalidateQueries({ queryKey: ["approvalData"] });
 										toast.success("IRQ1 assigned successfully");
 									},
-									onError: () => {
+									onError: (error) => {
+										console.error("❌ IRQ1 assignment failed:", error);
 										toast.error("Failed to assign IRQ1");
 									}
 								});
