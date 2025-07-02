@@ -238,13 +238,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 		console.log("🔍 EXCLUSIVE SEARCH: Showing only", filtered.length, "items out of", approvalData.length, "total items");
 		console.log("🔍 Filtered data sample:", filtered[0]);
 
-		// Show toast notification for search results
-		if (searchQuery && filtered.length > 0) {
-			toast.info(`Search results: ${filtered.length} items found for "${searchQuery}"`);
-		} else if (searchQuery && filtered.length === 0) {
-			toast.warning(`No items found for "${searchQuery}"`);
-		}
-
 		return filtered;
 	}, [approvalData, searchData, searchQuery]);
 
