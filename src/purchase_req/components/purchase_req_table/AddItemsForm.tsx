@@ -64,14 +64,6 @@ function AddItemsForm({
 	const [showSuccess, setShowSuccess] = useState(false);
 	const [selectedCO, setSelectedCO] = useState<number | "">("");
 
-	// Reserve the ID for the request
-	useEffect(() => {
-		(async () => {
-			const { id } = await createNewID();
-			setID?.(id);
-		})();
-	}, []);
-
 	// Debug form state
 	useEffect(() => {
 		console.log('Form State:', {
@@ -86,24 +78,7 @@ function AddItemsForm({
 		console.log('Success state changed:', showSuccess);
 	}, [showSuccess]);
 
-	/*************************************************************************************** */
-	/* CREATE NEW ID -- get from backend */
-	/*************************************************************************************** */
-	async function createNewID() {
-		const response = await fetch(
-			`${import.meta.env.VITE_API_URL}/api/createNewID`,
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-				},
-			}
-		);
-		if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-		console.log("New ID response", response);
-		return response.json();
-	}
+
 
 	/*************************************************************************************** */
 	/* HANDLE ADD ITEM function */
@@ -113,23 +88,21 @@ function AddItemsForm({
 			// Generate a new UUID for the item
 			const uuid = uuidv4();
 
-			// Get a new ID from the backend
-			const response = await createNewID();
-			const newId = response.ID; // Extract the ID from the response object
-			console.log("New ID handleAddItem", newId);
 
 			// Create a new item with the UUID and ID
 			const itemToAdd: PurchaseItem = {
 				...data,
 				UUID: uuid,
 				priceEach: data.priceEach,
-				ID: newId,
+				ID: ID,
 				status: "NEW REQUEST",
 				dateneed: data.dateneed === "" ? null : data.dateneed
 			};
 
 			// Store the UUID in the UUID store AFTER we have the ID
-			setUUID(newId, uuid);
+			if (ID) {
+				setUUID(ID, uuid);
+			}
 
 			console.log("Item to add:", itemToAdd);
 

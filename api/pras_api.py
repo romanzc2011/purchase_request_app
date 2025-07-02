@@ -399,13 +399,17 @@ async def send_purchase_request(
             pr_line_item_uuids.append(orm_pr_line_item.UUID)
         
         # Get CO from purchase request headers
-        #TODO: Look up CO username and put in Approval schema
-        stmt = select(PurchaseRequestHeader.contracting_officer_id).where(PurchaseRequestHeader.ID == purchase_req_id)
+        stmt = (
+			select(ContractingOfficer.username)
+			.join(
+				PurchaseRequestHeader,
+				ContractingOfficer.id == PurchaseRequestHeader.contracting_officer_id
+			)
+			.where(PurchaseRequestHeader.ID == purchase_req_id)
+		)
         result = await db.execute(stmt)
-        contracting_officer_id = result.scalar_one_or_none()
-        logger.info(f"Contracting officer ID: {contracting_officer_id}")
-        
-        # Get approvers from approvers table
+        contracting_officer_username = result.scalar_one_or_none()
+        logger.info(f"Contracting officer username: {contracting_officer_username}")
         
         # APPROVAL TABLE
         approvals: List[Approval] = []
@@ -414,6 +418,7 @@ async def send_purchase_request(
                 UUID=str(uuid.uuid4()),
                 purchase_request_id=purchase_req_id,
                 requester=payload.requester,
+                CO=contracting_officer_username,
                 phoneext=item.phoneext,
                 datereq=item.datereq,
                 dateneed=item.dateneed,
@@ -857,9 +862,19 @@ async def create_new_id(
             last_row_status = await dbas.get_last_row_any_status(db=db)
             logger.info(f"Last row status: {last_row_status}")
             
+            # IN_PROGRESS -- return the last row ID
             if last_row_status == "IN_PROGRESS":
-                return {"ID": "PENDING"}
+                stmt = (
+                    select(
+                        PurchaseRequestHeader.ID
+                    )
+                    .where(PurchaseRequestHeader.submission_status == "IN_PROGRESS")
+                )
+                result = await db.execute(stmt)
+                last_row_id = result.scalar_one_or_none()
+                return {"ID": last_row_id}
             
+            # SUBMITTED or None -- create a new ID, we're at a new request
             if last_row_status == "SUBMITTED" or last_row_status is None:
                 purchase_req_id = await dbas.set_purchase_req_id(db=db)
                 logger.info(f"New purchase request id: {purchase_req_id}")

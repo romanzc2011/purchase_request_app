@@ -60,6 +60,9 @@ class SMTP_Service:
         
         # Email payload request
         if isinstance(payload, EmailPayloadRequest):
+            # Get CO data from database
+            contracting_officer = await dbas.get_contracting_officer_by_id(db, payload.ID)
+            
             context = {
                 "ID": payload.ID,
                 "requester": payload.requester,
@@ -68,7 +71,9 @@ class SMTP_Service:
                 "orderType": payload.orderType,
                 "additional_comments": additional_comments,
                 "items": payload.items,
-                "totalPrice": sum(item.totalPrice for item in payload.items)
+                "totalPrice": sum(item.totalPrice for item in payload.items),
+                "CO": contracting_officer,
+                "contracting_officer": contracting_officer
             }
             logger.warning(f"CONTEXT EMAIL PAYLOAD REQUEST: {context}")
 

@@ -32,6 +32,9 @@ export const usePurchaseForm = () => {
 
 	const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
 
+	/*************************************************************************************** */
+	/* ASSIGN CO -- assign CO to request */
+	/*************************************************************************************** */
 	async function handleAssignCO(requestId: string, officerId: number, username: string) {
 		const payload = {
 			request_id: requestId,
@@ -58,8 +61,29 @@ export const usePurchaseForm = () => {
 			toast.error("Failed to assign CO");
 		}
 	}
+
+	/*************************************************************************************** */
+	/* CREATE NEW ID -- create new ID for request */
+	/*************************************************************************************** */
+	async function createNewID() {
+		const response = await fetch(
+			`${import.meta.env.VITE_API_URL}/api/createNewID`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+				},
+			}
+		);
+		if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+		console.log("New ID response", response);
+		return response.json();
+	}
+
 	return {
 		...form,
 		handleAssignCO,
+		createNewID,
 	}
 };
