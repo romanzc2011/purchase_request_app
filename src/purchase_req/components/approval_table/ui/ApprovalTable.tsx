@@ -26,6 +26,7 @@ import { addComments, cleanPayload } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { useUUIDStore } from "../../../services/UUIDService";
 import { useApprovalService } from "../../../hooks/useApprovalService";
+import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 
 /***********************************************************************************/
 // PROPS
@@ -170,6 +171,29 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		item_desc: []
 	});
 
+	// ADD THIS: rowSelectionModel state
+	const [rowSelectionModel, setRowSelectionModel] = useState<{ ids: Set<GridRowId>, type: 'include' | 'exclude' }>({
+		ids: new Set(),
+		type: 'include',
+	});
+
+	// ADD THIS: Modal state for description and justification
+	const [openDesc, setOpenDesc] = useState(false);
+	const [fullDesc, setFullDesc] = useState("");
+	const [openJust, setOpenJust] = useState(false);
+	const [fullJust, setFullJust] = useState("");
+
+	// ADD THIS: toggleRow function for group expand/collapse
+	const toggleRow = (groupKey: string) => {
+		setExpandedRows(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
+	};
+
+	// ADD THIS: assignIRQ1Mutation from useAssignIRQ1
+	const assignIRQ1Mutation = useAssignIRQ1();
+
+	// ADD THIS: Get handleEditPriceEach from useApprovalHandlers
+	const { handleEditPriceEach } = useApprovalHandlers(rowSelectionModel);
+
 	const {
 		data: approvalData = [],
 		isLoading,
@@ -196,17 +220,30 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	// Flattened rows
 	const flatRows = React.useMemo<FlatRow[]>(() => {
 		return Object.entries(grouped).flatMap(([groupKey, items]) => {
-			// building header
+			// If there's only one item, emit it as a normal row (no header)
+			if (items.length === 1) {
+				const item = items[0];
+				return [{
+					...item,
+					isGroup: false,
+					groupKey,
+					rowCount: 1,
+					rowId: item.UUID,
+					UUID: item.UUID,
+					hidden: false
+				}];
+			}
+
+			// For real groups (2+ items) emit a synthetic header + its children
 			const header: FlatRow = {
 				...items[0],
 				isGroup: true,
 				groupKey,
 				rowCount: items.length,
 				rowId: `header-${groupKey}`,
-				UUID: `header-${groupKey}`,
+				UUID: `header-${groupKey}`
 			};
 
-			// build ever child-with hidden flag
 			const children: FlatRow[] = items.map(item => ({
 				...item,
 				isGroup: false,
@@ -220,30 +257,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			return [header, ...children];
 		});
 	}, [grouped, expandedRows]);
-
-	// ITEM DESCRIPTION MODAL - for when length is too long
-	const [openDesc, setOpenDesc] = useState<boolean>(false);
-	const [fullDesc, setFullDesc] = useState<string>("");
-
-	// JUSTIFICATION MODAL - for when length is too long
-	const [openJust, setOpenJust] = useState<boolean>(false);
-	const [fullJust, setFullJust] = useState<string>("");
-
-	// SELECTED CONTRACTING OFFICER
-	const [selectedCO, setSelectedCO] = useState<number | "">("");
-
-	// track which groups are expanded
-	const toggleRow = (key: string) => setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
-
-	// MUTATION TO ASSIGN IRQ1
-	const assignIRQ1Mutation = useAssignIRQ1();
-
-	// track which rows are selected
-	const [rowSelectionModel, setRowSelectionModel] =
-		useState<{ ids: Set<GridRowId>, type: 'include' | 'exclude' }>({
-			ids: new Set(),
-			type: 'include',
-		});
 
 	// Calculate total items in selected groups
 	//  determine first if theres more than 1 UUID, then if there is i need to decide if its already flatten then 
@@ -586,13 +599,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		}
 	}
 
-	//####################################################################
-	// HANDLE UPDATE PROCESS ROW (PRICE EACH)
-	//####################################################################
-	const handleProcessRowUpdate = async (newRow: DataRow, oldRow: DataRow) => {
-		console.log("Processing row update", { newRow, oldRow });
-	}
-
 	// the "toggle" column for group headers
 	const toggleColumn: GridColDef = {
 		field: "__groupToggle",
@@ -637,21 +643,6 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 				</Box>
 			);
 		}
-	};
-
-	//####################################################################
-	// HANDLE EDIT PRICE EACH ROW
-	//####################################################################
-	const handleEditPriceEach = async (newRow: DataRow, oldRow: DataRow) => {
-		console.log("Processing row update", { newRow, oldRow });
-		const newPriceEach = newRow.priceEach;
-		const quantity = newRow.quantity;
-		const newTotalPrice = newPriceEach * quantity;
-
-		const purchase_request_id = newRow.ID;
-		const item_uuid = newRow.UUID;
-
-		return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
 	};
 
 	/***********************************************************************************/

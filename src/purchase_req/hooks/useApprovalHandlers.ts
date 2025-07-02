@@ -12,12 +12,12 @@ import { DataRow } from "../types/approvalTypes";
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
 const API_URL_UPDATE_PRICES = `${import.meta.env.VITE_API_URL}/api/updatePrices`;
+const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 
 // #########################################################################################
 // FETCH APPROVAL DATA
 // #########################################################################################
 async function fetchApprovalData(ID?: string) {
-	const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 
 	if (ID) {
 		const response = await fetch(`${API_URL_APPROVAL_DATA}?ID=${ID}`, {
@@ -109,8 +109,8 @@ async function updatePriceEachTotalPrice(
 		body: JSON.stringify({
 			purchase_request_id,
 			item_uuid,
-			newPriceEach,
-			newTotalPrice
+			new_price_each: newPriceEach,
+			new_total_price: newTotalPrice
 		})
 	});
 	if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -121,7 +121,7 @@ async function updatePriceEachTotalPrice(
 // #########################################################################################
 // APPROVAL HANDLERS HOOK
 // #########################################################################################
-export function useApprovalHandlers() {
+export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, type: 'include' | 'exclude' }) {
 	const queryClient = useQueryClient();
 	const assignIRQ1Mutation = useAssignIRQ1();
 	const {
@@ -142,10 +142,7 @@ export function useApprovalHandlers() {
 	const [fullDesc, setFullDesc] = useState("");
 	const [openJust, setOpenJust] = useState(false);
 	const [fullJust, setFullJust] = useState("");
-	const [rowSelectionModel, setRowSelectionModel] = useState<{ ids: Set<GridRowId>, type: 'include' | 'exclude' }>({
-		ids: new Set(),
-		type: 'include',
-	});
+	// rowSelectionModel state removed - will be passed as props from parent component
 
 	const toggleRow = (key: string) => setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -174,9 +171,23 @@ export function useApprovalHandlers() {
 	//####################################################################
 	const handleEditPriceEach = async (newRow: DataRow, oldRow: DataRow) => {
 		console.log("Processing row update", { newRow, oldRow });
+		
+		// Skip group header rows (they have UUIDs starting with "header-")
+		if (newRow.UUID && newRow.UUID.startsWith("header-")) {
+			console.log("Skipping group header row update");
+			return newRow;
+		}
+		
 		const newPriceEach = newRow.priceEach;
 		const quantity = newRow.quantity;
 		const newTotalPrice = newPriceEach * quantity;
+
+		// Extract the actual UUID and ID from the row data
+		const item_uuid = newRow.UUID;
+		const purchase_request_id = newRow.ID;
+
+		// update the price each and total price on backend
+		await updatePriceEachTotalPrice(purchase_request_id, item_uuid, newPriceEach, newTotalPrice);
 
 		return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
 	};
@@ -186,6 +197,12 @@ export function useApprovalHandlers() {
 	//####################################################################
 	async function handleAssignCO(officerId: number, username: string) {
 		console.log("Assigning CO to selected items", { officerId, username });
+
+		if (!rowSelectionModel) {
+			console.error("No rowSelectionModel provided");
+			toast.error("No items selected");
+			return;
+		}
 
 		try {
 			const response = await fetch(API_URL_ASSIGN_CO, {
@@ -234,8 +251,6 @@ export function useApprovalHandlers() {
 		openCommentModal,
 		close,
 		handleSubmit,
-		rowSelectionModel,
-		setRowSelectionModel,
 		handleAssignCO,
 		updatePriceEachTotalPrice,
 	};

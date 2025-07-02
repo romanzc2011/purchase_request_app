@@ -11,7 +11,7 @@ uvicorn pras_api:app --port 5004
 
 from datetime import datetime, timezone
 import json
-from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload
+from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
@@ -1078,16 +1078,33 @@ async def get_contracting_officer(
         }
         for co in contracting_officers
     ]
+    
+##########################################################################
+## UPDATE PRICE EACH/ TOTAL PRICE
+##########################################################################
+@api_router.post("/updatePrices")
+async def update_prices(
+    payload: UpdatePricesPayload,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    """
+    Update the price each and total price for a purchase request line item.
+    """
+    logger.info(f"Updating prices for purchase request ID: {payload.purchase_request_id} and item UUID: {payload.item_uuid}")
+    logger.debug(f"Payload: {payload}")
+    
+    stmt = (update(PurchaseRequestLineItem)
+            .where(PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id)
+            .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
+            .values(priceEach=payload.new_price_each, totalPrice=payload.new_total_price)
+            .execution_options(synchronize_session="fetch")
+    )
+    await db.execute(stmt)
+    await db.commit()
+    
+    return {"message": "Prices updated successfully"}
 
-##########################################################################
-##########################################################################
-## PROGRAM FUNCTIONS -- non API
-##########################################################################
-##########################################################################
-
-# Register routes -- routes must be above this to be visible
-app.include_router(api_router)
-        
 ##########################################################################
 ## HANDLE FILE UPLOAD
 ##########################################################################
@@ -1113,6 +1130,13 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
     except Exception as e:
         logger.error(f"Error during file upload: {e}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {e}")
+
+##########################################################################
+# REGISTER ROUTES -- routes must be above this to be visible
+##########################################################################
+app.include_router(api_router)
+        
+
 
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params

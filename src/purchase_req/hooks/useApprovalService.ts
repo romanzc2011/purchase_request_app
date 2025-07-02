@@ -14,6 +14,7 @@ export function useApprovalService() {
     const queryClient = useQueryClient();
 	const assignIRQ1Mutation = useAssignIRQ1();
 	const { openCommentModal, close, handleSubmit } = useCommentModal();
+	
     /* The approvalPayload is used to store the payload that will be sent to the server
     The approval payload will be coming in from ApprovalTable as approvalPayload. We will then 
     process the data the same way we did with comments, we want the same behavior */
@@ -47,12 +48,9 @@ export function useApprovalService() {
     // This function is called when the user clicks on the approve/deny button
     // It takes the payload as an argument and sends it to the server
     // processPayload --> approveDenyRequest (ApprovalService.ts)
-
-
     const processPayload = async (payload: ApprovalData | DenialData) => {
         setIsLoading(true);
         setError(null);
-
         try {
             const response = await approveDenyRequest(payload);
             console.log("🔥 APPROVE/DENY RESPONSE", response);
@@ -64,6 +62,18 @@ export function useApprovalService() {
             setIsLoading(false);
         }
     }
-    return { isLoading, error, processPayload, approvalPayload, setApprovalPayload, denialPayload, setDenialPayload, handleProcessRowUpdate };
+    return { 
+		isLoading, 
+		error, 
+		processPayload, 
+		approvalPayload, 
+		setApprovalPayload, 
+		denialPayload, 
+		setDenialPayload, 
+		handleProcessRowUpdate, 
+		openCommentModal, 
+		close, 
+		handleSubmit 
+	};
 }
 

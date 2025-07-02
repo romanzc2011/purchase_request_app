@@ -4,6 +4,14 @@ from datetime import datetime
 from api.schemas.purchase_schemas import ItemStatus
 from api.utils.pydantic_utils import to_camel_case
 
+# --------------------------------------------------------------
+#  UPDATE PRICE EACH/ TOTAL PRICE PAYLOAD SCHEMAS
+# --------------------------------------------------------------
+class UpdatePricesPayload(BaseModel):
+    purchase_request_id: str
+    item_uuid: str
+    new_price_each: float
+    new_total_price: float
 
 # --------------------------------------------------------------
 #  REQUEST APPROVAL PAYLOAD SCHEMAS
