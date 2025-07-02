@@ -169,17 +169,28 @@ async def download_statement_of_need_form(
 @api_router.get("/getSearchData/search", response_model=List[ApprovalSchema])
 async def get_search_data(
     query: str = "",
-    column: Optional[str] = None,
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
-    # If column is provided, use _exact_singleton_search instead
-    if column:
-        results = search_service._exact_singleton_search(column, query, db=None)
-    else:
-        # Otherwise use the standard execute_search method
-        results = search_service.execute_search(query, db=None)
+    # Use the standard execute_search method
+    results = search_service.execute_search(query, db=None)
     
+    logger.info(f"Search results for query '{query}': {len(results) if results else 0} items found")
     return JSONResponse(content=jsonable_encoder(results))
+
+##########################################################################
+## REBUILD SEARCH INDEX
+##########################################################################
+@api_router.post("/rebuildSearchIndex")
+async def rebuild_search_index(
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    """Rebuild the search index from scratch."""
+    try:
+        search_service.rebuild_index()
+        return {"message": "Search index rebuilt successfully"}
+    except Exception as e:
+        logger.error(f"Error rebuilding search index: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to rebuild search index: {str(e)}")
 
 ##########################################################################
 ## COROUTINE FUNCTIONS
@@ -1135,8 +1146,6 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 # REGISTER ROUTES -- routes must be above this to be visible
 ##########################################################################
 app.include_router(api_router)
-        
-
 
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params

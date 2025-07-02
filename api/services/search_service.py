@@ -85,6 +85,7 @@ class SearchService:
 
         # Build or rebuild the index
         self.create_whoosh_index()
+        logger.info("Search index initialized and ready")
 
         # Analyzer for custom parsers
         self.analyzer = RegexTokenizer() | LowercaseFilter() | StopFilter()
@@ -143,6 +144,9 @@ class SearchService:
                         else:
                             doc[key] = value
                     
+                    # Set the ID field to the purchase_request_id for search matching
+                    doc['ID'] = approval.purchase_request_id
+                    
                     # Filter to only include fields that exist in the schema
                     filtered_doc = {k: v for k, v in doc.items() if k in approval_schema.names()}
                     
@@ -158,7 +162,22 @@ class SearchService:
             logger.error(f"Error creating search index: {e}")
             raise
 
-    def execute_search(self, query: str, db: Session, limit: int = 10) -> List[Dict]:
+    def rebuild_index(self):
+        """Rebuild the search index from scratch."""
+        try:
+            # Remove existing index directory
+            import shutil
+            if os.path.exists(self.index_dir):
+                shutil.rmtree(self.index_dir)
+            
+            # Recreate the index
+            self.create_whoosh_index()
+            logger.info("Search index rebuilt successfully")
+        except Exception as e:
+            logger.error(f"Error rebuilding search index: {e}")
+            raise
+
+    def execute_search(self, query: str, db: Session = None, limit: int = 10) -> List[Dict]:
         """Perform a prefix-then-fuzzy search across multiple fields."""
         with self.ix.searcher() as searcher:
             # Build prefix queries for non-date/numeric fields
@@ -173,7 +192,11 @@ class SearchService:
                 query_obj = parser.parse(query)
                 results = searcher.search(query_obj, limit=limit)
 
-            return [dict(hit) for hit in results]
+            search_results = [dict(hit) for hit in results]
+            logger.info(f"Search results for '{query}': {len(search_results)} items found")
+            if search_results:
+                logger.info(f"First search result: {search_results[0]}")
+            return search_results
 
     def before_commit(self, session):
         """Cache pending ORM changes."""

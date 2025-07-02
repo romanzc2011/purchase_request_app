@@ -18,6 +18,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import MemoryIcon from '@mui/icons-material/Memory';
 import CloseIcon from "@mui/icons-material/Close";
 import ScheduleIcon from "@mui/icons-material/Schedule";
+import SearchIcon from "@mui/icons-material/Search";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 
@@ -35,6 +36,7 @@ interface ApprovalTableProps {
 	onDelete: (ID: string) => void;
 	resetTable: () => void;
 	searchQuery: string;
+	onClearSearch?: () => void;
 }
 
 // Global variable to store group comment payload
@@ -159,7 +161,7 @@ async function downloadStatementOfNeedForm(ID: string) {
 /***********************************************************************************/
 // APPROVAL TABLE
 /***********************************************************************************/
-export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
+export default function ApprovalTableDG({ searchQuery, onClearSearch }: ApprovalTableProps) {
 	const queryClient = useQueryClient();
 	const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 	const { data: searchData } = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
@@ -209,8 +211,45 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		refetchOnMount: true,
 	});
 
+	// Filter approval data based on search results - EXCLUSIVE SEARCH
+	const filteredApprovalData = useMemo(() => {
+		console.log("🔍 Search debug:", { searchQuery, searchDataLength: searchData?.length, approvalDataLength: approvalData?.length });
+		console.log("🔍 Search data sample:", searchData?.[0]);
+		console.log("🔍 Approval data sample:", approvalData?.[0]);
+		console.log("🔍 All search data:", searchData);
+
+		// If no search query, show all data
+		if (!searchQuery || !searchData || searchData.length === 0) {
+			console.log("🔍 No search query or data, returning all approval data");
+			return approvalData;
+		}
+
+		// Extract IDs from search results - check different possible field names
+		const searchResultIds = new Set();
+		searchData.forEach((item: any) => {
+			if (item.ID) searchResultIds.add(item.ID);
+			if (item.id) searchResultIds.add(item.id);
+			if (item.purchase_request_id) searchResultIds.add(item.purchase_request_id);
+		});
+		console.log("🔍 Search result IDs:", Array.from(searchResultIds));
+
+		// EXCLUSIVE FILTERING: Only show items that match search results
+		const filtered = approvalData.filter(item => searchResultIds.has(item.ID));
+		console.log("🔍 EXCLUSIVE SEARCH: Showing only", filtered.length, "items out of", approvalData.length, "total items");
+		console.log("🔍 Filtered data sample:", filtered[0]);
+
+		// Show toast notification for search results
+		if (searchQuery && filtered.length > 0) {
+			toast.info(`Search results: ${filtered.length} items found for "${searchQuery}"`);
+		} else if (searchQuery && filtered.length === 0) {
+			toast.warning(`No items found for "${searchQuery}"`);
+		}
+
+		return filtered;
+	}, [approvalData, searchData, searchQuery]);
+
 	// Build grouped map once per load
-	const rowsWithUUID: DataRow[] = approvalData.map((r, i) =>
+	const rowsWithUUID: DataRow[] = filteredApprovalData.map((r, i) =>
 		r.UUID ? r : { ...r, UUID: `row-${i}` }
 	);
 
@@ -305,13 +344,13 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 	// Update assignedIRQ1s when approvalData changes
 	const assignedIRQ1s = useMemo(() => {
 		const map: Record<string, string> = {};
-		approvalData.forEach(r => {
+		filteredApprovalData.forEach(r => {
 			if (r.IRQ1_ID) map[r.ID] = r.IRQ1_ID;
 		});
 		console.log("🔍 assignedIRQ1s updated:", map);
-		console.log("🔍 approvalData IRQ1_IDs:", approvalData.map(r => ({ ID: r.ID, IRQ1_ID: r.IRQ1_ID })));
+		console.log("🔍 filteredApprovalData IRQ1_IDs:", filteredApprovalData.map(r => ({ ID: r.ID, IRQ1_ID: r.IRQ1_ID })));
 		return map;
-	}, [approvalData]);
+	}, [filteredApprovalData]);
 
 	// User edit live in draftIRQ1 - update when assignedIRQ1s changes
 	const [draftIRQ1, setDraftIRQ1] = useState<Record<string, string>>({});
@@ -377,9 +416,9 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			return;
 		}
 
-		// From main data source of approvalData, find DataRow objects with UUIDs that
+		// From main data source of filteredApprovalData, find DataRow objects with UUIDs that
 		// are a NEW REQUEST or PENDING
-		const itemsToProcessForApproval = approvalData.filter(item =>
+		const itemsToProcessForApproval = filteredApprovalData.filter(item =>
 			selectedItemUuids.includes(item.UUID) &&
 			(item.status === ItemStatus.NEW_REQUEST || item.status === ItemStatus.PENDING_APPROVAL)
 		);
@@ -477,7 +516,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			return;
 		}
 
-		const itemsToProcessForDenial = approvalData.filter(item =>
+		const itemsToProcessForDenial = filteredApprovalData.filter(item =>
 			selectedItemUuids.includes(item.UUID) &&
 			(item.status === ItemStatus.NEW_REQUEST || item.status === ItemStatus.PENDING_APPROVAL)
 		);
@@ -576,7 +615,7 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 		}
 
 		const requestIDs = [
-			...new Set(approvalData
+			...new Set(filteredApprovalData
 				.filter(item => selectedItemUUIDs.includes(item.UUID))
 				.map(item => item.ID)
 			)
@@ -973,8 +1012,44 @@ export default function ApprovalTableDG({ searchQuery }: ApprovalTableProps) {
 			flexDirection: "column",
 
 		}}>
-			<Box sx={{ mb: 2, fontSize: '1.2rem', fontWeight: 'bold' }}>
-				COMMAND TOOLBAR
+			<Box sx={{ mb: 2, fontSize: '1.2rem', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+				<span>COMMAND TOOLBAR</span>
+				{searchQuery && (
+					<Box sx={{
+						display: 'flex',
+						alignItems: 'center',
+						gap: 1,
+						backgroundColor: '#1976d2',
+						color: 'white',
+						padding: '4px 12px',
+						borderRadius: '16px',
+						fontSize: '0.9rem'
+					}}>
+						<SearchIcon sx={{ fontSize: '1rem' }} />
+						<span>Search Active: "{searchQuery}" - {filteredApprovalData.length} items</span>
+						<Button
+							size="small"
+							variant="outlined"
+							sx={{
+								color: 'white',
+								borderColor: 'white',
+								ml: 1,
+								'&:hover': {
+									borderColor: 'white',
+									backgroundColor: 'rgba(255,255,255,0.1)'
+								}
+							}}
+							onClick={() => {
+								// Clear the search
+								if (onClearSearch) {
+									onClearSearch();
+								}
+							}}
+						>
+							Clear
+						</Button>
+					</Box>
+				)}
 			</Box>
 
 
