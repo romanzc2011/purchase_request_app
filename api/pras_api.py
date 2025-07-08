@@ -534,8 +534,27 @@ async def send_purchase_request(
     logger.info("Notifying requester and approvers")
     
     # Send request to approvers and requester
+    """
+    If this is a IT request, send it to IT Approver (Matt) 
+    If this is a non-IT request, send it to Finance Approver (Lela)
+    
+    Finance creates the SON so the initial request will also need to be sent
+    to Finance: Peter/Lauren
+    
+    This is the general route if starting with a Send to IT
+    IT (Matt) -> Send to Managment (Edmund)
+    Management (Edmund) -> Send to Clerk (Ted)
+    Clerk -> Send to Financial (Lela)
+    Financial -> Send to Procurement (Peter/Lauren)
+    """
+    send_to = None
+    if payload.items[0].fund.startswith("511"):
+        send_to = "IT"
+    elif payload.items[0].fund.startswith("092"):
+        send_to = "FINANCE"
+    
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(smtp_service.send_approver_email(email_request_payload, db=db))
+        tg.create_task(smtp_service.send_approver_email(email_request_payload, db=db, send_to=send_to))
         tg.create_task(smtp_service.send_requester_email(email_request_payload, db=db))
     
     return JSONResponse({"message": "All work completed"})

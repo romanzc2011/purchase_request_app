@@ -37,9 +37,13 @@ class ApproverPolicy:
         username = format_username(self.user.username)
 
         # Clerk Admin can always approve
-        if username == "edwardtakara" or username == "romancampbell":  # TESTING
+        logger.debug("DEPUTY AND CLERK TESTING AREA")
+        if username == "edwardtakara":
             logger.debug("CLERK ADMIN CAN APPROVE")
             return True
+        # if username == "edwardtakara" or username == "romancampbell":  # TESTING
+        #     logger.debug("CLERK ADMIN CAN APPROVE")
+        #     return True
 
         # Deputy Clerk logic
         if username == "edmundbrown" or username == "romancampbell":  # TESTING

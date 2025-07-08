@@ -99,6 +99,16 @@ class ITHandler(Handler):
                 
                 # Send email to clerk admins requesting approval
                 logger.debug(f"IT HANDLER: Sending email to clerk admins requesting approval for {request.uuid}")
+                
+                """
+                Send to the correct approver handler, the new request has been approved so we need to ensure the correct
+                approver is notified, lets test for deputy clerk first
+                """
+                
+                logger.debug(f"REQUEST: {request}")
+                logger.debug(f"CURRENT USER: {current_user}")
+                logger.debug(f"LDAP SERVICE: {ldap_service}")
+                
                 approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
                 email_payload = await approver_email_builder.build_email_payload()
                 await smtp_service.send_approver_email(email_payload,db=db)
