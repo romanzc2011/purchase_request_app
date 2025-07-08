@@ -33,66 +33,17 @@ class PDFService:
 
     def create_pdf(self, ID: str, payload: Dict[str, Any]) -> Path:
         """
-        Create a PDF document for a purchase request
+        Create a PDF document for a purchase request (synchronous version)
+        This method is deprecated - use the async version instead
         """
-        try:
-            # Get the purchase request data
-            with get_async_session() as session:
-                result = session.execute(
-                    select(PurchaseRequestHeader)
-                    .where(PurchaseRequestHeader.ID == ID)
-                )
-                header = result.scalar_one_or_none()
-                
-                if not header:
-                    raise ValueError(f"Purchase request with ID {ID} not found")
-                
-                # Get line items
-                result = session.execute(
-                    select(PurchaseRequestLineItem)
-                    .where(PurchaseRequestLineItem.purchase_request_uuid == header.UUID)
-                )
-                line_items = result.scalars().all()
-                
-                # Get approvals
-                result = session.execute(
-                    select(Approval)
-                    .where(Approval.purchase_request_uuid == header.UUID)
-                )
-                approvals = result.scalars().all()
-                
-                # Get pending approvals
-                result = session.execute(
-                    select(PendingApproval)
-                    .where(PendingApproval.purchase_request_uuid == header.UUID)
-                )
-                pending_approvals = result.scalars().all()
-            
-            # Create the PDF
-            output_path = self.output_dir / f"{ID}.pdf"
-            
-            # For now, just create an empty file
-            output_path.touch()
-            
-            return output_path
-            
-        except Exception as e:
-            raise Exception(f"Error creating PDF: {e}")
+        raise NotImplementedError("Use the async create_pdf method instead")
 
     def generate_pdf(self, ID: str, payload: Dict[str, Any], uploaded_files: Optional[List[str]] = None) -> str:
         """
-        Generate a PDF document for a purchase request
+        Generate a PDF document for a purchase request (synchronous version)
+        This method is deprecated - use the async version instead
         """
-        try:
-            # Create the PDF
-            output_path = self.create_pdf(ID, payload)
-            
-            # TODO: Add uploaded files to the PDF
-            
-            return str(output_path)
-            
-        except Exception as e:
-            raise Exception(f"Error generating PDF: {e}")
+        raise NotImplementedError("Use the async create_pdf method instead")
 
     """
     Generate a purchase request PDF.
@@ -143,19 +94,49 @@ class PDFService:
         contracting_officer = await dbas.get_contracting_officer_by_id(db, ID)
         logger.info(f"contracting_officer: {contracting_officer}")
         
-		# ------------------------------------------------------------------------
+		        # ------------------------------------------------------------------------
         # 3️⃣ Load SonComments via async select
-        stmt = (
+        # Try to get SonComments through both line_item_uuid and approvals_uuid
+        from api.services.db_service import PurchaseRequestLineItem
+        
+        # First, get line item UUIDs for this purchase request
+        line_items_stmt = (
+            select(PurchaseRequestLineItem.UUID)
+            .where(PurchaseRequestLineItem.purchase_request_id == ID)
+        )
+        line_items_result = await db.execute(line_items_stmt)
+        line_item_uuids = [row[0] for row in line_items_result.all()]
+        
+        # Get SonComments by line_item_uuid (more reliable)
+        son_comments_stmt = (
+            select(dbas.SonComment)
+            .where(dbas.SonComment.line_item_uuid.in_(line_item_uuids))
+            .where(dbas.SonComment.comment_text.is_not(None))
+        )
+        result = await db.execute(son_comments_stmt)
+        son_comments = result.scalars().all()
+        
+        # Also try to get SonComments through approvals_uuid as backup
+        approvals_stmt = (
             select(dbas.SonComment)
             .join(dbas.Approval, dbas.SonComment.approvals_uuid == dbas.Approval.UUID)
             .where(dbas.Approval.purchase_request_id == ID)
+            .where(dbas.SonComment.comment_text.is_not(None))
         )
-        result = await db.execute(stmt)
-        son_comments = result.scalars().all()
+        approvals_result = await db.execute(approvals_stmt)
+        approvals_son_comments = approvals_result.scalars().all()
+        
+        # Combine both results, avoiding duplicates
+        all_son_comments = list(son_comments) + list(approvals_son_comments)
+        unique_son_comments = list({comment.UUID: comment for comment in all_son_comments}.values())
+        
+        logger.info(f"Found {len(son_comments)} SonComments via line_item_uuid")
+        logger.info(f"Found {len(approvals_son_comments)} SonComments via approvals_uuid")
+        logger.info(f"Total unique SonComments: {len(unique_son_comments)}")
 
         # Build your comment array
         comment_arr: list[str] = []
-        for c in son_comments:
+        for c in unique_son_comments:
             cdata = SonCommentSchema.model_validate(c)
             if cdata.comment_text:
                 comment_arr.append(cdata.comment_text)
@@ -171,6 +152,7 @@ class PDFService:
             rows=rows,
             output_path=output_path,
             is_cyber=is_cyber,
+            use_comments=False,
             comments=comment_arr,
             order_type=order_type,
             contracting_officer=contracting_officer,
@@ -196,7 +178,8 @@ class PDFService:
     @staticmethod
     def _make_purchase_request_pdf(rows: list[dict], 
                                    output_path: Path,
-                                   is_cyber: bool, 
+                                   is_cyber: bool,
+                                   use_comments: bool,
                                    comments: list[str]=None, 
                                    order_type: str=None,
                                    contracting_officer: str=None
@@ -366,7 +349,7 @@ class PDFService:
         elements.append(Spacer(1, 6))
 
         # Comments paragraph with all collected comments
-        if comments:
+        if use_comments:
             comments_html = (
                 '<font name="Play-Bold">Comments/Additional Information Requested:</font><br/>' +
                 "<br/>".join(f'<font name="Play">{c}</font>' for c in comments)

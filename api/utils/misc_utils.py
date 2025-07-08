@@ -2,6 +2,10 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 import api.services.db_service as dbas
+from sqlalchemy import select
+from api.services.db_service import SonComment, Approval
+from api.services.db_service import PurchaseRequestLineItem
+
 
 """
 This file contains miscellaneous utility functions that are used throughout the project.
@@ -56,7 +60,22 @@ async def get_justifications_and_comments(db: AsyncSession, ID: str) -> list[str
     # Get SonComments
     # -------------------------------------------------------
     
+    # First, get line item UUIDs for this purchase request
+    line_items_stmt = (
+        select(PurchaseRequestLineItem.UUID)
+        .where(PurchaseRequestLineItem.purchase_request_id == ID)
+    )
+    line_items_result = await db.execute(line_items_stmt)
+    line_item_uuids = [row[0] for row in line_items_result.all()]
     
+    # Get SonComments by line_item_uuid (more reliable)
+    son_comments_stmt = (
+        select(SonComment)
+        .where(SonComment.line_item_uuid.in_(line_item_uuids))
+        .where(SonComment.comment_text.is_not(None))
+    )
+    result = await db.execute(son_comments_stmt)
+    son_comments = result.scalars().all()
     
     
     return additional_comments

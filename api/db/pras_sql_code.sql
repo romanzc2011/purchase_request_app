@@ -145,3 +145,34 @@ END;
 -- DELETE FROM son_comments
 -- DELETE FROM justification_templates;
 -- DELETE FROM contracting_officers;
+
+-- SELECT con.username 
+-- FROM contracting_officers con
+-- INNER JOIN purchase_request_headers prhdr ON con.id = prhdr.contracting_officer_id
+-- WHERE 1=1
+-- AND prhdr.purchase_request_seq_id = 1;
+
+-- DELETE FROM final_approvals WHERE approvals_uuid IN (
+--     SELECT UUID FROM approvals WHERE purchase_request_id = 'LAWB0011'
+-- );
+-- 
+-- DELETE FROM final_approvals WHERE pending_approval_id IN (
+--     SELECT pending_approval_id FROM pending_approvals WHERE purchase_request_id = 'LAWB0011'
+-- );
+-- 
+-- DELETE FROM final_approvals WHERE line_item_uuid IN (
+--     SELECT UUID FROM pr_line_items WHERE purchase_request_id = 'LAWB0011'
+-- );
+-- 
+-- DELETE FROM son_comments WHERE approvals_uuid IN (
+--     SELECT UUID FROM approvals WHERE purchase_request_id = 'LAWB0011'
+-- );
+-- 
+-- DELETE FROM son_comments WHERE line_item_uuid IN (
+--     SELECT UUID FROM pr_line_items WHERE purchase_request_id = 'LAWB0011'
+-- );
+-- 
+-- DELETE FROM pending_approvals WHERE purchase_request_id = 'LAWB0011';
+-- DELETE FROM approvals WHERE purchase_request_id = 'LAWB0011';
+-- DELETE FROM pr_line_items WHERE purchase_request_id = 'LAWB0011';
+-- DELETE FROM purchase_request_headers WHERE ID = 'LAWB0011';

@@ -25,6 +25,10 @@ class ApproverPolicy:
         if current_status != ItemStatus.PENDING_APPROVAL:
             logger.info(f"Request {request.uuid} is not in PENDING_APPROVAL status ({current_status}), skipping")
             return False
+        
+        ## FOR TESTING TO SEE PROGRESS
+        if current_status == ItemStatus.PENDING_APPROVAL:
+            logger.info(f"Request {request.uuid} is in PENDING_APPROVAL status")
 
         if not self.user.has_group("CUE_GROUP"):
             logger.info("User is not in CUE group, skipping")
