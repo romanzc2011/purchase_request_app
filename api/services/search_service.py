@@ -130,6 +130,7 @@ class SearchService:
                         # Handle enum values
                         if isinstance(value, dbas.ItemStatus):
                             doc[key] = value.value  # Use the enum's value (string)
+                            logger.debug(f"KEY: {key} VALUE: {value}")
                         elif isinstance(value, datetime):
                             # Store datetime as string in YYYY-MM-DD format
                             doc[key] = value.strftime('%Y-%m-%d')
@@ -146,6 +147,7 @@ class SearchService:
                     
                     # Set the ID field to the purchase_request_id for search matching
                     doc['ID'] = approval.purchase_request_id
+                    
                     
                     # Filter to only include fields that exist in the schema
                     filtered_doc = {k: v for k, v in doc.items() if k in approval_schema.names()}
@@ -180,18 +182,19 @@ class SearchService:
     def execute_search(self, query: str, db: Session = None, limit: int = 10) -> List[Dict]:
         """Perform a prefix-then-fuzzy search across multiple fields."""
         with self.ix.searcher() as searcher:
-            # Build prefix queries for non-date/numeric fields
-            prefixes = [Prefix(f, query) for f in searchable_fields
-                        if not self.ix.schema[f].__class__ in (NUMERIC, DATETIME)]
-            combined = Or(prefixes)
-            results = searcher.search(combined, limit=limit)
-
-            # Fallback to fuzzy if empty
-            if not results:
-                parser = MultifieldParser(searchable_fields, schema=self.ix.schema, group=OrGroup)
-                query_obj = parser.parse(query)
-                results = searcher.search(query_obj, limit=limit)
-
+            text_fields    = ['ID','CO','requester','itemDescription','justification','location','status']
+            numeric_fields = ['budgetObjCode','fund','quantity','priceEach','totalPrice']
+            
+            if query.isdigit():
+                fields_to_search = numeric_fields + text_fields
+            else:
+                fields_to_search = text_fields
+                
+            parser = MultifieldParser(fields_to_search, schema=self.ix.schema, group=OrGroup)
+            
+            query_obj = parser.parse(query)
+            results = searcher.search(query_obj, limit=limit)
+            
             search_results = [dict(hit) for hit in results]
             logger.info(f"Search results for '{query}': {len(search_results)} items found")
             if search_results:
@@ -236,106 +239,3 @@ class SearchService:
             writer.cancel()
             logger.error(f"Error in after_commit: {e}")
             raise
-
-    async def search_purchase_requests(self, search_term: str) -> List[Dict[str, Any]]:
-        """
-        Search purchase requests by various fields
-        """
-        # Create aliases for the tables
-        header = aliased(PurchaseRequestHeader)
-        line_item = aliased(PurchaseRequestLineItem)
-        approval = aliased(Approval)
-        pending = aliased(PendingApproval)
-
-        # Build the search query
-        query = (
-            select(header)
-            .outerjoin(line_item, header.ID == line_item.purchase_request_id)
-            .outerjoin(approval, header.ID == approval.purchase_request_id)
-            .outerjoin(pending, header.ID == pending.purchase_request_id)
-            .where(
-                or_(
-                    header.ID.ilike(f"%{search_term}%"),
-                    header.requester.ilike(f"%{search_term}%"),
-                    line_item.itemDescription.ilike(f"%{search_term}%"),
-                    line_item.justification.ilike(f"%{search_term}%"),
-                    approval.status.ilike(f"%{search_term}%"),
-                    pending.approver.ilike(f"%{search_term}%")
-                )
-            )
-            .distinct()
-        )
-
-        # Execute the query
-        result = await self.session.execute(query)
-        headers = result.scalars().all()
-
-        # Convert to dictionaries
-        return [self._header_to_dict(header) for header in headers]
-
-    def _header_to_dict(self, header: PurchaseRequestHeader) -> Dict[str, Any]:
-        """
-        Convert a PurchaseRequestHeader object to a dictionary
-        """
-        return {
-            "id": header.ID,
-            "requester": header.requester,
-            "phoneext": header.phoneext,
-            "datereq": header.datereq.isoformat() if header.datereq else None,
-            "dateneed": header.dateneed.isoformat() if header.dateneed else None,
-            "orderType": header.orderType,
-            "status": header.status,
-            "created_time": header.created_time.isoformat() if header.created_time else None,
-            "line_items": [self._line_item_to_dict(item) for item in header.line_items],
-            "approvals": [self._approval_to_dict(approval) for approval in header.approvals]
-        }
-
-    def _line_item_to_dict(self, item: PurchaseRequestLineItem) -> Dict[str, Any]:
-        """
-        Convert a PurchaseRequestLineItem object to a dictionary
-        """
-        return {
-            "uuid": item.UUID,
-            "id": item.ID,
-            "itemDescription": item.itemDescription,
-            "justification": item.justification,
-            "addComments": item.addComments,
-            "trainNotAval": item.trainNotAval,
-            "needsNotMeet": item.needsNotMeet,
-            "budgetObjCode": item.budgetObjCode,
-            "fund": item.fund,
-            "quantity": item.quantity,
-            "priceEach": item.priceEach,
-            "totalPrice": item.totalPrice,
-            "location": item.location,
-            "status": item.status,
-            "fileAttachments": item.fileAttachments,
-            "isCyberSecRelated": item.isCyberSecRelated,
-            "created_time": item.created_time.isoformat() if item.created_time else None
-        }
-
-    def _approval_to_dict(self, approval: Approval) -> Dict[str, Any]:
-        """
-        Convert an Approval object to a dictionary
-        """
-        return {
-            "uuid": approval.UUID,
-            "requester": approval.requester,
-            "phoneext": approval.phoneext,
-            "datereq": approval.datereq.isoformat() if approval.datereq else None,
-            "dateneed": approval.dateneed.isoformat() if approval.dateneed else None,
-            "orderType": approval.orderType,
-            "itemDescription": approval.itemDescription,
-            "justification": approval.justification,
-            "trainNotAval": approval.trainNotAval,
-            "needsNotMeet": approval.needsNotMeet,
-            "budgetObjCode": approval.budgetObjCode,
-            "fund": approval.fund,
-            "priceEach": approval.priceEach,
-            "totalPrice": approval.totalPrice,
-            "location": approval.location,
-            "quantity": approval.quantity,
-            "isCyberSecRelated": approval.isCyberSecRelated,
-            "status": approval.status,
-            "created_time": approval.created_time.isoformat() if approval.created_time else None
-        }

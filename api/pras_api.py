@@ -173,6 +173,7 @@ async def get_search_data(
 ):
     # Use the standard execute_search method
     results = search_service.execute_search(query, db=None)
+    logger.debug(f"RESULTS: {results}")
     
     logger.info(f"Search results for query '{query}': {len(results) if results else 0} items found")
     return JSONResponse(content=jsonable_encoder(results))
