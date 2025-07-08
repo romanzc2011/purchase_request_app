@@ -152,27 +152,14 @@ END;
 -- WHERE 1=1
 -- AND prhdr.purchase_request_seq_id = 1;
 
--- DELETE FROM final_approvals WHERE approvals_uuid IN (
---     SELECT UUID FROM approvals WHERE purchase_request_id = 'LAWB0011'
--- );
+-- UPDATE final_approvals
+-- SET status = 'NEW REQUEST'
+-- WHERE UUID = '60735e02-9679-406f-89ba-241e33e769fa';
 -- 
--- DELETE FROM final_approvals WHERE pending_approval_id IN (
---     SELECT pending_approval_id FROM pending_approvals WHERE purchase_request_id = 'LAWB0011'
--- );
--- 
--- DELETE FROM final_approvals WHERE line_item_uuid IN (
---     SELECT UUID FROM pr_line_items WHERE purchase_request_id = 'LAWB0011'
--- );
--- 
--- DELETE FROM son_comments WHERE approvals_uuid IN (
---     SELECT UUID FROM approvals WHERE purchase_request_id = 'LAWB0011'
--- );
--- 
--- DELETE FROM son_comments WHERE line_item_uuid IN (
---     SELECT UUID FROM pr_line_items WHERE purchase_request_id = 'LAWB0011'
--- );
--- 
--- DELETE FROM pending_approvals WHERE purchase_request_id = 'LAWB0011';
--- DELETE FROM approvals WHERE purchase_request_id = 'LAWB0011';
--- DELETE FROM pr_line_items WHERE purchase_request_id = 'LAWB0011';
--- DELETE FROM purchase_request_headers WHERE ID = 'LAWB0011';
+-- DELETE FROM final_approvals WHERE UUID = '60735e02-9679-406f-89ba-241e33e769fa';
+
+
+-- CHANGE REQUEST BACK TO NEW REQUEST
+UPDATE approvals
+SET status = 'NEW REQUEST'
+WHERE UUID = 'd4bc97bd-852e-44a1-988b-11b4a647165a';

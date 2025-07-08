@@ -89,6 +89,7 @@ class ITHandler(Handler):
                 await dbas.insert_final_approval(
                     db=db,
                     approvals_uuid=approvals_uuid,
+                    purchase_request_id=request.id,
                     line_item_uuid=request.uuid,
                     pending_approval_id=pending_approval_id,
                     approver=request.approver,
@@ -147,6 +148,7 @@ class FinanceHandler(Handler):
                 await dbas.insert_final_approval(
                     db=db,
                     approvals_uuid=approvals_uuid,
+                    purchase_request_id=request.id,
                     line_item_uuid=request.uuid,
                     pending_approval_id=pending_approval_id,
                     approver=request.approver,

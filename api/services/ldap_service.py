@@ -258,10 +258,6 @@ class LDAPService:
             )
             
             if conn.entries:
-                logger.info(f"Found {len(conn.entries)} entries for query: {query}")
-                logger.info(f"Raw entries: {conn.entries}")
-                logger.info(f"Entry attributes: {[entry.entry_attributes for entry in conn.entries]}")
-                logger.info(f"Entry JSON: {[entry.entry_to_json() for entry in conn.entries]}")
                 return [entry.sAMAccountName.value for entry in conn.entries]
             else:
                 logger.error(f"No user found for query: {query}")

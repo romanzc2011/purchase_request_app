@@ -23,22 +23,22 @@ class ApproverPolicy:
         - Deputy Clerk (edmundbrown) can only approve if deputy_can_approve = True in DB.
         """
         if current_status != ItemStatus.PENDING_APPROVAL:
-            logger.info(f"Request {request.uuid} is not in PENDING_APPROVAL status ({current_status}), skipping")
+            logger.debug(f"Request {request.uuid} is not in PENDING_APPROVAL status ({current_status}), skipping")
             return False
         
         ## FOR TESTING TO SEE PROGRESS
         if current_status == ItemStatus.PENDING_APPROVAL:
-            logger.info(f"Request {request.uuid} is in PENDING_APPROVAL status")
+            logger.debug(f"Request {request.uuid} is in PENDING_APPROVAL status")
 
         if not self.user.has_group("CUE_GROUP"):
-            logger.info("User is not in CUE group, skipping")
+            logger.debug("User is not in CUE group, skipping")
             return False
 
         username = format_username(self.user.username)
 
         # Clerk Admin can always approve
         if username == "edwardtakara" or username == "romancampbell":  # TESTING
-            logger.info("Clerk Admin can approve request")
+            logger.debug("CLERK ADMIN CAN APPROVE")
             return True
 
         # Deputy Clerk logic
@@ -51,18 +51,18 @@ class ApproverPolicy:
             deputy_can_approve = row and row.deputy_can_approve
 
             if deputy_can_approve:
-                logger.info("Deputy Clerk can approve request under $250")
+                logger.debug("Deputy Clerk can approve request under $250")
                 return True
             else:
-                logger.info("Deputy Clerk not allowed to approve this request")
+                logger.debug("Deputy Clerk not allowed to approve this request")
                 return False
 
-        logger.info("Only Deputy Clerk and Clerk Admin can approve requests")
+        logger.debug("Only Deputy Clerk and Clerk Admin can approve requests")
         return False
 
     def can_finance_approve(self, fund: str, current_status: ItemStatus) -> bool:
         if current_status != ItemStatus.NEW_REQUEST:
-            logger.info(f"Request status is not NEW_REQUEST ({current_status}), skipping")
+            logger.debug(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False
         return self.user.has_group("ACCESS_GROUP") and fund.startswith("092")
 

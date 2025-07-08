@@ -30,14 +30,14 @@ db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
 os.makedirs(db_dir, exist_ok=True)
 
 # Create engine and base
-engine = create_engine('sqlite:///api/db/pras.db', echo=True)  # PRAS = Purchase Request Approval System
+engine = create_engine('sqlite:///api/db/pras.db', echo=False)  # PRAS = Purchase Request Approval System
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
 
 DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
 engine_async = create_async_engine(
     DATABASE_URL_ASYNC, 
-    echo=True)
+    echo=False)
 
 AsyncSessionLocal = sessionmaker(bind=engine_async, class_=AsyncSession)
 
@@ -226,6 +226,12 @@ class Approval(Base):
                                 cascade="all, delete-orphan",
                                 foreign_keys="[FinalApproval.approvals_uuid]"
                              )
+    final_approval_by_pr_id: Mapped[List[FinalApproval]] = relationship(
+                                "FinalApproval",
+                                back_populates="approval_by_pr_id",
+                                cascade="all, delete-orphan",
+                                foreign_keys="[FinalApproval.purchase_request_id]"
+                             )
 
     # to pending
     pending_approvals      : Mapped[List[PendingApproval]] = relationship(
@@ -307,6 +313,7 @@ class FinalApproval(Base):
     __tablename__ = "final_approvals"
     
     UUID            : Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    purchase_request_id : Mapped[str] = mapped_column(String, ForeignKey("approvals.purchase_request_id"), nullable=False)
     pending_approval_id         : Mapped[int] = mapped_column(Integer, ForeignKey("pending_approvals.pending_approval_id"), nullable=False)
     approvals_uuid  : Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
     line_item_uuid  : Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=False)
@@ -321,6 +328,13 @@ class FinalApproval(Base):
                           back_populates="final_approval_attr",
                           foreign_keys=[approvals_uuid]
                       )
+    
+    # back to Approval by purchase request id
+    approval_by_pr_id : Mapped[Approval] = relationship(
+							"Approval",
+							back_populates="final_approval_by_pr_id",
+							foreign_keys=[purchase_request_id]
+						)
 
     # back to LineItem
     line_item      : Mapped[PurchaseRequestLineItem] = relationship(
@@ -614,6 +628,7 @@ async def fetch_flat_approvals(
 async def insert_final_approval(
     db: AsyncSession,
     approvals_uuid: str,
+    purchase_request_id: str,
     line_item_uuid: str,
     pending_approval_id: int,
     approver: str,
@@ -626,6 +641,7 @@ async def insert_final_approval(
     Args:
         db: Database session
         approvals_uuid: UUID from the approvals table
+        purchase_request_id: ID from the purchase_request_headers table
         line_item_uuid: UUID from the pr_line_items table
         pending_approval_id: Pending approval ID from the pending_approvals table
         approver: Username of the approver
@@ -640,6 +656,7 @@ async def insert_final_approval(
     # Create the new approval record
     final_approval = FinalApproval(
         approvals_uuid=approvals_uuid,
+        purchase_request_id=purchase_request_id,
         line_item_uuid=line_item_uuid,
         pending_approval_id=pending_approval_id,
         approver=approver,
@@ -902,5 +919,13 @@ def get_usernames(db_session: Session, prefix: str):
     """
     results = db_session.query(Approval.requester).filter(Approval.requester.like(f"{prefix}%")).distinct().all()
     return [row[0] for row in results]
+
+###################################################################################################
+# RESET REQUEST TO NEW REQUEST
+###################################################################################################
+async def reset_purchase_request(purchase_request_id: str, db: AsyncSession):
+    stmt = (
+		update(PurchaseRequestHeader)
+	)
 
 init_db()
