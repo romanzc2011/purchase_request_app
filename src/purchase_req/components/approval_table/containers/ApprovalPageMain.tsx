@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import ApprovalTable from "../ui/ApprovalTable";
 import SearchBar from "../ui/SearchBar";
 import { Box } from "@mui/material";
@@ -10,7 +9,7 @@ interface ApprovalTableProps {
 	resetTable: () => void;
 }
 
-export default function ApprovalPageMain({ onDelete, resetTable }: ApprovalTableProps) {
+export default function ApprovalPageMain({ resetTable }: ApprovalTableProps) {
 	const [dataBuffer, setDataBuffer] = useState<DataRow[]>([]);
 	const [searchQuery, setSearchQuery] = useState("");
 

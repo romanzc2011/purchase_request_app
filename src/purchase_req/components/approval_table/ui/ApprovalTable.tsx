@@ -1116,6 +1116,20 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 				columns={allColumns}
 				processRowUpdate={handleEditPriceEach}
 				rowSelectionModel={rowSelectionModel}
+				isCellEditable={(params) => {
+					// Only allow editing priceEach field
+					if (params.field !== 'priceEach') return false;
+
+					// Don't allow editing group headers
+					if (params.row.isGroup) return false;
+
+					// Don't allow editing if status is APPROVED, DENIED, COMPLETED, or CANCELLED
+					const status = params.row.status;
+					if (status === ItemStatus.APPROVED || status === ItemStatus.DENIED) {
+						return false;
+					}
+					return true;
+				}}
 				onRowSelectionModelChange={(newModel) => {
 					const newSelection = new Set<GridRowId>();
 					const prev = rowSelectionModel.ids;

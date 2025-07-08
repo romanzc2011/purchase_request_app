@@ -6,7 +6,7 @@ import { useAssignIRQ1 } from "./useAssignIRQ1";
 import { useCommentModal } from "./useCommentModal";
 import { useApprovalService } from "./useApprovalService";
 import { GridRowId } from "@mui/x-data-grid";
-import { DataRow } from "../types/approvalTypes";
+import { DataRow, ItemStatus } from "../types/approvalTypes";
 
 // API URLs
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
@@ -99,7 +99,9 @@ async function updatePriceEachTotalPrice(
 	purchase_request_id: string, 
 	item_uuid: string, 
 	newPriceEach: number, 
-	newTotalPrice: number) {
+	newTotalPrice: number,
+	status: ItemStatus
+) {
 	const response = await fetch(API_URL_UPDATE_PRICES, {
 		method: "POST",
 		headers: {
@@ -110,7 +112,8 @@ async function updatePriceEachTotalPrice(
 			purchase_request_id,
 			item_uuid,
 			new_price_each: newPriceEach,
-			new_total_price: newTotalPrice
+			new_total_price: newTotalPrice,
+			status
 		})
 	});
 	if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -181,13 +184,15 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 		const newPriceEach = newRow.priceEach;
 		const quantity = newRow.quantity;
 		const newTotalPrice = newPriceEach * quantity;
+		const status = newRow.status;
 
 		// Extract the actual UUID and ID from the row data
 		const item_uuid = newRow.UUID;
 		const purchase_request_id = newRow.ID;
 
+
 		// update the price each and total price on backend
-		await updatePriceEachTotalPrice(purchase_request_id, item_uuid, newPriceEach, newTotalPrice);
+		await updatePriceEachTotalPrice(purchase_request_id, item_uuid, newPriceEach, newTotalPrice, status);
 
 		return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
 	};

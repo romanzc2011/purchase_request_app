@@ -12,6 +12,7 @@ class UpdatePricesPayload(BaseModel):
     item_uuid: str
     new_price_each: float
     new_total_price: float
+    status: ItemStatus
 
 # --------------------------------------------------------------
 #  REQUEST APPROVAL PAYLOAD SCHEMAS

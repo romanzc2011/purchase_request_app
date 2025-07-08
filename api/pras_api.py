@@ -1125,14 +1125,20 @@ async def update_prices(
     logger.info(f"Updating prices for purchase request ID: {payload.purchase_request_id} and item UUID: {payload.item_uuid}")
     logger.debug(f"Payload: {payload}")
     
-    stmt = (update(PurchaseRequestLineItem)
-            .where(PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id)
-            .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
-            .values(priceEach=payload.new_price_each, totalPrice=payload.new_total_price)
-            .execution_options(synchronize_session="fetch")
-    )
-    await db.execute(stmt)
-    await db.commit()
+    # Only allow updating prices for NEW_REQUEST or PENDING_APPROVAL statuses, not APPROVED or DENIED
+    if ((payload.status is ItemStatus.NEW_REQUEST or payload.status is ItemStatus.PENDING_APPROVAL) 
+        and (payload.status is not ItemStatus.APPROVED and payload.status is not ItemStatus.DENIED)
+    ):
+        stmt = (update(PurchaseRequestLineItem)
+                .where(PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id)
+                .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
+                .values(priceEach=payload.new_price_each, totalPrice=payload.new_total_price)
+                .execution_options(synchronize_session="fetch")
+        )
+        await db.execute(stmt)
+        await db.commit()
+    else:
+        raise HTTPException(status_code=400, detail="Cannot update prices for items with status: APPROVED or DENIED")
     
     return {"message": "Prices updated successfully"}
 

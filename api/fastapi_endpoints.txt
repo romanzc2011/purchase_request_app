@@ -1,0 +1,56 @@
+POST /api/login
+Description: Authenticates users and returns JWTs.
+
+GET /api/getApprovalData
+Description: Fetches approval data (optionally filtered by ID).
+
+POST /api/downloadStatementOfNeedForm
+Description: Downloads the statement of need form for a given ID.
+
+GET /api/getSearchData/search
+Description: Performs a search and returns approval data.
+
+POST /api/rebuildSearchIndex
+Description: Rebuilds the search index from scratch.
+
+POST /api/sendToPurchaseReq
+Description: Submits a purchase request (with file upload support).
+
+POST /api/assignIRQ1_ID
+Description: Assigns a requisition ID to a purchase request.
+
+POST /api/assignCO
+Description: Assigns a contracting officer to a purchase request.
+
+POST /api/denyRequest
+Description: Denies a purchase request.
+
+POST /api/approveRequest
+Description: Approves or denies a purchase request (handles all actions).
+
+POST /api/refresh
+Description: Refreshes a JWT token.
+
+POST /api/createNewID
+Description: Creates a new purchase request ID.
+
+GET /api/getUUID/{ID}
+Description: Gets the UUID for a given purchase request ID.
+
+GET /api/usernames
+Description: Returns a list of usernames that start with a given prefix.
+
+POST /api/add_comments
+Description: Adds multiple comments to purchase requests.
+
+PUT /api/cyberSecRelated/{UUID}
+Description: Updates the isCyberSecRelated field for a line item.
+
+GET /api/get_contracting_officer
+Description: Gets a list of contracting officers.
+
+POST /api/updatePrices
+Description: Updates the price for a purchase request line item.
+
+POST /api/upload_file
+Description: Uploads a file for a purchase request.
