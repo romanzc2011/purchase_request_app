@@ -1112,6 +1112,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 					if (row.isGroup && expandedRows[row.groupKey]) return 'expanded-group-row';
 					return '';
 				}}
+
 				checkboxSelection
 				columns={allColumns}
 				processRowUpdate={handleEditPriceEach}
@@ -1130,6 +1131,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 					}
 					return true;
 				}}
+
 				onRowSelectionModelChange={(newModel) => {
 					const newSelection = new Set<GridRowId>();
 					const prev = rowSelectionModel.ids;

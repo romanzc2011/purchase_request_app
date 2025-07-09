@@ -16,6 +16,7 @@ import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
 import { IFile } from "../../types/IFile";
+import { defaultItemFields } from "../../types/formTypes";
 import InfoIcon from "@mui/icons-material/Info";
 import Tooltip from "@mui/material/Tooltip";
 import Justification from "./Justification";
@@ -78,6 +79,15 @@ function AddItemsForm({
 		console.log('Success state changed:', showSuccess);
 	}, [showSuccess]);
 
+	// Keep these header values between add items
+	const [requester, phoneext, datereq, dateneed, orderType] = watch([
+		"requester",
+		"phoneext",
+		"datereq",
+		"dateneed",
+		"orderType"
+	]);
+
 
 
 	/*************************************************************************************** */
@@ -88,7 +98,6 @@ function AddItemsForm({
 			// Generate a new UUID for the item
 			const uuid = uuidv4();
 
-
 			// Create a new item with the UUID and ID
 			const itemToAdd: PurchaseItem = {
 				...data,
@@ -98,6 +107,8 @@ function AddItemsForm({
 				status: "NEW REQUEST",
 				dateneed: data.dateneed === "" ? null : data.dateneed
 			};
+
+			console.log("Data:", data);
 
 			// Store the UUID in the UUID store AFTER we have the ID
 			if (ID) {
@@ -112,24 +123,25 @@ function AddItemsForm({
 			// Show success message
 			setShowSuccess(true);
 
-			// Reset the form with default values
+			// Reset the form on AddItems, keep header data, but not item data
 			reset({
-				requester: "",
-				phoneext: "",
-				datereq: formattedToday,
-				dateneed: null,
-				orderType: "",
-				itemDescription: "",
-				justification: "",
-				trainNotAval: false,
-				needsNotMeet: false,
-				budgetObjCode: "",
-				fund: "",
-				priceEach: 0,
-				location: "",
-				quantity: 0,
-				totalPrice: 0
+				requester,
+				phoneext,
+				datereq,
+				dateneed,
+				orderType,
+				...defaultItemFields
 			});
+
+			if (isSubmitted) {
+				reset({
+					requester: "",
+					phoneext: "",
+					datereq: formattedToday,
+					dateneed: null,
+					orderType: "",
+				})
+			}
 
 			// Force validation after reset
 			trigger();

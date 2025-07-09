@@ -130,12 +130,23 @@ END;
 		
 
 ----------------------------------------------------------
-/* INSERT CONTRACTING OFFICERS */
+/* INSERT CONTRACTING OFFICERS 
+    - peter_baltz will be peterbaltz in prod
+	PROD:
+	- peterbaltz, 	 peter_baltz@lawb.uscourts.gov
+	- laurenlee,  	 lauren_lee@lawb.uscourts.gov
+	- lelarobichaux, lela_robichaux@lawb.uscourts.gov
+ */
 ----------------------------------------------------------
--- INSERT INTO contracting_officers
--- (username, email)
--- VALUES
--- ("rydercampbell", "ryder@example.com");
+INSERT OR IGNORE INTO contracting_officers
+(username, email)
+VALUES
+("peter_baltz", "peter_baltz@lawb.uscourts.gov");
+
+INSERT OR IGNORE INTO contracting_officers
+(username, email)
+VALUES
+("romancampbell", "roman_campbell@lawb.uscourts.gov");
 
 -- DELETE FROM final_approvals;
 -- DELETE FROM pending_approvals;
@@ -160,6 +171,6 @@ END;
 
 
 -- CHANGE REQUEST BACK TO NEW REQUEST
-UPDATE approvals
-SET status = 'NEW REQUEST'
-WHERE UUID = 'd4bc97bd-852e-44a1-988b-11b4a647165a';
+-- UPDATE approvals
+-- SET status = 'NEW REQUEST'
+-- WHERE UUID = 'd4bc97bd-852e-44a1-988b-11b4a647165a';

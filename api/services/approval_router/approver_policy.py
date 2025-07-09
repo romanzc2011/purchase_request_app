@@ -22,30 +22,25 @@ class ApproverPolicy:
         - Clerk Admin (edwardtakara) can always approve.
         - Deputy Clerk (edmundbrown) can only approve if deputy_can_approve = True in DB.
         """
-        if current_status != ItemStatus.PENDING_APPROVAL:
-            logger.debug(f"Request {request.uuid} is not in PENDING_APPROVAL status ({current_status}), skipping")
-            return False
+        username = format_username(self.user.username)
         
-        ## FOR TESTING TO SEE PROGRESS
-        if current_status == ItemStatus.PENDING_APPROVAL:
-            logger.debug(f"Request {request.uuid} is in PENDING_APPROVAL status")
-
+        # Only CUE group members can approve
         if not self.user.has_group("CUE_GROUP"):
             logger.debug("User is not in CUE group, skipping")
             return False
 
-        username = format_username(self.user.username)
-
         # Clerk Admin can always approve
         logger.debug("DEPUTY AND CLERK TESTING AREA")
-        if username == "edwardtakara":
+        if username == "edwardtakara" or username == "romancampbell":
+            logger.info("this line in prod to check if the current_user is edwardtakara because he can approve anything at anytime")
             logger.debug("CLERK ADMIN CAN APPROVE")
             return True
-        # if username == "edwardtakara" or username == "romancampbell":  # TESTING
-        #     logger.debug("CLERK ADMIN CAN APPROVE")
-        #     return True
 
         # Deputy Clerk logic
+        """
+        This is pulling data from FinalApproval, which is a decision table and determining if request total price
+        is under $250, if it is then edmundbrown (deputy clerk or here just deputy)
+        """
         if username == "edmundbrown" or username == "romancampbell":  # TESTING
             stmt = select(dbas.FinalApproval.deputy_can_approve).where(
                 dbas.FinalApproval.line_item_uuid == request.uuid

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import datetime, timezone
+from api.settings import settings
 from http.client import HTTPException
 from api.schemas.approval_schemas import ApprovalSchema, ApprovalView
 from api.schemas.ldap_schema import LDAPUser
@@ -24,16 +25,20 @@ import os
 from sqlalchemy.pool import NullPool
 from dotenv import load_dotenv
 from multiprocessing import Lock
+import sqlite3
 
 # Ensure database directory exists
 db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
 os.makedirs(db_dir, exist_ok=True)
-
+DATABASE_URL = "sqlite:///api/db/pras.db"
 # Create engine and base
-engine = create_engine('sqlite:///api/db/pras.db', echo=False)  # PRAS = Purchase Request Approval System
+engine = create_engine(DATABASE_URL, echo=False)  # PRAS = Purchase Request Approval System
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
 
+# ────────────────────────────────────────────────────────────────────────────────
+# ASYNC DATABASE ENGINE
+# ────────────────────────────────────────────────────────────────────────────────
 DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
 engine_async = create_async_engine(
     DATABASE_URL_ASYNC, 
@@ -381,8 +386,8 @@ class SonComment(Base):
 class ContractingOfficer(Base):
     __tablename__ = "contracting_officers"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[Optional[str]] = mapped_column(String)
-    email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    username: Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
     
 
 ###################################################################################################
@@ -863,6 +868,14 @@ def init_db():
         # Create (sync) all tables
         Base.metadata.create_all(bind=engine)
         
+        logger.info(f"Initializing database with script: {settings.SQL_SCRIPT_PATH}")
+        with sqlite3.connect(settings.DATABASE_FILE_PATH) as conn:
+            cur = conn.cursor()
+            with open(settings.SQL_SCRIPT_PATH, "r") as f:
+                cur.executescript(f.read())
+                
+        logger.info("SQL script executed successfully")
+                
         # Seed justification templates
         with SessionLocal() as session:
             if not session.query(JustificationTemplate).first():
@@ -877,21 +890,7 @@ def init_db():
                         description="Current offerings do not meet the needs of the requester."
                     ),
                 ])
-                
-                session.commit()
-                
-            if not session.query(ContractingOfficer).first():
-                logger.info("Seeding Contracting Officers")
-                session.add_all([
-					ContractingOfficer(
-						username="romancampbell",
-						email="roman_campbell@lawb.uscourts.gov"
-					)
-				])
-                
-                session.commit()
         logger.info("Database initialized successfully")
-        
     except Exception as e:
         logger.error(f"Error initializing database: {e}")
         raise

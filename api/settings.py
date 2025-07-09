@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     
     # -- Project directories
     BASE_DIR: Path = Path(__file__).resolve().parent.parent
+    DATABASE_FILE_PATH: Path = BASE_DIR / "api" / "db" / "pras.db"
+    SQL_SCRIPT_PATH: Path = BASE_DIR / "api" / "db" / "pras_sql_script.sql"
     PDF_OUTPUT_FOLDER: Path = BASE_DIR / "api" / "pdf_output"
     UPLOAD_FOLDER: Path = BASE_DIR / "api" / "uploads"
 

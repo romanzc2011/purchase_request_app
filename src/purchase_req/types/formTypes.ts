@@ -32,6 +32,19 @@ export type FormValues = {
   status: ItemStatus;
 };
 
+export const defaultItemFields = {
+	itemDescription: "",
+	justification: "",
+	trainNotAval: false,
+	needsNotMeet: false,
+	budgetObjCode: "",
+	fund: "",
+	priceEach: 0,
+	location: "",
+	quantity: 0,
+	totalPrice: 0,
+  };
+
 /********************************************************/
 /* USER CREDENTIALS */
 /********************************************************/
@@ -68,3 +81,15 @@ export const locations = [
   "SHVT/C",
   "SHVT/J"
 ];
+
+/********************************************************/
+/* Global fields for purchase request header data */
+/********************************************************/
+export type Globals = {
+	requester: string;
+	phoneext: string;
+	datereq: Date | string;
+	dateneed?: Date | string;
+	orderType?: string;
+	
+}

@@ -219,7 +219,7 @@ class ClerkAdminHandler(Handler):
         )
         
         if not can_approve:
-            logger.debug(f"CLERK ADMIN HANDLER: {current_user.username} cannot approve request {request.uuid}")
+            logger.debug(f"CLERK ADMIN HANDLER: Item is NOT in PENDING_APPROVAL")
             return request
         
         # Get the approval UUID for this line item
