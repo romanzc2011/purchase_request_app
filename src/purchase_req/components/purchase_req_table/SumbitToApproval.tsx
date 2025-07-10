@@ -32,6 +32,7 @@ const API_URL = `${baseURL}${API_CALL}`;
 /************************************************************************************ */
 interface SubmitApprovalTableProps {
 	dataBuffer: FormValues[];
+	setIsFinalSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 	onDelete: (ID: string) => void;
 	ID?: string;
 	fileInfo: IFile[];
@@ -47,6 +48,7 @@ function SubmitApprovalTable({
 	onDelete,
 	ID,
 	fileInfo,
+	setIsFinalSubmitted,
 	isSubmitted,
 	setIsSubmitted,
 	setDataBuffer,
@@ -200,6 +202,7 @@ function SubmitApprovalTable({
 
 			// Reset the form and data buffer
 			setIsSubmitted(true);
+			setIsFinalSubmitted(true);
 			setDataBuffer([]);
 
 			// Update the ID if setID is provided

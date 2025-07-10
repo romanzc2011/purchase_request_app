@@ -16,7 +16,7 @@ import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
 import { IFile } from "../../types/IFile";
-import { defaultItemFields } from "../../types/formTypes";
+import { defaultItemFields, FormValues } from "../../types/formTypes";
 import InfoIcon from "@mui/icons-material/Info";
 import Tooltip from "@mui/material/Tooltip";
 import Justification from "./Justification";
@@ -32,10 +32,12 @@ import { toast } from "react-toastify";
 interface AddItemsProps {
 	ID?: string;
 	fileInfo: IFile[];
-	setDataBuffer: React.Dispatch<React.SetStateAction<PurchaseItem[]>>;
+	isFinalSubmitted: boolean;
+	setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
 	setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 	setID?: React.Dispatch<React.SetStateAction<string>>;
 	setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
+	setIsFinalSubmitted?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 /*************************************************************************************** */
@@ -44,10 +46,12 @@ interface AddItemsProps {
 function AddItemsForm({
 	ID,
 	setDataBuffer,
+	isFinalSubmitted,
 	setIsSubmitted,
 	setID,
 	fileInfo,
 	setFileInfo,
+	setIsFinalSubmitted,
 }: AddItemsProps) {
 	const { setUUID } = useUUIDStore();
 	const form = usePurchaseForm();
@@ -88,8 +92,6 @@ function AddItemsForm({
 		"orderType"
 	]);
 
-
-
 	/*************************************************************************************** */
 	/* HANDLE ADD ITEM function */
 	/*************************************************************************************** */
@@ -98,14 +100,25 @@ function AddItemsForm({
 			// Generate a new UUID for the item
 			const uuid = uuidv4();
 
-			// Create a new item with the UUID and ID
-			const itemToAdd: PurchaseItem = {
+			// Create a new item with the UUID and ID, converting to FormValues
+			const itemToAdd: FormValues = {
 				...data,
 				UUID: uuid,
+				ID: ID || "",
+				IRQ1_ID: data.IRQ1_ID || "",
+				orderType: data.orderType || "",
 				priceEach: data.priceEach,
-				ID: ID,
-				status: "NEW REQUEST",
-				dateneed: data.dateneed === "" ? null : data.dateneed
+				status: "NEW REQUEST" as any,
+				dateneed: data.dateneed === "" ? "" : (data.dateneed || ""),
+				trainNotAval: data.trainNotAval || false,
+				needsNotMeet: data.needsNotMeet || false,
+				totalPrice: data.totalPrice || (data.priceEach * data.quantity),
+				fileAttachments: data.fileAttachments?.map(f => ({
+					attachment: f.attachment || null,
+					name: f.name,
+					type: f.type,
+					size: f.size
+				})) || []
 			};
 
 			console.log("Data:", data);
@@ -124,23 +137,16 @@ function AddItemsForm({
 			setShowSuccess(true);
 
 			// Reset the form on AddItems, keep header data, but not item data
-			reset({
-				requester,
-				phoneext,
-				datereq,
-				dateneed,
-				orderType,
-				...defaultItemFields
-			});
-
-			if (isSubmitted) {
+			// Only reset to keep header data if not final submitted
+			if (!isFinalSubmitted) {
 				reset({
-					requester: "",
-					phoneext: "",
-					datereq: formattedToday,
-					dateneed: null,
-					orderType: "",
-				})
+					requester,
+					phoneext,
+					datereq,
+					dateneed,
+					orderType,
+					...defaultItemFields
+				});
 			}
 
 			// Force validation after reset
@@ -161,6 +167,28 @@ function AddItemsForm({
 	const today: Date = new Date();
 	const isoString: string = today.toISOString();
 	const formattedToday: string = isoString.split("T")[0];
+
+	// Watch for isFinalSubmitted changes and reset form accordingly
+	useEffect(() => {
+		if (isFinalSubmitted) {
+			console.log('Final submission detected, resetting form completely');
+			reset({
+				requester: "",
+				phoneext: "",
+				datereq: formattedToday,
+				dateneed: null,
+				orderType: "",
+				...defaultItemFields
+			});
+
+			// Reset isFinalSubmitted back to false after form reset
+			if (setIsFinalSubmitted) {
+				setTimeout(() => {
+					setIsFinalSubmitted(false);
+				}, 100);
+			}
+		}
+	}, [isFinalSubmitted, reset, formattedToday]);
 
 	// Trigger validation on mount
 	useEffect(() => {

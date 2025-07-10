@@ -34,6 +34,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 	const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
 	const [fileInfo, setFileInfo] = useState<IFile[]>([]);
 	const [loginOpen, setLoginOpen] = useState(!isLoggedIn);
+	const [isFinalSubmitted, setIsFinalSubmitted] = useState(false);
 
 	// Reserve the ID for the request
 	useEffect(() => {
@@ -133,10 +134,12 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 								<AddItemsForm
 									ID={ID}
 									fileInfo={fileInfo}
+									isFinalSubmitted={isFinalSubmitted}
 									setDataBuffer={setDataBuffer}
 									setIsSubmitted={setIsSubmitted}
 									setID={setID}
 									setFileInfo={setFileInfo}
+									setIsFinalSubmitted={setIsFinalSubmitted}
 								/>
 
 								{/********************************************************************* */}
@@ -150,6 +153,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 								>
 									<SubmitApprovalTable
 										ID={ID}
+										setIsFinalSubmitted={setIsFinalSubmitted}
 										dataBuffer={dataBuffer}
 										onDelete={onDelete}
 										fileInfo={fileInfo}
