@@ -15,9 +15,11 @@ from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPa
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
-from api.schemas.comment_schemas import CommentItem
 from pydantic import ValidationError
-from fastapi import (FastAPI, APIRouter, Depends, Form, File, UploadFile, HTTPException, Request, Query, status)
+from fastapi import (
+    FastAPI, APIRouter, Depends, Form, 
+    File, UploadFile, HTTPException, Request, 
+    Query, status, WebSocket, WebSocketDisconnect)
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,8 +42,10 @@ from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import settings
+from api.schemas.enums import PRProgress
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
+from api.services.websocket_manager import ConnectionManager
 
 # Database ORM Model Imports
 from api.services.db_service import (
@@ -68,7 +72,7 @@ app = FastAPI(title="PRAS API")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5002"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,6 +87,7 @@ lock = threading.Lock()
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
+websock_connection = ConnectionManager()
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
@@ -262,6 +267,18 @@ async def send_purchase_request(
     current_user: LDAPUser = Depends(auth_service.get_current_user),
     db: AsyncSession = Depends(get_async_session)
 ):
+    progress = {
+		PRProgress.ID_GENERATED: False,
+		PRProgress.PDF_GENERATED: False,
+		PRProgress.EMAIL_SENT_REQUESTER: False,
+		PRProgress.EMAIL_SENT_APPROVER: False,
+		PRProgress.PR_HEADERS_INSERTED: False,
+		PRProgress.LINE_ITEMS_INSERTED: False,
+		PRProgress.PENDING_APPROVAL_INSERTED: False,
+		PRProgress.SEND_APPROVER_EMAIL: False,
+		PRProgress.SEND_REQUESTER_EMAIL: False,
+		PRProgress.GENERATE_PDF: False,
+	}
     """
     This endpoint:
       - Parses the incoming payload
@@ -342,6 +359,13 @@ async def send_purchase_request(
         )
         result = await db.execute(stmt)
         purchase_req_id = result.scalar_one_or_none()
+        
+        # Send msg to frontend to upate progressnar ----------------------------------
+        progress[PRProgress.ID_GENERATED] = True
+        await websock_connection.broadcast(progress[PRProgress.ID_GENERATED])
+        logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        #-----------------------------------------------------------------------------
+        
         logger.debug(f"PURCHASE REQUEST ID: {purchase_req_id}")
         
         # Update Header table with rest of data
@@ -361,6 +385,12 @@ async def send_purchase_request(
 		)
         await db.execute(stmt)
         await db.flush()
+        
+        # Send msg to frontend to upate progressnar ----------------------------------
+        progress[PRProgress.PR_HEADERS_INSERTED] = True
+        await websock_connection.broadcast(progress[PRProgress.PR_HEADERS_INSERTED])
+        logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        #-----------------------------------------------------------------------------
         
         pr_line_item_uuids: List[str] = []
         uploaded_files: List[str] = []
@@ -391,6 +421,12 @@ async def send_purchase_request(
             )
             db.add(orm_pr_line_item)
             await db.flush() # UUID is now available
+            
+        	# Send msg to frontend to upate progressnar ----------------------------------
+            progress[PRProgress.LINE_ITEMS_INSERTED] = True
+            await websock_connection.broadcast(progress[PRProgress.LINE_ITEMS_INSERTED])
+            logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+         	#-----------------------------------------------------------------------------
             
             # Save uploaded file if exists
             if file and file.filename:
@@ -467,6 +503,12 @@ async def send_purchase_request(
             db.add(task)
             await db.flush()
             
+            # Send msg to frontend to upate progressnar ----------------------------------
+            progress[PRProgress.PENDING_APPROVAL_INSERTED] = True
+            await websock_connection.broadcast(progress[PRProgress.PENDING_APPROVAL_INSERTED])
+            logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+            #-----------------------------------------------------------------------------
+            
             stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.ID == purchase_req_id)
             result = await db.execute(stmt)
             orm_pr_header = result.scalar_one_or_none()
@@ -474,6 +516,12 @@ async def send_purchase_request(
             # Generate PDF once for the entire purchase request
             logger.info("Generating PDF document")
             pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
+            
+            # Send msg to frontend to upate progressnar ----------------------------------
+            progress[PRProgress.GENERATE_PDF] = True
+            await websock_connection.broadcast(progress[PRProgress.GENERATE_PDF])
+            logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+            #-----------------------------------------------------------------------------
             
             orm_pr_header.pdf_output_path = pdf_path
     # <--- transaction is committed here
@@ -555,8 +603,22 @@ async def send_purchase_request(
         send_to = "FINANCE"
     
     async with asyncio.TaskGroup() as tg:
+        
         tg.create_task(smtp_service.send_approver_email(email_request_payload, db=db, send_to=send_to))
+        
+		# Send msg to frontend to upate progressnar ----------------------------------
+        progress[PRProgress.SEND_APPROVER_EMAIL] = True
+        await websock_connection.broadcast(progress[PRProgress.SEND_APPROVER_EMAIL])
+        logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        #-----------------------------------------------------------------------------
+  
         tg.create_task(smtp_service.send_requester_email(email_request_payload, db=db))
+        
+        # Send msg to frontend to upate progressnar ----------------------------------
+        progress[PRProgress.SEND_REQUESTER_EMAIL] = True
+        await websock_connection.broadcast(progress[PRProgress.SEND_REQUESTER_EMAIL])
+        logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        #-----------------------------------------------------------------------------
     
     return JSONResponse({"message": "All work completed"})
 
@@ -1167,11 +1229,24 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
     except Exception as e:
         logger.error(f"Error during file upload: {e}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {e}")
-
+    
 ##########################################################################
 # REGISTER ROUTES -- routes must be above this to be visible
 ##########################################################################
 app.include_router(api_router)
+
+##########################################################################
+## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
+##########################################################################
+@app.websocket("/communicate")
+async def websocket_endpoint(websocket: WebSocket):
+    await websock_connection.connect(websocket)
+    try:
+        while True:
+            _ = await websocket.receive_text()
+    except WebSocketDisconnect:
+        await websock_connection.disconnect(websocket)
+
 
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params
@@ -1205,6 +1280,10 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
         raise HTTPException(status_code=404, detail="File not found")
 
     return {"delete": True}
+
+##########################################################################
+## WEBSOCKET PROGRESS
+##########################################################################
 
 ##########################################################################
 ## MAIN CONTROL FLOW

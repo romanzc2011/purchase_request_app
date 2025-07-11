@@ -130,7 +130,6 @@ class SearchService:
                         # Handle enum values
                         if isinstance(value, dbas.ItemStatus):
                             doc[key] = value.value  # Use the enum's value (string)
-                            logger.debug(f"KEY: {key} VALUE: {value}")
                         elif isinstance(value, datetime):
                             # Store datetime as string in YYYY-MM-DD format
                             doc[key] = value.strftime('%Y-%m-%d')

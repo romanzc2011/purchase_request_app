@@ -7,6 +7,12 @@ export default defineConfig({
   server: {
     host: "localhost",
     port: 5002,
+    proxy: {
+      '/communicate': {
+        target: 'http://localhost:5004',
+        ws: true, // WebSocket support
+      },
+    },
   },
   build: {
     outDir: "./dist",

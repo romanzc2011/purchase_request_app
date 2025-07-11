@@ -22,7 +22,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { toast } from "react-toastify";
 import { ItemStatus } from "../../types/approvalTypes";
-import showProgressToast from "./ProgressBar";
+import showProgressToast, { ProgressBar } from "./ProgressBar";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";

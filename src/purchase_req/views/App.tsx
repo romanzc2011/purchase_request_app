@@ -9,6 +9,7 @@ import SubmitApprovalTable from "../components/purchase_req_table/SumbitToApprov
 import { Layout } from "../components/approval_table/app_layout";
 import { Box, Toolbar } from "@mui/material";
 import { FormValues } from "../types/formTypes";
+import { ProgressBar } from "../components/purchase_req_table/ProgressBar";
 import ApprovalPageMain from "../components/approval_table/containers/ApprovalPageMain";
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
@@ -113,6 +114,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 				pauseOnHover
 				theme="dark"
 			/>
+			<ProgressBar isFinalSubmission={isFinalSubmitted} />
 			{/* Sidebar Navigation */}
 			{/* Layout component has the sidebar/header/main content */}
 			<Layout

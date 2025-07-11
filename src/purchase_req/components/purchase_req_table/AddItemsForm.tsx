@@ -138,6 +138,7 @@ function AddItemsForm({
 
 			// Reset the form on AddItems, keep header data, but not item data
 			// Only reset to keep header data if not final submitted
+
 			if (!isFinalSubmitted) {
 				reset({
 					requester,
