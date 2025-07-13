@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../styles/App.css";
 import { Routes, Route } from "react-router-dom";
@@ -14,6 +14,7 @@ import ApprovalPageMain from "../components/approval_table/containers/ApprovalPa
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
+import { useWebSockets } from "../hooks/useWebSockets";
 
 interface AppProps {
 	isLoggedIn: boolean;
@@ -23,8 +24,21 @@ interface AppProps {
 }
 
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
+
+	const handleWebSocketMessage = useCallback((event: MessageEvent) => {
+		const data = JSON.parse(event.data);
+		setProgressData(data);
+		console.log("🔁 Progress data:", data);
+
+		// will come back and this is where we will update toast
+	}, []);
+
 	// Bring custom hook for purchase form
 	const { createNewID } = usePurchaseForm();
+
+	// Websocket URL
+	const WEBSOCKET_URL = "ws://localhost:5002/communicate";
+	const { socket: socket, isConnected: _isConnected } = useWebSockets(WEBSOCKET_URL, handleWebSocketMessage);
 
 	// Local state for reserved ID
 	const [ID, setID] = useState<string>("");
@@ -36,6 +50,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 	const [fileInfo, setFileInfo] = useState<IFile[]>([]);
 	const [loginOpen, setLoginOpen] = useState(!isLoggedIn);
 	const [isFinalSubmitted, setIsFinalSubmitted] = useState(false);
+	const [progressData, setProgressData] = useState<Record<string, boolean>>({});
 
 	// Reserve the ID for the request
 	useEffect(() => {
@@ -114,7 +129,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 				pauseOnHover
 				theme="dark"
 			/>
-			<ProgressBar isFinalSubmission={isFinalSubmitted} />
+			{socket && <ProgressBar isFinalSubmission={isFinalSubmitted} socket={socket} />}
 			{/* Sidebar Navigation */}
 			{/* Layout component has the sidebar/header/main content */}
 			<Layout

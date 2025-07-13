@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { toast, Id } from "react-toastify";
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '../../../store/prasStore';
+import { startTest, startProgress, setPercent, completeProgress } from '../../../store/progressSlice';
 
 interface ProgressBarProps {
 	isFinalSubmission: boolean;
+	socket: WebSocket;
 }
+
 const STEPS = [
 	"id_generated",
 	"pr_headers_inserted",
@@ -35,23 +40,49 @@ const showProgressToast = (message: string, progress: number): Id => {
 		}
 	);
 };
-
-export function ProgressBar({ isFinalSubmission }: ProgressBarProps) {
+// #########################################################################################
+// PROGRESS BAR COMPONENT
+// #########################################################################################
+export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 	const toastIdRef = useRef<Id | null>(null);
+	const dispatch = useDispatch<AppDispatch>();
 
+	// Show initial toast when submission starts
 	useEffect(() => {
 		if (!isFinalSubmission) return;
 
-		const ws = new WebSocket("ws://localhost:5002/communicate");
-		console.log("Connected to websocket")
+		// Create initial toast
+		toastIdRef.current = toast.loading(
+			<div>
+				<div>Submitting request... (0%)</div>
+				<div style={{ width: '100%', backgroundColor: '#ddd', borderRadius: '4px', marginTop: '8px' }}>
+					<div
+						style={{
+							width: `0%`,
+							height: '4px',
+							backgroundColor: '#4caf50',
+							borderRadius: '4px',
+							transition: 'width 0.3s ease'
+						}}
+					/>
+				</div>
+			</div>,
+			{
+				position: "top-center",
+				autoClose: false
+			}
+		);
+	}, [isFinalSubmission]);
 
-		ws.onopen = () => {
-			console.log("✅ WebSocket connected");
-			toastIdRef.current = showProgressToast("Submitting request...", 0);
-		};
+	// Listen for WebSocket messages and update progress
+	useEffect(() => {
+		console.log("ProgressBar useEffect", { socket, isFinalSubmission });
+		if (!socket) return;
 
-		ws.onmessage = function (event) {
+		const handleMessage = (event: MessageEvent) => {
 			try {
+				console.log("🔔 WS message arrived:", event.data);
+				dispatch(startTest());
 				const progressData = JSON.parse(event.data);
 				console.log("Progress update received: ", progressData);
 
@@ -81,25 +112,15 @@ export function ProgressBar({ isFinalSubmission }: ProgressBarProps) {
 						autoClose: percent === 100 ? 3000 : false,
 						type: percent === 100 ? "success" : undefined,
 					});
-					console.log("Updated toast")
-					ws.send("This works")
 				}
 			} catch (error) {
 				console.error("Error parsing WebSocket message:", error);
 			}
 		};
 
-		ws.onerror = (error) => {
-			console.error("❌ WebSocket error:", error);
-		};
+		socket.addEventListener('message', handleMessage);
+		return () => socket.removeEventListener('message', handleMessage);
+	}, [socket, isFinalSubmission, dispatch]);
 
-		ws.onclose = (event) => {
-			console.log("❌ WebSocket disconnected:", event.code, event.reason);
-		};
-
-		return () => ws.close();
-	}, [isFinalSubmission]);
 	return null;
 }
-
-export default showProgressToast; 

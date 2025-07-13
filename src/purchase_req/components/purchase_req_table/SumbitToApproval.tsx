@@ -22,7 +22,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { toast } from "react-toastify";
 import { ItemStatus } from "../../types/approvalTypes";
-import showProgressToast, { ProgressBar } from "./ProgressBar";
+import { ProgressBar } from "./ProgressBar";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
@@ -110,7 +110,7 @@ function SubmitApprovalTable({
 	/************************************************************************************ */
 	const handleSubmitData = async (processedData: FormValues[]) => {
 		// Show immediate progress toast
-		const toastId = showProgressToast("Submitting request...", 10);
+		//const toastId = showProgressToast("Submitting request...", 10);
 
 		try {
 			// Get a proper ID from the backend
@@ -214,22 +214,22 @@ function SubmitApprovalTable({
 				setID(requestId);
 			}
 
-			// Update toast to success
-			toast.update(toastId, {
-				render: "Data submitted successfully!",
-				type: "success",
-				isLoading: false,
-				autoClose: 3000,
-			});
+			// // Update toast to success
+			// toast.update(toastId, {
+			// 	render: "Data submitted successfully!",
+			// 	type: "success",
+			// 	isLoading: false,
+			// 	autoClose: 3000,
+			// });
 		} catch (error) {
 			console.error("Error submitting data:", error);
 			// Update toast to error
-			toast.update(toastId, {
-				render: "Failed to submit data",
-				type: "error",
-				isLoading: false,
-				autoClose: 3000,
-			});
+			// toast.update(toastId, {
+			// 	render: "Failed to submit data",
+			// 	type: "error",
+			// 	isLoading: false,
+			// 	autoClose: 3000,
+			// });
 		}
 	};
 

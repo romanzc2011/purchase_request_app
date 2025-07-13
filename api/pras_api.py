@@ -279,6 +279,12 @@ async def send_purchase_request(
 		PRProgress.SEND_REQUESTER_EMAIL: False,
 		PRProgress.GENERATE_PDF: False,
 	}
+    
+    # Send initial progress message
+    message = "START_TOAST"
+    await websock_connection.broadcast(message)
+    logger.debug("START_TOAST SENT")
+    
     """
     This endpoint:
       - Parses the incoming payload
