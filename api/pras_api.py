@@ -42,6 +42,7 @@ from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import settings
+from api.services.progress_bar_service import ProgressBar
 from api.schemas.enums import PRProgress
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
@@ -267,18 +268,8 @@ async def send_purchase_request(
     current_user: LDAPUser = Depends(auth_service.get_current_user),
     db: AsyncSession = Depends(get_async_session)
 ):
-    progress = {
-		PRProgress.ID_GENERATED: (False, 0),
-		PRProgress.PDF_GENERATED: (False, 1),
-		PRProgress.EMAIL_SENT_REQUESTER: (False, 2),
-		PRProgress.EMAIL_SENT_APPROVER: (False, 3),
-		PRProgress.PR_HEADERS_INSERTED: (False, 4),
-		PRProgress.LINE_ITEMS_INSERTED: (False, 5),
-		PRProgress.PENDING_APPROVAL_INSERTED: (False, 6),
-		PRProgress.SEND_APPROVER_EMAIL: (False, 7),
-		PRProgress.SEND_REQUESTER_EMAIL: (False, 8),
-		PRProgress.GENERATE_PDF: (False, 9),
-	}
+    # Make new progress bar instance
+    progress_bar = ProgressBar()
     
     # Send initial progress message
     message = "START_TOAST"
@@ -367,9 +358,14 @@ async def send_purchase_request(
         purchase_req_id = result.scalar_one_or_none()
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        progress[PRProgress.ID_GENERATED] = True
-        await websock_connection.broadcast(progress[PRProgress.ID_GENERATED])
-        logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        progress_bar.set_id_generated(True)
+        
+        msg_data = {
+			"percent_complete": progress_bar.get_progress_percentage()
+		}
+        
+        await websock_connection.broadcast(json.dumps(msg_data))
+        logger.debug(f"PROGRESS: {progress_bar.get_id_generated()} SENT MESSAGE")
         #-----------------------------------------------------------------------------
         
         logger.debug(f"PURCHASE REQUEST ID: {purchase_req_id}")
@@ -393,9 +389,9 @@ async def send_purchase_request(
         await db.flush()
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        progress[PRProgress.PR_HEADERS_INSERTED] = True
-        await websock_connection.broadcast(progress[PRProgress.PR_HEADERS_INSERTED])
-        logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        # progress[PRProgress.PR_HEADERS_INSERTED] = True
+        # await websock_connection.broadcast(progress[PRProgress.PR_HEADERS_INSERTED])
+        # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
         #-----------------------------------------------------------------------------
         
         pr_line_item_uuids: List[str] = []
@@ -429,9 +425,9 @@ async def send_purchase_request(
             await db.flush() # UUID is now available
             
         	# Send msg to frontend to upate progressnar ----------------------------------
-            progress[PRProgress.LINE_ITEMS_INSERTED] = True
-            await websock_connection.broadcast(progress[PRProgress.LINE_ITEMS_INSERTED])
-            logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+            # progress[PRProgress.LINE_ITEMS_INSERTED] = True
+            # await websock_connection.broadcast(progress[PRProgress.LINE_ITEMS_INSERTED])
+            # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
          	#-----------------------------------------------------------------------------
             
             # Save uploaded file if exists
@@ -510,9 +506,9 @@ async def send_purchase_request(
             await db.flush()
             
             # Send msg to frontend to upate progressnar ----------------------------------
-            progress[PRProgress.PENDING_APPROVAL_INSERTED] = True
-            await websock_connection.broadcast(progress[PRProgress.PENDING_APPROVAL_INSERTED])
-            logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+            # progress[PRProgress.PENDING_APPROVAL_INSERTED] = True
+            # await websock_connection.broadcast(progress[PRProgress.PENDING_APPROVAL_INSERTED])
+            # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
             #-----------------------------------------------------------------------------
             
             stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.ID == purchase_req_id)
@@ -524,9 +520,9 @@ async def send_purchase_request(
             pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
             
             # Send msg to frontend to upate progressnar ----------------------------------
-            progress[PRProgress.GENERATE_PDF] = True
-            await websock_connection.broadcast(progress[PRProgress.GENERATE_PDF])
-            logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+            # progress[PRProgress.GENERATE_PDF] = True
+            # await websock_connection.broadcast(progress[PRProgress.GENERATE_PDF])
+            # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
             #-----------------------------------------------------------------------------
             
             orm_pr_header.pdf_output_path = pdf_path
@@ -613,17 +609,17 @@ async def send_purchase_request(
         tg.create_task(smtp_service.send_approver_email(email_request_payload, db=db, send_to=send_to))
         
 		# Send msg to frontend to upate progressnar ----------------------------------
-        progress[PRProgress.SEND_APPROVER_EMAIL] = True
-        await websock_connection.broadcast(progress[PRProgress.SEND_APPROVER_EMAIL])
-        logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        # progress[PRProgress.SEND_APPROVER_EMAIL] = True
+        # await websock_connection.broadcast(progress[PRProgress.SEND_APPROVER_EMAIL])
+        # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
         #-----------------------------------------------------------------------------
   
         tg.create_task(smtp_service.send_requester_email(email_request_payload, db=db))
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        progress[PRProgress.SEND_REQUESTER_EMAIL] = True
-        await websock_connection.broadcast(progress[PRProgress.SEND_REQUESTER_EMAIL])
-        logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        # progress[PRProgress.SEND_REQUESTER_EMAIL] = True
+        # await websock_connection.broadcast(progress[PRProgress.SEND_REQUESTER_EMAIL])
+        # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
         #-----------------------------------------------------------------------------
     
     return JSONResponse({"message": "All work completed"})

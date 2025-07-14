@@ -1,5 +1,6 @@
 from api.schemas.enums import PRProgress
 from dataclasses import dataclass
+from loguru import logger
 
 """
 This is to make progress data available globally. Just keeping up with work that 
@@ -9,16 +10,16 @@ it neatly and send to frontend to display visually.
 @dataclass
 class ProgressBarSteps:
     id_generated: bool = False
+    pr_headers_inserted: bool = False
     pdf_generated: bool = False
     line_items_inserted: bool = False
     generate_pdf: bool = False
-    pdf_generated: bool = False
     send_approver_email: bool = False
     send_requester_email: bool = False
     email_sent_requester: bool = False
     email_sent_approver: bool = False
     pending_approval_inserted: bool = False
-    total_steps: int = 8
+    total_steps: int = 10
     
 class ProgressBar:
     def __init__(self) -> None:
@@ -29,6 +30,9 @@ class ProgressBar:
  	#-----------------------------------------------------------------------------------
     def set_id_generated(self, id_generated: bool):
         self.progress_steps.id_generated = id_generated
+        
+    def set_pr_headers_inserted(self, pr_headers_inserted: bool):
+        self.progress_steps.pr_headers_inserted = pr_headers_inserted
         
     def set_pdf_generated(self,pdf_generated: bool) -> None:
         self.progress_steps.pdf_generated = pdf_generated
@@ -84,8 +88,10 @@ class ProgressBar:
     def get_pending_approval_inserted(self) -> bool:
         return self.progress_steps.pending_approval_inserted
     
+    # Caculate the current percentage of request submission complete
     def get_progress_percentage(self) -> float:
-        return (sum(self.progress_steps) / self.progress_steps.total_steps) * 100
-    
-    def get_progress_steps(self) -> ProgressBarSteps:
-        return self.progress_steps
+        completed = 0
+        for key, value in vars(self.progress_steps).items():
+            if isinstance(value, bool) and value:
+                completed += 1
+        return (completed / self.progress_steps.total_steps) * 100

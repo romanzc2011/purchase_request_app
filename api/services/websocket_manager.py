@@ -24,7 +24,7 @@ class ConnectionManager:
 	#-------------------------------------------------------------
 	# BROADCAST
 	#-------------------------------------------------------------
-    async def broadcast(self, message: PRProgress):
+    async def broadcast(self, message: dict):
         """
         This will also handle how much work has been completed
         total_steps = 10
