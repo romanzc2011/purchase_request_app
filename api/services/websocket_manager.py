@@ -25,8 +25,19 @@ class ConnectionManager:
 	# BROADCAST
 	#-------------------------------------------------------------
     async def broadcast(self, message: PRProgress):
+        """
+        This will also handle how much work has been completed
+        total_steps = 10
+        completed_steps = 5
+        percent = (completed_steps / total_steps) * 100
+        message = {
+            "status": "in_progress",
+            "percent": percent
+        }
+        """
         disconnected = []
         for connection in self.active_connections:
+            
             try:
                 await connection.send_json(message)
             except Exception:
