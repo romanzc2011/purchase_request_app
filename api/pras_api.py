@@ -268,16 +268,16 @@ async def send_purchase_request(
     db: AsyncSession = Depends(get_async_session)
 ):
     progress = {
-		PRProgress.ID_GENERATED: False,
-		PRProgress.PDF_GENERATED: False,
-		PRProgress.EMAIL_SENT_REQUESTER: False,
-		PRProgress.EMAIL_SENT_APPROVER: False,
-		PRProgress.PR_HEADERS_INSERTED: False,
-		PRProgress.LINE_ITEMS_INSERTED: False,
-		PRProgress.PENDING_APPROVAL_INSERTED: False,
-		PRProgress.SEND_APPROVER_EMAIL: False,
-		PRProgress.SEND_REQUESTER_EMAIL: False,
-		PRProgress.GENERATE_PDF: False,
+		PRProgress.ID_GENERATED: (False, 0),
+		PRProgress.PDF_GENERATED: (False, 1),
+		PRProgress.EMAIL_SENT_REQUESTER: (False, 2),
+		PRProgress.EMAIL_SENT_APPROVER: (False, 3),
+		PRProgress.PR_HEADERS_INSERTED: (False, 4),
+		PRProgress.LINE_ITEMS_INSERTED: (False, 5),
+		PRProgress.PENDING_APPROVAL_INSERTED: (False, 6),
+		PRProgress.SEND_APPROVER_EMAIL: (False, 7),
+		PRProgress.SEND_REQUESTER_EMAIL: (False, 8),
+		PRProgress.GENERATE_PDF: (False, 9),
 	}
     
     # Send initial progress message
