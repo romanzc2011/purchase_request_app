@@ -1,6 +1,7 @@
-from api.schemas.enums import PRProgress
 from dataclasses import dataclass
+import json
 from loguru import logger
+from api.services.redis_client import r
 
 """
 This is to make progress data available globally. Just keeping up with work that 
@@ -24,6 +25,12 @@ class ProgressBarSteps:
 class ProgressBar:
     def __init__(self) -> None:
         self.progress_steps = ProgressBarSteps()
+        
+    # Convert dataclass to json
+    def convert_steps_json(self) -> ProgressBarSteps:
+        self.progress_steps.asdict(self.progress_steps)
+        self.progress_steps = json.dumps(self.progress_steps)
+        return self.progress_steps
         
     #-----------------------------------------------------------------------------------
 	# SETTERS

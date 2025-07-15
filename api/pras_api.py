@@ -57,18 +57,26 @@ from api.services.db_service import (
     SonComment,
     ContractingOfficer
 )
-
 # Schemas
 from api.dependencies.pras_schemas import *
-import api.services.db_service as dbas
+from api.services.redis_client import r
 
-# TODO: Investigate why rendering approval data is taking so long,
-# TODO: There seems to be too much member validation in the approval schema when rendering the Approval Table
+import api.services.db_service as dbas
 import tracemalloc
 tracemalloc.start(10)
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    This is to set up the redis client and set up the job id for the progress bar.
+    The job id will be used to access redis persistent/stateful data. Can be used for
+    multiple things. For communication between files/services
+    """
+    job_id = str(uuid.uuid4())
+    r.set(f"job_id:{job_id}",)
 
 # Add CORS middleware
 app.add_middleware(
@@ -359,12 +367,9 @@ async def send_purchase_request(
         
         # Send msg to frontend to upate progressnar ----------------------------------
         progress_bar.set_id_generated(True)
-        
-        msg_data = {
-			"percent_complete": progress_bar.get_progress_percentage()
-		}
-        
+        msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
         await websock_connection.broadcast(json.dumps(msg_data))
+        
         logger.debug(f"PROGRESS: {progress_bar.get_id_generated()} SENT MESSAGE")
         #-----------------------------------------------------------------------------
         
@@ -389,9 +394,9 @@ async def send_purchase_request(
         await db.flush()
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        # progress[PRProgress.PR_HEADERS_INSERTED] = True
-        # await websock_connection.broadcast(progress[PRProgress.PR_HEADERS_INSERTED])
-        # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        progress_bar.set_pr_headers_inserted(True)
+        msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+        await websock_connection.broadcast(json.dumps(msg_data))
         #-----------------------------------------------------------------------------
         
         pr_line_item_uuids: List[str] = []
@@ -424,11 +429,11 @@ async def send_purchase_request(
             db.add(orm_pr_line_item)
             await db.flush() # UUID is now available
             
-        	# Send msg to frontend to upate progressnar ----------------------------------
-            # progress[PRProgress.LINE_ITEMS_INSERTED] = True
-            # await websock_connection.broadcast(progress[PRProgress.LINE_ITEMS_INSERTED])
-            # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
-         	#-----------------------------------------------------------------------------
+            # Send msg to frontend to upate progressnar ----------------------------------
+            progress_bar.set_line_items_inserted(True)
+            msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+            await websock_connection.broadcast(json.dumps(msg_data))
+            #-----------------------------------------------------------------------------
             
             # Save uploaded file if exists
             if file and file.filename:
@@ -450,13 +455,13 @@ async def send_purchase_request(
         
         # Get CO from purchase request headers
         stmt = (
-			select(ContractingOfficer.username)
-			.join(
-				PurchaseRequestHeader,
-				ContractingOfficer.id == PurchaseRequestHeader.contracting_officer_id
-			)
-			.where(PurchaseRequestHeader.ID == purchase_req_id)
-		)
+            select(ContractingOfficer.username)
+            .join(
+                PurchaseRequestHeader,
+                ContractingOfficer.id == PurchaseRequestHeader.contracting_officer_id
+            )
+            .where(PurchaseRequestHeader.ID == purchase_req_id)
+        )
         result = await db.execute(stmt)
         contracting_officer_username = result.scalar_one_or_none()
         logger.info(f"Contracting officer username: {contracting_officer_username}")
@@ -506,9 +511,9 @@ async def send_purchase_request(
             await db.flush()
             
             # Send msg to frontend to upate progressnar ----------------------------------
-            # progress[PRProgress.PENDING_APPROVAL_INSERTED] = True
-            # await websock_connection.broadcast(progress[PRProgress.PENDING_APPROVAL_INSERTED])
-            # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+            progress_bar.set_pending_approval_inserted(True)
+            msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+            await websock_connection.broadcast(msg_data)
             #-----------------------------------------------------------------------------
             
             stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.ID == purchase_req_id)
@@ -520,9 +525,9 @@ async def send_purchase_request(
             pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
             
             # Send msg to frontend to upate progressnar ----------------------------------
-            # progress[PRProgress.GENERATE_PDF] = True
-            # await websock_connection.broadcast(progress[PRProgress.GENERATE_PDF])
-            # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+            progress_bar.set_generate_pdf(True)
+            msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+            await websock_connection.broadcast(msg_data)
             #-----------------------------------------------------------------------------
             
             orm_pr_header.pdf_output_path = pdf_path
@@ -608,20 +613,20 @@ async def send_purchase_request(
         
         tg.create_task(smtp_service.send_approver_email(email_request_payload, db=db, send_to=send_to))
         
-		# Send msg to frontend to upate progressnar ----------------------------------
-        # progress[PRProgress.SEND_APPROVER_EMAIL] = True
-        # await websock_connection.broadcast(progress[PRProgress.SEND_APPROVER_EMAIL])
-        # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        # Send msg to frontend to upate progressnar ----------------------------------
+        progress_bar.set_send_approver_email(True)
+        msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+        await websock_connection.broadcast(msg_data)
         #-----------------------------------------------------------------------------
   
         tg.create_task(smtp_service.send_requester_email(email_request_payload, db=db))
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        # progress[PRProgress.SEND_REQUESTER_EMAIL] = True
-        # await websock_connection.broadcast(progress[PRProgress.SEND_REQUESTER_EMAIL])
-        # logger.debug(f"PROGRESS: {progress} SENT MESSAGE")
+        progress_bar.set_send_requester_email(True)
+        msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+        await websock_connection.broadcast(msg_data)
         #-----------------------------------------------------------------------------
-    
+        
     return JSONResponse({"message": "All work completed"})
 
 #########################################################################

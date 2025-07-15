@@ -12,6 +12,7 @@ from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
 from api.dependencies.pras_schemas          import *
 from api.schemas.email_schemas              import EmailPayloadRequest, EmailPayloadComment, LineItemsPayload
+from api.services.redis_client             import RedisService
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
