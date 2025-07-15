@@ -21,7 +21,7 @@ from api.services.smtp_service.renderer import TemplateRenderer
 from api.settings import settings
 import api.services.db_service as dbas
 from api.utils.misc_utils import get_justifications_and_comments
-from api.services.progress_bar_service import ProgressBar
+from api.services.progress_bar_state import ProgressBar
 
 class SMTP_Service:
     def __init__(

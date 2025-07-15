@@ -10,7 +10,6 @@ from api.services.auth_service              import AuthService
 from api.services.pdf_service               import PDFService
 from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
-from api.services.progress_bar_service      import ProgressBar
 from api.dependencies.pras_schemas          import *
 
 # —————————————— Email Renderer ————————————————————
@@ -59,6 +58,6 @@ search_service = SearchService()
 auth_service = AuthService(ldap_service=ldap_service)
 
 # -----------------------------------------------------
-# Progress Bar
+# Progress State
 # -----------------------------------------------------
-progress_bar = ProgressBar()
+
