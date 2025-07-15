@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import json
 from loguru import logger
 from api.services.redis_client import r
@@ -25,12 +25,6 @@ class ProgressBarSteps:
 class ProgressBar:
     def __init__(self) -> None:
         self.progress_steps = ProgressBarSteps()
-        
-    # Convert dataclass to json
-    def convert_steps_json(self) -> ProgressBarSteps:
-        self.progress_steps.asdict(self.progress_steps)
-        self.progress_steps = json.dumps(self.progress_steps)
-        return self.progress_steps
         
     #-----------------------------------------------------------------------------------
 	# SETTERS
@@ -94,6 +88,9 @@ class ProgressBar:
     
     def get_pending_approval_inserted(self) -> bool:
         return self.progress_steps.pending_approval_inserted
+    
+    def get_progress_steps(self) -> ProgressBarSteps:
+        return self.progress_steps
     
     # Caculate the current percentage of request submission complete
     def get_progress_percentage(self) -> float:

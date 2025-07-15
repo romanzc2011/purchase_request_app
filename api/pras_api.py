@@ -10,7 +10,9 @@ uvicorn pras_api:app --port 5004
 """
 
 from datetime import datetime, timezone
+from dataclasses import asdict
 import json
+import redis
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
@@ -41,9 +43,8 @@ from api.dependencies.pras_dependencies import ldap_service
 from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
+from api.dependencies.pras_dependencies import progress_bar
 from api.dependencies.pras_dependencies import settings
-from api.services.progress_bar_service import ProgressBar
-from api.schemas.enums import PRProgress
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
 from api.services.websocket_manager import ConnectionManager
@@ -59,7 +60,6 @@ from api.services.db_service import (
 )
 # Schemas
 from api.dependencies.pras_schemas import *
-from api.services.redis_client import r
 
 import api.services.db_service as dbas
 import tracemalloc
@@ -68,20 +68,12 @@ tracemalloc.start(10)
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
 
-@app.on_event("startup")
-async def startup_event():
-    """
-    This is to set up the redis client and set up the job id for the progress bar.
-    The job id will be used to access redis persistent/stateful data. Can be used for
-    multiple things. For communication between files/services
-    """
-    job_id = str(uuid.uuid4())
-    r.set(f"job_id:{job_id}",)
-
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5002"],
+    allow_origins=[
+        "http://localhost:5002",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,6 +84,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 # Thread safety
 lock = threading.Lock()
+
 
 ##########################################################################
 # API router

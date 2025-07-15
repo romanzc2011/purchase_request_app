@@ -10,9 +10,8 @@ from api.services.auth_service              import AuthService
 from api.services.pdf_service               import PDFService
 from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
+from api.services.progress_bar_service      import ProgressBar
 from api.dependencies.pras_schemas          import *
-from api.schemas.email_schemas              import EmailPayloadRequest, EmailPayloadComment, LineItemsPayload
-from api.services.redis_client             import RedisService
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
@@ -31,20 +30,35 @@ ldap_service = LDAPService(
     ],
 )
 
-# —————————————— SMTP Service ————————————————————
+# -----------------------------------------------------
+# SMTP Service
+# -----------------------------------------------------
 smtp_service = SMTP_Service(
     renderer     = renderer,
     ldap_service = ldap_service,
 )
 
-# —————————————— PDF Service ————————————————————
+# -----------------------------------------------------
+# PDF Service
+# -----------------------------------------------------
 pdf_service = PDFService()
 
-# —————————————— UUID Service ————————————————————
+# -----------------------------------------------------
+# UUID Service
+# -----------------------------------------------------
 uuid_service = UUIDService()
 
-# —————————————— Search Service ————————————————————
+# -----------------------------------------------------
+# Search Service
+# -----------------------------------------------------
 search_service = SearchService()
 
-# —————————————— Auth Service ————————————————————
+# -----------------------------------------------------
+# Auth Service
+# -----------------------------------------------------
 auth_service = AuthService(ldap_service=ldap_service)
+
+# -----------------------------------------------------
+# Progress Bar
+# -----------------------------------------------------
+progress_bar = ProgressBar()
