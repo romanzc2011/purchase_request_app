@@ -12,7 +12,6 @@ uvicorn pras_api:app --port 5004
 from datetime import datetime, timezone
 from dataclasses import asdict
 import json
-import redis
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
@@ -33,6 +32,7 @@ from sqlalchemy import update, select, text, func
 from api.services.db_service import get_async_session
 from api.schemas.enums import ItemStatus
 import asyncio
+import api.services.progress_bar_state
 
 # PRAS Miscellaneous Dependencies
 from api.dependencies.misc_dependencies import *
@@ -43,8 +43,8 @@ from api.dependencies.pras_dependencies import ldap_service
 from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
-from api.dependencies.pras_dependencies import progress_bar
 from api.dependencies.pras_dependencies import settings
+from api.dependencies.pras_dependencies import progress_state, shm_mgr
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
 from api.services.websocket_manager import ConnectionManager
@@ -84,7 +84,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 # Thread safety
 lock = threading.Lock()
-
+read_shm = shm_mgr.read()
+#DEBUG
+for k, v in vars(read_shm).items():
+    logger.debug(f"{k}: {v}")
 
 ##########################################################################
 # API router
@@ -1197,6 +1200,7 @@ async def update_prices(
                 .values(priceEach=payload.new_price_each, totalPrice=payload.new_total_price)
                 .execution_options(synchronize_session="fetch")
         )
+        
         await db.execute(stmt)
         await db.commit()
     else:

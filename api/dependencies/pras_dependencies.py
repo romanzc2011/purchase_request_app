@@ -11,6 +11,7 @@ from api.services.pdf_service               import PDFService
 from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
 from api.dependencies.pras_schemas          import *
+from api.services.progress_bar_state		import ProgressSharedMemory, ProgressState
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
@@ -60,4 +61,6 @@ auth_service = AuthService(ldap_service=ldap_service)
 # -----------------------------------------------------
 # Progress State
 # -----------------------------------------------------
+progress_state = ProgressState()
+shm_mgr = ProgressSharedMemory()
 
