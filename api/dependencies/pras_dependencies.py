@@ -63,4 +63,3 @@ auth_service = AuthService(ldap_service=ldap_service)
 # -----------------------------------------------------
 progress_state = ProgressState()
 shm_mgr = ProgressSharedMemory()
-

@@ -84,11 +84,18 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 # Thread safety
 lock = threading.Lock()
-read_shm = shm_mgr.read()
-#DEBUG
-for k, v in vars(read_shm).items():
-    logger.debug(f"{k}: {v}")
 
+read_shm = shm_mgr.read()  # This reads the entire progress state struct
+read_shm.total_steps = 10
+shm_mgr.write(read_shm)
+
+read_shm = shm_mgr.read()
+read_shm.id_generated = True
+logger.debug(f"READ SHM DATA TYPE: {type(read_shm.id_generated)}")
+shm_mgr.write(read_shm)
+
+read_shm = shm_mgr.read()
+    
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
@@ -272,8 +279,6 @@ async def send_purchase_request(
     current_user: LDAPUser = Depends(auth_service.get_current_user),
     db: AsyncSession = Depends(get_async_session)
 ):
-    # Make new progress bar instance
-    progress_bar = ProgressBar()
     
     # Send initial progress message
     message = "START_TOAST"
@@ -362,11 +367,15 @@ async def send_purchase_request(
         purchase_req_id = result.scalar_one_or_none()
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        progress_bar.set_id_generated(True)
-        msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+        progress_state.id_generated = True
+        shm_mgr.write(progress_state)
+        
+        # state_data = from_bytes(progress_state.id_generated)
+        
+        # msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
         await websock_connection.broadcast(json.dumps(msg_data))
         
-        logger.debug(f"PROGRESS: {progress_bar.get_id_generated()} SENT MESSAGE")
+       # logger.debug(f"PROGRESS: {progress_bar.get_id_generated()} SENT MESSAGE")
         #-----------------------------------------------------------------------------
         
         logger.debug(f"PURCHASE REQUEST ID: {purchase_req_id}")
