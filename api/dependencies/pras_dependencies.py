@@ -1,6 +1,7 @@
 # Dependencies for PRAS
 import os
 
+from api.services.websocket_manager import ConnectionManager
 from api.settings                           import settings
 from api.services.cache_service             import CacheService
 from api.services.smtp_service.renderer     import TemplateRenderer
@@ -59,7 +60,12 @@ search_service = SearchService()
 auth_service = AuthService(ldap_service=ldap_service)
 
 # -----------------------------------------------------
-# Progress State
+# Progress State Shared Memory
 # -----------------------------------------------------
 progress_state = ProgressState()
 shm_mgr = ProgressSharedMemory()
+
+# -----------------------------------------------------
+# WebSocket Connection
+# -----------------------------------------------------
+websock_connection = ConnectionManager()

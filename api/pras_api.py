@@ -10,7 +10,6 @@ uvicorn pras_api:app --port 5004
 """
 
 from datetime import datetime, timezone
-from dataclasses import asdict
 import json
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
@@ -32,7 +31,6 @@ from sqlalchemy import update, select, text, func
 from api.services.db_service import get_async_session
 from api.schemas.enums import ItemStatus
 import asyncio
-import api.services.progress_bar_state
 
 # PRAS Miscellaneous Dependencies
 from api.dependencies.misc_dependencies import *
@@ -84,17 +82,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 # Thread safety
 lock = threading.Lock()
-
-read_shm = shm_mgr.read()  # This reads the entire progress state struct
-read_shm.total_steps = 10
-shm_mgr.write(read_shm)
-
-read_shm = shm_mgr.read()
-read_shm.id_generated = True
-logger.debug(f"READ SHM DATA TYPE: {type(read_shm.id_generated)}")
-shm_mgr.write(read_shm)
-
-read_shm = shm_mgr.read()
     
 ##########################################################################
 # API router
@@ -366,17 +353,13 @@ async def send_purchase_request(
         result = await db.execute(stmt)
         purchase_req_id = result.scalar_one_or_none()
         
-        # Send msg to frontend to upate progressnar ----------------------------------
-        progress_state.id_generated = True
-        shm_mgr.write(progress_state)
-        
-        # state_data = from_bytes(progress_state.id_generated)
-        
-        # msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
-        await websock_connection.broadcast(json.dumps(msg_data))
-        
-       # logger.debug(f"PROGRESS: {progress_bar.get_id_generated()} SENT MESSAGE")
-        #-----------------------------------------------------------------------------
+        wait_on_update = True
+        while(wait_on_update):
+            # Send msg to frontend to upate progressnar ----------------------------------
+            await shm_mgr.update(field="id_generated", value=True)
+            msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
+            await websock_connection.broadcast(json.dumps(msg_data))
+            #-----------------------------------------------------------------------------
         
         logger.debug(f"PURCHASE REQUEST ID: {purchase_req_id}")
         
@@ -399,8 +382,8 @@ async def send_purchase_request(
         await db.flush()
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        progress_bar.set_pr_headers_inserted(True)
-        msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+        await shm_mgr.update(field="pr_headers_inserted", value=True)
+        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
         await websock_connection.broadcast(json.dumps(msg_data))
         #-----------------------------------------------------------------------------
         
@@ -435,8 +418,8 @@ async def send_purchase_request(
             await db.flush() # UUID is now available
             
             # Send msg to frontend to upate progressnar ----------------------------------
-            progress_bar.set_line_items_inserted(True)
-            msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
+            await shm_mgr.update(field="line_items_inserted", value=True)
+            msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
             await websock_connection.broadcast(json.dumps(msg_data))
             #-----------------------------------------------------------------------------
             
@@ -516,9 +499,9 @@ async def send_purchase_request(
             await db.flush()
             
             # Send msg to frontend to upate progressnar ----------------------------------
-            progress_bar.set_pending_approval_inserted(True)
-            msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
-            await websock_connection.broadcast(msg_data)
+            await shm_mgr.update(field="pending_approval_inserted", value=True)
+            msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
+            await websock_connection.broadcast(json.dumps(msg_data))
             #-----------------------------------------------------------------------------
             
             stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.ID == purchase_req_id)
@@ -530,9 +513,9 @@ async def send_purchase_request(
             pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
             
             # Send msg to frontend to upate progressnar ----------------------------------
-            progress_bar.set_generate_pdf(True)
-            msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
-            await websock_connection.broadcast(msg_data)
+            await shm_mgr.update(field="generate_pdf", value=True)
+            msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
+            await websock_connection.broadcast(json.dumps(msg_data))
             #-----------------------------------------------------------------------------
             
             orm_pr_header.pdf_output_path = pdf_path
@@ -619,17 +602,17 @@ async def send_purchase_request(
         tg.create_task(smtp_service.send_approver_email(email_request_payload, db=db, send_to=send_to))
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        progress_bar.set_send_approver_email(True)
-        msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
-        await websock_connection.broadcast(msg_data)
+        await shm_mgr.update(field="send_approver_email", value=True)
+        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
+        await websock_connection.broadcast(json.dumps(msg_data))
         #-----------------------------------------------------------------------------
   
         tg.create_task(smtp_service.send_requester_email(email_request_payload, db=db))
         
         # Send msg to frontend to upate progressnar ----------------------------------
-        progress_bar.set_send_requester_email(True)
-        msg_data = {"percent_complete": progress_bar.get_progress_percentage()}
-        await websock_connection.broadcast(msg_data)
+        await shm_mgr.update(field="send_requester_email", value=True)
+        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
+        await websock_connection.broadcast(json.dumps(msg_data))
         #-----------------------------------------------------------------------------
         
     return JSONResponse({"message": "All work completed"})
