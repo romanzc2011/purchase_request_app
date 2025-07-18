@@ -5,6 +5,8 @@ import struct
 import numpy as np
 from api.services.websocket_manager import ConnectionManager
 
+# TODO Investigate why the 'json' going to front end ProgressBar.tsx and useWebSockets is a string
+# TODO May need to convert data to json from bytes in progress_bar_state
 """
 This is to make progress data available globally. Just keeping up with work that 
 needs to be complete and calculate what percentage has been completed. Structure
@@ -24,17 +26,16 @@ read_shm = shm_mgr.read()
 """
 @dataclass
 class ProgressState:
-    id_generated: 				bool = False
-    pr_headers_inserted: 		bool = False
-    pdf_generated: 				bool = False
-    line_items_inserted: 		bool = False
-    generate_pdf: 				bool = False
-    send_approver_email: 		bool = False
-    send_requester_email: 		bool = False
-    email_sent_requester: 		bool = False
-    email_sent_approver: 		bool = False
-    pending_approval_inserted: 	bool = False
-    total_steps: int = 10
+    id_generated:                bool = False
+    pr_headers_inserted:         bool = False
+    pdf_generated:               bool = False
+    line_items_inserted:         bool = False
+    generate_pdf:                bool = False
+    send_approver_email:         bool = False
+    send_requester_email:        bool = False
+    email_sent_requester:        bool = False
+    email_sent_approver:         bool = False
+    pending_approval_inserted:   bool = False
 
 websock_connection = ConnectionManager()
 
@@ -44,8 +45,10 @@ websock_connection = ConnectionManager()
 class ProgressSharedMemory:
     
     def __init__(self, name="shm_progress_state") -> None:
-        self.STRUCT_FMT = '<' + '?' * 10 + 'i'
+        self.STRUCT_FMT = '<' + '?' * 10
         self.STRUCT_SIZE = struct.calcsize(self.STRUCT_FMT)
+        self.value = False
+        self.total_steps = 10
         try:
             self.shm = shared_memory.SharedMemory(name=name, create=True, size=self.STRUCT_SIZE)
             logger.info(f"Shared memory initialized: {self.shm}")
@@ -73,36 +76,30 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     async def update(self, field: str, value: bool | int) -> None:
         current_state = self.read()
+        self.value = value
         if hasattr(current_state, field):
             setattr(current_state, field, value)
             self.write(current_state)
-            self._add_total_steps(1)
             current_state = self.read()
             await websock_connection.broadcast(current_state)
             
             logger.debug(f"UPDATE COMPLETE: field-{field} value={value}")
         else:
             logger.error(f"Field {field} does not exist")
-    
-    #-------------------------------------------------------------
-    # REDUCE TOTAL STEPS
-    #-------------------------------------------------------------
-    def _add_total_steps(self, step: int) -> None:
-        current_state = self.read()
-        # if current_state.total_steps > 0:
-        #     current_state.total_steps += step
-        #     self.write(current_state)
-        # else:
-        #     logger.error(f"Total steps is already 0")
-        current_state.total_steps += step
-        self.write(current_state)
-                
+            
     #-------------------------------------------------------------
     # CALC PROGRESS PERCENTAGE
     #-------------------------------------------------------------
     def calc_progress_percentage(self) -> float:
         current_state = self.read()
-        percent_complete = (current_state.total_steps / current_state.total_steps) * 100
+        
+        step_count = sum(
+            1 for field in vars(current_state).values()
+            if isinstance(field, bool) and field
+        )
+        
+        percent_complete = (step_count / self.total_steps) * 100
+        logger.debug(f"Calculated step count: {step_count}")
         logger.debug(f"PERCENT COMPLETE: {percent_complete}")
         return percent_complete
                 
@@ -122,7 +119,6 @@ class ProgressSharedMemory:
             state.email_sent_requester,
             state.email_sent_approver,
             state.pending_approval_inserted,
-            state.total_steps
         )
     
     #-------------------------------------------------------------
@@ -140,5 +136,5 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     # UNLINK
     #-------------------------------------------------------------
-    def unlink(self):	
+    def unlink(self):
         self.shm.unlink()

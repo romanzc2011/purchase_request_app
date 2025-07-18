@@ -1,5 +1,6 @@
 from typing import List
 import json
+from loguru import logger
 from fastapi import WebSocket
 from api.schemas.enums import PRProgress
 
@@ -39,6 +40,7 @@ class ConnectionManager:
         for connection in self.active_connections:
             
             try:
+                logger.debug(f"DATA TYPE OF message: {type(message)}")
                 await connection.send_json(message)
             except Exception:
                 disconnected.append(connection)

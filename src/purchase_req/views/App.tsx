@@ -25,12 +25,9 @@ interface AppProps {
 
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 
-	const handleWebSocketMessage = useCallback((event: MessageEvent) => {
-		const data = JSON.parse(event.data);
-		setProgressData(data);
-		console.log("🔁 Progress data:", data);
-
-		// will come back and this is where we will update toast
+	const handleWebSocketMessage = useCallback((_event: MessageEvent) => {
+		// Progress messages are handled by ProgressBar component
+		// This handler is kept for potential future use
 	}, []);
 
 	// Bring custom hook for purchase form

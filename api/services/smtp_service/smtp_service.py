@@ -229,7 +229,7 @@ class SMTP_Service:
         from api.dependencies.pras_dependencies import shm_mgr
         from api.dependencies.pras_dependencies import websock_connection
         
-        await shm_mgr.update(field="pr_headers_inserted", value=True)
+        await shm_mgr.update(field="email_sent_approver", value=True)
         msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
         await websock_connection.broadcast(json.dumps(msg_data))
         #!-----------------------------------------------------------------------------
@@ -251,7 +251,7 @@ class SMTP_Service:
         from api.dependencies.pras_dependencies import shm_mgr
         from api.dependencies.pras_dependencies import websock_connection
         
-        await shm_mgr.update(field="send_requester_email", value=True)
+        await shm_mgr.update(field="email_sent_requester", value=True)
         msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
         await websock_connection.broadcast(json.dumps(msg_data))
         #!-----------------------------------------------------------------------------

@@ -21,7 +21,7 @@ uvicorn pras_api:app --port 5004
 """
 from datetime import datetime, timezone
 import json
-from typing import Awaitable
+from typing import Awaitable, Callable
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
@@ -522,7 +522,6 @@ async def send_purchase_request(
             elif item.fund.startswith("092"):
                 assigned_group = "FINANCE"
 
-
             task = PendingApproval(
                 purchase_request_id=purchase_req_id,
                 line_item_uuid=line_uuid,
@@ -549,6 +548,7 @@ async def send_purchase_request(
             
             #! PROGRESS TRACKING ----------------------------------------------------------
             await shm_mgr.update(field="generate_pdf", value=True)
+            await shm_mgr.update(field="pdf_generated", value=True)
             msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
             await websock_connection.broadcast(json.dumps(msg_data))
             #!-----------------------------------------------------------------------------
@@ -640,7 +640,7 @@ async def send_purchase_request(
         tg.create_task(
             send_with_progress(
                 step_name="send_approver_email", 
-                coro=smtp_service.send_approver_email(
+                coro_fn=lambda: smtp_service.send_approver_email(
                     email_request_payload, db=db, send_to=send_to)
 			)
 		)
@@ -650,33 +650,20 @@ async def send_purchase_request(
         tg.create_task(
 			send_with_progress(
 				step_name="send_requester_email",
-				coro=smtp_service.send_requester_email(
-					email_request_payload, db=db, send_to=send_to
+				coro_fn=lambda: smtp_service.send_requester_email(
+					email_request_payload, db=db
 				)
 			)
 		)
-        
-        # await shm_mgr.update(field="send_approver_email", value=True)
-        # msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-        # await websock_connection.broadcast(json.dumps(msg_data))
-        # #!-----------------------------------------------------------------------------
-  
-        # tg.create_task(smtp_service.send_requester_email(email_request_payload, db=db))
-        
-        # #! PROGRESS TRACKING ----------------------------------------------------------
-        # await shm_mgr.update(field="send_requester_email", value=True)
-        # msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-        # await websock_connection.broadcast(json.dumps(msg_data))
-        # #!-----------------------------------------------------------------------------
-        
+        #!-----------------------------------------------------------------------------------------
     return JSONResponse({"message": "All work completed"})
 
 #########################################################################
 ## SEND WITH PROGRESS -- helper function for sending the emails
 #########################################################################
-async def send_with_progress(step_name: str, coro: Awaitable):
-    await coro # Wait until the work is done to prevent race condition
+async def send_with_progress(step_name: str, coro_fn: Callable[[], Awaitable[None]]):
     await shm_mgr.update(field=step_name, value=True)
+    await coro_fn()
     msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
     await websock_connection.broadcast(json.dumps(msg_data))
 

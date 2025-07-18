@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 // #########################################################################################
-// WEBSOCKETS HOOK
+// WEBSOCKETS HOOK 
 // #########################################################################################
 export function useWebSockets(
 	WEBSOCKET_URL: string, 
@@ -9,7 +9,6 @@ export function useWebSockets(
 ) {
 	const [isConnected, setIsConnected] = useState(false);
 	const [socket, setSocket] = useState<WebSocket>();
-
 
 	// Create the connection to backend
 	useEffect(() => {
@@ -25,6 +24,8 @@ export function useWebSockets(
 		
 		ws.onmessage = (event) => {
 			console.log("📨 WEBSOCKET DATA: ", event.data);
+			console.log("ws.onmessage datatype: ", typeof(event));
+			console.log("WEBSOCKET RAW DATA: ", event);
 			if(onMessage) {
 				onMessage(event);
 			}
