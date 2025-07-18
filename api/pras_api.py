@@ -632,7 +632,8 @@ async def send_purchase_request(
         send_to = "IT"
     elif payload.items[0].fund.startswith("092"):
         send_to = "FINANCE"
-    
+        
+    logger.info(f"SENDING EMAILS {send_to}")
     async with asyncio.TaskGroup() as tg:
         # APPROVER
         #! PROGRESS TRACKING gets sent with task --------------------------------------------------

@@ -200,13 +200,6 @@ class SMTP_Service:
         Send email to approvers
         """
         logger.debug(f"SENDING TO: {send_to} send_approver_email")
-        from api.dependencies.pras_dependencies import shm_mgr
-        from api.dependencies.pras_dependencies import websock_connection
-        # Send msg to frontend to upate progressnar ----------------------------------
-        await shm_mgr.update(field="pr_headers_inserted", value=True)
-        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-        await websock_connection.broadcast(json.dumps(msg_data))
-        #-----------------------------------------------------------------------------
         if send_to == "IT":
             # Send to Matt (IT) for testing romancampbell
             #to_address = "matthew_strong@lawb.uscourts.gov"
@@ -222,7 +215,7 @@ class SMTP_Service:
             #to_address = ["Peter_Baltz@lawb.uscourts.gov", "Lauren_Lee@lawb.uscourts.gov"]
             to_address = ["roman_campbell@lawb.uscourts.gov"]
             logger.debug(f"SENDING TO: {to_address} send_approver_email")
-            
+        
         await self._send_mail_async(
             payload,
             db=db,
@@ -231,18 +224,20 @@ class SMTP_Service:
             use_requester_template=False,
             use_comment_template=False,
             use_approved_template=False
-        )   
+        )
+        #! PROGRESS TRACKING ----------------------------------------------------------
+        from api.dependencies.pras_dependencies import shm_mgr
+        from api.dependencies.pras_dependencies import websock_connection
+        
+        await shm_mgr.update(field="pr_headers_inserted", value=True)
+        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
+        await websock_connection.broadcast(json.dumps(msg_data))
+        #!-----------------------------------------------------------------------------
 
     async def send_requester_email(self, payload: EmailPayloadRequest, db: AsyncSession):
         """
         Send email to requester
         """
-        from api.dependencies.pras_dependencies import shm_mgr
-        from api.dependencies.pras_dependencies import websock_connection
-        # Send msg to frontend to upate progressnar ----------------------------------
-        await shm_mgr.update(field="send_requester_email", value=True)
-        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-        await websock_connection.broadcast(json.dumps(msg_data))
         await self._send_mail_async(
             payload,
             db=db,
@@ -251,6 +246,16 @@ class SMTP_Service:
             use_comment_template=False,
             use_approved_template=False
         )
+        
+        #! PROGRESS TRACKING ----------------------------------------------------------
+        from api.dependencies.pras_dependencies import shm_mgr
+        from api.dependencies.pras_dependencies import websock_connection
+        
+        await shm_mgr.update(field="send_requester_email", value=True)
+        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
+        await websock_connection.broadcast(json.dumps(msg_data))
+        #!-----------------------------------------------------------------------------
+        
         
     async def send_request_approved_email(self, payload: EmailPayloadRequest, db: AsyncSession):
         """

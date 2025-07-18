@@ -89,11 +89,13 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     def _add_total_steps(self, step: int) -> None:
         current_state = self.read()
-        if current_state.total_steps > 0:
-            current_state.total_steps += step
-            self.write(current_state)
-        else:
-            logger.error(f"Total steps is already 0")
+        # if current_state.total_steps > 0:
+        #     current_state.total_steps += step
+        #     self.write(current_state)
+        # else:
+        #     logger.error(f"Total steps is already 0")
+        current_state.total_steps += step
+        self.write(current_state)
                 
     #-------------------------------------------------------------
     # CALC PROGRESS PERCENTAGE
