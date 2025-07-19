@@ -51,10 +51,6 @@ class SMTP_Service:
         Send email with asyncio, using Jinja to render the html body
         Determine the template to use based on the template parameters
         """
-        logger.info("#############################################################")
-        logger.info("_SEND_MAIL_ASYNC")
-        logger.info("#############################################################")
-        
         additional_comments = await get_justifications_and_comments(db, payload.ID)
         
         # Email payload request
@@ -74,7 +70,6 @@ class SMTP_Service:
                 "CO": contracting_officer,
                 "contracting_officer": contracting_officer
             }
-            logger.warning(f"CONTEXT EMAIL PAYLOAD REQUEST: {context}")
 
         # Email payload comment
         if isinstance(payload, EmailPayloadComment):
@@ -83,7 +78,6 @@ class SMTP_Service:
             for comment_group in payload.comment_data:
                 for desc, comment in zip(comment_group.item_desc, comment_group.comment):
                     items.append((desc, comment))
-            logger.warning(f"CONTEXT EMAIL PAYLOAD COMMENT: {payload}")
             context = {
                 "groupKey": payload.ID,
                 "requestor_name": payload.requester,
@@ -152,14 +146,12 @@ class SMTP_Service:
         bcc = payload.bcc or []
         
         if bcc: msg_root['Bcc'] = ', '.join(bcc)
-        logger.info(f"PAYLOAD, look for email: {payload}")
         #-------------------------------------------------------------------------------
         # Add HTML body
         if text_body:
             msg_root.attach(MIMEText(text_body, "plain"))
         logger.info("Message attached to email")
         
-        logger.info(f"PAYLOAD, look for attachments: {payload}")
         # Add attachments only for request emails
         if isinstance(payload, EmailPayloadRequest) and payload.attachments:
             for file_path in payload.attachments:

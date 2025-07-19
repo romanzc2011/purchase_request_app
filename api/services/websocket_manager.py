@@ -2,7 +2,6 @@ from typing import List
 import json
 from loguru import logger
 from fastapi import WebSocket
-from api.schemas.enums import PRProgress
 
 class ConnectionManager:
     def __init__(self):

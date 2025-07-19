@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from multiprocessing import shared_memory, Lock
 from loguru import logger
 import struct
+import json
 import numpy as np
 from api.services.websocket_manager import ConnectionManager
 
@@ -47,14 +48,24 @@ class ProgressSharedMemory:
     def __init__(self, name="shm_progress_state") -> None:
         self.STRUCT_FMT = '<' + '?' * 10
         self.STRUCT_SIZE = struct.calcsize(self.STRUCT_FMT)
-        self.value = False
-        self.total_steps = 10
+        self.value: bool = False
+        self._keep_bytes: bool = False
+        self.total_steps: int = 10
+
         try:
             self.shm = shared_memory.SharedMemory(name=name, create=True, size=self.STRUCT_SIZE)
             logger.info(f"Shared memory initialized: {self.shm}")
         except FileExistsError:
             self.shm = shared_memory.SharedMemory(name=name)
         self.name = name
+        
+    @property
+    def keep_bytes(self) -> bool:
+        return self._keep_bytes
+    
+    @keep_bytes.setter
+    def keep_bytes(self, value: bool):
+        self._keep_bytes = value
         
     #-------------------------------------------------------------
     # WRITE
@@ -65,10 +76,13 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     # READ
     #-------------------------------------------------------------
-    def read(self) -> ProgressState:
+    def read(self, keep_bytes: bool) -> ProgressState:
         packed_data = bytes(self.shm.buf[:self.STRUCT_SIZE])
+        logger.debug(f"PACKED_DATA: {packed_data}")
+        
         np_array = np.frombuffer(packed_data, dtype=np.uint8)
         logger.debug(f"NP ARRAY: {np_array} and is shape {np_array.shape}")
+        
         return self.from_bytes(np_array)
         
     #-------------------------------------------------------------
@@ -76,13 +90,25 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     async def update(self, field: str, value: bool | int) -> None:
         current_state = self.read()
+        logger.debug(f"CURRENT_STATE = self.read(): {current_state}")
+        
         self.value = value
+        logger.debug(f"SELF.VALUE: {self.value}")
+        
         if hasattr(current_state, field):
             setattr(current_state, field, value)
             self.write(current_state)
             current_state = self.read()
-            await websock_connection.broadcast(current_state)
             
+            logger.debug(f"CURRENT_STATE: {current_state}")
+            # Convert current_state to dict
+            progress_dict = asdict(current_state) 
+            logger.debug(f"PROGRESS_DICT = asdict(current_state): {progress_dict}")
+            
+            progress_dict["percent_complete"] = self.calc_progress_percentage()           
+            await websock_connection.broadcast(json.dumps(progress_dict))
+            
+            logger.debug(f"{progress_dict}")
             logger.debug(f"UPDATE COMPLETE: field-{field} value={value}")
         else:
             logger.error(f"Field {field} does not exist")
@@ -127,6 +153,16 @@ class ProgressSharedMemory:
     def from_bytes(self, b: bytes) -> ProgressState:
         unpacked = struct.unpack(self.STRUCT_FMT, b)
         return ProgressState(*unpacked)
+    
+    #-------------------------------------------------------------
+    # CLEAR STATE
+    #-------------------------------------------------------------
+    def clear_state(self):
+        zero_bytes = bytes(self.STRUCT_SIZE)
+        self.shm.buf[:self.STRUCT_SIZE]
+        # TODO Make sure ProgressState dataclass is reset as well
+        
+        
     #-------------------------------------------------------------
     # CLOSE
     #-------------------------------------------------------------

@@ -983,9 +983,16 @@ async def create_new_id(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
-    #TODO: Minor bug multiple items on AddItem are not collapsed into group despite being in same order, only on frontend, fixes once submitted
     """
-    Create a new id for a purchase request.
+    createNewID is executed on startup to reserve a purchase_request_id,
+    it also marks the end of the current request submission to the backend.
+    
+    The new id is inserted into the purchase_request_headers. Submissions are broken
+    up for the most part into 2 sections. The Purchase Request Header and the Purchase
+    Request Line Items. The actual table name is pr_line_items, and this is done to 
+    allow for multiple items to be added to a request per submission. Once the request has
+    successfully be submitted marked by SubmissionStatus.SUBMITTED ie. 'SUBMITTED' it is
+    important to reset the shared_memory to continue progress tracking.
         # insert into purchase request to start id creation, obtain the incremented id
         from purchase_request_seq_id, only allow the creation if the last row is submitted
     
