@@ -101,23 +101,15 @@ class ProgressSharedMemory:
             current_state = self.read()
             
             logger.debug(f"CURRENT_STATE: {current_state}")
+            
             # Convert current_state to dict
             progress_dict = asdict(current_state) 
-            logger.debug(f"PROGRESS_DICT = asdict(current_state): {progress_dict}")
-            
             percent = self.calc_progress_percentage()
             progress_dict["percent_complete"] = percent
-            logger.debug(f"PERCENT line 109 progress_bar_state: {percent}, type: {type(percent)}")
-            #await websock_connection.broadcast(json.dumps(progress_dict))
-            
-            # send_data = {"percent_complete": percent}
             
             send_data = percent
             await websock_connection.broadcast(send_data)
             logger.success(f"send_data converted to json and sent {send_data}")
-            
-            logger.debug(f"{progress_dict}")
-            logger.debug(f"UPDATE COMPLETE: field-{field} value={value}")
         else:
             logger.error(f"Field {field} does not exist")
             

@@ -1310,7 +1310,17 @@ async def websocket_endpoint(websocket: WebSocket):
     await websock_connection.connect(websocket)
     try:
         while True:
-            _ = await websocket.receive_text()
+            incoming_data = await websocket.receive_text()
+            logger.success(f"RECV data: {incoming_data}")
+            
+            # Convert to json, if reset_data then reset shm, percent everything
+            try:
+                message = json.loads(incoming_data)
+                if message.get("event") == "reset_data":
+                    # reset shm
+                    shm_mgr.clear_state()
+            except json.JSONDecodeError:
+                logger.error("Received non-JSON data")
     except WebSocketDisconnect:
         await websock_connection.disconnect(websocket)
 

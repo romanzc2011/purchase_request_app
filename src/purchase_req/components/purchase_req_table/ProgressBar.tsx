@@ -22,29 +22,6 @@ const STEPS = [
 	"pending_approval_inserted"
 ];
 
-
-const showProgressToast = (message: string, progress: number): Id => {
-	return toast.loading(
-		<div>
-			<div>{message}</div>
-			<div style={{ width: '100%', backgroundColor: '#ddd', borderRadius: '4px', marginTop: '8px' }}>
-				<div
-					style={{
-						width: `${progress}%`,
-						height: '4px',
-						backgroundColor: '#4caf50',
-						borderRadius: '4px',
-						transition: 'width 0.3s ease'
-					}}
-				/>
-			</div>
-		</div>,
-		{
-			position: "top-center",
-			autoClose: false
-		}
-	);
-};
 // #########################################################################################
 // PROGRESS BAR COMPONENT
 // #########################################################################################
@@ -55,9 +32,10 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 
 	// Show initial toast when submission starts
 	useEffect(() => {
+		console.log("FINAL SUBMISSION: ", isFinalSubmission);
 		if (!isFinalSubmission) return;
-
-		// Create initial toast
+		console.log("FINAL SUBMISSION: ", isFinalSubmission);
+		// Create initial toast immediately
 		toastIdRef.current = toast.loading(
 			<div>
 				<div>Submitting request... (0%)</div>
@@ -94,7 +72,6 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 		console.log("ProgressBar useEffect", { socket, isFinalSubmission });
 		if (!socket) return;
 
-
 		const handleMessage = (event: MessageEvent) => {
 			try {
 				dispatch(startTest());
@@ -103,6 +80,34 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 				console.log("EVENT DATA: ", eventData.event);
 				console.log("PERCENT_COMPLETE", eventData.percent_complete)
 
+
+				// Handle START_TOAST message
+				if (eventData.event === "START_TOAST") {
+					console.log("Received START_TOAST, creating initial toast");
+					toastIdRef.current = toast.loading(
+						<div>
+							<div>Submitting request... (0%)</div>
+							<div style={{ width: '100%', backgroundColor: '#ddd', borderRadius: '4px', marginTop: '8px' }}>
+								<div
+									style={{
+										width: `0%`,
+										height: '4px',
+										backgroundColor: '#4caf50',
+										borderRadius: '4px',
+										transition: 'width 0.3s ease'
+									}}
+								/>
+							</div>
+						</div>,
+						{
+							position: "top-center",
+							autoClose: false
+						}
+					);
+					return;
+				}
+
+				// Handle progress updates
 				if (eventData.percent_complete !== undefined) {
 					let percent = eventData.percent_complete;
 					console.log("Calculated percent:", percent);
