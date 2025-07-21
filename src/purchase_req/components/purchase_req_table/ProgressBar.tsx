@@ -3,7 +3,6 @@ import { toast, Id } from "react-toastify";
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../../../store/prasStore';
 import { startTest, startProgress, setPercent, completeProgress } from '../../../store/progressSlice';
-import { wrap } from "module";
 
 interface ProgressBarProps {
 	isFinalSubmission: boolean;
@@ -13,11 +12,16 @@ interface ProgressBarProps {
 const STEPS = [
 	"id_generated",
 	"pr_headers_inserted",
+	"pdf_generated",
 	"line_items_inserted",
 	"generate_pdf",
 	"send_approver_email",
-	"send_requester_email"
+	"send_requester_email",
+	"email_sent_requester",
+	"email_sent_approver",
+	"pending_approval_inserted"
 ];
+
 
 const showProgressToast = (message: string, progress: number): Id => {
 	return toast.loading(
@@ -82,19 +86,15 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 
 		const handleMessage = (event: MessageEvent) => {
 			try {
-				console.log("🔔 WS message arrived:", event.data);
+				console.log("", event.data);
 				dispatch(startTest());
-				const progressData = JSON.parse(event.data);
-				console.log("Progress update received: ", progressData);
-				console.log("progressData datatype: ", typeof (progressData));
-				console.log("event.data type", typeof (event.data))
-				console.log("let me see just the event: ", event)
-				console.log("Type of event: ", typeof (event));
+				const eventData = JSON.parse(event.data);
+				console.log("🔔 WS message arrived: ", eventData);
+				console.log("EVENT DATA: ", eventData.event);
+				console.log("PERCENT_COMPLETE", eventData.percent_complete)
 
-				// Check if this is a progress update message
-				console.log("Checking percent_complete:", progressData.percent_complete);
-				if (progressData.percent_complete !== undefined) {
-					const percent = Math.floor(progressData.percent_complete);
+				if (eventData.percent_complete !== undefined) {
+					let percent = eventData.percent_complete;
 					console.log("Calculated percent:", percent);
 					console.log("toastIdRef.current:", toastIdRef.current);
 

@@ -21,7 +21,7 @@ uvicorn pras_api:app --port 5004
 """
 from datetime import datetime, timezone
 import json
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, ParamSpec, TypeVar
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
@@ -93,6 +93,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 # Thread safety
 lock = threading.Lock()
+
+# Set generic return type/ arg types
+P = ParamSpec("P")
+R = TypeVar("R")
     
 ##########################################################################
 # API router
@@ -280,7 +284,7 @@ async def send_purchase_request(
     
     #! PROGRESS TRACKING ---------------------------------------------------------
     message = "START_TOAST"
-    await websock_connection.broadcast(message)
+    await websock_connection.broadcast({"event": message})
     logger.debug("START_TOAST SENT")
     #!----------------------------------------------------------------------------
     
@@ -366,9 +370,7 @@ async def send_purchase_request(
         purchase_req_id = result.scalar_one_or_none()
         
         #! PROGRESS TRACKING ---------------------------------------------------------
-        await shm_mgr.update(field="id_generated", value=True)
-        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-        await websock_connection.broadcast(json.dumps(msg_data))
+        await send_socket_data(step_name="id_generated")
         #!-----------------------------------------------------------------------------
         
         ##################################################################################
@@ -395,9 +397,7 @@ async def send_purchase_request(
         await db.flush()
         
         #! PROGRESS TRACKING ----------------------------------------------------------
-        await shm_mgr.update(field="pr_headers_inserted", value=True)
-        msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-        await websock_connection.broadcast(json.dumps(msg_data))
+        await send_socket_data(step_name="pr_headers_inserted")
         #!-----------------------------------------------------------------------------
         
         pr_line_item_uuids: List[str] = []
@@ -434,14 +434,12 @@ async def send_purchase_request(
             await db.flush() # UUID is now available
             
             #! PROGRESS TRACKING ----------------------------------------------------------
-            await shm_mgr.update(field="line_items_inserted", value=True)
-            msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-            await websock_connection.broadcast(json.dumps(msg_data))
+            await send_socket_data(step_name="line_items_inserted")
             #!-----------------------------------------------------------------------------
             
             #?#################################################################################
-        	#? UPLOADING FILES IF USER ADDED ANY
-        	#?#################################################################################
+            #? UPLOADING FILES IF USER ADDED ANY
+            #?#################################################################################
             # Save uploaded file if exists
             if file and file.filename:
                 upload_dir = Path("uploads")
@@ -533,9 +531,7 @@ async def send_purchase_request(
             await db.flush()
             
             #! PROGRESS TRACKING ----------------------------------------------------------
-            await shm_mgr.update(field="pending_approval_inserted", value=True)
-            msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-            await websock_connection.broadcast(json.dumps(msg_data))
+            await send_socket_data(step_name="pending_approval_inserted")
             #!-----------------------------------------------------------------------------
             
             stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.ID == purchase_req_id)
@@ -547,10 +543,8 @@ async def send_purchase_request(
             pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
             
             #! PROGRESS TRACKING ----------------------------------------------------------
-            await shm_mgr.update(field="generate_pdf", value=True)
-            await shm_mgr.update(field="pdf_generated", value=True)
-            msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-            await websock_connection.broadcast(json.dumps(msg_data))
+            await send_socket_data(step_name="generate_pdf")
+            await send_socket_data(step_name="pdf_generated")
             #!-----------------------------------------------------------------------------
             
             orm_pr_header.pdf_output_path = pdf_path
@@ -635,20 +629,22 @@ async def send_purchase_request(
         
     logger.info(f"SENDING EMAILS {send_to}")
     async with asyncio.TaskGroup() as tg:
+        
         # APPROVER
         #! PROGRESS TRACKING gets sent with task --------------------------------------------------
         tg.create_task(
-            send_with_progress(
-                step_name="send_approver_email", 
-                coro_fn=lambda: smtp_service.send_approver_email(
-                    email_request_payload, db=db, send_to=send_to)
+            send_socket_data(
+				step_name="send_approver_email",
+				coro_fn=lambda: smtp_service.send_approver_email(
+					email_request_payload, db, send_to
+				)
 			)
 		)
         
         #! PROGRESS TRACKING gets sent with task --------------------------------------------------
         # REQUESTER
         tg.create_task(
-			send_with_progress(
+			send_socket_data(
 				step_name="send_requester_email",
 				coro_fn=lambda: smtp_service.send_requester_email(
 					email_request_payload, db=db
@@ -659,13 +655,31 @@ async def send_purchase_request(
     return JSONResponse({"message": "All work completed"})
 
 #########################################################################
-## SEND WITH PROGRESS -- helper function for sending the emails
+## SEND SOCKET DATA - send to frontend to update progress bar
 #########################################################################
-async def send_with_progress(step_name: str, coro_fn: Callable[[], Awaitable[None]]):
+async def send_socket_data(
+	step_name: str,
+	coro_fn: Optional[Callable[P, Awaitable[R]]] = None,
+	*args: P.args,
+	**kwargs: P.kwargs
+) -> Optional[R]:
+    #1 Mark the step done
     await shm_mgr.update(field=step_name, value=True)
-    await coro_fn()
-    msg_data = {"percent_complete": shm_mgr.calc_progress_percentage()}
-    await websock_connection.broadcast(json.dumps(msg_data))
+    
+    result: Optional[R] = None
+    # If coroutine is given
+    if coro_fn is not None:
+        result = await coro_fn(*args, **kwargs)
+        
+    # Broadcast updated percent to frontend
+    percent = shm_mgr.calc_progress_percentage()
+    
+    # Structure send data
+    send_data = {
+		"event": "progress_update",
+		"percent_complete": percent
+	}
+    await websock_connection.broadcast(send_data)
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware

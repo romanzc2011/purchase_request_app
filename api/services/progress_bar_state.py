@@ -76,7 +76,7 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     # READ
     #-------------------------------------------------------------
-    def read(self, keep_bytes: bool) -> ProgressState:
+    def read(self) -> ProgressState:
         packed_data = bytes(self.shm.buf[:self.STRUCT_SIZE])
         logger.debug(f"PACKED_DATA: {packed_data}")
         
@@ -105,8 +105,16 @@ class ProgressSharedMemory:
             progress_dict = asdict(current_state) 
             logger.debug(f"PROGRESS_DICT = asdict(current_state): {progress_dict}")
             
-            progress_dict["percent_complete"] = self.calc_progress_percentage()           
-            await websock_connection.broadcast(json.dumps(progress_dict))
+            percent = self.calc_progress_percentage()
+            progress_dict["percent_complete"] = percent
+            logger.debug(f"PERCENT line 109 progress_bar_state: {percent}, type: {type(percent)}")
+            #await websock_connection.broadcast(json.dumps(progress_dict))
+            
+            # send_data = {"percent_complete": percent}
+            
+            send_data = percent
+            await websock_connection.broadcast(send_data)
+            logger.success(f"send_data converted to json and sent {send_data}")
             
             logger.debug(f"{progress_dict}")
             logger.debug(f"UPDATE COMPLETE: field-{field} value={value}")
@@ -123,6 +131,7 @@ class ProgressSharedMemory:
             1 for field in vars(current_state).values()
             if isinstance(field, bool) and field
         )
+        logger.success(f"STEP_COUNT: {step_count}")
         
         percent_complete = (step_count / self.total_steps) * 100
         logger.debug(f"Calculated step count: {step_count}")
@@ -151,6 +160,9 @@ class ProgressSharedMemory:
     # FROM BYTES
     #-------------------------------------------------------------
     def from_bytes(self, b: bytes) -> ProgressState:
+        if isinstance(b, np.ndarray):
+            b = b.tobytes()
+            
         unpacked = struct.unpack(self.STRUCT_FMT, b)
         return ProgressState(*unpacked)
     
@@ -159,9 +171,8 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     def clear_state(self):
         zero_bytes = bytes(self.STRUCT_SIZE)
-        self.shm.buf[:self.STRUCT_SIZE]
+        self.shm.buf[:self.STRUCT_SIZE] = zero_bytes
         # TODO Make sure ProgressState dataclass is reset as well
-        
         
     #-------------------------------------------------------------
     # CLOSE

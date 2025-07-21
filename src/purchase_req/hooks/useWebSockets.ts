@@ -23,9 +23,6 @@ export function useWebSockets(
 		};
 		
 		ws.onmessage = (event) => {
-			console.log("📨 WEBSOCKET DATA: ", event.data);
-			console.log("ws.onmessage datatype: ", typeof(event));
-			console.log("WEBSOCKET RAW DATA: ", event);
 			if(onMessage) {
 				onMessage(event);
 			}

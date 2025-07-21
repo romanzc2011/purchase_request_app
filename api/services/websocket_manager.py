@@ -37,15 +37,13 @@ class ConnectionManager:
         """
         disconnected = []
         for connection in self.active_connections:
-            
+            logger.success("INSIDE ACTIVE CONNECTIONS...")
             try:
                 logger.debug(f"DATA TYPE OF message: {type(message)}")
                 await connection.send_json(message)
             except Exception:
                 disconnected.append(connection)
-        for connection in disconnected:
-            await self.disconnect(connection)
-
+                
 	#-------------------------------------------------------------
 	# BROADCAST BOOLEAN
 	#-------------------------------------------------------------
