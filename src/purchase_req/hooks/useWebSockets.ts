@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+
 // #########################################################################################
 // WEBSOCKETS HOOK 
 // #########################################################################################
@@ -23,6 +24,7 @@ export function useWebSockets(
 		};
 		
 		ws.onmessage = (event) => {
+
 			if(onMessage) {
 				onMessage(event);
 			}

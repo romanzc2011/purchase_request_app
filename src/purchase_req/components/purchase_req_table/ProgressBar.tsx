@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { toast, Id } from "react-toastify";
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '../../../store/prasStore';
-import { startTest, startProgress, setPercent, completeProgress } from '../../../store/progressSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../../../store/prasStore';
+import { startTest, startProgress, setPercent, completeProgress, resetProgress } from '../../../store/progressSlice';
 
 interface ProgressBarProps {
 	isFinalSubmission: boolean;
@@ -51,6 +51,7 @@ const showProgressToast = (message: string, progress: number): Id => {
 export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 	const toastIdRef = useRef<Id | null>(null);
 	const dispatch = useDispatch<AppDispatch>();
+	const status = useSelector((s: RootState) => s.progress.status);
 
 	// Show initial toast when submission starts
 	useEffect(() => {
@@ -79,14 +80,23 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 		);
 	}, [isFinalSubmission]);
 
+	// Subscribe to the status to send reset message on complete
+	useEffect(() => {
+		if (status === 'done' && socket) {
+			console.log("EVENT: DONE COMPLETE");
+			socket.send(JSON.stringify({ event: 'reset_data' }));
+			dispatch(resetProgress());
+		}
+	}, [status, socket, dispatch])
+
 	// Listen for WebSocket messages and update progress
 	useEffect(() => {
 		console.log("ProgressBar useEffect", { socket, isFinalSubmission });
 		if (!socket) return;
 
+
 		const handleMessage = (event: MessageEvent) => {
 			try {
-				console.log("", event.data);
 				dispatch(startTest());
 				const eventData = JSON.parse(event.data);
 				console.log("🔔 WS message arrived: ", eventData);
@@ -97,6 +107,11 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 					let percent = eventData.percent_complete;
 					console.log("Calculated percent:", percent);
 					console.log("toastIdRef.current:", toastIdRef.current);
+
+					// Send message back if done (100%)
+					if (eventData.percent_complete == 100) {
+						dispatch(completeProgress());
+					}
 
 					if (toastIdRef.current) {
 						toast.update(toastIdRef.current, {

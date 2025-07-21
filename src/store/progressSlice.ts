@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface ProgressState {
-	status: 'idle' | 'in_progress' | 'done';
+	status: 'idle' | 'in_progress' | 'done' | 'reset_data';
 	percent: number;
 }
 
@@ -26,9 +26,10 @@ const progressSlice = createSlice({
 		},
 		completeProgress: (state) => {
 			state.status = 'done';
+			console.log("complete: ", state.status);
 		},
 		resetProgress: (state) => {
-			state.status = 'idle';
+			state.status = 'reset_data';
 		},
 	},
 });

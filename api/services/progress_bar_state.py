@@ -172,7 +172,6 @@ class ProgressSharedMemory:
     def clear_state(self):
         zero_bytes = bytes(self.STRUCT_SIZE)
         self.shm.buf[:self.STRUCT_SIZE] = zero_bytes
-        # TODO Make sure ProgressState dataclass is reset as well
         
     #-------------------------------------------------------------
     # CLOSE
