@@ -126,7 +126,6 @@ class ProgressSharedMemory:
         logger.success(f"STEP_COUNT: {step_count}")
         
         percent_complete = (step_count / self.total_steps) * 100
-        logger.debug(f"Calculated step count: {step_count}")
         logger.debug(f"PERCENT COMPLETE: {percent_complete}")
         return percent_complete
                 

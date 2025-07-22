@@ -47,8 +47,6 @@ function AddItemsForm({
 	ID,
 	setDataBuffer,
 	isFinalSubmitted,
-	setIsSubmitted,
-	setID,
 	fileInfo,
 	setFileInfo,
 	setIsFinalSubmitted,
