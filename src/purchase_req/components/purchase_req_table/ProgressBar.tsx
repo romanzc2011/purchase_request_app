@@ -9,19 +9,6 @@ interface ProgressBarProps {
 	socket: WebSocket;
 }
 
-const STEPS = [
-	"id_generated",
-	"pr_headers_inserted",
-	"pdf_generated",
-	"line_items_inserted",
-	"generate_pdf",
-	"send_approver_email",
-	"send_requester_email",
-	"email_sent_requester",
-	"email_sent_approver",
-	"pending_approval_inserted"
-];
-
 // #########################################################################################
 // PROGRESS BAR COMPONENT
 // #########################################################################################
@@ -29,34 +16,6 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 	const toastIdRef = useRef<Id | null>(null);
 	const dispatch = useDispatch<AppDispatch>();
 	const status = useSelector((s: RootState) => s.progress.status);
-
-	// Show initial toast when submission starts
-	useEffect(() => {
-		console.log("FINAL SUBMISSION: ", isFinalSubmission);
-		if (!isFinalSubmission) return;
-		console.log("FINAL SUBMISSION: ", isFinalSubmission);
-		// Create initial toast immediately
-		toastIdRef.current = toast.loading(
-			<div>
-				<div>Submitting request... (0%)</div>
-				<div style={{ width: '100%', backgroundColor: '#ddd', borderRadius: '4px', marginTop: '8px' }}>
-					<div
-						style={{
-							width: `0%`,
-							height: '4px',
-							backgroundColor: '#4caf50',
-							borderRadius: '4px',
-							transition: 'width 0.3s ease'
-						}}
-					/>
-				</div>
-			</div>,
-			{
-				position: "top-center",
-				autoClose: false
-			}
-		);
-	}, [isFinalSubmission]);
 
 	// Subscribe to the status to send reset message on complete
 	useEffect(() => {
@@ -79,11 +38,12 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 				console.log("🔔 WS message arrived: ", eventData);
 				console.log("EVENT DATA: ", eventData.event);
 				console.log("PERCENT_COMPLETE", eventData.percent_complete)
-
+				console.log("IS FINAL SUBMISSION: ", isFinalSubmission);
 
 				// Handle START_TOAST message
 				if (eventData.event === "START_TOAST") {
 					console.log("Received START_TOAST, creating initial toast");
+					console.log("IS FINAL SUBMISSION, in if eventData.event === START TOAST");
 					toastIdRef.current = toast.loading(
 						<div>
 							<div>Submitting request... (0%)</div>
@@ -137,7 +97,7 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 								</div>
 							),
 							isLoading: percent < 100,
-							autoClose: percent === 100 ? 3000 : false,
+							autoClose: percent === 100 ? 1000 : false,
 							type: percent === 100 ? "success" : undefined,
 						});
 					}
