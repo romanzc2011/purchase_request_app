@@ -25,6 +25,7 @@ import { useUUIDStore } from "../../services/UUIDService";
 import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -37,7 +38,7 @@ interface AddItemsProps {
 	setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 	setID?: React.Dispatch<React.SetStateAction<string>>;
 	setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
-	setIsFinalSubmitted?: React.Dispatch<React.SetStateAction<boolean>>;
+	setIsFinalSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 /*************************************************************************************** */
@@ -47,8 +48,6 @@ function AddItemsForm({
 	ID,
 	setDataBuffer,
 	isFinalSubmitted,
-	setIsSubmitted,
-	setID,
 	fileInfo,
 	setFileInfo,
 	setIsFinalSubmitted,
@@ -82,6 +81,20 @@ function AddItemsForm({
 	useEffect(() => {
 		console.log('Success state changed:', showSuccess);
 	}, [showSuccess]);
+
+	// Reset everything on final submit
+	useEffect(() => {
+		if (isFinalSubmitted) {
+			console.log("Form State: ", {
+				isValid,
+				errors,
+				values: watch()
+			});
+			reset();
+			trigger();
+			setIsFinalSubmitted(false);
+		}
+	}, [isValid, errors, watch]);
 
 	// Keep these header values between add items
 	const [requester, phoneext, datereq, dateneed, orderType] = watch([
