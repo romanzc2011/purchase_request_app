@@ -23,6 +23,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { toast } from "react-toastify";
 import { ItemStatus } from "../../types/approvalTypes";
 import { ProgressBar } from "./ProgressBar";
+import { OrderType } from "../../schemas/purchaseSchema";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
@@ -149,7 +150,7 @@ function SubmitApprovalTable({
 				dateneed: item.dateneed instanceof Date
 					? item.dateneed.toISOString().split('T')[0]
 					: item.dateneed || null,
-				orderType: item.orderType || "STANDARD",
+				orderType: item.orderType || OrderType.STANDARD,
 				itemDescription: item.itemDescription,
 				justification: item.justification,
 				trainNotAval: Boolean(item.trainNotAval),

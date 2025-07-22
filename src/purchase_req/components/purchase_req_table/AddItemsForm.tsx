@@ -1,4 +1,4 @@
-import { FieldErrors, FormProvider } from "react-hook-form";
+import { FieldErrors, FormProvider, useFormContext } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
 import React, { useState } from "react";
 import "./LearningDev";
@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import { TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import LocationPicker from "./LocationPicker";
-import { PurchaseItem } from "../../schemas/purchaseSchema";
+import { PurchaseItem, OrderType, purchaseItemSchema } from "../../schemas/purchaseSchema";
 import FileUpload from "./FileUpload";
 import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
@@ -67,14 +67,29 @@ function AddItemsForm({
 	const [showSuccess, setShowSuccess] = useState(false);
 	const [selectedCO, setSelectedCO] = useState<number | "">("");
 
+	// #############################################################################
+	// DEBUG
+	// #############################################################################
 	// Debug form state
 	useEffect(() => {
 		console.log('Form State:', {
 			isValid,
 			errors,
-			values: watch()
+			values: watch(),
+			formState: formState
 		});
-	}, [isValid, errors, watch]);
+	}, [isValid, errors, watch, formState]);
+
+	useEffect(() => {
+		const subscription = watch((value, { name, type }) => {
+			console.log("📋 Watched Change:", { name, type, value });
+			console.log("🧪 Form State:", formState);
+		});
+		return () => subscription.unsubscribe();
+	}, [watch, formState]);
+	// #############################################################################
+	// #############################################################################
+	// #############################################################################
 
 	// Debug success state
 	useEffect(() => {
@@ -89,6 +104,14 @@ function AddItemsForm({
 		"dateneed",
 		"orderType"
 	]);
+
+	useEffect(() => {
+		const subscription = watch((value, { name, type }) => {
+			console.log("📋 Watched Change:", { name, type, value });
+			console.log("🧪 Form State:", formState);
+		});
+		return () => subscription.unsubscribe()
+	}, [watch, formState]);
 
 	/*************************************************************************************** */
 	/* HANDLE ADD ITEM function */
@@ -134,9 +157,10 @@ function AddItemsForm({
 			// Show success message
 			setShowSuccess(true);
 
+
+
 			// Reset the form on AddItems, keep header data, but not item data
 			// Only reset to keep header data if not final submitted
-
 			if (!isFinalSubmitted) {
 				reset({
 					requester,
@@ -145,11 +169,16 @@ function AddItemsForm({
 					dateneed,
 					orderType,
 					...defaultItemFields
+				}, {
+					keepErrors: false,
+					keepDirty: false,
+					keepTouched: false,
+					keepIsSubmitted: false,
 				});
+				// Re-run validation 
+				await trigger();
 			}
 
-			// Force validation after reset
-			trigger();
 		} catch (error) {
 			console.error("Error adding item:", error);
 		}
@@ -167,32 +196,46 @@ function AddItemsForm({
 	const isoString: string = today.toISOString();
 	const formattedToday: string = isoString.split("T")[0];
 
+	/* The form has successfully been submitted to the backend so we need to reset the form for everything */
 	// Watch for isFinalSubmitted changes and reset form accordingly
 	useEffect(() => {
 		if (isFinalSubmitted) {
-			console.log('Final submission detected, resetting form completely');
+			console.log('🧼 Final submission detected, resetting form completely');
+
+			// Clear form state completely
 			reset({
 				requester: "",
 				phoneext: "",
 				datereq: formattedToday,
 				dateneed: null,
-				orderType: "",
+				orderType: OrderType.STANDARD,
 				...defaultItemFields
+			}, {
+				keepErrors: false,
+				keepDirty: false,
+				keepIsSubmitted: false,
+				keepTouched: false
 			});
 
-			// Reset isFinalSubmitted back to false after form reset
+			// Define an async function inside useEffect for run trigger
+			async function runValidation() {
+				const result = await trigger(); // Re-validate whole form
+				console.log("📋 Trigger result:", result);
+				console.log("📋 Validation errors after trigger:", formState.errors);
+			};
+
+			// Call validation
+			runValidation();
+
+			// Reset the Final Submitted state back to false
 			if (setIsFinalSubmitted) {
 				setTimeout(() => {
 					setIsFinalSubmitted(false);
 				}, 100);
 			}
-		}
-	}, [isFinalSubmitted, reset, formattedToday]);
 
-	// Trigger validation on mount
-	useEffect(() => {
-		trigger();
-	}, [trigger]);
+		}
+	}, [isFinalSubmitted, reset, formattedToday, form]);
 
 	/*************************************************************************************** */
 	/* Form submission function */
@@ -203,6 +246,17 @@ function AddItemsForm({
 		});
 		return () => subscription.unsubscribe();
 	}, [watch]);
+
+	// Trigger validation on mount to show initial errors
+	useEffect(() => {
+		// Small delay to ensure form is fully initialized
+		const timer = setTimeout(() => {
+			trigger();
+		}, 100);
+		return () => clearTimeout(timer);
+	}, [trigger]);
+
+	// When formstat isValid the reset zod
 
 	return (
 		<Box sx={{

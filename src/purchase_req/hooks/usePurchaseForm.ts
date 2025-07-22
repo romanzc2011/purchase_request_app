@@ -1,7 +1,6 @@
 import { useForm }     from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { purchaseItemSchema, PurchaseItem } from "../schemas/purchaseSchema";
-import { useState } from "react";
+import { purchaseItemSchema, PurchaseItem, OrderType } from "../schemas/purchaseSchema";
 import { toast } from "react-toastify";
 
 export const usePurchaseForm = () => {
@@ -14,7 +13,7 @@ export const usePurchaseForm = () => {
 		phoneext: "",
 		datereq: today,
 		dateneed: null,
-		orderType: "",
+		orderType: OrderType.STANDARD,
 		itemDescription: "",
 		justification: "",
 		trainNotAval: false,
@@ -26,7 +25,7 @@ export const usePurchaseForm = () => {
 		quantity: 0,
 	},
 	mode: "onChange",
-	reValidateMode: "onChange",
+	reValidateMode: "onSubmit",
 	shouldFocusError: true,
 	});
 
