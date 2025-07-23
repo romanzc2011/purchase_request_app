@@ -1,10 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import progressReducer, {
-	startProgress,
-	setPercent,
-	completeProgress,
-	resetProgress,
-  } from './progressSlice';
+import progressReducer from './progressSlice';
 
 export const prasStore = configureStore({
 	reducer: {

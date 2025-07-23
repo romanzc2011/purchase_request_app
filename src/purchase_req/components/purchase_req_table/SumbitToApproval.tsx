@@ -17,14 +17,15 @@ import { tableHeaderStyles } from "../../styles/DataGridStyles";
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { v4 as uuidv4 } from 'uuid';
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { toast } from "react-toastify";
 import { ItemStatus } from "../../types/approvalTypes";
-import { ProgressBar } from "./ProgressBar";
 import { OrderType } from "../../schemas/purchaseSchema";
+import { isFinalSubmissionSig, isSubmittedSig } from "../../utils/PrasSignals";
+import { effect } from "@preact/signals-react";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
@@ -35,12 +36,9 @@ const API_URL = `${baseURL}${API_CALL}`;
 /************************************************************************************ */
 interface SubmitApprovalTableProps {
 	dataBuffer: FormValues[];
-	setIsFinalSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 	onDelete: (ID: string) => void;
 	ID?: string;
 	fileInfo: IFile[];
-	isSubmitted: boolean;
-	setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 	setID?: React.Dispatch<React.SetStateAction<string>>;
 	setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
 	setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
@@ -49,11 +47,7 @@ interface SubmitApprovalTableProps {
 function SubmitApprovalTable({
 	dataBuffer,
 	onDelete,
-	ID,
 	fileInfo,
-	setIsFinalSubmitted,
-	isSubmitted,
-	setIsSubmitted,
 	setDataBuffer,
 	setFileInfo,
 	setID
@@ -69,15 +63,14 @@ function SubmitApprovalTable({
 			[id]: !prev[id],
 		}));
 
-	/* Check if table has been submitted */
-	useEffect(() => {
-		if (isSubmitted) {
+	effect(() => {
+		if (isSubmittedSig.value) {
 			setDataBuffer([]);
-
-			console.log("In the if isSubmitted: dataBuffer==", dataBuffer);
-			setIsSubmitted(false);
+			isSubmittedSig.value = false;
 		}
-	}, [isSubmitted, setDataBuffer, setIsSubmitted]);
+	})
+
+
 
 
 	/************************************************************************************ */
@@ -111,8 +104,6 @@ function SubmitApprovalTable({
 	/* SUBMIT DATA --- send to backend to add to database */
 	/************************************************************************************ */
 	const handleSubmitData = async (processedData: FormValues[]) => {
-		// Show immediate progress toast
-		//const toastId = showProgressToast("Submitting request...", 10);
 
 		try {
 			// Get a proper ID from the backend
@@ -207,8 +198,8 @@ function SubmitApprovalTable({
 			console.log("Submission result:", result);
 
 			// Reset the form and data buffer
-			setIsSubmitted(true);
-			setIsFinalSubmitted(true);
+			isSubmittedSig.value = true;
+			isFinalSubmissionSig.value = true;
 			setDataBuffer([]);
 
 			// Update the ID if setID is provided
@@ -452,7 +443,7 @@ function SubmitApprovalTable({
 				</TableBody>
 
 				{/* FOOTER WITH FILE UPLOAD & SUBMIT BUTTON */}
-				<tfoot>
+				<TableBody>
 					<TableRow>
 						<TableCell colSpan={6}>
 							{/* Display current files */}
@@ -481,7 +472,7 @@ function SubmitApprovalTable({
 								disabled={dataBuffer.length === 0}
 								onClick={() => {
 									handleSubmitData(processedData);
-									setIsSubmitted(true);
+									isSubmittedSig.value = true;
 									setFileInfo([]);
 								}}
 							/>
@@ -513,7 +504,7 @@ function SubmitApprovalTable({
 								.toFixed(2)}
 						</TableCell>
 					</TableRow>
-				</tfoot>
+				</TableBody>
 			</Table>
 		</TableContainer>
 	);

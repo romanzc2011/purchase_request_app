@@ -25,7 +25,7 @@ export const usePurchaseForm = () => {
 		quantity: 0,
 	},
 	mode: "onChange",
-	reValidateMode: "onSubmit",
+	reValidateMode: "onChange",
 	shouldFocusError: true,
 	});
 

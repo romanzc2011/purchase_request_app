@@ -86,7 +86,6 @@ export default function LoginDialog({
 		localStorage.setItem("token_type", token_type);
 		localStorage.setItem("user", JSON.stringify(user));
 		onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
-		console.log("Login successful");
 		toast.success("Login successful");
 
 		onClose();
@@ -162,6 +161,8 @@ export default function LoginDialog({
 								margin="dense"
 								type="text"
 								fullWidth
+								label="Username"
+								autoComplete="username"
 								value={username}
 								onChange={(e) => setUsername(e.target.value)}
 								sx={{
@@ -183,9 +184,10 @@ export default function LoginDialog({
 
 							{/* PASSWORD INPUT */}
 							<TextField
-								margin="dense"
 								type="password"
 								fullWidth
+								label="Password"
+								autoComplete="current-password"
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
 								sx={{

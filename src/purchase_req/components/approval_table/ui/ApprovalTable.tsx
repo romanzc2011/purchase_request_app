@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
-import { DataGrid, DataGridProps, GridColDef, GridRowId } from "@mui/x-data-grid";
+import { DataGrid, GridColDef, GridRowId } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -16,7 +15,6 @@ import CommentIcon from '@mui/icons-material/Comment';
 import CheckIcon from "@mui/icons-material/Check";
 import MemoryIcon from '@mui/icons-material/Memory';
 import CloseIcon from "@mui/icons-material/Close";
-import ScheduleIcon from "@mui/icons-material/Schedule";
 import SearchIcon from "@mui/icons-material/Search";
 import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
@@ -24,9 +22,13 @@ import "../../../styles/ApprovalTable.css"
 import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow, ApprovalData, ItemStatus, DenialData } from "../../../types/approvalTypes";
 import { addComments } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
-import { useUUIDStore } from "../../../services/UUIDService";
 import { useApprovalService } from "../../../hooks/useApprovalService";
 import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
+import { toast, Id } from "react-toastify";
+import { LinearProgress } from "@mui/material";
+import { isDownloadSig } from "../../../utils/PrasSignals";
+import { ProgressBar } from "../../../utils/ProgressBar";
+
 
 /***********************************************************************************/
 // PROPS
@@ -37,15 +39,6 @@ interface ApprovalTableProps {
 	searchQuery: string;
 	onClearSearch?: () => void;
 }
-
-// Global variable to store group comment payload
-let groupCommentPayload: GroupCommentPayload = {
-	groupKey: "",
-	comment: [],
-	group_count: 0,
-	item_uuids: [],
-	item_desc: []
-};
 
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
@@ -197,8 +190,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 
 	const {
 		data: approvalData = [],
-		isLoading,
-		error,
 	} = useQuery<DataRow[]>({
 		queryKey: ["approvalData"],
 		queryFn: () => fetchApprovalData(),
@@ -312,8 +303,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 		return total;
 	}
 
-	const { getUUID } = useUUIDStore();
-
 	// ####################################################################
 	// ####################################################################
 	// COMMAND TOOLBAR
@@ -321,10 +310,84 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 	// ####################################################################
 	// ####################################################################
 
-	//####################################################################
-	// HANDLE CYBERSECURITY RELATED
-	//####################################################################
-	const handleDownload = (ID: string) => { downloadStatementOfNeedForm(ID) };
+	const handleDownload = async (ID: string) => {
+		try {
+			isDownloadSig.value = true;
+			await downloadStatementOfNeedForm(ID);
+		} catch (err) {
+			console.error("Error: ", err);
+		}
+	}
+
+	// const handleDownload = async (ID: string) => {
+	// 	const socket = socketSig.value;
+	// 	if (!socket) {
+	// 		toast.error("No WebSocket connection – can't track download progress.");
+	// 		return
+	// 	}
+
+	// 	// Show init Downloading... (0%) toast
+	// 	const toastId: Id = toast.loading(
+	// 		<Box>
+	// 			Downloading... (0%)
+	// 			<LinearProgress sx={{ height: 4, mt: 1, borderRadius: 2 }} />
+	// 		</Box>,
+	// 		{ position: 'top-center', autoClose: false }
+	// 	);
+
+	// 	// Listen for backend DOWNLOAD_PROGRESS events
+	// 	const onMessage = (evt: MessageEvent) => {
+	// 		try {
+	// 			const data = JSON.parse(evt.data);
+	// 			if (data.event === 'DOWNLOAD_PROGRESS' && data.ID === ID) {
+	// 				const pct: number = data.percent_complete ?? 0;
+
+	// 				toast.update(toastId, {
+	// 					render: (
+	// 						<Box>
+	// 							Downloading... ({pct}%)
+	// 							<LinearProgress
+	// 								variant="determinate"
+	// 								value={pct}
+	// 								sx={{ height: 4, mt: 1, borderRadius: 2 }}
+	// 							/>
+	// 						</Box>
+	// 					),
+	// 					isLoading: pct < 100,
+	// 					type: pct === 100 ? 'success' : undefined,
+	// 					autoClose: pct === 100 ? 1000 : false,
+	// 				});
+
+	// 				if (pct >= 100) {
+	// 					socket.removeEventListener('message', onMessage);
+	// 				}
+	// 			}
+	// 		} catch {
+	// 			console.error("ERROR DOWNLOADING");
+	// 		}
+	// 	};
+	// 	socket.addEventListener('message', onMessage);
+
+	// 	// Start actual HTTP download
+	// 	try {
+	// 		await downloadStatementOfNeedForm(ID);
+	// 		// Force finish if ws misses 100%
+	// 		toast.update(toastId, {
+	// 			render: 'Download complete!',
+	// 			type: 'success',
+	// 			isLoading: false,
+	// 			autoClose: 1000,
+	// 		});
+	// 	} catch (err) {
+	// 		socket.removeEventListener('message', onMessage);
+	// 		toast.update(toastId, {
+	// 			render: "Download failed. Please try again.",
+	// 			type: 'error',
+	// 			isLoading: false,
+	// 			autoClose: 3000,
+	// 		});
+	// 	}
+	// };
 
 	// ####################################################################
 	// Update assignedIRQ1s when approvalData changes
@@ -976,7 +1039,10 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 				<Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
 
 					{/* Download Button */}
-					<Button startIcon={<DownloadOutlinedIcon />} variant="contained" color="primary" onClick={() => handleDownload(params.row.ID)}>
+					<Button startIcon={<DownloadOutlinedIcon />} variant="contained" color="primary" onClick={() => {
+
+						handleDownload(params.row.ID);
+					}}>
 						Download
 					</Button>
 				</Box>
@@ -1093,160 +1159,164 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 				</Button>
 			</Box>
 
-			<DataGrid
-				rows={flatRows}
-				getRowId={r => {
-					const row = r as FlatRow;
-					return row.isGroup ? `header-${row.groupKey}` : row.UUID;
-				}}
-				getRowClassName={(params) => {
-					const row = params.row as FlatRow;
-					if (row.hidden) return 'hidden-row';
-					if (row.isGroup && expandedRows[row.groupKey]) return 'expanded-group-row';
-					return '';
-				}}
+			{/* DATA GRID */}
+			<div style={{ height: '70vh', overflowX: 'auto', overflowY: 'auto' }}>
+				<DataGrid
+					rows={flatRows}
+					disableVirtualization={false}
+					getRowId={r => {
+						const row = r as FlatRow;
+						return row.isGroup ? `header-${row.groupKey}` : row.UUID;
+					}}
+					getRowClassName={(params) => {
+						const row = params.row as FlatRow;
+						if (row.hidden) return 'hidden-row';
+						if (row.isGroup && expandedRows[row.groupKey]) return 'expanded-group-row';
+						return '';
+					}}
 
-				checkboxSelection
-				columns={allColumns}
-				processRowUpdate={handleEditPriceEach}
-				rowSelectionModel={rowSelectionModel}
-				isCellEditable={(params) => {
-					// Only allow editing priceEach field
-					if (params.field !== 'priceEach') return false;
+					checkboxSelection
+					columns={allColumns}
+					processRowUpdate={handleEditPriceEach}
+					rowSelectionModel={rowSelectionModel}
+					isCellEditable={(params) => {
+						// Only allow editing priceEach field
+						if (params.field !== 'priceEach') return false;
 
-					// Don't allow editing group headers
-					if (params.row.isGroup) return false;
+						// Don't allow editing group headers
+						if (params.row.isGroup) return false;
 
-					// Don't allow editing if status is APPROVED, DENIED, COMPLETED, or CANCELLED
-					const status = params.row.status;
-					if (status === ItemStatus.APPROVED || status === ItemStatus.DENIED) {
-						return false;
-					}
-					return true;
-				}}
+						// Don't allow editing if status is APPROVED, DENIED, COMPLETED, or CANCELLED
+						const status = params.row.status;
+						if (status === ItemStatus.APPROVED || status === ItemStatus.DENIED) {
+							return false;
+						}
+						return true;
+					}}
 
-				onRowSelectionModelChange={(newModel) => {
-					const newSelection = new Set<GridRowId>();
-					const prev = rowSelectionModel.ids;
-					// Process each selected UUID
-					Array.from(newModel.ids).forEach(uuid => {
-						const row = flatRows.find(r => r.UUID === uuid);
-						if (row) {
-							if (row.isGroup) {
-								// If it's a group, add all items in that group
-								const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
-								groupItems.forEach(item => newSelection.add(item.UUID));
-							} else {
-								// If it's an individual item, add it directly
-								newSelection.add(uuid);
+					onRowSelectionModelChange={(newModel) => {
+						const newSelection = new Set<GridRowId>();
+						const prev = rowSelectionModel.ids;
+						// Process each selected UUID
+						Array.from(newModel.ids).forEach(uuid => {
+							const row = flatRows.find(r => r.UUID === uuid);
+							if (row) {
+								if (row.isGroup) {
+									// If it's a group, add all items in that group
+									const groupItems = flatRows.filter(r => r.groupKey === row.groupKey);
+									groupItems.forEach(item => newSelection.add(item.UUID));
+								} else {
+									// If it's an individual item, add it directly
+									newSelection.add(uuid);
+								}
 							}
+						});
+
+						// Update the selection model
+						const removed = Array.from(prev).filter(id => !newSelection.has(id));
+						const updated = new Set(newSelection);
+						removed.forEach(uuid => {
+							const row = flatRows.find(r => r.UUID === uuid);
+							if (row?.isGroup) {
+								flatRows.filter(r => r.groupKey === row.groupKey && !r.isGroup).forEach(r => updated.delete(r.UUID));
+							}
+						});
+
+						setRowSelectionModel({ ids: updated, type: 'include' });
+
+						// Update comment payload based on selection
+						const selectedRows = Array.from(newSelection)
+							.map(uuid => flatRows.find(r => r.UUID === uuid))
+							.filter((r): r is FlatRow => !!r && !r.isGroup) as FlatRow[];
+
+						if (selectedRows.length === 0) return;
+
+						/* At this point we are unsure which button user will press so we need to prepare data
+						for all the functions, comments or approvals/deny */
+
+						// Prepare the payload for comments
+						const payload: GroupCommentPayload = {
+							groupKey: selectedRows[0].groupKey,
+							group_count: selectedRows.length,
+							item_uuids: selectedRows.map(r => r.UUID),
+							item_desc: selectedRows.map(r => r.itemDescription),
+							comment: []
+						};
+
+						// Set the group comment payload
+						setGroupCommentPayload(payload);
+
+						// Now prepare the payload for approvals/deny
+						const approvalPayload: ApprovalData = {
+							ID: selectedRows[0].ID,
+							item_uuids: selectedRows.map(r => r.UUID),
+							item_funds: selectedRows.map(r => r.fund),
+							totalPrice: selectedRows.map(r => r.totalPrice),
+							target_status: selectedRows.map(r => r.status),
+							action: "APPROVE" // Default to APPROVE, will be overridden by specific button clicks
+						};
+
+						// Process the approval payload in hook
+						setApprovalPayload(approvalPayload)
+
+						// Prepare Denial data
+						const denyPayload: DenialData = {
+							ID: selectedRows[0].ID,
+							item_uuids: selectedRows.map(r => r.UUID),
+							target_status: selectedRows.map(r => r.status),
+							action: "DENY"
 						}
-					});
 
-					// Update the selection model
-					const removed = Array.from(prev).filter(id => !newSelection.has(id));
-					const updated = new Set(newSelection);
-					removed.forEach(uuid => {
-						const row = flatRows.find(r => r.UUID === uuid);
-						if (row?.isGroup) {
-							flatRows.filter(r => r.groupKey === row.groupKey && !r.isGroup).forEach(r => updated.delete(r.UUID));
-						}
-					});
+						// Process the denial payload in hook
+						setDenialPayload(denyPayload)
+					}}
 
-					setRowSelectionModel({ ids: updated, type: 'include' });
-
-					// Update comment payload based on selection
-					const selectedRows = Array.from(newSelection)
-						.map(uuid => flatRows.find(r => r.UUID === uuid))
-						.filter((r): r is FlatRow => !!r && !r.isGroup) as FlatRow[];
-
-					if (selectedRows.length === 0) return;
-
-					/* At this point we are unsure which button user will press so we need to prepare data
-					for all the functions, comments or approvals/deny */
-
-					// Prepare the payload for comments
-					const payload: GroupCommentPayload = {
-						groupKey: selectedRows[0].groupKey,
-						group_count: selectedRows.length,
-						item_uuids: selectedRows.map(r => r.UUID),
-						item_desc: selectedRows.map(r => r.itemDescription),
-						comment: []
-					};
-
-					// Set the group comment payload
-					setGroupCommentPayload(payload);
-
-					// Now prepare the payload for approvals/deny
-					const approvalPayload: ApprovalData = {
-						ID: selectedRows[0].ID,
-						item_uuids: selectedRows.map(r => r.UUID),
-						item_funds: selectedRows.map(r => r.fund),
-						totalPrice: selectedRows.map(r => r.totalPrice),
-						target_status: selectedRows.map(r => r.status),
-						action: "APPROVE" // Default to APPROVE, will be overridden by specific button clicks
-					};
-
-					// Process the approval payload in hook
-					setApprovalPayload(approvalPayload)
-
-					// Prepare Denial data
-					const denyPayload: DenialData = {
-						ID: selectedRows[0].ID,
-						item_uuids: selectedRows.map(r => r.UUID),
-						target_status: selectedRows.map(r => r.status),
-						action: "DENY"
-					}
-
-					// Process the denial payload in hook
-					setDenialPayload(denyPayload)
-				}}
-
-				initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-				pageSizeOptions={[25, 50, 100]}
-				rowHeight={60}
-				sx={{
-					flex: 1,
-					bgcolor: "#2c2c2c",
-					border: 'none',
-					height: '100%',
-					'& .MuiDataGrid-main': {
-						overflow: 'auto'
-					},
-					'& .MuiDataGrid-virtualScroller': {
-						overflow: 'auto !important'
-					},
-					// Cells & rows
-					...cellRowStyles,
-
-					// Column headers
-					...headerStyles,
-
-					// Footer container
-					...footerStyles,
-
-					// Pagination labels
-					...paginationStyles,
-
-					// any one-off tweaks
-
-					'& .expanded-group-row': {
-						background: 'linear-gradient(180deg, #800000 0%, #600000 100%) !important',
-						'&:hover': {
-							background: 'linear-gradient(180deg, #600000 0%, #400000 100%) !important',
+					initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+					pageSizeOptions={[25, 50, 100]}
+					rowHeight={60}
+					sx={{
+						flex: 1,
+						bgcolor: "#2c2c2c",
+						border: 'none',
+						height: '100%',
+						'& .MuiDataGrid-main': {
+							overflow: 'auto'
 						},
-						'& .MuiDataGrid-cell': {
+						'& .MuiDataGrid-virtualScroller': {
+							overflow: 'auto !important'
+						},
+						// Cells & rows
+						...cellRowStyles,
+
+						// Column headers
+						...headerStyles,
+
+						// Footer container
+						...footerStyles,
+
+						// Pagination labels
+						...paginationStyles,
+
+						// any one-off tweaks
+
+						'& .expanded-group-row': {
 							background: 'linear-gradient(180deg, #800000 0%, #600000 100%) !important',
-							borderBottom: '2px solid #FFFFFF',
-							color: '#FFFFFF',
-							fontWeight: 'bold',
+							'&:hover': {
+								background: 'linear-gradient(180deg, #600000 0%, #400000 100%) !important',
+							},
+							'& .MuiDataGrid-cell': {
+								background: 'linear-gradient(180deg, #800000 0%, #600000 100%) !important',
+								borderBottom: '2px solid #FFFFFF',
+								color: '#FFFFFF',
+								fontWeight: 'bold',
+							}
+						},
+						'& .hidden-row': {
+							display: 'none',
 						}
-					},
-					'& .hidden-row': {
-						display: 'none',
-					}
-				} as DataGridSxProps}
-			/>
+					} as DataGridSxProps}
+				/>
+			</div>
 
 			{/* Item Description Modal */}
 			<Modal

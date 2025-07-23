@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../styles/App.css";
 import { Routes, Route } from "react-router-dom";
@@ -7,14 +7,16 @@ import 'react-toastify/dist/ReactToastify.css';
 import AddItemsForm from "../components/purchase_req_table/AddItemsForm";
 import SubmitApprovalTable from "../components/purchase_req_table/SumbitToApproval";
 import { Layout } from "../components/approval_table/app_layout";
-import { Box, Toolbar } from "@mui/material";
+import { Box } from "@mui/material";
 import { FormValues } from "../types/formTypes";
-import { ProgressBar } from "../components/purchase_req_table/ProgressBar";
+import { ProgressBar } from "../utils/ProgressBar";
 import ApprovalPageMain from "../components/approval_table/containers/ApprovalPageMain";
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
 import { useWebSockets } from "../hooks/useWebSockets";
+import { socketSig } from "../utils/PrasSignals";
+import { effect } from "@preact/signals-react";
 
 interface AppProps {
 	isLoggedIn: boolean;
@@ -25,17 +27,13 @@ interface AppProps {
 
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 
-	const handleWebSocketMessage = useCallback((_event: MessageEvent) => {
-		// Progress messages are handled by ProgressBar component
-		// This handler is kept for potential future use
-	}, []);
-
 	// Bring custom hook for purchase form
 	const { createNewID } = usePurchaseForm();
 
 	// Websocket URL
 	const WEBSOCKET_URL = "ws://localhost:5002/communicate";
-	const { socket: socket, isConnected: _isConnected } = useWebSockets(WEBSOCKET_URL, handleWebSocketMessage);
+	const { socket: socket, isConnected: _isConnected } = useWebSockets(WEBSOCKET_URL);
+	socketSig.value = socket;
 
 	// Local state for reserved ID
 	const [ID, setID] = useState<string>("");
@@ -43,18 +41,14 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 	/* *********************************************************************************** */
 	/* SHARED DATA BUFFER */
 	const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
-	const [isSubmitted, setIsSubmitted] = useState(false); // Re-render once form is submitted
 	const [fileInfo, setFileInfo] = useState<IFile[]>([]);
 	const [loginOpen, setLoginOpen] = useState(!isLoggedIn);
-	const [isFinalSubmitted, setIsFinalSubmitted] = useState(false);
-	const [progressData, setProgressData] = useState<Record<string, boolean>>({});
 
 	// Reserve the ID for the request
 	useEffect(() => {
 		(async () => {
 			try {
 				const json = await createNewID();
-				console.log("New ID", json);
 				setID(json.ID)
 			} catch (e) {
 				console.error("Error creating new ID", e);
@@ -126,7 +120,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 				pauseOnHover
 				theme="dark"
 			/>
-			{socket && <ProgressBar isFinalSubmission={isFinalSubmitted} socket={socket} />}
+
+			{<ProgressBar />}
+
 			{/* Sidebar Navigation */}
 			{/* Layout component has the sidebar/header/main content */}
 			<Layout
@@ -148,12 +144,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 								<AddItemsForm
 									ID={ID}
 									fileInfo={fileInfo}
-									isFinalSubmitted={isFinalSubmitted}
 									setDataBuffer={setDataBuffer}
-									setIsSubmitted={setIsSubmitted}
 									setID={setID}
 									setFileInfo={setFileInfo}
-									setIsFinalSubmitted={setIsFinalSubmitted}
 								/>
 
 								{/********************************************************************* */}
@@ -167,12 +160,9 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 								>
 									<SubmitApprovalTable
 										ID={ID}
-										setIsFinalSubmitted={setIsFinalSubmitted}
 										dataBuffer={dataBuffer}
 										onDelete={onDelete}
 										fileInfo={fileInfo}
-										isSubmitted={isSubmitted}
-										setIsSubmitted={setIsSubmitted}
 										setDataBuffer={setDataBuffer}
 										setFileInfo={setFileInfo}
 									/>

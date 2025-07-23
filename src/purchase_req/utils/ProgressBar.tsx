@@ -1,27 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { toast, Id } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '../../../store/prasStore';
-import { startTest, completeProgress, resetProgress } from '../../../store/progressSlice';
-
-interface ProgressBarProps {
-	isFinalSubmission: boolean;
-	socket: WebSocket;
-}
+import { AppDispatch, RootState } from '../../store/prasStore';
+import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
+import { isDownloadSig, socketSig, isFinalSubmissionSig, isSubmittedSig } from "./PrasSignals";
 
 // #########################################################################################
 // PROGRESS BAR COMPONENT
 // #########################################################################################
-export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
+export function ProgressBar() {
 	const toastIdRef = useRef<Id | null>(null);
 	const dispatch = useDispatch<AppDispatch>();
 	const status = useSelector((s: RootState) => s.progress.status);
 	const [currentPercent, setCurrentPercent] = useState(0);
+	let socketSignal = socketSig.value;
 
 	// Subscribe to the status to send reset message on complete
 	useEffect(() => {
-		if (status === 'done' && socket) {
-			socket.send(JSON.stringify({ event: 'reset_data' }));
+		if (status === 'done' && socketSignal) {
+			console.log("IS_FINAL_SUBMISSION: ", isFinalSubmissionSig);
+			console.log("IS_SUBMITTED: ", isSubmittedSig);
+			console.log("SOCKET_SIG: ", socketSig);
+			console.log("SOCKET_SIGNAL: ", socketSignal);
+			socketSignal.send(JSON.stringify({ event: 'reset_data' }));
 			dispatch(resetProgress());
 			setCurrentPercent(0);
 
@@ -29,11 +30,11 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 				toast.dismiss(toastIdRef.current);
 			}
 		}
-	}, [status, socket, dispatch])
+	}, [status, socketSignal, dispatch])
 
 	// Listen for WebSocket messages and update progress
 	useEffect(() => {
-		if (!socket) return;
+		if (!socketSignal) return;
 
 		const handleMessage = (event: MessageEvent) => {
 			try {
@@ -111,9 +112,9 @@ export function ProgressBar({ isFinalSubmission, socket }: ProgressBarProps) {
 			}
 		};
 
-		socket.addEventListener('message', handleMessage);
-		return () => socket.removeEventListener('message', handleMessage);
-	}, [socket, isFinalSubmission, dispatch]);
+		socketSignal.addEventListener('message', handleMessage);
+		return () => socketSignal.removeEventListener('message', handleMessage);
+	}, [socketSignal, dispatch]);
 
 	return null;
 }

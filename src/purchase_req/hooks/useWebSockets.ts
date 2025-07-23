@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-
+import { isDownloadSig } from "../utils/PrasSignals";
 
 // #########################################################################################
 // WEBSOCKETS HOOK 
@@ -24,8 +24,11 @@ export function useWebSockets(
 		};
 		
 		ws.onmessage = (event) => {
-
-			if(onMessage) {
+			if(isDownloadSig.value) {
+				ws.send('DOWNLOAD_PROGRESS');
+				isDownloadSig.value = false;
+			} 
+			else if(onMessage) {
 				onMessage(event);
 			}
 		}

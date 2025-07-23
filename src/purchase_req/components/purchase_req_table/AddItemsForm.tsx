@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import { TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import LocationPicker from "./LocationPicker";
-import { PurchaseItem, OrderType, purchaseItemSchema } from "../../schemas/purchaseSchema";
+import { PurchaseItem, OrderType } from "../../schemas/purchaseSchema";
 import FileUpload from "./FileUpload";
 import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
@@ -25,6 +25,7 @@ import { useUUIDStore } from "../../services/UUIDService";
 import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
+import { isFinalSubmissionSig } from "../../utils/PrasSignals";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -32,12 +33,9 @@ import { toast } from "react-toastify";
 interface AddItemsProps {
 	ID?: string;
 	fileInfo: IFile[];
-	isFinalSubmitted: boolean;
 	setDataBuffer: React.Dispatch<React.SetStateAction<FormValues[]>>;
-	setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 	setID?: React.Dispatch<React.SetStateAction<string>>;
 	setFileInfo: React.Dispatch<React.SetStateAction<IFile[]>>;
-	setIsFinalSubmitted?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 /*************************************************************************************** */
@@ -46,10 +44,8 @@ interface AddItemsProps {
 function AddItemsForm({
 	ID,
 	setDataBuffer,
-	isFinalSubmitted,
 	fileInfo,
 	setFileInfo,
-	setIsFinalSubmitted,
 }: AddItemsProps) {
 	const { setUUID } = useUUIDStore();
 	const form = usePurchaseForm();
@@ -142,14 +138,10 @@ function AddItemsForm({
 				})) || []
 			};
 
-			console.log("Data:", data);
-
 			// Store the UUID in the UUID store AFTER we have the ID
 			if (ID) {
 				setUUID(ID, uuid);
 			}
-
-			console.log("Item to add:", itemToAdd);
 
 			// Add the item to the data buffer
 			setDataBuffer(prev => [...prev, itemToAdd]);
@@ -157,11 +149,9 @@ function AddItemsForm({
 			// Show success message
 			setShowSuccess(true);
 
-
-
 			// Reset the form on AddItems, keep header data, but not item data
 			// Only reset to keep header data if not final submitted
-			if (!isFinalSubmitted) {
+			if (!isFinalSubmissionSig.value) {
 				reset({
 					requester,
 					phoneext,
@@ -199,8 +189,7 @@ function AddItemsForm({
 	/* The form has successfully been submitted to the backend so we need to reset the form for everything */
 	// Watch for isFinalSubmitted changes and reset form accordingly
 	useEffect(() => {
-		if (isFinalSubmitted) {
-			console.log('🧼 Final submission detected, resetting form completely');
+		if (isFinalSubmissionSig.value) {
 
 			// Clear form state completely
 			reset({
@@ -228,14 +217,14 @@ function AddItemsForm({
 			runValidation();
 
 			// Reset the Final Submitted state back to false
-			if (setIsFinalSubmitted) {
+			if (isFinalSubmissionSig.value) {
 				setTimeout(() => {
-					setIsFinalSubmitted(false);
+					isFinalSubmissionSig.value = false;
 				}, 100);
 			}
 
 		}
-	}, [isFinalSubmitted, reset, formattedToday, form]);
+	}, [reset, formattedToday, form]);
 
 	/*************************************************************************************** */
 	/* Form submission function */
