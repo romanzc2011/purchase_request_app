@@ -3,8 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
-import ContractingOfficerDropdown from "../../purchase_req_table/ContractingOfficerDropdown";
-import { DataGrid, DataGridProps, GridColDef, GridRowId, GridRowSelectionModel } from "@mui/x-data-grid";
+import { DataGrid, DataGridProps, GridColDef, GridRowId } from "@mui/x-data-grid";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -23,7 +22,7 @@ import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 
 import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow, ApprovalData, ItemStatus, DenialData } from "../../../types/approvalTypes";
-import { addComments, cleanPayload } from "../../../services/CommentService";
+import { addComments } from "../../../services/CommentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { useUUIDStore } from "../../../services/UUIDService";
 import { useApprovalService } from "../../../hooks/useApprovalService";
@@ -51,8 +50,6 @@ let groupCommentPayload: GroupCommentPayload = {
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-const API_URL_APPROVE = `${import.meta.env.VITE_API_URL}/api/approveRequest`;
-const API_URL_DENY = `${import.meta.env.VITE_API_URL}/api/denyRequest`;
 const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 
@@ -213,14 +210,9 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 
 	// Filter approval data based on search results - EXCLUSIVE SEARCH
 	const filteredApprovalData = useMemo(() => {
-		console.log("🔍 Search debug:", { searchQuery, searchDataLength: searchData?.length, approvalDataLength: approvalData?.length });
-		console.log("🔍 Search data sample:", searchData?.[0]);
-		console.log("🔍 Approval data sample:", approvalData?.[0]);
-		console.log("🔍 All search data:", searchData);
 
 		// If no search query, show all data
 		if (!searchQuery || !searchData || searchData.length === 0) {
-			console.log("🔍 No search query or data, returning all approval data");
 			return approvalData;
 		}
 
@@ -251,7 +243,8 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 		return acc;
 	}, {} as Record<string, DataRow[]>);
 
-	// Flattened rows
+	/* Flatten the rows so the data can be displayed as a list for
+	for expand/collapsed functionality */
 	const flatRows = React.useMemo<FlatRow[]>(() => {
 		return Object.entries(grouped).flatMap(([groupKey, items]) => {
 			// If there's only one item, emit it as a normal row (no header)

@@ -13,6 +13,7 @@ import {
 	Collapse,
 	Typography,
 } from "@mui/material";
+import { tableHeaderStyles } from "../../styles/DataGridStyles";
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
@@ -215,22 +216,8 @@ function SubmitApprovalTable({
 				setID(requestId);
 			}
 
-			// // Update toast to success
-			// toast.update(toastId, {
-			// 	render: "Data submitted successfully!",
-			// 	type: "success",
-			// 	isLoading: false,
-			// 	autoClose: 3000,
-			// });
 		} catch (error) {
 			console.error("Error submitting data:", error);
-			// Update toast to error
-			// toast.update(toastId, {
-			// 	render: "Failed to submit data",
-			// 	type: "error",
-			// 	isLoading: false,
-			// 	autoClose: 3000,
-			// });
 		}
 	};
 
@@ -245,39 +232,27 @@ function SubmitApprovalTable({
 				width: "100%",
 			}}
 		>
-			<Table sx={{ width: "100%", tableLayout: "auto" }}>
+			<Table sx={{
+				width: "100%",
+				tableLayout: "auto",
+				fontFamily: "'Play', sans-serif !important",
+			}}>
 				<TableHead
 					sx={{
-						background:
-							"linear-gradient(to bottom, #2c2c2c, #800000)",
+						...tableHeaderStyles,
+						fontFamily: "'Play', sans-serif !important"
 					}}
 				>
-					<TableRow>
+					<TableRow sx={{ fontFamily: "'Play', sans-serif !important", fontSize: "1.1rem" }}>
 						<TableCell sx={{ width: 40 }} /> {/* expand/collapse */}
-						<TableCell sx={{ color: "white", fontWeight: "bold" }}>
-							ID
-						</TableCell>
-						<TableCell sx={{ color: "white", fontWeight: "bold" }}>
-							Budget Object Code
-						</TableCell>
-						<TableCell sx={{ color: "white", fontWeight: "bold" }}>
-							Fund
-						</TableCell>
-						<TableCell sx={{ color: "white", fontWeight: "bold" }}>
-							Location
-						</TableCell>
-						<TableCell sx={{ color: "white", fontWeight: "bold" }}>
-							Quantity
-						</TableCell>
-						<TableCell sx={{ color: "white", fontWeight: "bold" }}>
-							Price Each
-						</TableCell>
-						<TableCell sx={{ color: "white", fontWeight: "bold" }}>
-							Line Total
-						</TableCell>
-						<TableCell sx={{ color: "white", fontWeight: "bold" }}>
-							Actions
-						</TableCell>
+						<TableCell>ID</TableCell>
+						<TableCell>Budget Object Code</TableCell>
+						<TableCell>Fund</TableCell>
+						<TableCell>Location</TableCell>
+						<TableCell sx={{ fontSize: "1.1rem" }}>Quantity</TableCell>
+						<TableCell>Price Each</TableCell>
+						<TableCell>Line Total</TableCell>
+						<TableCell>Actions</TableCell>
 					</TableRow>
 				</TableHead>
 				<TableBody>
@@ -300,27 +275,55 @@ function SubmitApprovalTable({
 										</IconButton>
 									)}
 								</TableCell>
-								<TableCell sx={{ color: "white" }}>
+								<TableCell sx={{
+									color: "white",
+									fontFamily: "'Play', sans-serif !important",
+									fontSize: "1rem"
+								}}>
 									{items[0].ID}
 								</TableCell>
-								<TableCell sx={{ color: "white" }}>
+								<TableCell sx={{
+									color: "white",
+									fontFamily: "'Play', sans-serif !important",
+									fontSize: "1rem"
+								}}>
 									{convertBOC(items[0].budgetObjCode)}
 								</TableCell>
-								<TableCell sx={{ color: "white" }}>
+								<TableCell sx={{
+									color: "white",
+									fontFamily: "'Play', sans-serif !important",
+									fontSize: "1rem"
+								}}>
 									{items[0].fund}
 								</TableCell>
-								<TableCell sx={{ color: "white" }}>
+								<TableCell sx={{
+									color: "white",
+									fontFamily: "'Play', sans-serif !important",
+									fontSize: "1rem"
+								}}>
 									{items[0].location}
 								</TableCell>
-								<TableCell sx={{ color: "white" }}>
+								<TableCell sx={{
+									color: "white",
+									fontFamily: "'Play', sans-serif !important",
+									fontSize: "1rem"
+								}}>
 									{items[0].quantity}
 								</TableCell>
-								<TableCell sx={{ color: "white" }}>
+								<TableCell sx={{
+									color: "white",
+									fontFamily: "'Play', sans-serif !important",
+									fontSize: "1rem"
+								}}>
 									{typeof items[0].priceEach === "number"
 										? items[0].priceEach.toFixed(2)
 										: "0.00"}
 								</TableCell>
-								<TableCell sx={{ color: "white" }}>
+								<TableCell sx={{
+									color: "white",
+									fontFamily: "'Play', sans-serif !important",
+									fontSize: "1rem"
+								}}>
 									{calculatePrice(items[0]).toFixed(2)}
 								</TableCell>
 								<TableCell>
@@ -384,27 +387,55 @@ function SubmitApprovalTable({
 													<TableBody>
 														{items.slice(1).map((item, idx) => (
 															<TableRow key={idx}>
-																<TableCell sx={{ color: "white" }}>
+																<TableCell sx={{
+																	color: "white",
+																	fontFamily: "'Play', sans-serif !important",
+																	fontSize: "1rem"
+																}}>
 																	{item.ID}
 																</TableCell>
-																<TableCell sx={{ color: "white" }}>
+																<TableCell sx={{
+																	color: "white",
+																	fontFamily: "'Play', sans-serif !important",
+																	fontSize: "1rem"
+																}}>
 																	{convertBOC(item.budgetObjCode)}
 																</TableCell>
-																<TableCell sx={{ color: "white" }}>
+																<TableCell sx={{
+																	color: "white",
+																	fontFamily: "'Play', sans-serif !important",
+																	fontSize: "1rem"
+																}}>
 																	{item.fund}
 																</TableCell>
-																<TableCell sx={{ color: "white" }}>
+																<TableCell sx={{
+																	color: "white",
+																	fontFamily: "'Play', sans-serif !important",
+																	fontSize: "1rem"
+																}}>
 																	{item.location}
 																</TableCell>
-																<TableCell sx={{ color: "white" }}>
+																<TableCell sx={{
+																	color: "white",
+																	fontFamily: "'Play', sans-serif !important",
+																	fontSize: "1rem"
+																}}>
 																	{item.quantity}
 																</TableCell>
-																<TableCell sx={{ color: "white" }}>
+																<TableCell sx={{
+																	color: "white",
+																	fontFamily: "'Play', sans-serif !important",
+																	fontSize: "1rem"
+																}}>
 																	{typeof item.priceEach === "number"
 																		? item.priceEach.toFixed(2)
 																		: "0.00"}
 																</TableCell>
-																<TableCell sx={{ color: "white" }}>
+																<TableCell sx={{
+																	color: "white",
+																	fontFamily: "'Play', sans-serif !important",
+																	fontSize: "1rem"
+																}}>
 																	{calculatePrice(item).toFixed(2)}
 																</TableCell>
 															</TableRow>
@@ -423,7 +454,7 @@ function SubmitApprovalTable({
 				{/* FOOTER WITH FILE UPLOAD & SUBMIT BUTTON */}
 				<tfoot>
 					<TableRow>
-						<TableCell colSpan={9}>
+						<TableCell colSpan={6}>
 							{/* Display current files */}
 							{fileInfo.length > 0 && (
 								<Box sx={{ mb: 2 }}>
@@ -441,7 +472,7 @@ function SubmitApprovalTable({
 							)}
 
 							{/************************************************************************************ */}
-							{/* BUTTONS: SUBMIT/PRINT */}
+							{/* BUTTONS: SUBMIT */}
 							{/************************************************************************************ */}
 							{/* Submit data to proper destination, email to supervisor or notify sup that there's a request for them to approve */}
 							<Buttons
@@ -455,11 +486,6 @@ function SubmitApprovalTable({
 								}}
 							/>
 
-							{/* This button will print out item Request */}
-							<Buttons
-								label="Print Form"
-								className="btn btn-maroon"
-							/>
 						</TableCell>
 
 						<TableCell
@@ -469,9 +495,11 @@ function SubmitApprovalTable({
 						<TableCell
 							colSpan={3}
 							sx={{
-								color: "white",
-								fontWeight: "bold",
-								textAlign: "right",
+								border: 1,
+								color: "#16fdda",
+								textAlign: "left",
+								fontSize: "1.15rem",
+								fontFamily: "'Play', sans-serif !important"
 							}}
 						>
 							Total: $
