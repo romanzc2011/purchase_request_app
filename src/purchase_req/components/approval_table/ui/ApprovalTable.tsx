@@ -214,18 +214,15 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 			if (item.id) searchResultIds.add(item.id);
 			if (item.purchase_request_id) searchResultIds.add(item.purchase_request_id);
 		});
-		console.log("🔍 Search result IDs:", Array.from(searchResultIds));
 
 		// EXCLUSIVE FILTERING: Only show items that match search results
 		const filtered = approvalData.filter(item => searchResultIds.has(item.ID));
-		console.log("🔍 EXCLUSIVE SEARCH: Showing only", filtered.length, "items out of", approvalData.length, "total items");
-		console.log("🔍 Filtered data sample:", filtered[0]);
 
 		return filtered;
 	}, [approvalData, searchData, searchQuery]);
 
 	// Optimize expensive calculations with useMemo
-	const rowsWithUUID = useMemo(() => 
+	const rowsWithUUID = useMemo(() =>
 		filteredApprovalData.map((r, i) =>
 			r.UUID ? r : { ...r, UUID: `row-${i}` }
 		), [filteredApprovalData]);
@@ -314,7 +311,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 	const handleDownload = useCallback(async (ID: string) => {
 		try {
 			isDownloadSig.value = true;
-			<ProgressBar />
 			await downloadStatementOfNeedForm(ID);
 		} catch (err) {
 			console.error("Error: ", err);

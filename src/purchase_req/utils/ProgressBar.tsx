@@ -29,6 +29,12 @@ export function ProgressBar() {
 		}
 	}, [status, socketSignal, dispatch])
 
+	effect(() => {
+		if (isDownloadSig.value) {
+			console.log("START THE DOWNLOAD PROGRESS BAR");
+		}
+	})
+
 	// Listen for WebSocket messages and update progress
 	useEffect(() => {
 		if (!socketSignal) return;

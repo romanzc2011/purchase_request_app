@@ -1,6 +1,6 @@
 import { FieldErrors, FormProvider, useFormContext } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState } from "react";
 import "./LearningDev";
 import { Box, Snackbar, Alert } from "@mui/material";
 import Buttons from "./Buttons";
@@ -26,6 +26,7 @@ import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
 import { isSubmittedSig } from "../../utils/PrasSignals";
+import { effect } from "@preact/signals-react";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -92,19 +93,27 @@ function AddItemsForm({
 		console.log('Success state changed:', showSuccess);
 	}, [showSuccess]);
 
-	// Optimize watched values with useMemo
-	const watchedValues = useMemo(() => watch([
+	// Keep these header values between add items
+	const [requester, phoneext, datereq, dateneed, orderType] = watch([
 		"requester",
 		"phoneext",
 		"datereq",
 		"dateneed",
 		"orderType"
-	]), [watch]);
+	]);
 
-	const [requester, phoneext, datereq, dateneed, orderType] = watchedValues;
+	useEffect(() => {
+		const subscription = watch((value, { name, type }) => {
+			console.log("📋 Watched Change:", { name, type, value });
+			console.log("🧪 Form State:", formState);
+		});
+		return () => subscription.unsubscribe()
+	}, [watch, formState]);
 
-	// Optimize event handlers with useCallback
-	const handleAddItem = useCallback(async (data: PurchaseItem) => {
+	/*************************************************************************************** */
+	/* HANDLE ADD ITEM function */
+	/*************************************************************************************** */
+	const handleAddItem = async (data: PurchaseItem) => {
 		try {
 			// Generate a new UUID for the item
 			const uuid = uuidv4();
@@ -164,11 +173,14 @@ function AddItemsForm({
 		} catch (error) {
 			console.error("Error adding item:", error);
 		}
-	}, [ID, setUUID, setDataBuffer, setShowSuccess, isSubmittedSig, reset, requester, phoneext, datereq, dateneed, orderType, trigger]);
+	};
 
-	const onError = useCallback((errors: FieldErrors<PurchaseItem>) => {
-		console.log("Form errors:", errors);
-	}, []);
+	/*************************************************************************************** */
+	/* HANDLE ADD ITEM ERRORS function */
+	/*************************************************************************************** */
+	const onError = (errors: FieldErrors<PurchaseItem>) => {
+		console.log("Form errors", errors);
+	};
 
 	// This is used to set the default value for the date requested field to today's date
 	const today: Date = new Date();
@@ -176,8 +188,8 @@ function AddItemsForm({
 	const formattedToday: string = isoString.split("T")[0];
 
 	/* The form has successfully been submitted to the backend so we need to reset the form for everything */
-	// Watch for isSubmitted changes and reset form accordingly
-	useEffect(() => {
+	// Watch for isFinalSubmitted changes and reset form accordingly
+	effect(() => {
 		if (isSubmittedSig.value) {
 
 			// Clear form state completely
@@ -197,13 +209,15 @@ function AddItemsForm({
 
 			// Define an async function inside useEffect for run trigger
 			async function runValidation() {
-				await trigger(); // Re-validate whole form
+				const result = await trigger(); // Re-validate whole form
+				console.log("📋 Trigger result:", result);
+				console.log("📋 Validation errors after trigger:", formState.errors);
 			};
 
 			// Call validation
 			runValidation();
 
-			// Reset the Submitted state back to false
+			// Reset the Final Submitted state back to false
 			if (isSubmittedSig.value) {
 				setTimeout(() => {
 					isSubmittedSig.value = false;
@@ -211,7 +225,7 @@ function AddItemsForm({
 			}
 
 		}
-	}, [reset, formattedToday, form]);
+	});
 
 	/*************************************************************************************** */
 	/* Form submission function */

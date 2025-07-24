@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import React from "react";
 import ApprovalTable from "../ui/ApprovalTable";
 import SearchBar from "../ui/SearchBar";
 import { Box } from "@mui/material";
@@ -9,9 +10,20 @@ interface ApprovalTableProps {
 	resetTable: () => void;
 }
 
-export default function ApprovalPageMain({ resetTable }: ApprovalTableProps) {
+const ApprovalPageMain = React.memo(({ resetTable }: ApprovalTableProps) => {
 	const [dataBuffer, setDataBuffer] = useState<DataRow[]>([]);
 	const [searchQuery, setSearchQuery] = useState("");
+
+	// Optimize event handlers with useCallback
+	const handleDelete = useCallback((ID: string) => {
+		setDataBuffer(prevData =>
+			prevData.filter(item => item.ID !== ID)
+		);
+	}, []);
+
+	const handleClearSearch = useCallback(() => {
+		setSearchQuery("");
+	}, []);
 
 	return (
 		<Box sx={{
@@ -24,18 +36,16 @@ export default function ApprovalPageMain({ resetTable }: ApprovalTableProps) {
 			</Box>
 			<Box sx={{ flex: 1 }}>
 				<ApprovalTable
-					onDelete={(ID: string) =>
-						setDataBuffer(
-							dataBuffer.filter(
-								(item) => item.ID !== ID
-							)
-						)
-					}
+					onDelete={handleDelete}
 					resetTable={resetTable}
 					searchQuery={searchQuery}
-					onClearSearch={() => setSearchQuery("")}
+					onClearSearch={handleClearSearch}
 				/>
 			</Box>
 		</Box>
 	)
-}
+});
+
+ApprovalPageMain.displayName = 'ApprovalPageMain';
+
+export default ApprovalPageMain;

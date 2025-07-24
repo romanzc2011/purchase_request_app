@@ -74,7 +74,7 @@ function SubmitApprovalTable({
 	const itemCount = dataBuffer.length;
 
 	// Group items by ID - memoized
-	const groupedItems = useMemo(() => 
+	const groupedItems = useMemo(() =>
 		processedData.reduce<Record<string, FormValues[]>>((acc, item) => {
 			(acc[item.ID] = acc[item.ID] || []).push(item);
 			return acc;
@@ -93,14 +93,6 @@ function SubmitApprovalTable({
 			isSubmittedSig.value = false;
 		}
 	})
-
-	/************************************************************************************ */
-	/* CALCULATE PRICE -- helper function to convert price/quantity to number and do
-		 calculations */
-	/************************************************************************************ */
-
-
-	// Group items by ID
 
 	/************************************************************************************ */
 	/* SUBMIT DATA --- send to backend to add to database */

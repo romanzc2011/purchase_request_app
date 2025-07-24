@@ -41,7 +41,7 @@ export async function fetchSearchData(query: string) {
 
 /* SEARCH BAR */
 /* Using debouncing, which waits so many ms to get continuous data */
-function SearchBar({ setSearchQuery }: SearchBarProps) {
+const SearchBar = React.memo(({ setSearchQuery }: SearchBarProps) => {
 	const [query, setQuery] = useState('');
 	const [debouncedQuery] = useDebounce(query, DEBOUNCE_MS);
 
@@ -84,6 +84,8 @@ function SearchBar({ setSearchQuery }: SearchBarProps) {
 			</Box>
 		</Box>
 	);
-};
+});
+
+SearchBar.displayName = 'SearchBar';
 
 export default SearchBar;
