@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { useState } from "react";
 import { useDebounce } from 'use-debounce';
 import { Box, IconButton, debounce } from "@mui/material";
@@ -60,6 +60,12 @@ function SearchBar({ setSearchQuery }: SearchBarProps) {
 		placeholderData: keepPreviousData,
 	});
 
+	// Optimize onChange handler
+	const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+		const newValue = e.target.value;
+		setQuery(newValue);
+	}, []);
+
 	return (
 		<Box display="flex" justifyContent="space-between" p={2}>
 			{/* SEARCH BAR */}
@@ -71,10 +77,7 @@ function SearchBar({ setSearchQuery }: SearchBarProps) {
 						flex: 1
 					}}
 					placeholder="Search"
-					onChange={(e) => {
-						const newValue = e.target.value;
-						setQuery(newValue);
-					}} />
+					onChange={handleInputChange} />
 				<IconButton type="button" sx={{ p: 1 }}>
 					<SearchIcon sx={{ color: "white" }} />
 				</IconButton>

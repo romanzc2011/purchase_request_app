@@ -2,6 +2,7 @@ import { useForm }     from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { purchaseItemSchema, PurchaseItem, OrderType } from "../schemas/purchaseSchema";
 import { toast } from "react-toastify";
+import { useCallback } from "react";
 
 export const usePurchaseForm = () => {
 	const today = new Date().toISOString().split("T")[0];
@@ -34,7 +35,7 @@ export const usePurchaseForm = () => {
 	/*************************************************************************************** */
 	/* ASSIGN CO -- assign CO to request */
 	/*************************************************************************************** */
-	async function handleAssignCO(requestId: string, officerId: number, username: string) {
+	const handleAssignCO = useCallback(async (requestId: string, officerId: number, username: string) => {
 		const payload = {
 			request_id: requestId,
 			contracting_officer_id: officerId,
@@ -59,12 +60,12 @@ export const usePurchaseForm = () => {
 			console.error("❌ Error assigning CO:", error);
 			toast.error("Failed to assign CO");
 		}
-	}
+	}, []);
 
 	/*************************************************************************************** */
 	/* CREATE NEW ID -- create new ID for request */
 	/*************************************************************************************** */
-	async function createNewID() {
+	const createNewID = useCallback(async () => {
 		const response = await fetch(
 			`${import.meta.env.VITE_API_URL}/api/createNewID`,
 			{
@@ -78,7 +79,7 @@ export const usePurchaseForm = () => {
 		if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
 		console.log("New ID response", response);
 		return response.json();
-	}
+	}, []);
 
 	return {
 		...form,

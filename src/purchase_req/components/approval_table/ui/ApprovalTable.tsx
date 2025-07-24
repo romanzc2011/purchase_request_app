@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
@@ -176,9 +176,9 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 	const [fullJust, setFullJust] = useState("");
 
 	// ADD THIS: toggleRow function for group expand/collapse
-	const toggleRow = (groupKey: string) => {
+	const toggleRow = useCallback((groupKey: string) => {
 		setExpandedRows(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
-	};
+	}, []);
 
 	// ADD THIS: assignIRQ1Mutation from useAssignIRQ1
 	const assignIRQ1Mutation = useAssignIRQ1();
@@ -224,15 +224,18 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 		return filtered;
 	}, [approvalData, searchData, searchQuery]);
 
-	// Build grouped map once per load
-	const rowsWithUUID: DataRow[] = filteredApprovalData.map((r, i) =>
-		r.UUID ? r : { ...r, UUID: `row-${i}` }
-	);
+	// Optimize expensive calculations with useMemo
+	const rowsWithUUID = useMemo(() => 
+		filteredApprovalData.map((r, i) =>
+			r.UUID ? r : { ...r, UUID: `row-${i}` }
+		), [filteredApprovalData]);
 
-	const grouped: Record<string, DataRow[]> = rowsWithUUID.reduce((acc, row) => {
-		(acc[row.ID] ||= []).push(row);
-		return acc;
-	}, {} as Record<string, DataRow[]>);
+	const grouped = useMemo(() => {
+		return rowsWithUUID.reduce((acc, row) => {
+			(acc[row.ID] ||= []).push(row);
+			return acc;
+		}, {} as Record<string, DataRow[]>);
+	}, [rowsWithUUID]);
 
 	/* Flatten the rows so the data can be displayed as a list for
 	for expand/collapsed functionality */
@@ -276,10 +279,8 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 		});
 	}, [grouped, expandedRows]);
 
-	// Calculate total items in selected groups
-	//  determine first if theres more than 1 UUID, then if there is i need to decide if its already flatten then 
-	// flatten if not then count but theres 10 items altogether but this is count 1 if everything is collapsed
-	const getTotalSelectedItems = () => {
+	// Optimize event handlers with useCallback
+	const getTotalSelectedItems = useCallback(() => {
 		if (rowSelectionModel.type === 'exclude') {
 			return flatRows.filter(row => !row.isGroup && !rowSelectionModel.ids.has(row.UUID)).length;
 		}
@@ -301,7 +302,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 			}
 		});
 		return total;
-	}
+	}, [flatRows, rowSelectionModel]);
 
 	// ####################################################################
 	// ####################################################################
@@ -310,14 +311,15 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 	// ####################################################################
 	// ####################################################################
 
-	const handleDownload = async (ID: string) => {
+	const handleDownload = useCallback(async (ID: string) => {
 		try {
 			isDownloadSig.value = true;
+			<ProgressBar />
 			await downloadStatementOfNeedForm(ID);
 		} catch (err) {
 			console.error("Error: ", err);
 		}
-	}
+	}, []);
 
 	// const handleDownload = async (ID: string) => {
 	// 	const socket = socketSig.value;
@@ -414,27 +416,27 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 	/***********************************************************************************/
 	/***********************************************************************************/
 	// ITEM DESCRIPTION MODAL
-	const handleOpenDesc = (desc: string) => {
+	const handleOpenDesc = useCallback((desc: string) => {
 		setFullDesc(desc);
 		setOpenDesc(true);
-	};
+	}, []);
 
-	const handleCloseDesc = () => {
+	const handleCloseDesc = useCallback(() => {
 		setOpenDesc(false);
 		setFullDesc("");
-	};
+	}, []);
 
 	/***********************************************************************************/
 	// JUSTIFICATION MODAL
-	const handleOpenJust = (just: string) => {
+	const handleOpenJust = useCallback((just: string) => {
 		setFullJust(just);
 		setOpenJust(true);
-	};
+	}, []);
 
-	const handleCloseJust = () => {
+	const handleCloseJust = useCallback(() => {
 		setOpenJust(false);
 		setFullJust("");
-	};
+	}, []);
 
 	const {
 		processPayload,

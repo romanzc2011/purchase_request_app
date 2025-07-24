@@ -1,6 +1,6 @@
 import { FieldErrors, FormProvider, useFormContext } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import "./LearningDev";
 import { Box, Snackbar, Alert } from "@mui/material";
 import Buttons from "./Buttons";
@@ -25,7 +25,7 @@ import { useUUIDStore } from "../../services/UUIDService";
 import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
-import { isFinalSubmissionSig } from "../../utils/PrasSignals";
+import { isSubmittedSig } from "../../utils/PrasSignals";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -92,27 +92,19 @@ function AddItemsForm({
 		console.log('Success state changed:', showSuccess);
 	}, [showSuccess]);
 
-	// Keep these header values between add items
-	const [requester, phoneext, datereq, dateneed, orderType] = watch([
+	// Optimize watched values with useMemo
+	const watchedValues = useMemo(() => watch([
 		"requester",
 		"phoneext",
 		"datereq",
 		"dateneed",
 		"orderType"
-	]);
+	]), [watch]);
 
-	useEffect(() => {
-		const subscription = watch((value, { name, type }) => {
-			console.log("📋 Watched Change:", { name, type, value });
-			console.log("🧪 Form State:", formState);
-		});
-		return () => subscription.unsubscribe()
-	}, [watch, formState]);
+	const [requester, phoneext, datereq, dateneed, orderType] = watchedValues;
 
-	/*************************************************************************************** */
-	/* HANDLE ADD ITEM function */
-	/*************************************************************************************** */
-	const handleAddItem = async (data: PurchaseItem) => {
+	// Optimize event handlers with useCallback
+	const handleAddItem = useCallback(async (data: PurchaseItem) => {
 		try {
 			// Generate a new UUID for the item
 			const uuid = uuidv4();
@@ -151,7 +143,7 @@ function AddItemsForm({
 
 			// Reset the form on AddItems, keep header data, but not item data
 			// Only reset to keep header data if not final submitted
-			if (!isFinalSubmissionSig.value) {
+			if (!isSubmittedSig.value) {
 				reset({
 					requester,
 					phoneext,
@@ -172,14 +164,11 @@ function AddItemsForm({
 		} catch (error) {
 			console.error("Error adding item:", error);
 		}
-	};
+	}, [ID, setUUID, setDataBuffer, setShowSuccess, isSubmittedSig, reset, requester, phoneext, datereq, dateneed, orderType, trigger]);
 
-	/*************************************************************************************** */
-	/* HANDLE ADD ITEM ERRORS function */
-	/*************************************************************************************** */
-	const onError = (errors: FieldErrors<PurchaseItem>) => {
-		console.log("Form errors", errors);
-	};
+	const onError = useCallback((errors: FieldErrors<PurchaseItem>) => {
+		console.log("Form errors:", errors);
+	}, []);
 
 	// This is used to set the default value for the date requested field to today's date
 	const today: Date = new Date();
@@ -187,9 +176,9 @@ function AddItemsForm({
 	const formattedToday: string = isoString.split("T")[0];
 
 	/* The form has successfully been submitted to the backend so we need to reset the form for everything */
-	// Watch for isFinalSubmitted changes and reset form accordingly
+	// Watch for isSubmitted changes and reset form accordingly
 	useEffect(() => {
-		if (isFinalSubmissionSig.value) {
+		if (isSubmittedSig.value) {
 
 			// Clear form state completely
 			reset({
@@ -208,18 +197,16 @@ function AddItemsForm({
 
 			// Define an async function inside useEffect for run trigger
 			async function runValidation() {
-				const result = await trigger(); // Re-validate whole form
-				console.log("📋 Trigger result:", result);
-				console.log("📋 Validation errors after trigger:", formState.errors);
+				await trigger(); // Re-validate whole form
 			};
 
 			// Call validation
 			runValidation();
 
-			// Reset the Final Submitted state back to false
-			if (isFinalSubmissionSig.value) {
+			// Reset the Submitted state back to false
+			if (isSubmittedSig.value) {
 				setTimeout(() => {
-					isFinalSubmissionSig.value = false;
+					isSubmittedSig.value = false;
 				}, 100);
 			}
 

@@ -17,14 +17,14 @@ import { tableHeaderStyles } from "../../styles/DataGridStyles";
 import { FormValues } from "../../types/formTypes";
 import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { v4 as uuidv4 } from 'uuid';
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { toast } from "react-toastify";
 import { ItemStatus } from "../../types/approvalTypes";
 import { OrderType } from "../../schemas/purchaseSchema";
-import { isFinalSubmissionSig, isSubmittedSig } from "../../utils/PrasSignals";
+import { isSubmittedSig } from "../../utils/PrasSignals";
 import { effect } from "@preact/signals-react";
 
 const baseURL = import.meta.env.VITE_API_URL;
@@ -56,12 +56,36 @@ function SubmitApprovalTable({
 	// State for expanded rows
 	const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
-	// Toggle row expansion
-	const toggleRowExpanded = (id: string) =>
+	// Optimize expensive calculations with useMemo
+	const calculatePrice = useCallback((item: FormValues): number => {
+		const price = Number(item.priceEach) || 0;
+		const quantity = Number(item.quantity) || 1;
+		return price * quantity;
+	}, []);
+
+	// Preprocess data to calculate price - memoized
+	const processedData = useMemo(() => dataBuffer.map((item) => ({
+		...item,
+		priceEach: Number(item.priceEach),
+		calculatedPrice: calculatePrice(item)
+	})), [dataBuffer, calculatePrice]);
+
+	/* Check if data buffer is multiple items */
+	const itemCount = dataBuffer.length;
+
+	// Group items by ID - memoized
+	const groupedItems = useMemo(() => 
+		processedData.reduce<Record<string, FormValues[]>>((acc, item) => {
+			(acc[item.ID] = acc[item.ID] || []).push(item);
+			return acc;
+		}, {}), [processedData]);
+
+	// Optimize toggle function
+	const toggleRowExpanded = useCallback((id: string) =>
 		setExpandedRows((prev) => ({
 			...prev,
 			[id]: !prev[id],
-		}));
+		})), []);
 
 	effect(() => {
 		if (isSubmittedSig.value) {
@@ -70,36 +94,14 @@ function SubmitApprovalTable({
 		}
 	})
 
-
-
-
 	/************************************************************************************ */
 	/* CALCULATE PRICE -- helper function to convert price/quantity to number and do
 		 calculations */
 	/************************************************************************************ */
-	function calculatePrice(item: FormValues): number {
-		const price = Number(item.priceEach) || 0;
-		const quantity = Number(item.quantity) || 1;
-		return price * quantity;
-	}
 
-	// Preprocess data to calculate price
-	const processedData = dataBuffer.map((item) => ({
-		...item,
-		priceEach: Number(item.priceEach),
-		calculatedPrice: calculatePrice(item)
-	}));
-
-	/* Check if data buffer is multiple items */
-	const itemCount = dataBuffer.length;
-	console.log("itemCount==", itemCount);
 
 	// Group items by ID
-	const groupedItems = processedData.reduce<Record<string, FormValues[]>>((acc, item) => {
-		(acc[item.ID] = acc[item.ID] || []).push(item);
-		return acc;
-	}, {});
-	console.log("processedData==", processedData);
+
 	/************************************************************************************ */
 	/* SUBMIT DATA --- send to backend to add to database */
 	/************************************************************************************ */
@@ -176,7 +178,6 @@ function SubmitApprovalTable({
 			fileInfo.forEach(file => {
 				if (file.file && file.status === "ready") {
 					formData.append("files", file.file);
-					console.log("Attaching file to formData:", file.name);
 				}
 			});
 
@@ -192,14 +193,9 @@ function SubmitApprovalTable({
 			if (!response.ok) {
 				throw new Error(`HTTP error! status: ${response.status}`);
 			}
-			console.log("dataBuffer, isArray==", Array.isArray(dataBuffer), " length==", dataBuffer.length)
-
-			const result = await response.json();
-			console.log("Submission result:", result);
 
 			// Reset the form and data buffer
 			isSubmittedSig.value = true;
-			isFinalSubmissionSig.value = true;
 			setDataBuffer([]);
 
 			// Update the ID if setID is provided
@@ -468,7 +464,7 @@ function SubmitApprovalTable({
 							{/* Submit data to proper destination, email to supervisor or notify sup that there's a request for them to approve */}
 							<Buttons
 								label="Submit Form"
-								className=" me-3 btn btn-maroon"
+								className="me-3 btn btn-maroon"
 								disabled={dataBuffer.length === 0}
 								onClick={() => {
 									handleSubmitData(processedData);
