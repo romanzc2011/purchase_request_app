@@ -579,6 +579,7 @@ ORM_Approval = (
 async def fetch_flat_approvals(
     db: AsyncSession,
     ID: Optional[str] = None,
+    progress_mgr=None,
 ) -> List[ApprovalSchema]:
     
     # alias each table for clarity
@@ -623,6 +624,9 @@ async def fetch_flat_approvals(
     # execute the statement
     result = await db.execute(stmt)
     rows = result.all()
+    
+    if progress_mgr:
+        progress_mgr.mark_step_done("fetch_flat_approvals")
     
     # Map each row to the ApprovalSchema
     return [ApprovalSchema(**r._asdict()) for r in rows]

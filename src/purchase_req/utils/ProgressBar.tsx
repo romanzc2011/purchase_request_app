@@ -3,8 +3,9 @@ import { toast, Id } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../store/prasStore';
 import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
-import { isDownloadSig, socketSig, isSubmittedSig } from "./PrasSignals";
+import { isDownloadSig, socketSig, isSubmittedSig, messageSig } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
+import { LinearProgress, Typography } from "@mui/material";
 
 // #########################################################################################
 // PROGRESS BAR COMPONENT
@@ -29,9 +30,14 @@ export function ProgressBar() {
 		}
 	}, [status, socketSignal, dispatch])
 
+	// Capture signal trigger and change
 	effect(() => {
 		if (isDownloadSig.value) {
-			console.log("START THE DOWNLOAD PROGRESS BAR");
+			messageSig.value = "Downloading PDF";
+		}
+
+		if (isSubmittedSig.value) {
+			messageSig.value = "Submitting request";
 		}
 	})
 
@@ -42,29 +48,27 @@ export function ProgressBar() {
 		const handleMessage = (event: MessageEvent) => {
 			try {
 				dispatch(startTest());
+
 				const eventData = JSON.parse(event.data);
 
 				// Handle START_TOAST message
 				if (eventData.event === "START_TOAST") {
 					toastIdRef.current = toast.loading(
-						<div>
-							<div>Submitting request... (0%)</div>
-							<div style={{ width: '100%', backgroundColor: '#ddd', borderRadius: '4px', marginTop: '8px' }}>
-								<div
-									style={{
-										width: `0%`,
-										height: '4px',
-										backgroundColor: '#4caf50',
-										borderRadius: '4px',
-										transition: 'width 0.3s ease'
-									}}
-								/>
-							</div>
+						<div style={{ width: "100%" }}>
+							<Typography variant="body2">
+								{`${messageSig.value}... (0%)`}
+							</Typography>
+							<LinearProgress
+								variant="determinate"
+								value={0}
+								sx={{ height: 4, borderRadius: 2, marginTop: 1 }}
+							/>
 						</div>,
 						{
 							position: "top-center",
 							autoClose: false
 						}
+
 					);
 					return;
 				}
@@ -83,19 +87,15 @@ export function ProgressBar() {
 						for (let i = currentPercent; i <= percent; i++) {
 							toast.update(toastIdRef.current, {
 								render: (
-									<div>
-										<div>Submitting request... ({i}%)</div>
-										<div style={{ width: '100%', backgroundColor: '#ddd', borderRadius: '4px', marginTop: '8px' }}>
-											<div
-												style={{
-													width: `${i}%`,
-													height: '4px',
-													backgroundColor: '#4caf50',
-													borderRadius: '4px',
-													transition: 'width 0.3s ease'
-												}}
-											/>
-										</div>
+									<div style={{ width: "100%" }}>
+										<Typography variant="body2">
+											{`${messageSig.value}... (${i}%)`}
+										</Typography>
+										<LinearProgress
+											variant="determinate"
+											value={i}
+											sx={{ height: 4, borderRadius: 2, marginTop: 1 }}
+										/>
 									</div>
 								),
 								isLoading: percent < 100,

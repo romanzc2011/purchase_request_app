@@ -13,6 +13,7 @@ from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
 from api.dependencies.pras_schemas          import *
 from api.services.progress_bar_state		import ProgressSharedMemory, ProgressState
+from api.utils.mini_signals					import pdf_download_signal
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
@@ -63,7 +64,8 @@ auth_service = AuthService(ldap_service=ldap_service)
 # Progress State Shared Memory
 # -----------------------------------------------------
 progress_state = ProgressState()
-shm_mgr = ProgressSharedMemory()
+shm_mgr = ProgressSharedMemory(pdf_download_signal)
+pdf_download_signal.connect(shm_mgr.on_steps_updated)
 
 # -----------------------------------------------------
 # WebSocket Connection

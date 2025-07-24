@@ -1,13 +1,14 @@
 from dataclasses import dataclass, asdict
 from multiprocessing import shared_memory, Lock
+from typing import List
 from loguru import logger
 import struct
-import json
+import asyncio
 import numpy as np
 from api.services.websocket_manager import ConnectionManager
+from api.utils.mini_signals import Signal
+from api.schemas.enums import DownloadStepName
 
-# TODO Investigate why the 'json' going to front end ProgressBar.tsx and useWebSockets is a string
-# TODO May need to convert data to json from bytes in progress_bar_state
 """
 This is to make progress data available globally. Just keeping up with work that 
 needs to be complete and calculate what percentage has been completed. Structure
@@ -37,20 +38,42 @@ class ProgressState:
     email_sent_requester:        bool = False
     email_sent_approver:         bool = False
     pending_approval_inserted:   bool = False
+    
+@dataclass
+class DownloadStep:
+    name: DownloadStepName
+    weight: int
+
+STEPS: List[DownloadStep] = [
+    # DATABASE & DATA FETCHING
+    DownloadStep(DownloadStepName.FETCH_APPROVAL_DATA,             10),  # Just a DB fetch (already very fast)
+    DownloadStep(DownloadStepName.FETCH_FLAT_APPROVALS,            10),  # Related to above; medium-light work
+    DownloadStep(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS,  5),  # Lightweight
+    DownloadStep(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID,    5),  # simple lookup
+    DownloadStep(DownloadStepName.GET_LINE_ITEMS,                  10),  # multiple rows
+    DownloadStep(DownloadStepName.GET_SON_COMMENTS,                 5),  # Lightweight again
+    DownloadStep(DownloadStepName.GET_ORDER_TYPES,                  5),  # Very quick small query
+
+    # PDF PROCESSING
+    DownloadStep(DownloadStepName.LOAD_PDF_TEMPLATE,                5),  # Style and assets load, small
+    DownloadStep(DownloadStepName.MERGE_DATA_INTO_TEMPLATE,        15),  # This is a major content-binding step
+    DownloadStep(DownloadStepName.RENDER_PDF_BINARY,               15),  # ReportLab rendering can be slow
+    DownloadStep(DownloadStepName.SAVE_PDF_TO_DISK,                 5),  # Just file write
+    DownloadStep(DownloadStepName.VERIFY_FILE_EXISTS,               5),  # Simple filesystem check
+]
 
 websock_connection = ConnectionManager()
 
-# read_shm = shm_mgr.read()  # This reads the entire progress state struct
-# read_shm.total_steps = 10
-# shm_mgr.write(read_shm)
 class ProgressSharedMemory:
     
-    def __init__(self, name="shm_progress_state") -> None:
+    def __init__(self, signal: Signal, name="shm_progress_state"):
         self.STRUCT_FMT = '<' + '?' * 10
         self.STRUCT_SIZE = struct.calcsize(self.STRUCT_FMT)
         self.value: bool = False
         self._keep_bytes: bool = False
         self.total_steps: int = 10
+        self.signal = signal
+        self.signal.connect(self.on_steps_updated)
 
         try:
             self.shm = shared_memory.SharedMemory(name=name, create=True, size=self.STRUCT_SIZE)
@@ -90,17 +113,13 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     async def update(self, field: str, value: bool | int) -> None:
         current_state = self.read()
-        logger.debug(f"CURRENT_STATE = self.read(): {current_state}")
         
         self.value = value
-        logger.debug(f"SELF.VALUE: {self.value}")
         
         if hasattr(current_state, field):
             setattr(current_state, field, value)
             self.write(current_state)
             current_state = self.read()
-            
-            logger.debug(f"CURRENT_STATE: {current_state}")
             
             # Convert current_state to dict
             progress_dict = asdict(current_state) 
@@ -128,6 +147,32 @@ class ProgressSharedMemory:
         percent_complete = (step_count / self.total_steps) * 100
         logger.debug(f"PERCENT COMPLETE: {percent_complete}")
         return percent_complete
+    
+    #-------------------------------------------------------------
+    # CALC PROGRESS DOWNLOAD
+    #-------------------------------------------------------------
+    def calc_download_progress(self, completed: list[DownloadStepName]) -> int:
+        total_weight = sum(step.weight for step in STEPS)
+        done_weight = sum(
+			step.weight for step in STEPS if step.name in completed
+		)
+        return int((done_weight / total_weight) * 100)
+    
+    def on_steps_updated(self, completed: list[DownloadStepName]):
+        percent = self.calc_download_progress(completed)
+        logger.success(f"Percent: {percent}")
+        
+        # broadcast to front end
+        asyncio.create_task(websock_connection.broadcast({
+			"event": "PROGRESS_UPDATE",
+			"percent_complete": percent,
+			"complete_steps": completed
+		}))
+        
+    def mark_step_done(self, step_name: DownloadStepName):
+        current = self.signal.get()
+        if step_name not in current:
+            self.signal.set(current + [step_name])
                 
     #-------------------------------------------------------------
     # TO BYTES

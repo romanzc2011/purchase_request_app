@@ -25,9 +25,7 @@ import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../
 import { useApprovalService } from "../../../hooks/useApprovalService";
 import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 import { toast, Id } from "react-toastify";
-import { LinearProgress } from "@mui/material";
 import { isDownloadSig } from "../../../utils/PrasSignals";
-import { ProgressBar } from "../../../utils/ProgressBar";
 
 
 /***********************************************************************************/
@@ -317,76 +315,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 		}
 	}, []);
 
-	// const handleDownload = async (ID: string) => {
-	// 	const socket = socketSig.value;
-	// 	if (!socket) {
-	// 		toast.error("No WebSocket connection – can't track download progress.");
-	// 		return
-	// 	}
-
-	// 	// Show init Downloading... (0%) toast
-	// 	const toastId: Id = toast.loading(
-	// 		<Box>
-	// 			Downloading... (0%)
-	// 			<LinearProgress sx={{ height: 4, mt: 1, borderRadius: 2 }} />
-	// 		</Box>,
-	// 		{ position: 'top-center', autoClose: false }
-	// 	);
-
-	// 	// Listen for backend DOWNLOAD_PROGRESS events
-	// 	const onMessage = (evt: MessageEvent) => {
-	// 		try {
-	// 			const data = JSON.parse(evt.data);
-	// 			if (data.event === 'DOWNLOAD_PROGRESS' && data.ID === ID) {
-	// 				const pct: number = data.percent_complete ?? 0;
-
-	// 				toast.update(toastId, {
-	// 					render: (
-	// 						<Box>
-	// 							Downloading... ({pct}%)
-	// 							<LinearProgress
-	// 								variant="determinate"
-	// 								value={pct}
-	// 								sx={{ height: 4, mt: 1, borderRadius: 2 }}
-	// 							/>
-	// 						</Box>
-	// 					),
-	// 					isLoading: pct < 100,
-	// 					type: pct === 100 ? 'success' : undefined,
-	// 					autoClose: pct === 100 ? 1000 : false,
-	// 				});
-
-	// 				if (pct >= 100) {
-	// 					socket.removeEventListener('message', onMessage);
-	// 				}
-	// 			}
-	// 		} catch {
-	// 			console.error("ERROR DOWNLOADING");
-	// 		}
-	// 	};
-	// 	socket.addEventListener('message', onMessage);
-
-	// 	// Start actual HTTP download
-	// 	try {
-	// 		await downloadStatementOfNeedForm(ID);
-	// 		// Force finish if ws misses 100%
-	// 		toast.update(toastId, {
-	// 			render: 'Download complete!',
-	// 			type: 'success',
-	// 			isLoading: false,
-	// 			autoClose: 1000,
-	// 		});
-	// 	} catch (err) {
-	// 		socket.removeEventListener('message', onMessage);
-	// 		toast.update(toastId, {
-	// 			render: "Download failed. Please try again.",
-	// 			type: 'error',
-	// 			isLoading: false,
-	// 			autoClose: 3000,
-	// 		});
-	// 	}
-	// };
-
 	// ####################################################################
 	// Update assignedIRQ1s when approvalData changes
 	const assignedIRQ1s = useMemo(() => {
@@ -394,8 +322,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 		filteredApprovalData.forEach(r => {
 			if (r.IRQ1_ID) map[r.ID] = r.IRQ1_ID;
 		});
-		console.log("🔍 assignedIRQ1s updated:", map);
-		console.log("🔍 filteredApprovalData IRQ1_IDs:", filteredApprovalData.map(r => ({ ID: r.ID, IRQ1_ID: r.IRQ1_ID })));
+
 		return map;
 	}, [filteredApprovalData]);
 
@@ -486,8 +413,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 			action: "APPROVE"
 		}
 
-		console.log("Submitting payload to backend:", apiPayload);
-
 		// Calling the processPayload function to send the payload to the backend
 		try {
 			await processPayload(apiPayload);
@@ -538,10 +463,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 			comment: entries
 		}
 
-		// clean the payload
-		//cleanPayload(payloadToSend);
-		console.log("🔥 PAYLOAD TO SEND", payloadToSend);
-
 		// Deselect all rows
 		setRowSelectionModel({ ids: new Set(), type: 'include' });
 
@@ -570,7 +491,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 
 		if (itemsToProcessForDenial.length === 0) {
 			toast.error("No items selected for denial");
-			console.log("No items selected for denial")
 		}
 
 		// Construct small payload of uuids to deny
@@ -580,7 +500,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 			target_status: itemsToProcessForDenial.map(item => ItemStatus.DENIED),
 			action: "DENY"
 		}
-		console.log("Submitting payload to backend for denial: ", apiDenyPayload);
 
 		// Calling the processPayload function to send the payload to the backend
 		try {
@@ -649,7 +568,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 	// HANDLE CONTRACTING OFFICER
 	//####################################################################
 	async function handleAssignCO(officerId: number, username: string) {
-		console.log("Assigning CO to selected items", { officerId, username });
 
 		// Get selected Rows
 		const selectedItemUUIDs = Array.from(rowSelectionModel.ids)
@@ -657,7 +575,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 
 		if (selectedItemUUIDs.length === 0) {
 			toast.error("No items selected");
-			console.log("No items selected");
 			return;
 		}
 
@@ -762,19 +679,16 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 							disabled={!!assignedIRQ1s[id]}
 							label={assignedIRQ1s[id] ? "Assigned" : "Assign"}
 							onClick={() => {
-								console.log("🚀 Assigning IRQ1:", { ID: id, newIRQ1ID: currentDraftIRQ1 });
 								assignIRQ1Mutation.mutate({
 									ID: id,
 									newIRQ1ID: currentDraftIRQ1
 								}, {
-									onSuccess: (data) => {
-										console.log("✅ IRQ1 assignment successful:", data);
+									onSuccess: () => {
 										// Invalidate the query to refresh the data
 										queryClient.invalidateQueries({ queryKey: ["approvalData"] });
 										toast.success("IRQ1 assigned successfully");
 									},
-									onError: (error) => {
-										console.error("❌ IRQ1 assignment failed:", error);
+									onError: () => {
 										toast.error("Failed to assign IRQ1");
 									}
 								});

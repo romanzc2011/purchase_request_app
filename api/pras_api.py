@@ -57,6 +57,8 @@ from api.dependencies.pras_dependencies import progress_state, shm_mgr
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
 from api.services.websocket_manager import ConnectionManager
+from api.services.progress_bar_state import pdf_download_step
+from api.dependencies.pras_dependencies import shm_mgr
 
 # Database ORM Model Imports
 from api.services.db_service import (
@@ -145,7 +147,12 @@ async def get_approval_data(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
-    return await dbas.fetch_flat_approvals(db, ID=ID)
+    approval_data = await dbas.fetch_flat_approvals(db, ID=ID, progress_mgr=shm_mgr)
+    #! PROGRESS TRACKING ---------------------------------------------------------
+    shm_mgr.mark_step_done("fetch_approval_data")
+    logger.debug("fetch_approval_data COMPLETE")
+    #!----------------------------------------------------------------------------
+    return approval_data
     
 ##########################################################################
 ## GET STATEMENT OF NEED FORM
@@ -159,6 +166,12 @@ async def download_statement_of_need_form(
     """
     This endpoint is used to download the statement of need form for a given ID.
     """
+    #! PROGRESS TRACKING ---------------------------------------------------------
+    message = "START_TOAST"
+    await websock_connection.broadcast({"event": message})
+    logger.debug("START_TOAST SENT")
+    #!----------------------------------------------------------------------------
+    
     ID = payload.get("ID")
     if not ID:
         raise HTTPException(status_code=400, detail="ID is required")

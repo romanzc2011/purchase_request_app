@@ -202,7 +202,7 @@ class SMTP_Service:
             #to_address = ["Lela_Robichaux@lawb.uscourts.gov"]
             # TESTING
             logger.debug("Sending to Roman for testing, but in prod we send to Lela")
-            to_address = ["roman_campbell@lawb.uscourts.gov"]
+            to_address = ["lauren_lee@lawb.uscourts.gov"]   # AND OTERS
         else:
             #to_address = ["Peter_Baltz@lawb.uscourts.gov", "Lauren_Lee@lawb.uscourts.gov"]
             to_address = ["roman_campbell@lawb.uscourts.gov"]

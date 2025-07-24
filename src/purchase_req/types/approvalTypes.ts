@@ -170,3 +170,20 @@ export const STATUS_CONFIG: Record<DataRow["status"], {
         canFollowUp: false
     }
 }
+
+interface ProgressStep {
+	name: string;
+	weight: number;
+	completed: boolean;
+}
+
+export const STEPS: ProgressStep[] = [
+	{ name: "fetch_approval_data", weight: 25, completed: false },
+	{ name: "db_query_and_payload", weight: 15, completed: false },
+	{ name: "load_pdf_template", weight: 10, completed: false },
+	{ name: "merge_data",     weight: 30, completed: false },
+	{ name: "render_pdf",     weight: 20, completed: false },
+	{ name: "save_to_disk",   weight:  5, completed: false },
+	{ name: "verify_exists",  weight:  5, completed: false },
+	{ name: "send_response",  weight: 10, completed: false },
+]

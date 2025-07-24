@@ -136,6 +136,9 @@ class FinanceHandler(Handler):
         # Finance can approve any request that doesn't start with 511
         logger.debug("FINANCE HANDLER PROCESSING REQUEST")
         
+        """
+        Finance 092x will email peter, lela, lauren, edmund
+        """
         if approver_policy.can_finance_approve(request.fund, ItemStatus.NEW_REQUEST):
             # Finance handles non-IT requests
             logger.debug(f"FINANCE HANDLER APPROVING NON-IT REQUEST: {request.uuid}")

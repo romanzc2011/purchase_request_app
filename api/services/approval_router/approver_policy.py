@@ -31,7 +31,8 @@ class ApproverPolicy:
 
         # Clerk Admin can always approve
         logger.debug("DEPUTY AND CLERK TESTING AREA")
-        if username == "edwardtakara" or username == "romancampbell":
+        logger.debug("if username==edwardtakara")
+        if username == "edwardtakara":   
             logger.info("this line in prod to check if the current_user is edwardtakara because he can approve anything at anytime")
             logger.debug("CLERK ADMIN CAN APPROVE")
             return True
