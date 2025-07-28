@@ -24,11 +24,7 @@ export function useWebSockets(
 		};
 		
 		ws.onmessage = (event) => {
-			if(isDownloadSig.value) {
-				ws.send('DOWNLOAD_PROGRESS');
-				isDownloadSig.value = false;
-			} 
-			else if(onMessage) {
+			if(onMessage) {
 				onMessage(event);
 			}
 		}

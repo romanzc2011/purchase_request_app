@@ -161,6 +161,7 @@ async def download_statement_of_need_form(
     """
     download_progress.reset()
     download_progress.start_download_tracking = True
+    download_progress.send_download_start_msg()
     logger.success(f"DOWNLOAD STARTED: {download_progress.start_download_tracking}")
     
     ID = payload.get("ID")

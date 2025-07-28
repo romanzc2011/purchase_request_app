@@ -78,6 +78,13 @@ class ProgressTracker:
     def reset(self):
         for step in self.steps:
             step.done = False
+            
+    def send_download_start_msg(self):
+        asyncio.create_task(websock_conn.broadcast({
+            "event": "START_TOAST",
+            "percent_complete": 0
+        }));
+        logger.debug("Sent start toast message")
     
     #------------------------------------------------------------------
     # Calculate progress
