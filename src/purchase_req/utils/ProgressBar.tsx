@@ -51,8 +51,15 @@ export function ProgressBar() {
 
 				const eventData = JSON.parse(event.data);
 
+				if (eventData.event === "PROGRESS_UPDATE") {
+					console.log(eventData);
+					let percent = eventData.percent_complete;
+					setCurrentPercent(percent);
+				}
+
 				// Handle START_TOAST message
 				if (eventData.event === "START_TOAST") {
+					console.log(eventData);
 					toastIdRef.current = toast.loading(
 						<div style={{ width: "100%" }}>
 							<Typography variant="body2">

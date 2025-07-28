@@ -148,6 +148,12 @@ INSERT OR IGNORE INTO contracting_officers
 VALUES
 ("romancampbell", "roman_campbell@lawb.uscourts.gov");
 
+CREATE TABLE IF NOT EXISTS email_addresses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE
+);
+
 -- DELETE FROM final_approvals;
 -- DELETE FROM pending_approvals;
 -- DELETE FROM approvals;

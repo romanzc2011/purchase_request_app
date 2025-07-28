@@ -4,4 +4,3 @@ from api.schemas.misc_schemas       import CyberSecRelatedPayload
 from api.schemas.approval_schemas   import ApprovalSchema, RequestPayload
 from api.schemas.comment_schemas    import GroupCommentPayload, SonCommentSchema
 from api.schemas.ldap_schema       import LDAPUser
-

@@ -50,4 +50,4 @@ class ConnectionManager:
     async def broadcast_boolean(self, value: bool):
         await self.broadcast(json.dumps({"boolean": value}))
         
-    
+websock_conn = ConnectionManager()

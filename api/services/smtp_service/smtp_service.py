@@ -219,11 +219,11 @@ class SMTP_Service:
         )
         #! PROGRESS TRACKING ----------------------------------------------------------
         from api.dependencies.pras_dependencies import shm_mgr
-        from api.dependencies.pras_dependencies import websock_connection
+        from api.services.websocket_manager import websock_conn
         
         await shm_mgr.update(field="email_sent_approver", value=True)
         msg_data = shm_mgr.calc_progress_percentage()
-        await websock_connection.broadcast({"event": json.dumps(msg_data)})
+        await websock_conn.broadcast({"event": json.dumps(msg_data)})
         #!-----------------------------------------------------------------------------
 
     async def send_requester_email(self, payload: EmailPayloadRequest, db: AsyncSession):
@@ -241,11 +241,11 @@ class SMTP_Service:
         
         #! PROGRESS TRACKING ----------------------------------------------------------
         from api.dependencies.pras_dependencies import shm_mgr
-        from api.dependencies.pras_dependencies import websock_connection
+        from api.services.websocket_manager import websock_conn
         
         await shm_mgr.update(field="email_sent_requester", value=True)
         msg_data = shm_mgr.calc_progress_percentage()
-        await websock_connection.broadcast({"event": json.dumps(msg_data)})
+        await websock_conn.broadcast({"event": json.dumps(msg_data)})
         #!-----------------------------------------------------------------------------
         
         

@@ -1,13 +1,11 @@
 from dataclasses import dataclass, asdict
+from enum import Enum, auto
 from multiprocessing import shared_memory, Lock
-from typing import List
+from typing import List, Any
 from loguru import logger
 import struct
 import asyncio
 import numpy as np
-from api.services.websocket_manager import ConnectionManager
-from api.utils.mini_signals import Signal
-from api.schemas.enums import DownloadStepName
 
 """
 This is to make progress data available globally. Just keeping up with work that 
@@ -26,6 +24,49 @@ shm_mgr.write(read_shm)
 
 read_shm = shm_mgr.read()
 """
+
+#-------------------------------------------------------------
+# DOWNLOAD STEPS
+#-------------------------------------------------------------
+class DownloadStepName(Enum):
+    FETCH_APPROVAL_DATA = auto()
+    FETCH_FLAT_APPROVALS = auto()
+    GET_JUSTIFICATIONS_AND_COMMENTS = auto()
+    GET_CONTRACTING_OFFICER_BY_ID = auto()
+    GET_LINE_ITEMS = auto()
+    GET_SON_COMMENTS = auto()
+    GET_ORDER_TYPES = auto()
+    LOAD_PDF_TEMPLATE = auto()
+    MERGE_DATA_INTO_TEMPLATE = auto()
+    RENDER_PDF_BINARY = auto()
+    SAVE_PDF_TO_DISK = auto()
+    VERIFY_FILE_EXISTS = auto()
+    
+@dataclass
+class DownloadStep:
+    step_name: DownloadStepName
+    weight: int
+    done: bool = False
+    download_state: bool = False
+    
+STEPS: List[DownloadStep] = [
+    # DATABASE & DATA FETCHING
+    DownloadStep(DownloadStepName.FETCH_APPROVAL_DATA,             10, False),  # Just a DB fetch (already very fast)
+    DownloadStep(DownloadStepName.FETCH_FLAT_APPROVALS,            10, False),  # Related to above; medium-light work
+    DownloadStep(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS,  5, False),  # Lightweight
+    DownloadStep(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID,    5, False),  # simple lookup
+    DownloadStep(DownloadStepName.GET_LINE_ITEMS,                  10, False),  # multiple rows
+    DownloadStep(DownloadStepName.GET_SON_COMMENTS,                 5, False),  # Lightweight again
+    DownloadStep(DownloadStepName.GET_ORDER_TYPES,                  5, False),  # Very quick small query
+
+    # PDF PROCESSING
+    DownloadStep(DownloadStepName.LOAD_PDF_TEMPLATE,                5, False),  # Style and assets load, small
+    DownloadStep(DownloadStepName.MERGE_DATA_INTO_TEMPLATE,        15, False),  # This is a major content-binding step
+    DownloadStep(DownloadStepName.RENDER_PDF_BINARY,               15, False),  # ReportLab rendering can be slow
+    DownloadStep(DownloadStepName.SAVE_PDF_TO_DISK,                 5, False),  # Just file write
+    DownloadStep(DownloadStepName.VERIFY_FILE_EXISTS,               5, False),  # Simple filesystem check
+]
+
 @dataclass
 class ProgressState:
     id_generated:                bool = False
@@ -38,42 +79,17 @@ class ProgressState:
     email_sent_requester:        bool = False
     email_sent_approver:         bool = False
     pending_approval_inserted:   bool = False
-    
-@dataclass
-class DownloadStep:
-    name: DownloadStepName
-    weight: int
 
-STEPS: List[DownloadStep] = [
-    # DATABASE & DATA FETCHING
-    DownloadStep(DownloadStepName.FETCH_APPROVAL_DATA,             10),  # Just a DB fetch (already very fast)
-    DownloadStep(DownloadStepName.FETCH_FLAT_APPROVALS,            10),  # Related to above; medium-light work
-    DownloadStep(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS,  5),  # Lightweight
-    DownloadStep(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID,    5),  # simple lookup
-    DownloadStep(DownloadStepName.GET_LINE_ITEMS,                  10),  # multiple rows
-    DownloadStep(DownloadStepName.GET_SON_COMMENTS,                 5),  # Lightweight again
-    DownloadStep(DownloadStepName.GET_ORDER_TYPES,                  5),  # Very quick small query
-
-    # PDF PROCESSING
-    DownloadStep(DownloadStepName.LOAD_PDF_TEMPLATE,                5),  # Style and assets load, small
-    DownloadStep(DownloadStepName.MERGE_DATA_INTO_TEMPLATE,        15),  # This is a major content-binding step
-    DownloadStep(DownloadStepName.RENDER_PDF_BINARY,               15),  # ReportLab rendering can be slow
-    DownloadStep(DownloadStepName.SAVE_PDF_TO_DISK,                 5),  # Just file write
-    DownloadStep(DownloadStepName.VERIFY_FILE_EXISTS,               5),  # Simple filesystem check
-]
-
-websock_connection = ConnectionManager()
+from api.services.websocket_manager import websock_conn
 
 class ProgressSharedMemory:
     
-    def __init__(self, signal: Signal, name="shm_progress_state"):
+    def __init__(self, name="shm_progress_state"):
         self.STRUCT_FMT = '<' + '?' * 10
         self.STRUCT_SIZE = struct.calcsize(self.STRUCT_FMT)
         self.value: bool = False
         self._keep_bytes: bool = False
         self.total_steps: int = 10
-        self.signal = signal
-        self.signal.connect(self.on_steps_updated)
 
         try:
             self.shm = shared_memory.SharedMemory(name=name, create=True, size=self.STRUCT_SIZE)
@@ -127,7 +143,7 @@ class ProgressSharedMemory:
             progress_dict["percent_complete"] = percent
             
             send_data = percent
-            await websock_connection.broadcast(send_data)
+            await websock_conn.broadcast(send_data)
             logger.success(f"send_data converted to json and sent {send_data}")
         else:
             logger.error(f"Field {field} does not exist")
@@ -163,17 +179,12 @@ class ProgressSharedMemory:
         logger.success(f"Percent: {percent}")
         
         # broadcast to front end
-        asyncio.create_task(websock_connection.broadcast({
+        asyncio.create_task(websock_conn.broadcast({
 			"event": "PROGRESS_UPDATE",
 			"percent_complete": percent,
 			"complete_steps": completed
 		}))
-        
-    def mark_step_done(self, step_name: DownloadStepName):
-        current = self.signal.get()
-        if step_name not in current:
-            self.signal.set(current + [step_name])
-                
+
     #-------------------------------------------------------------
     # TO BYTES
     #-------------------------------------------------------------
@@ -191,7 +202,7 @@ class ProgressSharedMemory:
             state.email_sent_approver,
             state.pending_approval_inserted,
         )
-    
+        
     #-------------------------------------------------------------
     # FROM BYTES
     #-------------------------------------------------------------

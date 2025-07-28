@@ -1,4 +1,4 @@
-from api.dependencies.pras_dependencies import websock_connection
+from api.services.websocket_manager import websock_conn
 from loguru import logger
 
 async def send_custom_toast(
@@ -24,7 +24,7 @@ async def send_custom_toast(
             "position": position,
             "autoClose": auto_close
         }
-        await websock_connection.broadcast(send_data)
+        await websock_conn.broadcast(send_data)
         logger.debug(f"Custom toast sent: {message}")
     except Exception as e:
         logger.error(f"Failed to send custom toast: {e}")

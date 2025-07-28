@@ -102,6 +102,7 @@ async function fetchCyberSecRelated(UUID: string) {
 async function downloadStatementOfNeedForm(ID: string) {
 	try {
 		// fetch approval data
+		console.log("FETCHING APPROVAL DATA");
 		const approvalData = await fetchApprovalData(ID);
 
 		// Ensure approvalData is an array
@@ -309,6 +310,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 	const handleDownload = useCallback(async (ID: string) => {
 		try {
 			isDownloadSig.value = true;
+			console.log("IS DOWNLOADING: ", isDownloadSig);
 			await downloadStatementOfNeedForm(ID);
 		} catch (err) {
 			console.error("Error: ", err);

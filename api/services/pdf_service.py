@@ -14,7 +14,6 @@ from reportlab.lib.units import inch
 from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
-from api.services.db_service import get_async_session
 from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
 from datetime import datetime
@@ -23,7 +22,7 @@ from sqlalchemy import select
 from api.utils.misc_utils import get_justifications_and_comments
 from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.schemas.enums import DownloadStepName
+from api.services.progress_tracker import DownloadStepName, download_sig, download_progress
 
 class PDFService:
     def __init__(self):
@@ -49,7 +48,6 @@ class PDFService:
         payload: dict | None = None,
         comments: list[str] | None = None,
         is_cyber: bool = False,
-        progress_mgr=None,
     ) -> Path:
         logger.info(f"#####################################################")
         logger.info("create_pdf()")
@@ -58,14 +56,21 @@ class PDFService:
         logger.info(f"payload: {payload}")
         logger.info(f"comments: {comments}")
         logger.info(f"is_cyber: {is_cyber}")
+        
         if not ID:
             raise HTTPException(status_code=400, detail="ID is required")
 
         # 1️⃣ Fetch the flattened approval rows
-        rows = await dbas.fetch_flat_approvals(db, ID=ID, progress_mgr=progress_mgr)
+        rows = await dbas.fetch_flat_approvals(db, ID=ID)
+        
+        # Only run if this is from the download pdf signal
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.FETCH_APPROVAL_DATA)
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.FETCH_FLAT_APPROVALS)
+        
         if not rows:
             raise HTTPException(status_code=404, detail="No approvals found for this ID")
-
+        
         # Turn Pydantic models into dicts
         rows = [row.model_dump() for row in rows]
         logger.info(f"rows: {rows}")
@@ -77,12 +82,13 @@ class PDFService:
         # Build justifcation template if true for trainNotAval or needsNotMeet
         # Fetch additional comment from database if present
         additional_comments = await get_justifications_and_comments(db, ID)
-        if progress_mgr:
-            progress_mgr.mark_step_done("get_justifications_and_comments")
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
         
         contracting_officer = await dbas.get_contracting_officer_by_id(db, ID)
-        if progress_mgr:
-            progress_mgr.mark_step_done("get_contracting_officer_by_id")
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
+        
         logger.info(f"contracting_officer: {contracting_officer}")
         
 		        # ------------------------------------------------------------------------
@@ -97,8 +103,9 @@ class PDFService:
         )
         line_items_result = await db.execute(line_items_stmt)
         line_item_uuids = [row[0] for row in line_items_result.all()]
-        if progress_mgr:
-            progress_mgr.mark_step_done("get_line_items")
+        
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_LINE_ITEMS)
         
         # Get SonComments by line_item_uuid (more reliable)
         son_comments_stmt = (
@@ -108,9 +115,6 @@ class PDFService:
         )
         result = await db.execute(son_comments_stmt)
         son_comments = result.scalars().all()
-        
-        if progress_mgr:
-            progress_mgr.mark_step_done("get_son_comments")
         
         # Also try to get SonComments through approvals_uuid as backup
         approvals_stmt = (
@@ -126,6 +130,9 @@ class PDFService:
         all_son_comments = list(son_comments) + list(approvals_son_comments)
         unique_son_comments = list({comment.UUID: comment for comment in all_son_comments}.values())
         
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_SON_COMMENTS)
+        
         # Build your comment array
         comment_arr: list[str] = []
         for c in unique_son_comments:
@@ -137,9 +144,13 @@ class PDFService:
             comment_arr.extend(additional_comments)
 
         order_type = dbas.get_order_types(ID)
-        if progress_mgr:
-            progress_mgr.mark_step_done("get_order_types")
-       
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_ORDER_TYPES)
+        
+        # Only run if this is from the download pdf signal
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.LOAD_PDF_TEMPLATE)
+        
         # 5️⃣ Render the PDF
         output_path = self.output_dir / f"statement_of_need-{ID}.pdf"
         return self._make_purchase_request_pdf(
@@ -150,7 +161,6 @@ class PDFService:
             comments=comment_arr,
             order_type=order_type,
             contracting_officer=contracting_officer,
-            progress_mgr=progress_mgr,
         )
             
     """
@@ -178,13 +188,11 @@ class PDFService:
                                    comments: list[str]=None, 
                                    order_type: str=None,
                                    contracting_officer: str=None,
-                                   progress_mgr=None
                                    ) -> Path: 
         logger.info(f"#####################################################")
         logger.info("make_purchase_request_pdf()")
         logger.info(f"#####################################################")
         logger.info(f"COMMENTS: {comments}")
-        
         # ensure output folder exists
         output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
         
@@ -192,8 +200,6 @@ class PDFService:
         project_root = Path(__file__).resolve().parent.parent.parent
         pdfmetrics.registerFont(TTFont("Play", str(project_root / "src/assets/fonts/Play-Regular.ttf")))
         pdfmetrics.registerFont(TTFont("Play-Bold", str(project_root / "src/assets/fonts/Play-Bold.ttf")))
-        if progress_mgr:
-            progress_mgr.mark_step_done("load_pdf_template")
 
         logo_path = project_root / "src/assets/seal_no_border.png"
         img_w, img_h = 0.85 * inch, 0.85 * inch
@@ -230,8 +236,6 @@ class PDFService:
             leftMargin=1*inch, rightMargin=1*inch,
             topMargin=img_h + gap + 1*inch, bottomMargin=1*inch
         )
-        if progress_mgr:
-            progress_mgr.mark_step_done("merge_data_into_template")
 
         # Get first row data
         first = rows[0] if rows else {}
@@ -303,6 +307,10 @@ class PDFService:
         # line-items table
         headings = ["BOC","Fund","Location","Description","Qty","Price Each","Total Price","Justification"]
         table_data = [[Paragraph(h, header_style) for h in headings]]
+        
+        # Signal for MERGE_DATA_INTO_TEMPLATE step
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
         
         for r in rows:
             table_data.append([
@@ -378,16 +386,17 @@ class PDFService:
             ("BOTTOMPADDING",   (0, 0), (-1, -1), 2),
         ]))
         elements.append(total_table)
-        if progress_mgr:
-            progress_mgr.mark_step_done("render_pdf_binary")
 
         # Build document
         doc.build(elements, onFirstPage=draw_header, onLaterPages=draw_header)
-        if progress_mgr:
-            progress_mgr.mark_step_done("save_pdf_to_disk")
         
-        if output_path.exists():
-            if progress_mgr:
-                progress_mgr.mark_step_done("verify_file_exists")
+        # Only run if this is from the download pdf signal
+        if download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.RENDER_PDF_BINARY)
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.SAVE_PDF_TO_DISK)
+        
+        if output_path.exists() and download_progress._start_download_tracking:
+            download_sig.send(sender="pdf_download", step_name=DownloadStepName.VERIFY_FILE_EXISTS)
         
         return output_path

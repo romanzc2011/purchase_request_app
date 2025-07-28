@@ -13,7 +13,6 @@ from sqlalchemy import (create_engine, String, Integer, Float, Boolean, Text, La
 from sqlalchemy.orm import declarative_base, selectinload, aliased
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.inspection import inspect
 from sqlalchemy import select
 from sqlalchemy.orm import aliased, joinedload
 from datetime import datetime, timezone
@@ -22,9 +21,6 @@ from typing import List, Optional
 from api.schemas.enums import ItemStatus, TaskStatus
 import uuid
 import os
-from sqlalchemy.pool import NullPool
-from dotenv import load_dotenv
-from multiprocessing import Lock
 import sqlite3
 
 # Ensure database directory exists
@@ -579,7 +575,6 @@ ORM_Approval = (
 async def fetch_flat_approvals(
     db: AsyncSession,
     ID: Optional[str] = None,
-    progress_mgr=None,
 ) -> List[ApprovalSchema]:
     
     # alias each table for clarity
@@ -624,9 +619,6 @@ async def fetch_flat_approvals(
     # execute the statement
     result = await db.execute(stmt)
     rows = result.all()
-    
-    if progress_mgr:
-        progress_mgr.mark_step_done("fetch_flat_approvals")
     
     # Map each row to the ApprovalSchema
     return [ApprovalSchema(**r._asdict()) for r in rows]
