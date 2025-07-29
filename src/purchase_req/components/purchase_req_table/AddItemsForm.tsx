@@ -25,7 +25,7 @@ import { useUUIDStore } from "../../services/UUIDService";
 import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
-import { isSubmittedSig } from "../../utils/PrasSignals";
+import { isSubmittedSig, isRequestSubmitted } from "../../utils/PrasSignals";
 import { effect } from "@preact/signals-react";
 
 /*************************************************************************************** */

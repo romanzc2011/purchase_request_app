@@ -681,7 +681,7 @@ async def send_socket_data(
     
     # Structure send data
     send_data = {
-		"event": "progress_update",
+		"event": "PROGRESS_UPDATE",
 		"percent_complete": percent
 	}
     await websock_conn.broadcast(send_data)

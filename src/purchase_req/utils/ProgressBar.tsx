@@ -3,7 +3,7 @@ import { toast, Id } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../store/prasStore';
 import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
-import { isDownloadSig, socketSig, isSubmittedSig, messageSig } from "./PrasSignals";
+import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
 import { LinearProgress, Typography } from "@mui/material";
 import { ProgressToast } from "../components/ProgressToast";
@@ -19,6 +19,7 @@ export function ProgressBar() {
     let socketSignal = socketSig.value;
 
     console.log("IS SUBMITTED SIG: ", isSubmittedSig.value);
+
     // Subscribe to the status to send reset message on complete
     useEffect(() => {
         if (status === 'done' && socketSignal) {
@@ -38,11 +39,12 @@ export function ProgressBar() {
             messageSig.value = "Downloading PDF";
         }
 
-        if (isSubmittedSig.value) {
+        if (isRequestSubmitted.value) {
             messageSig.value = "Submitting request";
         }
-    })
+    });
 
+    console.log("45: isRequestSubmitted: ", isRequestSubmitted.value);
     // Listen for WebSocket messages and update progress
     useEffect(() => {
         if (!socketSignal) return;
@@ -68,8 +70,10 @@ export function ProgressBar() {
                 console.log("Download sig: ", isDownloadSig.value);
                 console.log("Submitted Sig: ", isSubmittedSig.value);
                 console.log("Percent: ", percent);
+                console.log("isRequestSubmitted: ", isRequestSubmitted.value);
+
                 // PROGRESS_UPDATE (for downloading pdf)
-                if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isSubmittedSig.value) && percent != null) {
+                if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isRequestSubmitted.value) && percent != null) {
                     // create toast if needed
                     console.log("PROGRESS UPDATE SECTION");
                     if (toastIdRef.current === null) {
@@ -93,6 +97,7 @@ export function ProgressBar() {
                             dispatch(completeProgress());
                             isDownloadSig.value = false; // Reset the signal when done
                             isSubmittedSig.value = false;
+                            isRequestSubmitted.value = false;
                         }, 1000);
                     }
                 }

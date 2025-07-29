@@ -24,7 +24,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { toast } from "react-toastify";
 import { ItemStatus } from "../../types/approvalTypes";
 import { OrderType } from "../../schemas/purchaseSchema";
-import { isSubmittedSig } from "../../utils/PrasSignals";
+import { isRequestSubmitted, isSubmittedSig } from "../../utils/PrasSignals";
 import { effect } from "@preact/signals-react";
 
 const baseURL = import.meta.env.VITE_API_URL;
@@ -93,7 +93,7 @@ function SubmitApprovalTable({
             // Don't reset immediately - let the progress bar handle it
             // isSubmittedSig.value = false;
         }
-    })
+    });
 
     /************************************************************************************ */
     /* SUBMIT DATA --- send to backend to add to database */
@@ -455,6 +455,7 @@ function SubmitApprovalTable({
                                 className="me-3 btn btn-maroon"
                                 disabled={dataBuffer.length === 0}
                                 onClick={() => {
+                                    isRequestSubmitted.value = true;
                                     handleSubmitData(processedData);
                                     isSubmittedSig.value = true;
                                     setFileInfo([]);
