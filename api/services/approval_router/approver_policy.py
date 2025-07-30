@@ -32,6 +32,30 @@ class ApproverPolicy:
         # Clerk Admin can always approve
         logger.debug("DEPUTY AND CLERK TESTING AREA")
         logger.debug("if username==edwardtakara")
+        
+        # Grab the clerk admin from DB, clerk admin will always be able to approve
+        stmt = select(dbas.WorkflowUser.active).where(
+            dbas.WorkflowUser.department == "chief_clerk",
+            dbas.WorkflowUser.username == username
+        )
+        
+        result = await db.execute(stmt)
+        row = result.first()
+        chief_clerk_active = row and row.active
+        
+        if not chief_clerk_active:
+            logger.debug("PROGRAM IS IN TESTING - Substitute romancampbell for edwardtakara")
+            #!-----------------------------------------------------------------------------------------
+            #! TESTING CODE
+            stmt = select(
+                dbas.WorkflowUser.active,
+                dbas.WorkflowUser.email).where(
+                    dbas.WorkflowUser.username == "roman_campbell"
+                )
+            #!-----------------------------------------------------------------------------------------
+            # logger.debug("User is not active, skipping")
+            # return False
+        
         if username == "edwardtakara":   
             logger.info("this line in prod to check if the current_user is edwardtakara because he can approve anything at anytime")
             logger.debug("CLERK ADMIN CAN APPROVE")
@@ -42,10 +66,14 @@ class ApproverPolicy:
         This is pulling data from FinalApproval, which is a decision table and determining if request total price
         is under $250, if it is then edmundbrown (deputy clerk or here just deputy)
         """
+        
         if username == "edmundbrown" or username == "romancampbell":  # TESTING
             stmt = select(dbas.FinalApproval.deputy_can_approve).where(
                 dbas.FinalApproval.line_item_uuid == request.uuid
             )
+            
+        
+            
             result = await db.execute(stmt)
             row = result.first()
             deputy_can_approve = row and row.deputy_can_approve

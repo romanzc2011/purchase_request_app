@@ -27,6 +27,7 @@ import sqlite3
 db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
 os.makedirs(db_dir, exist_ok=True)
 DATABASE_URL = "sqlite:///api/db/pras.db"
+
 # Create engine and base
 engine = create_engine(DATABASE_URL, echo=False)  # PRAS = Purchase Request Approval System
 Base = declarative_base()
@@ -384,6 +385,18 @@ class ContractingOfficer(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
+  
+# ────────────────────────────────────────────────────────────────────────────────
+# WORKFLOW USER
+# ────────────────────────────────────────────────────────────────────────────────  
+class WorkflowUser(Base):
+    __tablename__ = "workflow_users"
+
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username = mapped_column(String, nullable=False)
+    email = mapped_column(String, nullable=False, unique=True)
+    department = mapped_column(String, nullable=False)
+    active = mapped_column(Boolean, nullable=False, default=False)
     
 
 ###################################################################################################
@@ -697,6 +710,7 @@ async def get_final_approvals_by_line_item_uuid(
     result = await db.execute(stmt)
     return result.scalars().all()
 
+
 ###################################################################################################
 # GET LINE ITEM FINAL APPROVALS BY APPROVAL UUID
 ###################################################################################################
@@ -860,6 +874,16 @@ async def get_contracting_officer_by_id(db: AsyncSession, ID: str) -> str:
 ###################################################################################################
 def init_db():
     """Initialize the database by creating all tables."""
+    users = [
+        WorkflowUser(username="lauren_lee", email="lauren_lee@lawb.uscourts.gov", department="finance", active=True),
+        WorkflowUser(username="peter_baltz", email="peter_baltz@lawb.uscourts.gov", department="finance", active=False),
+        WorkflowUser(username="lela_robichaux", email="lela_robichaux@lawb.uscourts.gov", department="finance", active=False),
+        WorkflowUser(username="matthew_strong", email="matthew_strong@lawb.uscourts.gov", department="it", active=False),
+        WorkflowUser(username="roman_campbell", email="roman_campbell@lawb.uscourts.gov", department="it", active=True),
+        WorkflowUser(username="edmund_brown", email="edmund_brown@lawb.uscourts.gov", department="deputy_clerk", active=False),
+        WorkflowUser(username="edward_takara", email="edward_takara@lawb.uscourts.gov", department="chief_clerk", active=False),
+    ]
+    
     try:
         # Create (sync) all tables
         Base.metadata.create_all(bind=engine)
@@ -886,6 +910,10 @@ def init_db():
                         description="Current offerings do not meet the needs of the requester."
                     ),
                 ])
+            if not session.query(WorkflowUser).first():
+                logger.info("Seeding workflow users")
+                session.add_all(users)
+                session.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing database: {e}")

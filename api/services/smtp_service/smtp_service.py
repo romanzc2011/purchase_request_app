@@ -248,7 +248,6 @@ class SMTP_Service:
         await websock_conn.broadcast({"event": json.dumps(msg_data)})
         #!-----------------------------------------------------------------------------
         
-        
     async def send_request_approved_email(self, payload: EmailPayloadRequest, db: AsyncSession):
         """
         Send email to requester that their request has been approved
