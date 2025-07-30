@@ -90,6 +90,7 @@ class ITHandler(Handler):
                     db=db,
                     approvals_uuid=approvals_uuid,
                     purchase_request_id=request.id,
+                    
                     line_item_uuid=request.uuid,
                     pending_approval_id=pending_approval_id,
                     approver=request.approver,
@@ -104,14 +105,9 @@ class ITHandler(Handler):
                 Send to the correct approver handler, the new request has been approved so we need to ensure the correct
                 approver is notified, lets test for deputy clerk first
                 """
-                
-                logger.debug(f"REQUEST: {request}")
-                logger.debug(f"CURRENT USER: {current_user}")
-                logger.debug(f"LDAP SERVICE: {ldap_service}")
-                
                 approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
                 email_payload = await approver_email_builder.build_email_payload()
-                await smtp_service.send_approver_email(email_payload,db=db)
+                await smtp_service.send_approver_email(email_payload,db=db, send_to="IT")
                 
                 logger.debug(f"IT HANDLER: Inserted final approval for {request.uuid}")
             else:
@@ -120,9 +116,9 @@ class ITHandler(Handler):
         return await super().handle(request, db, current_user, ldap_service)
 
 # ----------------------------------------------------------------------------------------
-# FINANCE HANDLER
+# MANAGEMENT HANDLER
 # ----------------------------------------------------------------------------------------
-class FinanceHandler(Handler):
+class ManagementHandler(Handler):
     async def handle(
         self, 
         request: ApprovalRequest, 
@@ -131,17 +127,18 @@ class FinanceHandler(Handler):
         ldap_service: LDAPService
     ) -> ApprovalRequest:
         approver_policy = ApproverPolicy(current_user)
-        
         logger.debug(f"User: {current_user}")
-        # Finance can approve any request that doesn't start with 511
-        logger.debug("FINANCE HANDLER PROCESSING REQUEST")
+        
+        # Management can approve any request that doesn't start with 511
+        logger.debug("MANAGEMENT HANDLER PROCESSING REQUEST")
         
         """
-        Finance 092x will email peter, lela, lauren, edmund
+        Finance/Management 092x will email TO: Edmund Brown, Lela
+        CC Peter, 
         """
         if approver_policy.can_finance_approve(request.fund, ItemStatus.NEW_REQUEST):
-            # Finance handles non-IT requests
-            logger.debug(f"FINANCE HANDLER APPROVING NON-IT REQUEST: {request.uuid}")
+            # Management handles non-IT requests
+            logger.debug(f"MANAGEMENT HANDLER APPROVING NON-IT REQUEST: {request.uuid}")
             
             # Get the approval UUID and task_id for this line item
             stmt = select(dbas.Approval.UUID, dbas.PendingApproval.pending_approval_id).join(
@@ -152,7 +149,7 @@ class FinanceHandler(Handler):
             )
             result = await db.execute(stmt)
             row = result.first()
-            logger.debug(f"FINANCE HANDLER: Row: {row}")
+            logger.debug(f"MANAGEMENT HANDLER: Row: {row}")
             
             if row:
                 approvals_uuid, pending_approval_id = row
@@ -170,14 +167,14 @@ class FinanceHandler(Handler):
                 )
                 
                 # Send email to clerk admins requesting approval
-                logger.debug(f"FINANCE HANDLER: Sending email to clerk admins requesting approval for {request.uuid}")
+                logger.debug(f"MANAGEMENT HANDLER: Sending email to clerk admins requesting approval for {request.uuid}")
                 approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
                 email_payload = await approver_email_builder.build_email_payload()
-                await smtp_service.send_approver_email(email_payload,db=db)
+                await smtp_service.send_approver_email(email_payload, db=db, send_to="MANAGEMENT")
                 
-                logger.debug(f"FINANCE HANDLER: Inserted final approval for {request.uuid}")
+                logger.debug(f"MANAGEMENT HANDLER: Inserted final approval for {request.uuid}")
             else:
-                logger.error(f"FINANCE HANDLER: Could not find approval/task data for {request.uuid}")
+                logger.error(f"MANAGEMENT HANDLER: Could not find approval/task data for {request.uuid}")
         
         return await super().handle(request, db, current_user, ldap_service)
     
@@ -195,11 +192,12 @@ class ClerkAdminHandler(Handler):
         current_user: LDAPUser,
         ldap_service: LDAPService
     ) -> ApprovalRequest:
-        
-        approver_policy = ApproverPolicy(current_user)
-        
         # ClerkAdmin is the final handler - they can approve based on price
-        logger.debug("CLERK ADMIN HANDLER PROCESSING REQUEST")
+        logger.critical("CLERK ADMIN HANDLER PROCESSING REQUEST")
+        approver_policy = ApproverPolicy(current_user)    # Create an instance of the approver policy
+        # This is the current user who is trying to approve the request
+        logger.debug(f"User: {current_user}")
+        can_approve: bool = False
         
         # Get current status from pending_approvals table
         stmt = select(dbas.PendingApproval.status).where(dbas.PendingApproval.line_item_uuid == request.uuid)
@@ -209,12 +207,23 @@ class ClerkAdminHandler(Handler):
         if not row:
             logger.warning(f"CLERK ADMIN HANDLER: No pending approval found for {request.uuid}")
             return await super().handle(request, db, current_user, ldap_service)
+        
+        logger.debug("CLERK ADMIN HANDLER PROCESSING REQUEST")
+        can_approve = await approver_policy.deputy_chief_clerk_policy(
+            total_price=request.total_price,
+            current_status=row[0],
+            request=request,
+            db=db
+        )
+        if not can_approve:
+            logger.debug("CLERK ADMIN HANDLER: User is not allowed to approve this request")
+            return await super().handle(request, db, current_user, ldap_service)
             
         current_status = row[0]
         logger.debug(f"CURRENT STATUS: {current_status}")
         
         # ClerkAdmin should only process requests that are already in PENDING_APPROVAL
-        can_approve = await approver_policy.can_clerk_admin_approve(
+        can_approve = await approver_policy.deputy_chief_clerk_policy(
             request.total_price,
             current_status,
             request,

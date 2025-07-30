@@ -27,6 +27,8 @@ import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
 import { isSubmittedSig, isRequestSubmitted } from "../../utils/PrasSignals";
 import { effect } from "@preact/signals-react";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../store/prasStore";
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -63,6 +65,7 @@ function AddItemsForm({
     const { errors, isValid, isSubmitted } = formState;
     const [showSuccess, setShowSuccess] = useState(false);
     const [selectedCO, setSelectedCO] = useState<number | "">("");
+    const request_submitted = useSelector((state: RootState) => state.progress.status);
 
     // #############################################################################
     // DEBUG
@@ -152,6 +155,7 @@ function AddItemsForm({
 
             // Reset the form on AddItems, keep header data, but not item data
             // Only reset to keep header data if not final submitted
+
             if (!isSubmittedSig.value) {
                 reset({
                     requester,

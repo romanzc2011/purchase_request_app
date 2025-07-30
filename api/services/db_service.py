@@ -877,7 +877,7 @@ def init_db():
     users = [
         WorkflowUser(username="lauren_lee", email="lauren_lee@lawb.uscourts.gov", department="finance", active=True),
         WorkflowUser(username="peter_baltz", email="peter_baltz@lawb.uscourts.gov", department="finance", active=False),
-        WorkflowUser(username="lela_robichaux", email="lela_robichaux@lawb.uscourts.gov", department="finance", active=False),
+        WorkflowUser(username="lela_robichaux", email="lela_robichaux@lawb.uscourts.gov", department="management", active=False),
         WorkflowUser(username="matthew_strong", email="matthew_strong@lawb.uscourts.gov", department="it", active=False),
         WorkflowUser(username="roman_campbell", email="roman_campbell@lawb.uscourts.gov", department="it", active=True),
         WorkflowUser(username="edmund_brown", email="edmund_brown@lawb.uscourts.gov", department="deputy_clerk", active=False),

@@ -75,7 +75,7 @@ export const locations = [
   "LAFY/C",
   "LAFY/J",
   "LKCH/C",
-  "LKCC/J",
+  "LKCH/J",
   "MONR/C",
   "MONR/J",
   "SHVT/C",

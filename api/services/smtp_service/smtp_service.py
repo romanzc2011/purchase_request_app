@@ -12,6 +12,7 @@ from pathlib import Path
 from email.mime.application import MIMEApplication
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from sqlalchemy import select
 
 from api.services.ldap_service import LDAPService
 from api.schemas.email_schemas import ValidModel, EmailPayloadComment, EmailPayloadRequest
@@ -182,7 +183,8 @@ class SMTP_Service:
             logger.info(f"RESULT: {result}")
         
     #-------------------------------------------------------------------------------
-    # Email Wrappers
+    # SEND EMAIL TO APPROVERS
+    #-------------------------------------------------------------------------------
     async def send_approver_email(
         self, 
         payload: EmailPayloadRequest, 
@@ -192,7 +194,34 @@ class SMTP_Service:
         Send email to approvers
         """
         logger.debug(f"SENDING TO: {send_to} send_approver_email")
+        
+        match send_to:
+            case "IT":
+                # Send to IT
+                to_address = ["matthew_strong@lawb.uscourts.gov"]
+                
+            case "FINANCE":
+                # Query WorkflowUser table for finance users and see if active
+                # Lauren Lee, Peter Baltz
+                stmt = select(dbas.WorkflowUser.email).where(
+                    dbas.WorkflowUser.department == "finance",
+                    dbas.WorkflowUser.active == True
+                )
+                result = await db.execute(stmt)
+                rows = result.all()
+                
+                # Collect all FINANCE emails
+                to_address = [row.email for row in rows]
+                
+            case "MANAGEMENT":
+                # Send to Management
+                pass
+            case _:
+                # Default case
+                to_address = ["roman_campbell@lawb.uscourts.gov"]
+
         if send_to == "IT":
+            
             # Send to Matt (IT) for testing romancampbell
             #to_address = "matthew_strong@lawb.uscourts.gov"
             # TESTING
@@ -203,6 +232,12 @@ class SMTP_Service:
             # TESTING
             logger.debug("Sending to Roman for testing, but in prod we send to Lela")
             to_address = ["lauren_lee@lawb.uscourts.gov"]   # AND OTERS
+            
+        elif send_to == "MANAGEMENT":
+            #to_address = ["Lela_Robichaux@lawb.uscourts.gov"]
+            pass
+            
+    
         else:
             #to_address = ["Peter_Baltz@lawb.uscourts.gov", "Lauren_Lee@lawb.uscourts.gov"]
             to_address = ["roman_campbell@lawb.uscourts.gov"]
@@ -275,3 +310,16 @@ class SMTP_Service:
             use_requester_template=False,
             use_comment_template=True
         )
+        
+    #-------------------------------------------------------------------------------
+    # Retrieve to_addresses based on department and active
+    #-------------------------------------------------------------------------------
+    async def get_toaddr(department: str, db: AsyncSession):
+        stmt = select(dbas.WorkflowUser.email).where(
+            dbas.WorkflowUser.department == department,
+            dbas.WorkflowUser.active == True
+        )
+        result = await db.execute(stmt)
+        rows = result.all()
+        to_address = [row.email for row in rows]
+        return to_address
