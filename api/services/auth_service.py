@@ -28,6 +28,28 @@ class AuthService:
         self.ALGORITHM = "HS256"
         self.expire_minutes = 60
         self.ldap_service = ldap_service
+        # Test override - set to None in production
+        self._test_user_override = None
+
+    #####################################################################################
+    ## TEST OVERRIDE - FOR TESTING ONLY
+    #####################################################################################
+    def set_test_user_override(self, username: str, email: str = None, groups: list = None):
+        """
+        Override the current user for testing purposes
+        Usage: auth_service.set_test_user_override("test_user", "test@example.com", ["IT", "ADMIN"])
+        """
+        self._test_user_override = LDAPUser(
+            username=username,
+            email=email or f"{username}@lawb.uscourts.gov",
+            groups=groups or ["IT"]
+        )
+        logger.warning(f"🔧 TEST USER OVERRIDE SET: {self._test_user_override}")
+    
+    def clear_test_user_override(self):
+        """Clear the test user override"""
+        self._test_user_override = None
+        logger.warning("🔧 TEST USER OVERRIDE CLEARED")
 
     #####################################################################################
     ## CREATE ACCESS TOKEN
@@ -54,7 +76,6 @@ class AuthService:
         }
         return jwt.encode(to_encode, self.JWT_SECRET_KEY, algorithm=self.ALGORITHM)
 
-        XS
     #####################################################################################
     ## AUTHENTICATE USER
     async def authenticate_user(
@@ -83,6 +104,11 @@ class AuthService:
     #####################################################################################
     ## Get Current LDAPUser
     async def get_current_user(self, token: str = Depends(oauth2_scheme)) -> LDAPUser:
+        # Check for test override first
+        if self._test_user_override:
+            logger.warning(f"🔧 USING TEST USER OVERRIDE: {self._test_user_override}")
+            return self._test_user_override
+            
         try:
             payload = jwt.decode(token, self.JWT_SECRET_KEY, algorithms=[self.ALGORITHM])
             return LDAPUser(

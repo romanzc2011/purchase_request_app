@@ -893,12 +893,12 @@ def init_db():
     #! ------------------------------------------------------------------------
     users = [
         WorkflowUser(username="laurenlee", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.FINANCE.value, active=True),
-        WorkflowUser(username="peterbaltz", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.FINANCE.value, active=False),
-        WorkflowUser(username="lelarobichaux", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.MANAGEMENT.value, active=False),
-        WorkflowUser(username="matthewstrong", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.IT.value, active=False),
+        WorkflowUser(username="peterbaltz", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.FINANCE.value, active=True),
+        WorkflowUser(username="lelarobichaux", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.MANAGEMENT.value, active=True),
+        WorkflowUser(username="matthewstrong", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.IT.value, active=True),
         WorkflowUser(username="romancampbell", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.IT.value, active=True),
-        WorkflowUser(username="edmundbrown", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.DEPUTY_CLERK.value, active=False),
-        WorkflowUser(username="edwardtakara", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.CHIEF_CLERK.value, active=False),
+        WorkflowUser(username="edmundbrown", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.DEPUTY_CLERK.value, active=True),
+        WorkflowUser(username="edwardtakara", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.CHIEF_CLERK.value, active=True),
     ]
 
     try:

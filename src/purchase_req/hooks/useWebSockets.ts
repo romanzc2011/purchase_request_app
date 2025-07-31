@@ -39,7 +39,7 @@ export function useWebSockets(
 		}
 
 		return () => ws.close();
-	}, [WEBSOCKET_URL, onMessage]);
+	}, [WEBSOCKET_URL]); // Removed onMessage from dependencies to prevent reconnections
 
 	return {
 		socket,

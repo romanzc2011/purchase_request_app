@@ -225,8 +225,13 @@ class SMTP_Service:
                 # Send to deputy clerk
                 to_address = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
                 
+            case AssignedGroup.CHIEF_CLERK:
+                # Send to chief clerk
+                to_address = await self.get_toaddr(department=AssignedGroup.CHIEF_CLERK.value, db=db)
+                
             case _:
                 # Default case, most likely testing
+                logger.debug("Default case, most likely testing")
                 logger.debug(f"SENDING TO: {to_address} send_approver_email")
                 # to_address already set to default above
         

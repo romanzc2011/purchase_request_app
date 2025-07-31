@@ -21,7 +21,7 @@ class ApproverPolicy:
     ) -> bool:
         TESTING: bool = False
         logger.warning("#############################################################")
-        logger.warning("TESTING MODE ON")
+        logger.warning("TESTING MODE OFF")
         logger.warning("#############################################################")
         """
         - Clerk Admin (edwardtakara) can always approve.
@@ -36,7 +36,6 @@ class ApproverPolicy:
 
         # Clerk Admin can always approve
         logger.debug("DEPUTY AND CLERK TESTING AREA")
-        logger.debug("if username==edwardtakara")
         
         #*-----------------------------------------------------------------------------------------
         #* NON-TESTING CODE
@@ -49,18 +48,19 @@ class ApproverPolicy:
             #? This is for the chief clerk, which is edwardtakara
             stmt = select(dbas.WorkflowUser.active).where(
                 dbas.WorkflowUser.department == AssignedGroup.CHIEF_CLERK.value,
-                dbas.WorkflowUser.username == username
+                dbas.WorkflowUser.username == "edwardtakara"  # Simulating TED being the current user
             )
             logger.debug(f"Checking if chief clerk {username} is active")
             
             result = await db.execute(stmt)
             row = result.first()
-            chief_clerk_active = row and row.active
-            CHIEF_CLERK_ACTIVE = (username == "edwardtakara" and chief_clerk_active)
+            CHIEF_CLERK_ACTIVE = row and row.active
+            logger.debug(f"CHIEF_CLERK_ACTIVE: {CHIEF_CLERK_ACTIVE}")
             CHIEF_CLERK_GROUP = self.user.has_group(LDAPGroup.CUE_GROUP.value)
             logger.debug(f"CHIEF_CLERK_GROUP: {CHIEF_CLERK_GROUP}")
+            logger.debug(f"CHIEF_CLERK_ACTIVE: {CHIEF_CLERK_ACTIVE}")
             
-            if CHIEF_CLERK_ACTIVE and CHIEF_CLERK_GROUP:
+            if (CHIEF_CLERK_ACTIVE and CHIEF_CLERK_GROUP):
                 logger.debug("CHIEF_CLERK_ACTIVE and CHIEF_CLERK_GROUP are True, allowing approval")
                 logger.debug("############################################################")
                 logger.info("this line in prod to check if the current_user is edwardtakara because he can approve anything at anytime")
@@ -95,7 +95,7 @@ class ApproverPolicy:
             #!---------------------------------------------------------------------------------------
             #! BOTH ARE INACTIVE DEPUTY AND CHIEF CLERK
             #!-----------------------------------------------------------------------------------------
-            if not (CHIEF_CLERK_ACTIVE or DEPUTY_CLERK_ACTIVE):
+            if not (CHIEF_CLERK_ACTIVE and DEPUTY_CLERK_ACTIVE):
                 """
                 Semi-testing, trying logic for when TESTING is False, need to substitute romancampbell
                 for edwardtakara or edmundbrown
