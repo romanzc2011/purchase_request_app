@@ -2,6 +2,7 @@ from api.schemas.ldap_schema import LDAPUser
 from api.utils.misc_utils import format_username
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
+from api.schemas.enums import AssignedGroup, LDAPGroup
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +30,7 @@ class ApproverPolicy:
         username = format_username(self.user.username)
         
         # Only CUE group members can approve
-        if not self.user.has_group("CUE_GROUP"):
+        if not self.user.has_group(LDAPGroup.CUE_GROUP.value):
             logger.debug("User is not in CUE group, skipping")
             return False
 
@@ -47,7 +48,7 @@ class ApproverPolicy:
             #?-----------------------------------------------------------------------------------------
             #? This is for the chief clerk, which is edwardtakara
             stmt = select(dbas.WorkflowUser.active).where(
-                dbas.WorkflowUser.department == "chief_clerk",
+                dbas.WorkflowUser.department == AssignedGroup.CHIEF_CLERK.value,
                 dbas.WorkflowUser.username == username
             )
             logger.debug(f"Checking if chief clerk {username} is active")
@@ -56,8 +57,11 @@ class ApproverPolicy:
             row = result.first()
             chief_clerk_active = row and row.active
             CHIEF_CLERK_ACTIVE = (username == "edwardtakara" and chief_clerk_active)
+            CHIEF_CLERK_GROUP = self.user.has_group(LDAPGroup.CUE_GROUP.value)
+            logger.debug(f"CHIEF_CLERK_GROUP: {CHIEF_CLERK_GROUP}")
             
-            if CHIEF_CLERK_ACTIVE:
+            if CHIEF_CLERK_ACTIVE and CHIEF_CLERK_GROUP:
+                logger.debug("CHIEF_CLERK_ACTIVE and CHIEF_CLERK_GROUP are True, allowing approval")
                 logger.debug("############################################################")
                 logger.info("this line in prod to check if the current_user is edwardtakara because he can approve anything at anytime")
                 logger.debug("CLERK ADMIN CAN APPROVE")
@@ -68,17 +72,18 @@ class ApproverPolicy:
             #? DEPUTY CLERK
             #?-----------------------------------------------------------------------------------------
             #? This is for the deputy clerk, which is edmundbrown
-            logger.debug("Checking if deputy clerk is active")
             stmt = select(dbas.WorkflowUser.active).where(
-                dbas.WorkflowUser.department == "deputy_clerk",
+                dbas.WorkflowUser.department == AssignedGroup.DEPUTY_CLERK.value,
                 dbas.WorkflowUser.username == username
             )
-            logger.debug(f"Checking if deputy clerk {username} is active")
+            logger.debug(f"Checking if deputy clerk {username} is active and proper permissions/group")
+            logger.debug(f"User has group: {self.user.has_group(LDAPGroup.CUE_GROUP)}")
             #?-----------------------------------------------------------------------------------------
             result = await db.execute(stmt)
             row = result.first()
             deputy_clerk_active = row and row.active
             DEPUTY_CLERK_ACTIVE = (username == "edmundbrown" and deputy_clerk_active)
+            logger.debug(f"DEPUTY_CLERK_ACTIVE: {DEPUTY_CLERK_ACTIVE}")
 
             if DEPUTY_CLERK_ACTIVE:
                 logger.debug("############################################################")
@@ -107,6 +112,11 @@ class ApproverPolicy:
                 row = result.first()
                 roman_test_user_active = row and row.active
                 ROMAN_TEST_USER_ACTIVE = (username == "romancampbell" and roman_test_user_active)
+                logger.debug(f"User has group: {self.user.has_group(LDAPGroup.CUE_GROUP.value)}")
+                
+                if ROMAN_TEST_USER_ACTIVE:
+                    logger.debug("ROMAN_TEST_USER_ACTIVE is True, allowing approval")
+                    return True
                 #!-----------------------------------------------------------------------------------------
 
             # Deputy Clerk logic
@@ -148,7 +158,7 @@ class ApproverPolicy:
     # ----------------------------------------------------------------------------------    
     # FINANCE HANDLER APPROVAL LOGIC
     # ----------------------------------------------------------------------------------
-    def can_finance_approve(self, fund: str, current_status: ItemStatus) -> bool:
+    def can_management_approve(self, fund: str, current_status: ItemStatus) -> bool:
         if current_status != ItemStatus.NEW_REQUEST:
             logger.debug(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False

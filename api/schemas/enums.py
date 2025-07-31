@@ -20,4 +20,24 @@ class TaskStatus(Enum):
     PENDING     = "PENDING"
     PROCESSED   = "PROCESSED"
     ERROR       = "ERROR"
-    CANCELLED   = "CANCELLED" 
+    CANCELLED   = "CANCELLED"
+    
+#-------------------------------------------------------------
+# ASSIGNED GROUPS
+#-------------------------------------------------------------
+class AssignedGroup(Enum):
+    IT = "IT"
+    FINANCE = "FINANCE"
+    MANAGEMENT = "MANAGEMENT"
+    DEPUTY_CLERK = "DEPUTY_CLERK"
+    CHIEF_CLERK = "CHIEF_CLERK"
+    
+#-------------------------------------------------------------------------------------
+# LDAP GROUP
+#-------------------------------------------------------------------------------------
+class LDAPGroup(Enum):
+    IT_GROUP = "IT_GROUP"
+    CUE_GROUP = "CUE_GROUP"
+    ACCESS_GROUP = "ACCESS_GROUP"
+    
+    

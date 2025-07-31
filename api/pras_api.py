@@ -40,7 +40,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update, select, text, func
 from api.services.db_service import get_async_session
-from api.schemas.enums import ItemStatus
+from api.schemas.enums import AssignedGroup, ItemStatus
 import asyncio
 
 # PRAS Miscellaneous Dependencies
@@ -521,9 +521,9 @@ async def send_purchase_request(
 				if EDMUND (DEPUTY CLERK) can approve it (< $250)
             """
             if item.fund.startswith("511"):
-                assigned_group = "IT"
+                assigned_group = AssignedGroup.IT.value
             elif item.fund.startswith("092"):
-                assigned_group = "FINANCE"
+                assigned_group = AssignedGroup.MANAGEMENT.value
 
             task = PendingApproval(
                 purchase_request_id=purchase_req_id,

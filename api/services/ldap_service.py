@@ -14,6 +14,7 @@ from ldap3.core.exceptions import LDAPExceptionError, LDAPSocketOpenError
 from aiocache import cached, Cache
 from loguru import logger
 
+from api.schemas.enums import LDAPGroup
 from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings 
 
@@ -200,12 +201,12 @@ class LDAPService:
             user_dn = self._subtree_user_search(username)
             if not user_dn:
                 logger.error(f"No user DN found for {username}")
-                return {"IT_GROUP": False, "CUE_GROUP": False, "ACCESS_GROUP": False}
+                return { LDAPGroup.IT_GROUP: False, LDAPGroup.CUE_GROUP: False, LDAPGroup.ACCESS_GROUP: False }
             
             conn = self.get_service_connection()
             
             # Set results dictionary
-            results = {"IT_GROUP": False, "CUE_GROUP": False, "ACCESS_GROUP": False} 
+            results = { LDAPGroup.IT_GROUP: False, LDAPGroup.CUE_GROUP: False, LDAPGroup.ACCESS_GROUP: False  } 
             
             for group_dn, key in zip(self.group_dns, results):
                 success = self._search(conn, group_dn, "(objectClass=group)", ["member"])
@@ -227,7 +228,7 @@ class LDAPService:
     
         except Exception as e:
             logger.error(f"Error getting membership: {e}")
-            return {"IT_GROUP": False, "CUE_GROUP": False, "ACCESS_GROUP": False}
+            return { LDAPGroup.IT_GROUP: False, LDAPGroup.CUE_GROUP: False, LDAPGroup.ACCESS_GROUP: False }
     
     #-------------------------------------------------------------------------------------
     # GET APPROVERS
@@ -237,7 +238,6 @@ class LDAPService:
         Sync method to fetch all members of group
         """
         pass
-        
         
     #-------------------------------------------------------------------------------------
     # FETCH USERNAMES SYNCHRONOUSLY

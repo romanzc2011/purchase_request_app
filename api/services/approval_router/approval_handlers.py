@@ -5,6 +5,7 @@ from typing import Optional
 from abc import ABC, abstractmethod
 from api import settings
 from api.schemas.email_schemas import EmailPayloadRequest, LineItemsPayload
+from api.schemas.enums import AssignedGroup
 from api.services import cache_service
 from api.dependencies.pras_dependencies import smtp_service
 from api.utils.misc_utils import format_username
@@ -71,6 +72,7 @@ class ITHandler(Handler):
         if approver_policy.can_it_approve(request.fund, ItemStatus.NEW_REQUEST):
             # IT can approve IT-related requests
             logger.debug(f"IT HANDLER APPROVING IT REQUEST: {request.uuid}")
+            logger.info("IT will approve/deny, if approve mark as pending and email deputy_clerk and chief_clerk")
 	
             # Get the approval UUID and task_id for this line item
             stmt = select(dbas.Approval.UUID, dbas.PendingApproval.pending_approval_id).join(
@@ -107,7 +109,7 @@ class ITHandler(Handler):
                 """
                 approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
                 email_payload = await approver_email_builder.build_email_payload()
-                await smtp_service.send_approver_email(email_payload,db=db, send_to="IT")
+                await smtp_service.send_approver_email(email_payload,db=db, send_to=AssignedGroup.IT.value)
                 
                 logger.debug(f"IT HANDLER: Inserted final approval for {request.uuid}")
             else:
@@ -119,6 +121,13 @@ class ITHandler(Handler):
 # MANAGEMENT HANDLER
 # ----------------------------------------------------------------------------------------
 class ManagementHandler(Handler):
+    """
+    The route of the non-IT (092x) requests is as follows:
+    - Request is sent to management: Edmund/Lela
+    - If the value <= $250 then Edmund may go ahead and approve
+    - If the value is > $250 then Edmund can do a PENDING APPROVAL that gets sent to Ted
+    - Ted will deny/approve 
+    """
     async def handle(
         self, 
         request: ApprovalRequest, 
@@ -134,9 +143,10 @@ class ManagementHandler(Handler):
         
         """
         Finance/Management 092x will email TO: Edmund Brown, Lela
-        CC Peter, 
+        CC Peter, Lauren
         """
-        if approver_policy.can_finance_approve(request.fund, ItemStatus.NEW_REQUEST):
+        #? Determine whether MANAGEMENT can approve, ie Edmund value <= $250
+        if approver_policy.can_management_approve(request.fund, ItemStatus.NEW_REQUEST):
             # Management handles non-IT requests
             logger.debug(f"MANAGEMENT HANDLER APPROVING NON-IT REQUEST: {request.uuid}")
             
@@ -166,11 +176,11 @@ class ManagementHandler(Handler):
                     deputy_can_approve=dbas.can_deputy_approve(request.total_price)
                 )
                 
-                # Send email to clerk admins requesting approval
+                # Send email to clerk admin and management (Edmund/Lela) requesting approval
                 logger.debug(f"MANAGEMENT HANDLER: Sending email to clerk admins requesting approval for {request.uuid}")
                 approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
                 email_payload = await approver_email_builder.build_email_payload()
-                await smtp_service.send_approver_email(email_payload, db=db, send_to="MANAGEMENT")
+                await smtp_service.send_approver_email(email_payload, db=db, send_to=AssignedGroup.MANAGEMENT.value)
                 
                 logger.debug(f"MANAGEMENT HANDLER: Inserted final approval for {request.uuid}")
             else:
@@ -192,9 +202,11 @@ class ClerkAdminHandler(Handler):
         current_user: LDAPUser,
         ldap_service: LDAPService
     ) -> ApprovalRequest:
+        
         # ClerkAdmin is the final handler - they can approve based on price
         logger.critical("CLERK ADMIN HANDLER PROCESSING REQUEST")
         approver_policy = ApproverPolicy(current_user)    # Create an instance of the approver policy
+        
         # This is the current user who is trying to approve the request
         logger.debug(f"User: {current_user}")
         can_approve: bool = False

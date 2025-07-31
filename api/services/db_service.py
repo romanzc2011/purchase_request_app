@@ -18,7 +18,7 @@ from sqlalchemy.orm import aliased, joinedload
 from datetime import datetime, timezone
 from contextlib import contextmanager, asynccontextmanager
 from typing import List, Optional
-from api.schemas.enums import ItemStatus, TaskStatus
+from api.schemas.enums import AssignedGroup, ItemStatus, TaskStatus
 import uuid
 import os
 import sqlite3
@@ -394,7 +394,9 @@ class WorkflowUser(Base):
 
     id = mapped_column(Integer, primary_key=True, autoincrement=True)
     username = mapped_column(String, nullable=False)
-    email = mapped_column(String, nullable=False, unique=True)
+    
+    # TODO: Change email back to unique=True for production
+    email = mapped_column(String, nullable=False, unique=False) # Unique if false FOR TESTING, simulate actual prod flow but just sending to roman_campbell
     department = mapped_column(String, nullable=False)
     active = mapped_column(Boolean, nullable=False, default=False)
     
@@ -874,16 +876,31 @@ async def get_contracting_officer_by_id(db: AsyncSession, ID: str) -> str:
 ###################################################################################################
 def init_db():
     """Initialize the database by creating all tables."""
+    #! ------------------------------------------------------------------------
+    #! THIS IS PRODUCTION WORKFLOW USERS
+    #! ------------------------------------------------------------------------
+    # users = [
+    #     WorkflowUser(username="lauren_lee", email="lauren_lee@lawb.uscourts.gov", department=AssignedGroup.FINANCE.value, active=True),
+    #     WorkflowUser(username="peter_baltz", email="peter_baltz@lawb.uscourts.gov", department=AssignedGroup.FINANCE.value, active=False),
+    #     WorkflowUser(username="lela_robichaux", email="lela_robichaux@lawb.uscourts.gov", department=AssignedGroup.MANAGEMENT.value, active=False),
+    #     WorkflowUser(username="matthew_strong", email="matthew_strong@lawb.uscourts.gov", department=AssignedGroup.IT.value, active=False),
+    #     WorkflowUser(username="roman_campbell", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.IT.value, active=True),
+    #     WorkflowUser(username="edmund_brown", email="edmund_brown@lawb.uscourts.gov", department=AssignedGroup.DEPUTY_CLERK.value, active=False),
+    #     WorkflowUser(username="edward_takara", email="edward_takara@lawb.uscourts.gov", department=AssignedGroup.CHIEF_CLERK.value, active=False),
+    # ]
+    #! ------------------------------------------------------------------------
+    #! THIS IS TESTING WORKFLOW USERS
+    #! ------------------------------------------------------------------------
     users = [
-        WorkflowUser(username="lauren_lee", email="lauren_lee@lawb.uscourts.gov", department="finance", active=True),
-        WorkflowUser(username="peter_baltz", email="peter_baltz@lawb.uscourts.gov", department="finance", active=False),
-        WorkflowUser(username="lela_robichaux", email="lela_robichaux@lawb.uscourts.gov", department="management", active=False),
-        WorkflowUser(username="matthew_strong", email="matthew_strong@lawb.uscourts.gov", department="it", active=False),
-        WorkflowUser(username="roman_campbell", email="roman_campbell@lawb.uscourts.gov", department="it", active=True),
-        WorkflowUser(username="edmund_brown", email="edmund_brown@lawb.uscourts.gov", department="deputy_clerk", active=False),
-        WorkflowUser(username="edward_takara", email="edward_takara@lawb.uscourts.gov", department="chief_clerk", active=False),
+        WorkflowUser(username="laurenlee", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.FINANCE.value, active=True),
+        WorkflowUser(username="peterbaltz", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.FINANCE.value, active=False),
+        WorkflowUser(username="lelarobichaux", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.MANAGEMENT.value, active=False),
+        WorkflowUser(username="matthewstrong", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.IT.value, active=False),
+        WorkflowUser(username="romancampbell", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.IT.value, active=True),
+        WorkflowUser(username="edmundbrown", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.DEPUTY_CLERK.value, active=False),
+        WorkflowUser(username="edwardtakara", email="roman_campbell@lawb.uscourts.gov", department=AssignedGroup.CHIEF_CLERK.value, active=False),
     ]
-    
+
     try:
         # Create (sync) all tables
         Base.metadata.create_all(bind=engine)

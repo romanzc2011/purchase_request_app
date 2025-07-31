@@ -20,6 +20,7 @@ from api.services.smtp_service.renderer import TemplateRenderer
 from api.settings import settings
 import api.services.db_service as dbas
 from api.utils.misc_utils import get_justifications_and_comments
+from api.schemas.enums import AssignedGroup
 
 class SMTP_Service:
     def __init__(
@@ -104,18 +105,24 @@ class SMTP_Service:
                 msg_root['Cc'] = ', '.join(ccs)
             
             html_body = self.renderer.render_approver_request_template(context)
-        
+
+        #-------------------------------------------------------------------------------
         # REQUESTER TEMPLATE
+        #-------------------------------------------------------------------------------
         elif use_requester_template and not use_approver_template and not use_comment_template and not use_approved_template:
             msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_requester_request_template(context)
             
+        #-------------------------------------------------------------------------------
         # APPROVED TEMPLATE
+        #-------------------------------------------------------------------------------
         elif use_approved_template and not use_approver_template and not use_requester_template and not use_comment_template:
             msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_requester_approved_template(context)
             
+        #-------------------------------------------------------------------------------
         # COMMENT TEMPLATE
+        #-------------------------------------------------------------------------------
         elif use_comment_template and not use_approver_template and not use_requester_template and not use_approved_template:
             msg_root['To'] = payload.requester_email
             html_body = self.renderer.render_comment_template(context)
@@ -195,53 +202,33 @@ class SMTP_Service:
         """
         logger.debug(f"SENDING TO: {send_to} send_approver_email")
         
+        # Initialize to_address with a default value
+        to_address = ["roman_campbell@lawb.uscourts.gov"]  # Default fallback
+        
         match send_to:
-            case "IT":
+            case AssignedGroup.IT:
                 # Send to IT
-                to_address = ["matthew_strong@lawb.uscourts.gov"]
+                to_address = await self.get_toaddr(department=AssignedGroup.IT.value, db=db)
                 
-            case "FINANCE":
+            case AssignedGroup.FINANCE:
                 # Query WorkflowUser table for finance users and see if active
                 # Lauren Lee, Peter Baltz
-                stmt = select(dbas.WorkflowUser.email).where(
-                    dbas.WorkflowUser.department == "finance",
-                    dbas.WorkflowUser.active == True
-                )
-                result = await db.execute(stmt)
-                rows = result.all()
+                to_address = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
                 
-                # Collect all FINANCE emails
-                to_address = [row.email for row in rows]
-                
-            case "MANAGEMENT":
+            case AssignedGroup.MANAGEMENT:
                 # Send to Management
-                pass
+                to_address = await self.get_toaddr(department=AssignedGroup.MANAGEMENT.value, db=db)
+                deputy_clerk_addresses = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                to_address.extend(deputy_clerk_addresses)  # Because deputy_clerk is also in management team
+                
+            case AssignedGroup.DEPUTY_CLERK:
+                # Send to deputy clerk
+                to_address = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                
             case _:
-                # Default case
-                to_address = ["roman_campbell@lawb.uscourts.gov"]
-
-        if send_to == "IT":
-            
-            # Send to Matt (IT) for testing romancampbell
-            #to_address = "matthew_strong@lawb.uscourts.gov"
-            # TESTING
-            logger.debug("Sending to Roman for testing, but in prod we send to Matt")
-            to_address = ["roman_campbell@lawb.uscourts.gov"]
-        elif send_to == "FINANCE":
-            #to_address = ["Lela_Robichaux@lawb.uscourts.gov"]
-            # TESTING
-            logger.debug("Sending to Roman for testing, but in prod we send to Lela")
-            to_address = ["lauren_lee@lawb.uscourts.gov"]   # AND OTERS
-            
-        elif send_to == "MANAGEMENT":
-            #to_address = ["Lela_Robichaux@lawb.uscourts.gov"]
-            pass
-            
-    
-        else:
-            #to_address = ["Peter_Baltz@lawb.uscourts.gov", "Lauren_Lee@lawb.uscourts.gov"]
-            to_address = ["roman_campbell@lawb.uscourts.gov"]
-            logger.debug(f"SENDING TO: {to_address} send_approver_email")
+                # Default case, most likely testing
+                logger.debug(f"SENDING TO: {to_address} send_approver_email")
+                # to_address already set to default above
         
         await self._send_mail_async(
             payload,
@@ -299,6 +286,7 @@ class SMTP_Service:
         
     #-------------------------------------------------------------------------------
     # Email Wrappers - COMMENTS
+    #-------------------------------------------------------------------------------
     async def send_comments_email(self, payload: EmailPayloadComment, db: AsyncSession):
         """
         Send comments
@@ -314,7 +302,7 @@ class SMTP_Service:
     #-------------------------------------------------------------------------------
     # Retrieve to_addresses based on department and active
     #-------------------------------------------------------------------------------
-    async def get_toaddr(department: str, db: AsyncSession):
+    async def get_toaddr(self, department: str, db: AsyncSession):
         stmt = select(dbas.WorkflowUser.email).where(
             dbas.WorkflowUser.department == department,
             dbas.WorkflowUser.active == True
