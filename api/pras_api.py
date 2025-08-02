@@ -14,7 +14,7 @@ EXPLANATION OF COMMENT COLORS:
 	# * (GREEN)
 	# ? (BLUE)
 	# // General note (GRAY)
-	# TODO: implement email handler (ORANGE)
+	# TODO:
 
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
@@ -1372,43 +1372,3 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 ##########################################################################
 if __name__ == "__main__":
     uvicorn.run("pras_api:app", host="localhost", port=5004, reload=True)
-
-@api_router.post("/test-override-user")
-async def test_override_user(
-    username: str = Form(...),
-    email: str = Form(None),
-    groups: str = Form("IT"),  # Comma-separated groups
-    current_user: LDAPUser = Depends(auth_service.get_current_user)
-):
-    """
-    Test endpoint to override the current user for testing
-    Usage: POST /api/test-override-user with form data
-    """
-    # Parse groups from comma-separated string
-    group_list = [g.strip() for g in groups.split(",")] if groups else ["IT"]
-    
-    # Set the test override
-    auth_service.set_test_user_override(username, email, group_list)
-    
-    return {
-        "message": "Test user override set",
-        "test_user": {
-            "username": username,
-            "email": email or f"{username}@lawb.uscourts.gov",
-            "groups": group_list
-        },
-        "current_user": current_user.model_dump()
-    }
-
-@api_router.post("/clear-test-override")
-async def clear_test_override(
-    current_user: LDAPUser = Depends(auth_service.get_current_user)
-):
-    """
-    Clear the test user override
-    """
-    auth_service.clear_test_user_override()
-    return {
-        "message": "Test user override cleared",
-        "current_user": current_user.model_dump()
-    }

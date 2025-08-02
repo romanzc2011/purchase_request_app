@@ -111,8 +111,8 @@ class ApproverEmailBuilder(EmailBuilder):
             orderType=rows[0].orderType,
             subject=f"Purchase Request #{self.request.id}",
             sender=settings.smtp_email_addr,
-            to=None,   # Assign this in the smtp service
-            cc=None,
+            to=None,    # Assign this in the smtp service
+            cc=None,    # Assign this in the smtp service
             bcc=None,
             text_body=None,
             approval_link=f"{settings.link_to_request}",

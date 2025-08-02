@@ -29,10 +29,11 @@ class ApproverPolicy:
         """
         username = format_username(self.user.username)
         
-        # Only CUE group members can approve
+        assert self.user.has_group(LDAPGroup.CUE_GROUP.value), "User is not in CUE group"
         if not self.user.has_group(LDAPGroup.CUE_GROUP.value):
             logger.debug("User is not in CUE group, skipping")
             return False
+
 
         # Clerk Admin can always approve
         logger.debug("DEPUTY AND CLERK TESTING AREA")
@@ -48,7 +49,7 @@ class ApproverPolicy:
             #? This is for the chief clerk, which is edwardtakara
             stmt = select(dbas.WorkflowUser.active).where(
                 dbas.WorkflowUser.department == AssignedGroup.CHIEF_CLERK.value,
-                dbas.WorkflowUser.username == "edwardtakara"  # Simulating TED being the current user
+                dbas.WorkflowUser.username == "edwardtakara"
             )
             logger.debug(f"Checking if chief clerk {username} is active")
             
@@ -56,6 +57,7 @@ class ApproverPolicy:
             row = result.first()
             CHIEF_CLERK_ACTIVE = row and row.active
             logger.debug(f"CHIEF_CLERK_ACTIVE: {CHIEF_CLERK_ACTIVE}")
+            
             CHIEF_CLERK_GROUP = self.user.has_group(LDAPGroup.CUE_GROUP.value)
             logger.debug(f"CHIEF_CLERK_GROUP: {CHIEF_CLERK_GROUP}")
             logger.debug(f"CHIEF_CLERK_ACTIVE: {CHIEF_CLERK_ACTIVE}")
@@ -93,7 +95,7 @@ class ApproverPolicy:
                 return True
 
             #!---------------------------------------------------------------------------------------
-            #! BOTH ARE INACTIVE DEPUTY AND CHIEF CLERK
+            #! IF BOTH ARE INACTIVE DEPUTY AND CHIEF CLERK
             #!-----------------------------------------------------------------------------------------
             if not (CHIEF_CLERK_ACTIVE and DEPUTY_CLERK_ACTIVE):
                 """

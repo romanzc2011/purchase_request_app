@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from api import settings
 from api.schemas.email_schemas import EmailPayloadRequest, LineItemsPayload
 from api.schemas.enums import AssignedGroup
-from api.services import cache_service
+from api.services import auth_service, cache_service
 from api.dependencies.pras_dependencies import smtp_service
 from api.utils.misc_utils import format_username
 from loguru import logger
@@ -123,7 +123,7 @@ class ITHandler(Handler):
 class ManagementHandler(Handler):
     """
     The route of the non-IT (092x) requests is as follows:
-    - Request is sent to management: Edmund/Lela
+    - Request is sent to management: Edmund/Lelaxz
     - If the value <= $250 then Edmund may go ahead and approve
     - If the value is > $250 then Edmund can do a PENDING APPROVAL that gets sent to Ted
     - Ted will deny/approve 
@@ -135,6 +135,9 @@ class ManagementHandler(Handler):
         current_user: LDAPUser,
         ldap_service: LDAPService
     ) -> ApprovalRequest:
+        #!----------------------------------------------------------
+        #! TEST USER OVERRIDE - REMOVED FOR PRODUCTION
+        #!----------------------------------------------------------
         approver_policy = ApproverPolicy(current_user)
         logger.debug(f"User: {current_user}")
         
@@ -194,7 +197,7 @@ class ManagementHandler(Handler):
 class ClerkAdminHandler(Handler):
     def __init__(self):
         self._next: Optional[Handler] = None
-        
+    # TODO: DEPUTY AND CHIEF CLERK CAN APPROVE NEW REQUESTS, NOT JUST PENDING APPROVAL
     async def handle(
         self, 
         request: ApprovalRequest, 
@@ -220,31 +223,20 @@ class ClerkAdminHandler(Handler):
             logger.warning(f"CLERK ADMIN HANDLER: No pending approval found for {request.uuid}")
             return await super().handle(request, db, current_user, ldap_service)
         
-        logger.debug("CLERK ADMIN HANDLER PROCESSING REQUEST")
-        can_approve = await approver_policy.deputy_chief_clerk_policy(
-            total_price=request.total_price,
-            current_status=row[0],
-            request=request,
-            db=db
-        )
-        if not can_approve:
-            logger.debug("CLERK ADMIN HANDLER: User is not allowed to approve this request")
-            return await super().handle(request, db, current_user, ldap_service)
-            
         current_status = row[0]
         logger.debug(f"CURRENT STATUS: {current_status}")
         
-        # ClerkAdmin should only process requests that are already in PENDING_APPROVAL
+        logger.debug("CLERK ADMIN HANDLER PROCESSING REQUEST")
         can_approve = await approver_policy.deputy_chief_clerk_policy(
-            request.total_price,
-            current_status,
-            request,
-            db
+            total_price=request.total_price,
+            current_status=current_status,
+            request=request,
+            db=db
         )
         
         if not can_approve:
-            logger.debug(f"CLERK ADMIN HANDLER: Item is NOT in PENDING_APPROVAL")
-            return request
+            logger.debug("CLERK ADMIN HANDLER: User is not allowed to approve this request")
+            return await super().handle(request, db, current_user, ldap_service)
         
         # Get the approval UUID for this line item
         stmt = select(dbas.Approval.UUID).join(
