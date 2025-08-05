@@ -517,7 +517,7 @@ async def send_purchase_request(
             Separating the requests based on the fund
             The 511x goes to IT (MATT STRONG)
             The 092x goes to "FINANCE" (LELA ROBICHAUX AND EDMUND BROWN)
-            The FINANCE requests could possibly never be sent to TED (EDWARD TAKARA), 
+            The MANAGEMENT requests could possibly never be sent to TED (EDWARD TAKARA), 
 				if EDMUND (DEPUTY CLERK) can approve it (< $250)
             """
             if item.fund.startswith("511"):
@@ -613,14 +613,14 @@ async def send_purchase_request(
     
     """
     If this is a IT request, send it to IT Approver (Matt) 
-    If this is a non-IT request, send it to Finance Approver (Lela)
+    If this is a non-IT request, send it to MANAGEMENT Approver (Lela)
     
     Finance creates the SON so the initial request will also need to be sent
     to Finance: Peter/Lauren
     
     This is the general route if starting with a Send to IT
     IT (Matt) -> Send to Managment (Edmund)
-    Management (Edmund) -> Send to Clerk (Ted)
+    Management (Edmund/Lela) -> Send to Clerk (Ted)
     Clerk -> Send to Financial (Lela)
     Financial -> Send to Procurement (Peter/Lauren)
     """
@@ -628,9 +628,9 @@ async def send_purchase_request(
     #? Send request to approvers and requester
     send_to = None
     if payload.items[0].fund.startswith("511"):
-        send_to = "IT"
+        send_to = AssignedGroup.IT.value
     elif payload.items[0].fund.startswith("092"):
-        send_to = "FINANCE"
+        send_to = AssignedGroup.MANAGEMENT.value
         
     logger.info(f"SENDING EMAILS {send_to}")
     async with asyncio.TaskGroup() as tg:
@@ -899,7 +899,7 @@ async def approve_deny_request(
             status_row = result.scalar_one_or_none()
             already_in_chain = status_row == ItemStatus.PENDING_APPROVAL
             
-            # Decide which chain to use
+            # Decide which chain to use as in the request is already in approval chain
             if already_in_chain:
                 router = ApprovalRouter().start_handler(ClerkAdminHandler())
             else:
@@ -1324,6 +1324,21 @@ async def websocket_endpoint(websocket: WebSocket):
                 if message.get("event") == "reset_data":
                     # reset shm
                     shm_mgr.clear_state()
+                    logger.info("Progress state cleared via WebSocket reset")
+                elif message.get("event") == "check_connection":
+                    # Send connection status back
+                    await websocket.send_json({
+                        "event": "connection_status",
+                        "connected": True,
+                        "timestamp": asyncio.get_event_loop().time()
+                    })
+                elif message.get("event") == "clear_stale_state":
+                    # Clear stale progress state
+                    await shm_mgr.check_and_clear_stale_state()
+                    await websocket.send_json({
+                        "event": "state_cleared",
+                        "timestamp": asyncio.get_event_loop().time()
+                    })
             except json.JSONDecodeError:
                 logger.error("Received non-JSON data")
     except WebSocketDisconnect:

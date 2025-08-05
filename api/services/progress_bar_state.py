@@ -6,6 +6,7 @@ from loguru import logger
 import struct
 import asyncio
 import numpy as np
+import time
 
 """
 This is to make progress data available globally. Just keeping up with work that 
@@ -90,6 +91,8 @@ class ProgressSharedMemory:
         self.value: bool = False
         self._keep_bytes: bool = False
         self.total_steps: int = 10
+        self.last_activity_time = time.time()
+        self.cleanup_task = None
 
         try:
             self.shm = shared_memory.SharedMemory(name=name, create=True, size=self.STRUCT_SIZE)
@@ -98,6 +101,29 @@ class ProgressSharedMemory:
             self.shm = shared_memory.SharedMemory(name=name)
         self.name = name
         
+        # Start cleanup task
+        self.start_cleanup_task()
+        
+    def start_cleanup_task(self):
+        """Start periodic cleanup of stale progress state"""
+        if self.cleanup_task is None:
+            self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+            
+    async def _cleanup_loop(self):
+        """Periodically check and clear stale progress state"""
+        while True:
+            try:
+                await asyncio.sleep(300)  # Check every 5 minutes
+                current_time = time.time()
+                
+                # If no activity for 10 minutes, clear stale state
+                if current_time - self.last_activity_time > 600:  # 10 minutes
+                    logger.info("Clearing stale progress state due to inactivity")
+                    await self.reset_progress_state()
+                    
+            except Exception as e:
+                logger.error(f"Cleanup task error: {e}")
+    
     @property
     def keep_bytes(self) -> bool:
         return self._keep_bytes
@@ -219,6 +245,33 @@ class ProgressSharedMemory:
     def clear_state(self):
         zero_bytes = bytes(self.STRUCT_SIZE)
         self.shm.buf[:self.STRUCT_SIZE] = zero_bytes
+        
+    #-------------------------------------------------------------
+    # RESET PROGRESS STATE
+    #-------------------------------------------------------------
+    async def reset_progress_state(self):
+        """Reset all progress flags to False"""
+        current_state = self.read()
+        for field in vars(current_state):
+            if isinstance(getattr(current_state, field), bool):
+                setattr(current_state, field, False)
+        self.write(current_state)
+        logger.info("Progress state reset")
+        
+    #-------------------------------------------------------------
+    # CHECK AND CLEAR STALE STATE
+    #-------------------------------------------------------------
+    async def check_and_clear_stale_state(self):
+        """Check if progress state is stale and clear if needed"""
+        current_state = self.read()
+        # If all flags are False, state is already clean
+        if not any(vars(current_state).values()):
+            return
+            
+        # Check if any progress was made but not completed
+        # This could indicate a stale state
+        logger.info("Checking for stale progress state...")
+        await self.reset_progress_state()
         
     #-------------------------------------------------------------
     # CLOSE

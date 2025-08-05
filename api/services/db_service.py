@@ -322,7 +322,7 @@ class FinalApproval(Base):
     approver        = mapped_column(String, nullable=False)
     status          = mapped_column(SQLEnum(ItemStatus), nullable=False)
     created_at      = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
-    deputy_can_approve = mapped_column(Boolean, nullable=False)  # total 00price must be equal to or less than $250
+    deputy_can_approve = mapped_column(Boolean, nullable=False)  # total price must be equal to or less than $250
 
     # back to Approval
     approval        : Mapped[Approval] = relationship(
@@ -810,6 +810,7 @@ def can_deputy_approve(total_price: float) -> bool:
     Returns:
         True if deputy can approve, False otherwise
     """
+    logger.debug(f"Total price: {total_price} can_deputy_approve function: {total_price <= 250.0}")
     return total_price <= 250.0
 
 ###################################################################################################

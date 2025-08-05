@@ -16,6 +16,8 @@ export function ProgressBar() {
     const dispatch = useDispatch<AppDispatch>();
     const status = useSelector((s: RootState) => s.progress.status);
     const [currentPercent, setCurrentPercent] = useState(0);
+    const [lastHeartbeat, setLastHeartbeat] = useState<number>(Date.now());
+    const [isConnected, setIsConnected] = useState(false);
     let socketSignal = socketSig.value;
 
     console.log("IS SUBMITTED SIG: ", isSubmittedSig.value);
@@ -44,6 +46,40 @@ export function ProgressBar() {
         }
     });
 
+    // Handle connection status changes
+    useEffect(() => {
+        if (socketSignal) {
+            const handleOpen = () => {
+                console.log("✅ WebSocket connected");
+                setIsConnected(true);
+                // Reset signals when reconnecting
+                isDownloadSig.value = false;
+                isSubmittedSig.value = false;
+                isRequestSubmitted.value = false;
+                if (toastIdRef.current !== null) {
+                    toast.dismiss(toastIdRef.current);
+                }
+            };
+
+            const handleClose = () => {
+                console.log("❌ WebSocket disconnected");
+                setIsConnected(false);
+                // Clear any existing toasts when disconnected
+                if (toastIdRef.current !== null) {
+                    toast.dismiss(toastIdRef.current);
+                }
+            };
+
+            socketSignal.addEventListener('open', handleOpen);
+            socketSignal.addEventListener('close', handleClose);
+
+            return () => {
+                socketSignal.removeEventListener('open', handleOpen);
+                socketSignal.removeEventListener('close', handleClose);
+            };
+        }
+    }, [socketSignal]);
+
     console.log("45: isRequestSubmitted: ", isRequestSubmitted.value);
     // Listen for WebSocket messages and update progress
     useEffect(() => {
@@ -51,9 +87,16 @@ export function ProgressBar() {
 
         const handleMessage = (event: MessageEvent) => {
             try {
+                const data = JSON.parse(event.data);
+
+                // Handle heartbeat
+                if (data.event === "heartbeat") {
+                    setLastHeartbeat(Date.now());
+                    return;
+                }
+
                 dispatch(startTest());
 
-                const data = JSON.parse(event.data);
                 const percent = data.percent_complete;
                 console.log("PERCENT: ", percent);
 
@@ -106,10 +149,24 @@ export function ProgressBar() {
             }
         };
 
-
         socketSignal.addEventListener('message', handleMessage);
         return () => socketSignal.removeEventListener('message', handleMessage);
     }, [socketSignal, dispatch]);
+
+    // Check for stale connection (no heartbeat for 2 minutes)
+    useEffect(() => {
+        const checkConnection = () => {
+            const now = Date.now();
+            if (now - lastHeartbeat > 120000 && isConnected) { // 2 minutes
+                console.log("⚠️ No heartbeat received for 2 minutes, connection may be stale");
+                // Optionally trigger a reconnection by refreshing the page
+                // window.location.reload();
+            }
+        };
+
+        const interval = setInterval(checkConnection, 30000); // Check every 30 seconds
+        return () => clearInterval(interval);
+    }, [lastHeartbeat, isConnected]);
 
     return null;
 }

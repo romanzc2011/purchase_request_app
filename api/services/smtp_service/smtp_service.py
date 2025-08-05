@@ -203,42 +203,56 @@ class SMTP_Service:
         logger.debug(f"SENDING TO: {send_to} send_approver_email")
         
         # Initialize to_address with a default value
-        to_address = ["roman_campbell@lawb.uscourts.gov"]  # Default fallback
+        to_address = []
+        cc_address = []
+        
+        logger.info(f"SEND_TO: {send_to}")
         
         match send_to:
-            case AssignedGroup.IT:
+            case AssignedGroup.IT.value:
                 # Send to IT
-                to_address = await self.get_toaddr(department=AssignedGroup.IT.value, db=db)
+                to_address, to_username = await self.get_toaddr(department=AssignedGroup.IT.value, db=db)
+                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
                 
-            case AssignedGroup.FINANCE:
+            case AssignedGroup.FINANCE.value:
                 # Query WorkflowUser table for finance users and see if active
                 # Lauren Lee, Peter Baltz
-                to_address = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                to_address, to_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
                 
-            case AssignedGroup.MANAGEMENT:
+            case AssignedGroup.MANAGEMENT.value:
                 # Send to Management
-                to_address = await self.get_toaddr(department=AssignedGroup.MANAGEMENT.value, db=db)
-                deputy_clerk_addresses = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                to_address, to_username = await self.get_toaddr(department=AssignedGroup.MANAGEMENT.value, db=db)
+                deputy_clerk_addresses, deputy_clerk_username = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                to_username.extend(deputy_clerk_username)
+                
                 to_address.extend(deputy_clerk_addresses)  # Because deputy_clerk is also in management team
+                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
                 
-            case AssignedGroup.DEPUTY_CLERK:
+            case AssignedGroup.DEPUTY_CLERK.value:
                 # Send to deputy clerk
-                to_address = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                to_address, to_username = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
                 
-            case AssignedGroup.CHIEF_CLERK:
+            case AssignedGroup.CHIEF_CLERK.value:
                 # Send to chief clerk
-                to_address = await self.get_toaddr(department=AssignedGroup.CHIEF_CLERK.value, db=db)
+                to_address, to_username = await self.get_toaddr(department=AssignedGroup.CHIEF_CLERK.value, db=db)
+                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
                 
             case _:
                 # Default case, most likely testing
                 logger.debug("Default case, most likely testing")
-                logger.debug(f"SENDING TO: {to_address} send_approver_email")
+                logger.warning(f"SENDING TO: {to_address} send_approver_email")
+                logger.warning(f"CC TO: {cc_address} send_approver_email function")
                 # to_address already set to default above
         
+        logger.warning(f"SENDING TO: {to_address}::{to_username} send_approver_email function")
+        logger.warning(f"CC TO: {cc_address}::{cc_username} send_approver_enmail function")
         await self._send_mail_async(
             payload,
             db=db,
             to_address=to_address,
+            cc_address=cc_address,
             use_approver_template=True,
             use_requester_template=False,
             use_comment_template=False,
@@ -308,11 +322,18 @@ class SMTP_Service:
     # Retrieve to_addresses based on department and active
     #-------------------------------------------------------------------------------
     async def get_toaddr(self, department: str, db: AsyncSession):
-        stmt = select(dbas.WorkflowUser.email).where(
+        stmt = select(dbas.WorkflowUser.email, dbas.WorkflowUser.username).where(
             dbas.WorkflowUser.department == department,
             dbas.WorkflowUser.active == True
         )
         result = await db.execute(stmt)
         rows = result.all()
-        to_address = [row.email for row in rows]
-        return to_address
+        
+        to_address = []
+        username = []
+        
+        for email, uname in rows:
+            to_address.append(email)
+            username.append(uname)
+            
+        return to_address, username

@@ -2,7 +2,7 @@ from api.schemas.ldap_schema import LDAPUser
 from api.utils.misc_utils import format_username
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
-from api.schemas.enums import AssignedGroup, LDAPGroup
+from api.schemas.enums import AssignedGroup, CueClerk, LDAPGroup
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,160 +11,82 @@ import api.services.db_service as dbas
 class ApproverPolicy:
     def __init__(self, user: LDAPUser):
         self.user = user
-        
-    async def deputy_chief_clerk_policy(
+        self.username = user.username
+    
+    # ----------------------------------------------------------------------------------
+    # CLERK ADMIN APPROVAL LOGIC
+    # ----------------------------------------------------------------------------------
+    async def can_clerk_admin_approve(
         self, 
-        total_price: float, 
-        current_status: str, 
         request: ApprovalRequest,
         db: AsyncSession
-    ) -> bool:
-        TESTING: bool = False
-        logger.warning("#############################################################")
-        logger.warning("TESTING MODE OFF")
-        logger.warning("#############################################################")
-        """
-        - Clerk Admin (edwardtakara) can always approve.
-        - Deputy Clerk (edmundbrown) can only approve if deputy_can_approve = True in DB.
-        """
-        username = format_username(self.user.username)
-        
-        assert self.user.has_group(LDAPGroup.CUE_GROUP.value), "User is not in CUE group"
+    ):
         if not self.user.has_group(LDAPGroup.CUE_GROUP.value):
-            logger.debug("User is not in CUE group, skipping")
             return False
-
-
-        # Clerk Admin can always approve
-        logger.debug("DEPUTY AND CLERK TESTING AREA")
         
-        #*-----------------------------------------------------------------------------------------
-        #* NON-TESTING CODE
-        #*-----------------------------------------------------------------------------------------
-        if not TESTING:
-            # Grab the clerk admin from DB, clerk admin will always be able to approve
-            #?-----------------------------------------------------------------------------------------
-            #? CHIEF CLERK ADMIN
-            #?-----------------------------------------------------------------------------------------
-            #? This is for the chief clerk, which is edwardtakara
-            stmt = select(dbas.WorkflowUser.active).where(
-                dbas.WorkflowUser.department == AssignedGroup.CHIEF_CLERK.value,
-                dbas.WorkflowUser.username == "edwardtakara"
-            )
-            logger.debug(f"Checking if chief clerk {username} is active")
-            
-            result = await db.execute(stmt)
-            row = result.first()
-            CHIEF_CLERK_ACTIVE = row and row.active
-            logger.debug(f"CHIEF_CLERK_ACTIVE: {CHIEF_CLERK_ACTIVE}")
-            
-            CHIEF_CLERK_GROUP = self.user.has_group(LDAPGroup.CUE_GROUP.value)
-            logger.debug(f"CHIEF_CLERK_GROUP: {CHIEF_CLERK_GROUP}")
-            logger.debug(f"CHIEF_CLERK_ACTIVE: {CHIEF_CLERK_ACTIVE}")
-            
-            if (CHIEF_CLERK_ACTIVE and CHIEF_CLERK_GROUP):
-                logger.debug("CHIEF_CLERK_ACTIVE and CHIEF_CLERK_GROUP are True, allowing approval")
-                logger.debug("############################################################")
-                logger.info("this line in prod to check if the current_user is edwardtakara because he can approve anything at anytime")
-                logger.debug("CLERK ADMIN CAN APPROVE")
-                logger.debug("############################################################")
-                return True
-            
-            #?-----------------------------------------------------------------------------------------
-            #? DEPUTY CLERK
-            #?-----------------------------------------------------------------------------------------
-            #? This is for the deputy clerk, which is edmundbrown
-            stmt = select(dbas.WorkflowUser.active).where(
-                dbas.WorkflowUser.department == AssignedGroup.DEPUTY_CLERK.value,
-                dbas.WorkflowUser.username == username
-            )
-            logger.debug(f"Checking if deputy clerk {username} is active and proper permissions/group")
-            logger.debug(f"User has group: {self.user.has_group(LDAPGroup.CUE_GROUP)}")
-            #?-----------------------------------------------------------------------------------------
-            result = await db.execute(stmt)
-            row = result.first()
-            deputy_clerk_active = row and row.active
-            DEPUTY_CLERK_ACTIVE = (username == "edmundbrown" and deputy_clerk_active)
-            logger.debug(f"DEPUTY_CLERK_ACTIVE: {DEPUTY_CLERK_ACTIVE}")
-
-            if DEPUTY_CLERK_ACTIVE:
-                logger.debug("############################################################")
-                logger.info("this line in prod to check if the current_user is edwardtakara because he can approve anything at anytime")
-                logger.debug("DEPUTY CLERK IS ACTIVE")
-                logger.debug("############################################################")
-                return True
-
-            #!---------------------------------------------------------------------------------------
-            #! IF BOTH ARE INACTIVE DEPUTY AND CHIEF CLERK
-            #!-----------------------------------------------------------------------------------------
-            if not (CHIEF_CLERK_ACTIVE and DEPUTY_CLERK_ACTIVE):
-                """
-                Semi-testing, trying logic for when TESTING is False, need to substitute romancampbell
-                for edwardtakara or edmundbrown
-                """
-                logger.debug("PROGRAM IS IN SEMI - TESTING - Substitute romancampbell for edwardtakara")
-                #!-----------------------------------------------------------------------------------------
-                #! TESTING CODE
-                stmt = select(
-                    dbas.WorkflowUser.active,
-                    dbas.WorkflowUser.email).where(
-                        dbas.WorkflowUser.username == "roman_campbell"
-                    )
-                result = await db.execute(stmt)
-                row = result.first()
-                roman_test_user_active = row and row.active
-                ROMAN_TEST_USER_ACTIVE = (username == "romancampbell" and roman_test_user_active)
-                logger.debug(f"User has group: {self.user.has_group(LDAPGroup.CUE_GROUP.value)}")
-                
-                if ROMAN_TEST_USER_ACTIVE:
-                    logger.debug("ROMAN_TEST_USER_ACTIVE is True, allowing approval")
-                    return True
-                #!-----------------------------------------------------------------------------------------
-
-            # Deputy Clerk logic
-            """
-            This is pulling data from FinalApproval, which is a decision table and determining if request total price
-            is under $250, if it is then edmundbrown (deputy clerk or here just deputy)
-            """
-            #? If testing this would be ROMAN_TEST_USER_ACTIVE
-            if DEPUTY_CLERK_ACTIVE:
-                stmt = select(dbas.FinalApproval.deputy_can_approve).where(
-                    dbas.FinalApproval.line_item_uuid == request.uuid
-                )
-                result = await db.execute(stmt)
-                row = result.first()
-                deputy_can_approve = row and row.deputy_can_approve
-
-                if deputy_can_approve:
-                    logger.debug("Deputy Clerk can approve request under $250")
-                    return True
-                else:
-                    logger.debug("Deputy Clerk not allowed to approve this request")
-                    return False
-
-            logger.debug("Only Deputy Clerk and Clerk Admin can approve requests")
-            return False
-        elif TESTING:
-            logger.debug("PROGRAM IS IN TESTING - Substitute romancampbell for edwardtakara")
-            #!-----------------------------------------------------------------------------------------
-            #! TESTING CODE
-            ROMAN_TEST_USER_ACTIVE = await self.is_test_user_active(db)
-            if ROMAN_TEST_USER_ACTIVE:
-                logger.debug("ROMAN_TEST_USER_ACTIVE is True, allowing approval")
-                return True
-            #!-----------------------------------------------------------------------------------------
-            #*-----------------------------------------------------------------------------------------
-            #* END NON-TESTING CODE
-            #*-----------------------------------------------------------------------------------------
+        if await self._is_chief_clerk_active(db):
+            logger.debug(f"Chief Clerk is active, approving request")
+            return True
+        
+        if await self._is_deputy_clerk_active(db):
+            logger.debug(f"Deputy Clerk is active, approving request")
+            return True
+        
+        if await self._is_test_user_active(db):
+            logger.debug(f"Test user is active, approving request")
+            return True
+        
+        if await self._check_deputy_can_approve(request, db):
+            logger.debug(f"Deputy can approve, approving request")
+            return True
+        
+        return False
+    
+    # ----------------------------------------------------------------------------------
+    # CLERK ACTIVE CHECKS
+    # ----------------------------------------------------------------------------------
+    async def _is_chief_clerk_active(self, db: AsyncSession) -> bool:
+        stmt = select(dbas.WorkflowUser.active).where(
+            dbas.WorkflowUser.department == AssignedGroup.CHIEF_CLERK.value,
+            dbas.WorkflowUser.username == CueClerk.CHIEF_CLERK.value
+        )
+        result = await db.execute(stmt)
+        row = result.first()
+        return bool(row and row.active)
+    
+    async def _is_deputy_clerk_active(self, db: AsyncSession) -> bool:
+        stmt = select(dbas.WorkflowUser.active).where(
+            dbas.WorkflowUser.department == AssignedGroup.DEPUTY_CLERK.value,
+            dbas.WorkflowUser.username == CueClerk.DEPUTY_CLERK.value
+        )
+        result = await db.execute(stmt)
+        row = result.first()
+        return bool(row and row.active)
+    
+    async def _check_deputy_can_approve(self, request: ApprovalRequest, db: AsyncSession) -> bool:
+        stmt = select(dbas.FinalApproval.deputy_can_approve).where(
+            dbas.FinalApproval.line_item_uuid == request.line_item_uuid,
+        )
+        result = await db.execute(stmt)
+        row = result.first()
+        return bool(row and row.deputy_can_approve)
+    
+    async def _is_test_user_active(self, db: AsyncSession) -> bool:
+        stmt = select(dbas.WorkflowUser.active).where(
+            dbas.WorkflowUser.username == "roman_campbell"
+        )
+        result = await db.execute(stmt)
+        row = result.first()
+        return self.username == "romancampbell" and bool(row and row.active)
     
     # ----------------------------------------------------------------------------------    
-    # FINANCE HANDLER APPROVAL LOGIC
+    # MANAGEMENT HANDLER APPROVAL LOGIC (LELA, EDMUND)
     # ----------------------------------------------------------------------------------
     def can_management_approve(self, fund: str, current_status: ItemStatus) -> bool:
         if current_status != ItemStatus.NEW_REQUEST:
             logger.debug(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False
-        return self.user.has_group("ACCESS_GROUP") and fund.startswith("092")
+        return self.user.has_group(LDAPGroup.CUE_GROUP.value) and fund.startswith("092")
 
     # ----------------------------------------------------------------------------------
     # IT HANDLER APPROVAL LOGIC
@@ -173,19 +95,45 @@ class ApproverPolicy:
         if current_status != ItemStatus.NEW_REQUEST:
             logger.warning(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False
-        return self.user.has_group("IT_GROUP") and fund.startswith("511")
-    
+        return self.user.has_group(LDAPGroup.IT_GROUP.value) and fund.startswith("511")
+
     # ----------------------------------------------------------------------------------
-    # TEST USER ACTIVE CHECK
+    # DEPUTY/CHIEF CLERK APPROVAL LOGIC
     # ----------------------------------------------------------------------------------
-    async def is_test_user_active(self, db: AsyncSession) -> bool:
+    async def deputy_chief_clerk_policy(
+        self,
+        total_price: float,
+        current_status: ItemStatus,
+        request: ApprovalRequest,
+        db: AsyncSession
+    ) -> bool:
         """
-        Check if the test user is active in the database.
+        Determine if deputy or chief clerk can approve the request
         """
-        username = format_username(self.user.username)
-        stmt = select(dbas.WorkflowUser.active).where(
-            dbas.WorkflowUser.username == "roman_campbell"  # Replace with the test user username if needed
-        )
-        result = await db.execute(stmt)
-        row = result.first()
-        return row and row.active if row else False
+        # Check if user has clerk admin permissions
+        if not self.user.has_group(LDAPGroup.CUE_GROUP.value):
+            logger.debug("User does not have CUE_GROUP permissions")
+            return False
+        
+        # Check if the request is in a state that can be approved
+        if current_status not in [ItemStatus.NEW_REQUEST, ItemStatus.PENDING_APPROVAL]:
+            logger.debug(f"Request status {current_status} cannot be approved by clerk admin")
+            return False
+        
+        # Check if deputy can approve based on price
+        if dbas.can_deputy_approve(total_price) and self.username == CueClerk.DEPUTY_CLERK.value:
+            logger.success("Deputy can approve based on price")
+            return True
+        
+        # Check if chief clerk is active and is the current user
+        if await self._is_chief_clerk_active(db) and self.username == CueClerk.CHIEF_CLERK.value:
+            logger.success("Chief clerk is active and can approve")
+            return True
+        
+        # Check if test user is active
+        if await self._is_test_user_active(db):
+            logger.success("Test user is active and can approve")
+            return True
+        
+        logger.debug("User cannot approve this request")
+        return False

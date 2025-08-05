@@ -40,4 +40,10 @@ class LDAPGroup(Enum):
     CUE_GROUP = "CUE_GROUP"
     ACCESS_GROUP = "ACCESS_GROUP"
     
+#-------------------------------------------------------------------------------------
+# CUE Clerk
+#-------------------------------------------------------------------------------------
+class CueClerk(Enum):
+    DEPUTY_CLERK = "edmundbrown"
+    CHIEF_CLERK = "edwardtakara"
     

@@ -4,9 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.schemas.ldap_schema import LDAPUser
 from api.dependencies.pras_dependencies import auth_service
 from api.services.ldap_service import LDAPService
+from loguru import logger
 
 class ApprovalRouter:
     def __init__(self):
+        logger.info("ApprovalRouter initialized")
+        
         # Initialize the handlers
         self.it_handler = ITHandler()  # Matt
         self.management_handler = ManagementHandler()  # Lela, Edmund

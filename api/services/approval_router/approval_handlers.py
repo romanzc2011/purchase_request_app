@@ -8,6 +8,7 @@ from api.schemas.email_schemas import EmailPayloadRequest, LineItemsPayload
 from api.schemas.enums import AssignedGroup
 from api.services import auth_service, cache_service
 from api.dependencies.pras_dependencies import smtp_service
+from api.services.approval_router.approval_utils import ApprovalUtils
 from api.utils.misc_utils import format_username
 from loguru import logger
 from api.schemas.misc_schemas import ItemStatus
@@ -60,61 +61,23 @@ class ITHandler(Handler):
         current_user: LDAPUser,
         ldap_service: LDAPService
     ) -> ApprovalRequest:
-        approver_policy = ApproverPolicy(current_user)
-        
-        logger.debug(f"User: {current_user.groups}")
-        # IT can only approve requests from fund 511***
-        logger.debug("IT HANDLER PROCESSING REQUEST")
-        
-        # Query the assigned_group column in pending_approvals table
-        assigned_group = await dbas.get_assigned_group(db, request.uuid)
-        
-        if approver_policy.can_it_approve(request.fund, ItemStatus.NEW_REQUEST):
-            # IT can approve IT-related requests
-            logger.debug(f"IT HANDLER APPROVING IT REQUEST: {request.uuid}")
-            logger.info("IT will approve/deny, if approve mark as pending and email deputy_clerk and chief_clerk")
-	
-            # Get the approval UUID and task_id for this line item
-            stmt = select(dbas.Approval.UUID, dbas.PendingApproval.pending_approval_id).join(
-                dbas.PendingApproval,
-                dbas.PendingApproval.approvals_uuid == dbas.Approval.UUID
-            ).where(
-                dbas.PendingApproval.line_item_uuid == request.uuid
-            )
-            result = await db.execute(stmt)
-            row = result.first()
-            
-            if row:
-                approvals_uuid, pending_approval_id = row
-                # --------------------------------------------------------
-                # Use the insert_final_approval function
-                await dbas.insert_final_approval(
-                    db=db,
-                    approvals_uuid=approvals_uuid,
-                    purchase_request_id=request.id,
-                    
-                    line_item_uuid=request.uuid,
-                    pending_approval_id=pending_approval_id,
-                    approver=request.approver,
-                    status=ItemStatus.PENDING_APPROVAL,
-                    deputy_can_approve=dbas.can_deputy_approve(request.total_price)
-                )
-                
-                # Send email to clerk admins requesting approval
-                logger.debug(f"IT HANDLER: Sending email to clerk admins requesting approval for {request.uuid}")
-                
-                """
-                Send to the correct approver handler, the new request has been approved so we need to ensure the correct
-                approver is notified, lets test for deputy clerk first
-                """
-                approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
-                email_payload = await approver_email_builder.build_email_payload()
-                await smtp_service.send_approver_email(email_payload,db=db, send_to=AssignedGroup.IT.value)
-                
-                logger.debug(f"IT HANDLER: Inserted final approval for {request.uuid}")
-            else:
+        policy = ApproverPolicy(current_user)
+        if policy.can_it_approve(request.fund, ItemStatus.NEW_REQUEST):
+            logger.debug("IT HANDLER CAN APPROVE HANDLER")
+            row = await ApprovalUtils.get_approval_data(db, request.uuid)
+            if not row:
                 logger.error(f"IT HANDLER: Could not find approval/task data for {request.uuid}")
-        
+                return await super().handle(request, db, current_user, ldap_service)
+            
+            approvals_uuid, pending_approval_id = row
+            await ApprovalUtils.insert_pending_approval(db, approvals_uuid, request, pending_approval_id)
+            await ApprovalUtils.build_and_send_email(
+                group=AssignedGroup.IT.value,
+                db=db,
+                request=request,
+                current_user=current_user,
+                ldap_service=ldap_service
+            )
         return await super().handle(request, db, current_user, ldap_service)
 
 # ----------------------------------------------------------------------------------------
@@ -236,8 +199,18 @@ class ClerkAdminHandler(Handler):
         
         if not can_approve:
             logger.debug("CLERK ADMIN HANDLER: User is not allowed to approve this request")
+            # Send email to Chief Clerk for escalation
+            logger.debug(f"CLERK ADMIN HANDLER: Sending escalation email to Chief Clerk for {request.uuid}")
+            approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
+            email_payload = await approver_email_builder.build_email_payload()
+            await smtp_service.send_approver_email(email_payload, db=db, send_to=AssignedGroup.CHIEF_CLERK.value)
             return await super().handle(request, db, current_user, ldap_service)
         
+        #*#################################################################################
+        #*#################################################################################
+        # * Code below is for if the request was approved
+        #*#################################################################################
+        #*#################################################################################
         # Get the approval UUID for this line item
         stmt = select(dbas.Approval.UUID).join(
             dbas.PendingApproval,
