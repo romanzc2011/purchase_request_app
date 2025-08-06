@@ -26,9 +26,12 @@ import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
 import { isSubmittedSig, isRequestSubmitted } from "../../utils/PrasSignals";
-import { effect } from "@preact/signals-react";
+import { effect, signal } from "@preact/signals-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../store/prasStore";
+
+// Create a local test signal
+const localTestSig = signal<boolean>(false);
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */
@@ -193,11 +196,12 @@ function AddItemsForm({
 
     /* The form has successfully been submitted to the backend so we need to reset the form for everything */
     // Watch for isFinalSubmitted changes and reset form accordingly
-    effect(() => {
-        if (isSubmittedSig.value) {
-            // Prevent infinite loop by temporarily setting the signal to false
-            const wasSubmitted = isSubmittedSig.value;
-            isSubmittedSig.value = false;
+    useEffect(() => {
+        const shouldReset = isSubmittedSig.value;
+        console.log("📋 useEffect running, isSubmittedSig.value:", shouldReset);
+
+        if (shouldReset) {
+            console.log("📋 Form submitted - resetting form");
 
             // Clear form state completely
             reset({
@@ -224,8 +228,12 @@ function AddItemsForm({
             // Call validation
             runValidation();
 
+            // Reset the signal after the form is reset
+            isSubmittedSig.value = false;
+            console.log("📋 Signal reset to false");
+
         }
-    });
+    }, [isSubmittedSig.value, reset, trigger, formattedToday]);
 
     /*************************************************************************************** */
     /* Form submission function */
@@ -628,6 +636,15 @@ function AddItemsForm({
                             label="Reset Form"
                             className="btn btn-maroon"
                             onClick={() => reset()}
+                        />
+                        <Buttons
+                            label="Test Signal"
+                            className="btn btn-warning"
+                            onClick={() => {
+                                console.log("🧪 Testing signal - setting to true");
+                                isSubmittedSig.value = true;
+                                localTestSig.value = true;
+                            }}
                         />
                     </Grid>
                     <hr

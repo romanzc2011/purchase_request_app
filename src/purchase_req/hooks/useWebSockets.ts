@@ -31,7 +31,8 @@ export function useWebSockets(
 			
 			ws.onmessage = (event) => {
 				if(onMessage) {
-					onMessage(event);
+                    onMessage(event);
+                    console.log("🔴 WEBSOCKET MESSAGE RECEIVED", event);
 				}
 			}
 

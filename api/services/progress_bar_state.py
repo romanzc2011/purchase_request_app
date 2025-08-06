@@ -163,10 +163,8 @@ class ProgressSharedMemory:
             progress_dict = asdict(current_state) 
             percent = self.calc_progress_percentage()
             progress_dict["percent_complete"] = percent
-            
             send_data = percent
             await websock_conn.broadcast(send_data)
-            logger.success(f"send_data converted to json and sent {send_data}")
         else:
             logger.error(f"Field {field} does not exist")
             
@@ -175,15 +173,11 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     def calc_progress_percentage(self) -> float:
         current_state = self.read()
-        
         step_count = sum(
             1 for field in vars(current_state).values()
             if isinstance(field, bool) and field
         )
-        logger.success(f"STEP_COUNT: {step_count}")
-        
         percent_complete = (step_count / self.total_steps) * 100
-        logger.debug(f"PERCENT COMPLETE: {percent_complete}")
         return percent_complete
     
     #-------------------------------------------------------------

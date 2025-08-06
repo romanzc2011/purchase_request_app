@@ -1,12 +1,8 @@
 # api/services/ldap_service.py
 
-from dataclasses import dataclass
-import os
 import asyncio
-import re
 import ssl
-from typing import Optional, List, Dict
-from functools import lru_cache
+from typing import List, Dict
 from urllib.parse import urlparse
 
 from ldap3 import Server, Connection, ALL, SUBTREE, Tls
@@ -17,6 +13,7 @@ from loguru import logger
 from api.schemas.enums import LDAPGroup
 from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings 
+from api.services.websocket_manager import websock_conn
 
 def run_in_thread(fn):
     async def wrapper(*args, **kwargs):
@@ -249,6 +246,9 @@ class LDAPService:
 
         # Perform subtree search
         try:
+            logger.debug(f"Query: {query}")
+            query = query.replace(" ", "")
+            logger.debug(f"Query: {query}")
             conn.search(
                 search_base='OU=LAWB,OU=USCOURTS,DC=ADU,DC=DCN',
                 search_filter=f'(sAMAccountName={query}*)',
@@ -258,9 +258,18 @@ class LDAPService:
             )
             
             if conn.entries:
+                # Inform frontend that user was found
+                asyncio.run(websock_conn.broadcast({"event": "USER_FOUND", 
+                                              "status_code": "200",
+                                              "message": "User found for query"}))
                 return [entry.sAMAccountName.value for entry in conn.entries]
             else:
                 logger.error(f"No user found for query: {query}")
+                
+                # Inform frontend that no user was found
+                asyncio.run(websock_conn.broadcast({"event": "NO_USER_FOUND", 
+                                              "status_code": "404",
+                                              "message": "No user found for query"}))
                 return ["Error"]
         except Exception as e:
             logger.error(f"Error getting username: {e}")

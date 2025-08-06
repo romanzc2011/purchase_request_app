@@ -3,7 +3,7 @@ import { toast, Id } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../store/prasStore';
 import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
-import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted } from "./PrasSignals";
+import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
 import { LinearProgress, Typography } from "@mui/material";
 import { ProgressToast } from "../components/ProgressToast";
@@ -143,6 +143,11 @@ export function ProgressBar() {
                             isRequestSubmitted.value = false;
                         }, 1000);
                     }
+                } else if (data.event === "NO_USER_FOUND") {
+                    toast.error(data.message);
+                    userFoundSig.value = false;
+                } else if (data.event === "USER_FOUND") {
+                    userFoundSig.value = true;
                 }
             } catch (error) {
                 console.error("Error parsing WebSocket message:", error);
