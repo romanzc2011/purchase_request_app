@@ -511,9 +511,7 @@ async def get_justifications_by_id(db: AsyncSession, ID: str) -> list[tuple[bool
         PurchaseRequestLineItem.purchase_request_id == ID
     )
     result = await db.execute(stmt)
-    logger.info(f"Result: {result}")
     rows = result.all()
-    logger.info(f"Rows: {rows}")
     return rows
 
 ###################################################################################################

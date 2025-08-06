@@ -46,4 +46,5 @@ class LDAPGroup(Enum):
 class CueClerk(Enum):
     DEPUTY_CLERK = "edmundbrown"
     CHIEF_CLERK = "edwardtakara"
-    
+    MANAGER = "lelarobichaux"
+    TEST_USER = "romancampbell"

@@ -46,8 +46,9 @@ export function useAssignIRQ1() {
                     UUID,
                 }),
             });
-            if(!res.ok) {
+            if (!res.ok) {
                 const errorText = await res.text();
+
                 throw new Error(`HTTP error: ${res.status} - ${errorText}`);
             }
             return res.json();

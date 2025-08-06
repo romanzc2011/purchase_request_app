@@ -5,8 +5,8 @@ from api.schemas.email_schemas import EmailPayloadRequest, LineItemsPayload
 from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings
 from api.utils.misc_utils import format_username
-from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
+from api.dependencies.pras_dependencies import pdf_service
 from sqlalchemy import select
 from api.services.db_service import (
     PurchaseRequestHeader,
@@ -39,7 +39,6 @@ class ApproverEmailBuilder(EmailBuilder):
         self.ldap_service = ldap_service
 
     async def build_email_payload(self) -> EmailPayloadRequest:
-        logger.info(f"Building email payload for {self.request.uuid}")
         # ----------------------------------------------------------------------------------------
         # BUILD EMAIL PAYLOADS
         # ----------------------------------------------------------------------------------------
@@ -68,7 +67,6 @@ class ApproverEmailBuilder(EmailBuilder):
         result = await self.db.execute(stmt)
         rows = result.all()
         
-        logger.info(f"Rows: {rows}")
         if not rows:
             raise HTTPException(status_code=404, detail="No line items found for this request")
 
@@ -92,6 +90,9 @@ class ApproverEmailBuilder(EmailBuilder):
         
         # Build flat list of attachments from every row
         attachments: list[str] = []
+        pdf_path = await pdf_service.create_pdf(self.request.id, self.db)
+        
+        attachments.append(str(pdf_path))
         for r in rows:
             if r.uploaded_file_path:
                 if isinstance(r.uploaded_file_path, (list, tuple)):
@@ -119,5 +120,4 @@ class ApproverEmailBuilder(EmailBuilder):
             items=items_for_email,
             attachments=attachments
         )
-        logger.info(f"Email request payload: {email_request_payload}")
         return email_request_payload

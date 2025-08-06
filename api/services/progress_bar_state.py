@@ -143,11 +143,7 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     def read(self) -> ProgressState:
         packed_data = bytes(self.shm.buf[:self.STRUCT_SIZE])
-        logger.debug(f"PACKED_DATA: {packed_data}")
-        
         np_array = np.frombuffer(packed_data, dtype=np.uint8)
-        logger.debug(f"NP ARRAY: {np_array} and is shape {np_array.shape}")
-        
         return self.from_bytes(np_array)
         
     #-------------------------------------------------------------

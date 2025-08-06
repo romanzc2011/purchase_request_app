@@ -43,10 +43,7 @@ class Handler(ABC):
         ldap_service: LDAPService
     ) -> ApprovalRequest:
         
-        logger.debug(f"User: {current_user}")
-        logger.debug(f"Handling request: {request}")
         if self._next:
-            logger.debug(f"Passing request to next handler: {self._next}")
             return await self._next.handle(request, db, current_user, ldap_service)
         return "No handler could process the request."
 
@@ -102,7 +99,6 @@ class ManagementHandler(Handler):
         #! TEST USER OVERRIDE - REMOVED FOR PRODUCTION
         #!----------------------------------------------------------
         approver_policy = ApproverPolicy(current_user)
-        logger.debug(f"User: {current_user}")
         
         # Management can approve any request that doesn't start with 511
         logger.debug("MANAGEMENT HANDLER PROCESSING REQUEST")
@@ -174,7 +170,6 @@ class ClerkAdminHandler(Handler):
         approver_policy = ApproverPolicy(current_user)    # Create an instance of the approver policy
         
         # This is the current user who is trying to approve the request
-        logger.debug(f"User: {current_user}")
         can_approve: bool = False
         
         # Get current status from pending_approvals table
@@ -202,6 +197,8 @@ class ClerkAdminHandler(Handler):
             # Send email to Chief Clerk for escalation
             logger.debug(f"CLERK ADMIN HANDLER: Sending escalation email to Chief Clerk for {request.uuid}")
             approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
+            
+            
             email_payload = await approver_email_builder.build_email_payload()
             await smtp_service.send_approver_email(email_payload, db=db, send_to=AssignedGroup.CHIEF_CLERK.value)
             return await super().handle(request, db, current_user, ldap_service)

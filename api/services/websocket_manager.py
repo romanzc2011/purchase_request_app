@@ -35,7 +35,6 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
 
 	#-------------------------------------------------------------
 	# DISCONNECT
@@ -43,7 +42,6 @@ class ConnectionManager:
     async def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
 
 	#-------------------------------------------------------------
 	# BROADCAST
@@ -61,9 +59,7 @@ class ConnectionManager:
         """
         disconnected = []
         for connection in self.active_connections:
-            logger.success("INSIDE ACTIVE CONNECTIONS...")
             try:
-                logger.debug(f"DATA TYPE OF message: {type(message)}")
                 await connection.send_json(message)
             except Exception as e:
                 logger.warning(f"Failed to send message to connection: {e}")

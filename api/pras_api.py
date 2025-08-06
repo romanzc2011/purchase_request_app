@@ -26,6 +26,7 @@ from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPa
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
+from api.utils.misc_utils import format_username
 from pydantic import ValidationError
 from fastapi import (
     FastAPI, APIRouter, Depends, Form, 
@@ -40,7 +41,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update, select, text, func
 from api.services.db_service import get_async_session
-from api.schemas.enums import AssignedGroup, ItemStatus
+from api.schemas.enums import AssignedGroup, CueClerk, ItemStatus, LDAPGroup
 import asyncio
 
 # PRAS Miscellaneous Dependencies
@@ -479,9 +480,6 @@ async def send_purchase_request(
         contracting_officer_username = result.scalar_one_or_none()
         logger.info(f"Contracting officer username: {contracting_officer_username}")
         
-        # TODO ---------------------------------------------
-        # TODO Add a step for contracting officer (SETTING THE CONTRACTING OFFICER)
-        
         #?#################################################################################
         #? INSERTING THE REQUEST INTO THE APPROVAL TABLE
         #?#################################################################################
@@ -784,6 +782,19 @@ async def assign_IRQ1_ID(
     IRQ number that is retrieved from JFIMS by Lela
     """
     logger.info(f"Assigning requisition ID: {data.get('IRQ1_ID')}")
+    
+    # Only lela can assign RQ1 IDs
+    if (current_user.has_group(LDAPGroup.CUE_GROUP.value) 
+            and 
+        (format_username(current_user.username) == CueClerk.MANAGER.value)):
+        logger.debug("AUTHORIZATION SUCCESSFUL")
+        pass
+    else:
+        logger.debug("AUTHORIZATION FAILED")
+        await websock_conn.broadcast({"event": "error", 
+                                      "status_code": "403",
+                                      "message": "You are not authorized to assign requisition IDs"})
+        raise HTTPException(status_code=403, detail="You are not authorized to assign requisition IDs")
     
     # Get the original ID from the request
     irq1_id = data.get('IRQ1_ID')

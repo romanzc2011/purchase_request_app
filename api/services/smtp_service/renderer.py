@@ -1,5 +1,4 @@
 from jinja2 import Environment, FileSystemLoader
-from loguru import logger
 
 class TemplateRenderer:
     def __init__(self, template_dir: str):
@@ -13,16 +12,13 @@ class TemplateRenderer:
     # RENDER TEMPLATES
     ##############################################################
     def render_approver_request_template(self, context: dict) -> str:
-        logger.info(f"RENDERING APPROVER REQUEST TEMPLATE: {context}")
         return self.render("approver_new_request.html", context)
     
     def render_requester_request_template(self, context: dict) -> str:
-        logger.info(f"RENDERING REQUESTER REQUEST TEMPLATE: {context}")
         return self.render("requester_new_request.html", context)
     
     def render_comment_template(self, context: dict) -> str:
         return self.render("requesters_comment_template.html", context)
     
     def render_requester_approved_template(self, context: dict) -> str:
-        logger.info(f"RENDERING REQUESTER APPROVED TEMPLATE: {context}")
         return self.render("requester_approved_request.html", context)

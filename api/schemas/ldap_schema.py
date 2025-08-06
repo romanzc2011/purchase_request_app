@@ -60,10 +60,6 @@ class LDAPUser(BaseModel):
         
         # Store as dict so cache can serialize it easily
         cache_service.set("ldap_users", cache_key, user.model_dump())
-        logger.info(f"Cached LDAPUser: {cache_key}")
-        logger.info(f"User: {user}")
-        logger.info(f"User Dict: {user.model_dump()}")
-        
         return user
     
 	
