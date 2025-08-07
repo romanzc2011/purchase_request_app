@@ -115,7 +115,7 @@ BEGIN
 END;
 
 ----------------------------------------------------------
-/* Trigger to auto update IRQ1 number in approvals
+/* Trigger to auto update RQ1 number in approvals
 	after inserting into purchase_request_headers */
 ----------------------------------------------------------
 CREATE TRIGGER IF NOT EXISTS sync_irq1_on_update_irq1_prhdr
@@ -141,15 +141,19 @@ END;
 INSERT OR IGNORE INTO contracting_officers
 (username, email)
 VALUES
-("peter_baltz", "peter_baltz@lawb.uscourts.gov");
+("Peter Baltz", "peter_baltz@lawb.uscourts.gov");
 
 INSERT OR IGNORE INTO contracting_officers
 (username, email)
 VALUES
-("romancampbell", "roman_campbell@lawb.uscourts.gov");
+("Lauren Lee", "lauren_lee@lawb.uscourts.gov");
+
+INSERT OR IGNORE INTO contracting_officers
+(username, email)
+VALUES
+("Lela Robichaux", "lela_robichaux@lawb.uscourts.gov");
 
 -- Court Clerks: Edmund, Ted
-
 
 -- DELETE FROM final_approvals;
 -- DELETE FROM pending_approvals;

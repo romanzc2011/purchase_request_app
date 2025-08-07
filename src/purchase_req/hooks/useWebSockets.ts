@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from "react";
-import { isDownloadSig } from "../utils/PrasSignals";
 
 // #########################################################################################
 // WEBSOCKETS HOOK 

@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-const API_URL_ITEM_UUIDS = `${import.meta.env.VITE_API_URL}/api/getItemUUIDs`
 const STORAGE_KEY = 'UUID_store';
 
 export const useUUIDStore = () => {

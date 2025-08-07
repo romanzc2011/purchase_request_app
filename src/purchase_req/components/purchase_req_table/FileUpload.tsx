@@ -72,21 +72,6 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
             formData.append("file", file.file);
             formData.append("ID", ID);
 
-            // const API_URL = `${import.meta.env.VITE_API_URL}/api/upload_file`;
-            // const accessToken = localStorage.getItem("access_token");
-
-            //  response = await fetch(API_URL, {
-            //     method: "POST",
-            //     headers: {
-            //         Authorization: `Bearer ${accessToken}`,
-            //     },
-            //     body: formData,
-            // });const
-
-            // if (!response.ok) {
-            //     throw new Error(`HTTP error: ${response.status}`);
-            // }
-
             // Update file status to ready
             setFileInfo((prev) => {
                 const updated = prev.map((f) =>

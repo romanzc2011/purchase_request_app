@@ -53,7 +53,7 @@ export function useAssignIRQ1() {
             }
             return res.json();
         },
-        onSuccess: (data, { ID }) => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["approvalData"] });
             queryClient.invalidateQueries({ queryKey: ["search"] });
             toast.success("IRQ1 ID assigned successfully");

@@ -1,4 +1,4 @@
-import { FieldErrors, FormProvider, useFormContext } from "react-hook-form";
+import { FieldErrors, FormProvider } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
 import React, { useState } from "react";
 import "./LearningDev";
@@ -25,10 +25,8 @@ import { useUUIDStore } from "../../services/UUIDService";
 import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
-import { isSubmittedSig, isRequestSubmitted } from "../../utils/PrasSignals";
-import { effect, signal } from "@preact/signals-react";
-import { useSelector } from "react-redux";
-import { RootState } from "../../../store/prasStore";
+import { isSubmittedSig } from "../../utils/PrasSignals";
+import { signal } from "@preact/signals-react";
 
 // Create a local test signal
 const localTestSig = signal<boolean>(false);
@@ -68,7 +66,6 @@ function AddItemsForm({
     const { errors, isValid, isSubmitted } = formState;
     const [showSuccess, setShowSuccess] = useState(false);
     const [selectedCO, setSelectedCO] = useState<number | "">("");
-    const request_submitted = useSelector((state: RootState) => state.progress.status);
 
     // #############################################################################
     // DEBUG
@@ -393,7 +390,7 @@ function AddItemsForm({
                                     type="radio"
                                     value="QUARTERLY_ORDER"
                                     {...register("orderType", {
-                                        onChange: (e) => {
+                                        onChange: () => {
                                             trigger("dateneed");
                                         }
                                     })}
@@ -419,7 +416,7 @@ function AddItemsForm({
                                     type="radio"
                                     value="NO_RUSH"
                                     {...register("orderType", {
-                                        onChange: (e) => {
+                                        onChange: () => {
                                             trigger("dateneed");
                                         }
                                     })}

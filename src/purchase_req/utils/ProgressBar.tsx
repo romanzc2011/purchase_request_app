@@ -5,7 +5,6 @@ import { AppDispatch, RootState } from '../../store/prasStore';
 import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
 import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
-import { LinearProgress, Typography } from "@mui/material";
 import { ProgressToast } from "../components/ProgressToast";
 
 // #########################################################################################
@@ -15,7 +14,6 @@ export function ProgressBar() {
     const toastIdRef = useRef<Id | null>(null);
     const dispatch = useDispatch<AppDispatch>();
     const status = useSelector((s: RootState) => s.progress.status);
-    const [currentPercent, setCurrentPercent] = useState(0);
     const [lastHeartbeat, setLastHeartbeat] = useState<number>(Date.now());
     const [isConnected, setIsConnected] = useState(false);
     let socketSignal = socketSig.value;
@@ -27,7 +25,6 @@ export function ProgressBar() {
         if (status === 'done' && socketSignal) {
             socketSignal.send(JSON.stringify({ event: 'reset_data' }));
             dispatch(resetProgress());
-            setCurrentPercent(0);
 
             if (toastIdRef.current !== null) {
                 toast.dismiss(toastIdRef.current);

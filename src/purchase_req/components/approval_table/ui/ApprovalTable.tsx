@@ -20,11 +20,11 @@ import CommentModal from "../modals/CommentModal";
 import "../../../styles/ApprovalTable.css"
 
 import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow, ApprovalData, ItemStatus, DenialData } from "../../../types/approvalTypes";
-import { addComments } from "../../../services/CommentService";
+import { addComments } from "../../../services/commentService";
 import { cellRowStyles, headerStyles, footerStyles, paginationStyles } from "../../../styles/DataGridStyles";
 import { useApprovalService } from "../../../hooks/useApprovalService";
 import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
-import { toast, Id } from "react-toastify";
+import { toast } from "react-toastify";
 import { isDownloadSig } from "../../../utils/PrasSignals";
 
 
@@ -184,8 +184,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 
     // ref for IRQ1 input field
     const irq1InputRef = useRef<Record<string, HTMLInputElement | null>>({});
-
-    const [selectedCO, setSelectedCO] = useState<number | "">(1); // Change 1 to default CO's ID
 
     // Get handleEditPriceEach from useApprovalHandlers
     const { handleEditPriceEach } = useApprovalHandlers(rowSelectionModel);
@@ -414,7 +412,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
             item_uuids: itemsToProcessForApproval.map(item => item.UUID),
             item_funds: itemsToProcessForApproval.map(item => item.fund),
             totalPrice: itemsToProcessForApproval.map(item => item.totalPrice),
-            target_status: itemsToProcessForApproval.map(item => ItemStatus.PENDING_APPROVAL), // Change to this if conditions met in backend
+            target_status: itemsToProcessForApproval.map(() => ItemStatus.PENDING_APPROVAL), // Change to this if conditions met in backend
             action: "APPROVE"
         }
 
@@ -459,7 +457,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
                 comment: []
             }
 
-            const userComment = await openCommentModal(singlePayLoad);
+            const userComment = await openCommentModal();
             entries.push({ uuid, comment: userComment });
         }
 
@@ -502,7 +500,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
         const apiDenyPayload: DenialData = {
             ID: itemsToProcessForDenial[0].ID,
             item_uuids: itemsToProcessForDenial.map(item => item.UUID),
-            target_status: itemsToProcessForDenial.map(item => ItemStatus.DENIED),
+            target_status: itemsToProcessForDenial.map(() => ItemStatus.DENIED),
             action: "DENY"
         }
 
@@ -567,53 +565,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
 
         // Deselect all rows
         setRowSelectionModel({ ids: new Set(), type: 'include' });
-    }
-
-    //####################################################################
-    // HANDLE CONTRACTING OFFICER
-    //####################################################################
-    async function handleAssignCO(officerId: number, username: string) {
-
-        // Get selected Rows
-        const selectedItemUUIDs = Array.from(rowSelectionModel.ids)
-            .filter(id => !String(id).startsWith("header-"));
-
-        if (selectedItemUUIDs.length === 0) {
-            toast.error("No items selected");
-            return;
-        }
-
-        const requestIDs = [
-            ...new Set(filteredApprovalData
-                .filter(item => selectedItemUUIDs.includes(item.UUID))
-                .map(item => item.ID)
-            )
-        ];
-
-        try {
-            const response = await fetch(API_URL_ASSIGN_CO, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    request_ids: requestIDs,
-                    contracting_officer_id: officerId,
-                    contracting_officer: username
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error("Failed to assign CO");
-            }
-
-            toast.success("CO assigned successfully");
-            queryClient.invalidateQueries({ queryKey: ["approvalData"] });
-        } catch (error) {
-            console.error("Failed to assign CO:", error);
-            toast.error("Failed to assign CO");
-        }
     }
 
     // the "toggle" column for group headers

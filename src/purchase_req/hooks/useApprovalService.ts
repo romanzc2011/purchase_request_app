@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ApprovalData, DataRow, DenialData } from "../types/approvalTypes";
 import { approveDenyRequest } from "../services/ApprovalService";
 import { toast } from "react-toastify";
-import { useAssignIRQ1 } from "./useAssignIRQ1";
 import { useCommentModal } from "./useCommentModal";
 
 export function useApprovalService() {
@@ -12,7 +11,6 @@ export function useApprovalService() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const queryClient = useQueryClient();
-	const assignIRQ1Mutation = useAssignIRQ1();
 	const { openCommentModal, close, handleSubmit } = useCommentModal();
 	
     /* The approvalPayload is used to store the payload that will be sent to the server

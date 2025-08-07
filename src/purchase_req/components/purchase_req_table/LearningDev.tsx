@@ -1,4 +1,4 @@
-import { UseFormRegister, Controller, Control } from "react-hook-form";
+import { Controller, Control } from "react-hook-form";
 import { PurchaseItem } from "../../schemas/purchaseSchema";
 import Grid from "@mui/material/Grid2";
 import { Typography, Checkbox, FormControlLabel } from "@mui/material";

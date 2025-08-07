@@ -116,7 +116,6 @@ class ProgressTracker:
             "event": "PROGRESS_UPDATE",
             "percent_complete": self._percent_complete
         }))
-        logger.success(f"[Signal] {step.step_name.name} complete - {self._percent_complete}%")
         
 download_progress = ProgressTracker()
 download_sig = signal('download_sig')
