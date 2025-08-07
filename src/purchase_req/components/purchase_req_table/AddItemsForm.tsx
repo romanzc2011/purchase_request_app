@@ -559,16 +559,9 @@ function AddItemsForm({
                             spacing={2}
                         >
                             <Grid>
-                                <BudgetCodePicker
-                                    onSelectBudgetCode={(budgetObjCode) =>
-                                        console.log(budgetObjCode)
-                                    }
-                                    control={control}
-                                    register={register("budgetObjCode")}
-                                    errors={errors}
-                                />
-                            </Grid>
-                            <Grid>
+                                {/* ****************************************************** */}
+                                {/* Fund Picker */}
+                                {/* ****************************************************** */}
                                 <FundPicker
                                     onSelectFund={(fund: string) =>
                                         console.log(fund)
@@ -578,6 +571,24 @@ function AddItemsForm({
                                     errors={errors}
                                 />
                             </Grid>
+
+                            {/* ****************************************************** */}
+                            {/* Budget Code Picker */}
+                            {/* ****************************************************** */}
+                            <Grid>
+                                <BudgetCodePicker
+                                    onSelectBudgetCode={(budgetObjCode, fund: string) =>
+                                        console.log(budgetObjCode, fund)
+                                    }
+                                    control={control}
+                                    register={register("budgetObjCode")}
+                                    errors={errors}
+                                    fund={watch("fund") || ""}
+                                />
+                            </Grid>
+                            {/* ****************************************************** */}
+                            {/* Location Picker */}
+                            {/* ****************************************************** */}
                             <Grid>
                                 <LocationPicker
                                     onSelectLocation={(location: string) =>
@@ -597,12 +608,19 @@ function AddItemsForm({
                             direction="column"
                             spacing={2}
                         >
+                            {/* ****************************************************** */}
+                            {/* Price Input */}
+                            {/* ****************************************************** */}
                             <Grid>
                                 <PriceInput
                                     register={register}
                                     errors={errors}
                                 />
                             </Grid>
+
+                            {/* ****************************************************** */}
+                            {/* Quantity Input */}
+                            {/* ****************************************************** */}
                             <Grid>
                                 <QuantityInput
                                     register={register}
@@ -633,15 +651,6 @@ function AddItemsForm({
                             label="Reset Form"
                             className="btn btn-maroon"
                             onClick={() => reset()}
-                        />
-                        <Buttons
-                            label="Test Signal"
-                            className="btn btn-warning"
-                            onClick={() => {
-                                console.log("🧪 Testing signal - setting to true");
-                                isSubmittedSig.value = true;
-                                localTestSig.value = true;
-                            }}
                         />
                     </Grid>
                     <hr

@@ -1,24 +1,29 @@
 import { UseFormRegister, FieldErrors, Controller } from "react-hook-form";
 import { FormValues } from "../../types/formTypes";
+import { getBOCOptions } from "../../utils/bocUtils";
 import {
     Box,
     FormControl,
     InputLabel,
     Select,
     MenuItem,
+    ListSubheader,
     FormHelperText,
+    Typography,
 } from "@mui/material";
 
 interface BudgetPickerProps {
-    onSelectBudgetCode: (budgetObjCode: string) => void;
+    onSelectBudgetCode: (budgetObjCode: string, fund: string) => void;
     register: ReturnType<UseFormRegister<FormValues>>;
     errors: FieldErrors<FormValues>;
     control: any; // Consider typing this as Control<FormValues> if desired
+    fund: string;
 }
 
 const BudgetCodePicker = ({
     onSelectBudgetCode,
     control,
+    fund,
 }: BudgetPickerProps) => {
     return (
         <Box
@@ -73,44 +78,40 @@ const BudgetCodePicker = ({
                             {...field}
                             onChange={(e) => {
                                 field.onChange(e);
-                                onSelectBudgetCode(e.target.value as string);
+                                onSelectBudgetCode(e.target.value as string, fund);
                             }}
                         >
-                            <MenuItem value={"3101"}>
-                                3101 - General Office Equipment
-                            </MenuItem>
-                            <MenuItem
-                                value={"3107"}
-                            >
-                                3107 - Audio Recording Equipment
-                            </MenuItem>
-                            <MenuItem value={"3111"}>
-                                3111 - Furniture and Fixtures
-                            </MenuItem>
-                            <MenuItem value={"3113"}>
-                                3113 - Mailing Equipment
-                            </MenuItem>
-                            <MenuItem
-                                value={
-                                    "3121"
+                            {getBOCOptions(fund)?.map((option) => {
+                                if (option.disabled) {
+                                    return (
+                                        <ListSubheader
+                                            key={option.value}
+                                            disableSticky
+                                            sx={{
+                                                fontFamily: "Play",
+                                                fontWeight: "bold", color: "blue"
+                                            }}
+                                        >
+                                            {option.label}
+                                        </ListSubheader>
+                                    );
                                 }
-                            >
-                                3121 - Legal Resources - New Print and Digital
-                                Purchases
-                            </MenuItem>
-                            <MenuItem
-                                value={
-                                    "3122"
-                                }
-                            >
-                                3122 - Legal Resources - Print and Digital
-                                Continuations
-                            </MenuItem>
-                            <MenuItem
-                                value={"3130"}
-                            >
-                                3130 - Law Enforcement Equipment
-                            </MenuItem>
+                                const [code, ...rest] = option.label.split(" - ");
+                                const description = rest.join(" - ");
+                                return (
+                                    <MenuItem key={option.value} value={option.value}>
+                                        <Typography component="span" fontWeight="bold">
+                                            {code}
+                                        </Typography>
+                                        {description && (
+                                            <Typography component="span">
+                                                {" - "}
+                                                {description}
+                                            </Typography>
+                                        )}
+                                    </MenuItem>
+                                );
+                            })}
                         </Select>
                         {fieldState.error && (
                             <FormHelperText>

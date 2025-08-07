@@ -8,7 +8,6 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { fetchSearchData } from "./SearchBar";
 import Buttons from "../../purchase_req_table/Buttons";
-import { convertBOC } from "../../../utils/bocUtils";
 import { useAssignIRQ1 } from "../../../hooks/useAssignIRQ1";
 import { useCommentModal } from "../../../hooks/useCommentModal";
 import CommentIcon from '@mui/icons-material/Comment';
@@ -709,7 +708,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
             width: 150,
             renderCell: params => {
                 if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                return convertBOC(params.value);
+                return params.value;
             }
         },
 

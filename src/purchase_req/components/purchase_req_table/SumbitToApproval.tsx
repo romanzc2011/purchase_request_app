@@ -15,7 +15,6 @@ import {
 } from "@mui/material";
 import { tableHeaderStyles } from "../../styles/DataGridStyles";
 import { FormValues } from "../../types/formTypes";
-import { convertBOC } from "../../utils/bocUtils";
 import { IFile } from "../../types/IFile";
 import React, { useState, useMemo, useCallback } from "react";
 import { v4 as uuidv4 } from 'uuid';
@@ -267,7 +266,7 @@ function SubmitApprovalTable({
                                     fontFamily: "'Play', sans-serif !important",
                                     fontSize: "1rem"
                                 }}>
-                                    {convertBOC(items[0].budgetObjCode)}
+                                    {items[0].budgetObjCode}
                                 </TableCell>
                                 <TableCell sx={{
                                     color: "white",
@@ -375,7 +374,7 @@ function SubmitApprovalTable({
                                                                 fontFamily: "'Play', sans-serif !important",
                                                                 fontSize: "1rem"
                                                             }}>
-                                                                {convertBOC(item.budgetObjCode)}
+                                                                {item.budgetObjCode}
                                                             </TableCell>
                                                             <TableCell sx={{
                                                                 color: "white",
