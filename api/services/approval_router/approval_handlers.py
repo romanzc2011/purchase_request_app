@@ -126,6 +126,20 @@ class ManagementHandler(Handler):
             if row:
                 approvals_uuid, pending_approval_id = row
                 
+                # Initialize variables
+                pending_approved_by = None
+                final_approved_by = None
+                pending_approved_at = None
+                final_approved_at = None
+                
+                if request.status is ItemStatus.PENDING_APPROVAL:
+                    pending_approved_by = format_username(request.approver)
+                    pending_approved_at = dbas.utc_now_truncated()
+                
+                if request.status is ItemStatus.APPROVED:
+                    final_approved_by = format_username(request.approver)
+                    final_approved_at = dbas.utc_now_truncated()
+                
                 # Use the insert_final_approval function, this is just a table, its not making it final approved
                 await dbas.insert_final_approval(
                     db=db,
@@ -133,9 +147,12 @@ class ManagementHandler(Handler):
                     purchase_request_id=request.id,
                     line_item_uuid=request.uuid,
                     pending_approval_id=pending_approval_id,
-                    approver=request.approver,
                     status=ItemStatus.PENDING_APPROVAL,
-                    deputy_can_approve=dbas.can_deputy_approve(request.total_price)
+                    deputy_can_approve=dbas.can_deputy_approve(request.total_price),
+                    pending_approved_by=pending_approved_by,
+                    final_approved_by=final_approved_by,
+                    pending_approved_at=pending_approved_at,
+                    final_approved_at=final_approved_at
                 )
                 
                 # Send email to clerk admin and management (Edmund/Lela) requesting approval

@@ -28,8 +28,8 @@ function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
     formData.append("file", file);
     formData.append("ID", ID);
 
-    if(api_call == "/api/upload") {
-        return api.post("/api/upload", formData, {
+    if(api_call == "/api/upload_file") {
+        return api.post("/api/upload_file", formData, {
             headers: { 
                 "Content-Type": "multipart/form-data",
                 'Authorization': `Bearer ${localStorage.getItem('access_token')}`,

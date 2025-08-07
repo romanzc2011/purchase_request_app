@@ -27,9 +27,10 @@ class ApprovalUtils:
             purchase_request_id=request.id,
             line_item_uuid=request.uuid,
             pending_approval_id=pending_approval_id,
-            approver=request.approver,
             status=ItemStatus.PENDING_APPROVAL,
-            deputy_can_approve=dbas.can_deputy_approve(request.total_price)
+            deputy_can_approve=dbas.can_deputy_approve(request.total_price),
+            pending_approved_by=request.approver,
+            final_approved_by=request.approver
         )
     
     @staticmethod
