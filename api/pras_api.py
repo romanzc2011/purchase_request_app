@@ -21,11 +21,14 @@ uvicorn pras_api:app --port 5004
 """
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 from typing import Awaitable, Callable, ParamSpec, TypeVar
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
+from api.services.progress_tracker.steps.download_steps import DownloadStepName
+from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
 from api.utils.misc_utils import format_username
 from pydantic import ValidationError
 from fastapi import (
@@ -54,11 +57,10 @@ from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import settings
-from api.dependencies.pras_dependencies import progress_state, shm_mgr
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
 from api.services.websocket_manager import websock_conn
-from api.services.progress_tracker import download_sig, download_progress
+from api.services.progress_tracker.progress_manager import create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 
 # Database ORM Model Imports
 from api.services.db_service import (
@@ -160,10 +162,11 @@ async def download_statement_of_need_form(
     """
     This endpoint is used to download the statement of need form for a given ID.
     """
-    download_progress.reset()
-    download_progress.start_download_tracking = True
-    download_progress.send_download_start_msg()
-    logger.success(f"DOWNLOAD STARTED: {download_progress.start_download_tracking}")
+    #!-PROGRESS TRACKING --------------------------------------------------------------
+    download_tracker = create_download_tracker()
+    download_tracker.start_download_tracking = True
+    download_tracker.send_start_msg()
+    #!---------------------------------------------------------------------------------
     
     ID = payload.get("ID")
     if not ID:
@@ -176,8 +179,15 @@ async def download_statement_of_need_form(
             payload=payload
         )
         
+        # Convert to Path object if it's a string
+        if isinstance(output_path, str):
+            output_path = Path(output_path)
+        
         if not output_path.exists():
             raise HTTPException(status_code=404, detail="Statement of need form not found")
+
+        # File does exists 
+        download_tracker.mark_step_done(DownloadStepName.VERIFY_FILE_EXISTS)
         
         return FileResponse(
             path=str(output_path),
@@ -289,11 +299,12 @@ async def send_purchase_request(
 ):
     
     #! PROGRESS TRACKING ---------------------------------------------------------
-    message = "START_TOAST"
-    await websock_conn.broadcast({"event": message})
-    logger.debug("START_TOAST SENT")
-    #!----------------------------------------------------------------------------
+    submit_request_tracker = create_submit_request_tracker()
+    submit_request_tracker.start_submit_request_tracking = True
     
+    submit_request_tracker.send_start_msg()
+    submit_request_tracker.mark_step_done(SubmitRequestStepName.REQUEST_STARTED)
+    #!----------------------------------------------------------------------------
     """
     This endpoint:
       - Parses the incoming payload
@@ -302,7 +313,7 @@ async def send_purchase_request(
     """
     try:
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
-        logger.info(f"Received files: {[f.filename for f in files] if files else 'No files'}")
+        submit_request_tracker.mark_step_done(SubmitRequestStepName.PAYLOAD_VALIDATED)
         
     except ValidationError as e:
         error_details = e.errors()
@@ -318,15 +329,14 @@ async def send_purchase_request(
 
     logger.info("###########################################################")
     logger.info(f"CURRENT USER: {current_user}")
+    submit_request_tracker.mark_step_done(SubmitRequestStepName.USER_AUTHENTICATED)
     logger.info("###########################################################")
-    ################################################################3
-    ## VALIDATE REQUESTER
-    requester = payload.requester
-    # Use current_user's email instead of doing another LDAP lookup
+    
+    # Use current_user's email instead of doing another LDAP lookup to validate requester
     requester_email = current_user.email
     
     if not requester_email: 
-        logger.error(f"Could not find email for user {requester}")
+        logger.error(f"Could not find email for user {current_user.username}")
         return JSONResponse(
             status_code=400,
             content={"message": "Invalid requester"}
@@ -375,8 +385,8 @@ async def send_purchase_request(
         result = await db.execute(stmt)
         purchase_req_id = result.scalar_one_or_none()
         
-        #! PROGRESS TRACKING ---------------------------------------------------------
-        await send_socket_data(step_name="id_generated")
+        #! PROGRESS TRACKING ----------------------------------------------------------
+        submit_request_tracker.mark_step_done(SubmitRequestStepName.PURCHASE_REQUEST_ID_GENERATED)
         #!-----------------------------------------------------------------------------
         
         ##################################################################################
@@ -403,7 +413,7 @@ async def send_purchase_request(
         await db.flush()
         
         #! PROGRESS TRACKING ----------------------------------------------------------
-        await send_socket_data(step_name="pr_headers_inserted")
+        submit_request_tracker.mark_step_done(SubmitRequestStepName.PR_HEADER_UPDATED)
         #!-----------------------------------------------------------------------------
         
         pr_line_item_uuids: List[str] = []
@@ -440,7 +450,7 @@ async def send_purchase_request(
             await db.flush() # UUID is now available
             
             #! PROGRESS TRACKING ----------------------------------------------------------
-            await send_socket_data(step_name="line_items_inserted")
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.LINE_ITEMS_INSERTED)
             #!-----------------------------------------------------------------------------
             
             #?#################################################################################
@@ -463,7 +473,8 @@ async def send_purchase_request(
             
             # UUID tracking
             pr_line_item_uuids.append(orm_pr_line_item.UUID)
-        
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.FILES_UPLOADED)
+
         #?#################################################################################
         #? SETTING THE CONTRACTING OFFICER
         #?#################################################################################
@@ -478,6 +489,7 @@ async def send_purchase_request(
         )
         result = await db.execute(stmt)
         contracting_officer_username = result.scalar_one_or_none()
+        submit_request_tracker.mark_step_done(SubmitRequestStepName.CONTRACTING_OFFICER_RETRIEVED)
         logger.info(f"Contracting officer username: {contracting_officer_username}")
         
         #?#################################################################################
@@ -510,6 +522,7 @@ async def send_purchase_request(
             db.add(appr)
             await db.flush()
             approvals.append(appr)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.APPROVAL_RECORDS_CREATED)
             
             """
             Separating the requests based on the fund
@@ -534,7 +547,7 @@ async def send_purchase_request(
             await db.flush()
             
             #! PROGRESS TRACKING ----------------------------------------------------------
-            await send_socket_data(step_name="pending_approval_inserted")
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PENDING_APPROVAL_INSERTED)
             #!-----------------------------------------------------------------------------
             
             stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.ID == purchase_req_id)
@@ -545,21 +558,13 @@ async def send_purchase_request(
             logger.info("Generating PDF document")
             pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
             
+            
             #! PROGRESS TRACKING ----------------------------------------------------------
-            await send_socket_data(step_name="generate_pdf")
-            await send_socket_data(step_name="pdf_generated")
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
             #!-----------------------------------------------------------------------------
             
             orm_pr_header.pdf_output_path = pdf_path
     #* <--- transaction is committed here
-    
-    #?########################################################################
-    #?# VALIDATE/PROCESS PAYLOAD
-    logger.debug(f"DATA: {payload}")
-    #fileAttachments=[FileAttachment(attachment=None, name='NBIS_questionaire_final.pdf', type='application/pdf', size=160428)])]
-    
-    requester = payload.requester
-    items = payload.items
     
     #?#########################################################################
     #?# EMAIL PAYLOADS
@@ -573,6 +578,8 @@ async def send_purchase_request(
         if path is not None:
             attachments_list.append(path)
             
+    submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
+    
     # Build kwargs dict for Pydantic, omitting attachments until confirmed present
     payload_kwargs = {
         "model_type": "email_request",
@@ -655,6 +662,23 @@ async def send_purchase_request(
 			)
 		)
         #!-----------------------------------------------------------------------------------------
+    
+    #! PROGRESS TRACKING ----------------------------------------------------------
+    # Mark final steps as done and broadcast final progress
+    submit_request_tracker.mark_step_done(SubmitRequestStepName.EMAIL_PAYLOAD_BUILT)
+    submit_request_tracker.mark_step_done(SubmitRequestStepName.TRANSACTION_COMMITTED)
+    submit_request_tracker.mark_step_done(SubmitRequestStepName.REQUEST_COMPLETED)
+    
+    # Calculate final progress and broadcast
+    final_percent = submit_request_tracker.calculate_progress()
+    final_send_data = {
+        "event": "PROGRESS_UPDATE",
+        "percent_complete": final_percent
+    }  
+    
+    await websock_conn.broadcast(final_send_data)
+    #!-----------------------------------------------------------------------------
+    
     return JSONResponse({"message": "All work completed"})
 
 #########################################################################
@@ -666,16 +690,22 @@ async def send_socket_data(
 	*args: P.args,
 	**kwargs: P.kwargs
 ) -> Optional[R]:
-    #1 Mark the step done
-    await shm_mgr.update(field=step_name, value=True)
+    # Get the submit request tracker
+    submit_request_tracker = get_submit_request_tracker()
     
     result: Optional[R] = None
     # If coroutine is given
     if coro_fn is not None:
         result = await coro_fn(*args, **kwargs)
         
-    # Broadcast updated percent to frontend
-    percent = shm_mgr.calc_progress_percentage()
+    # Mark the step done based on the step_name
+    if step_name == "send_approver_email":
+        submit_request_tracker.mark_step_done(SubmitRequestStepName.APPROVER_EMAIL_SENT)
+    elif step_name == "send_requester_email":
+        submit_request_tracker.mark_step_done(SubmitRequestStepName.REQUESTER_EMAIL_SENT)
+    
+    # Calculate progress and broadcast
+    percent = submit_request_tracker.calculate_progress()
     
     # Structure send data
     send_data = {
@@ -1334,7 +1364,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 message = json.loads(incoming_data)
                 if message.get("event") == "reset_data":
                     # reset shm
-                    shm_mgr.clear_state()
                     logger.info("Progress state cleared via WebSocket reset")
                 elif message.get("event") == "check_connection":
                     # Send connection status back
@@ -1345,7 +1374,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
                 elif message.get("event") == "clear_stale_state":
                     # Clear stale progress state
-                    await shm_mgr.check_and_clear_stale_state()
                     await websocket.send_json({
                         "event": "state_cleared",
                         "timestamp": asyncio.get_event_loop().time()

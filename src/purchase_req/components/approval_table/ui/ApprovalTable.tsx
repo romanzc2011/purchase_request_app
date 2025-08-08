@@ -40,7 +40,6 @@ interface ApprovalTableProps {
 /* API URLs */
 const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
 const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
 const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
 
 // Define a type for the DataGrid sx prop
@@ -220,7 +219,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
         return filtered;
     }, [approvalData, searchData, searchQuery]);
 
-    // Optimize expensive calculations with useMemo
     const rowsWithUUID = useMemo(() =>
         filteredApprovalData.map((r, i) =>
             r.UUID ? r : { ...r, UUID: `row-${i}` }

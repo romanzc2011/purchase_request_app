@@ -1,3 +1,5 @@
+import asyncio
+from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
 from fastapi import HTTPException
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib import colors
@@ -22,7 +24,9 @@ from sqlalchemy import select
 from api.utils.misc_utils import get_justifications_and_comments
 from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.services.progress_tracker import DownloadStepName, download_sig, download_progress
+from api.services.progress_tracker.steps.download_steps import DownloadStepName
+from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
+from api.services.progress_tracker.progress_manager import get_active_tracker, get_approval_tracker, get_download_tracker, get_submit_request_tracker, ProgressTrackerType
 
 class PDFService:
     def __init__(self):
@@ -59,14 +63,42 @@ class PDFService:
         
         if not ID:
             raise HTTPException(status_code=400, detail="ID is required")
+        
+        tracker = get_active_tracker()
+        
+        # Init local trackers to prevent error
+        download_tracker = None
+        approval_tracker = None
+        submit_request_tracker = None
 
+        # Get download tracker
+        if tracker and tracker.active_tracker == ProgressTrackerType.DOWNLOAD:
+            download_tracker = get_download_tracker()
+        
+        # Try to get submit request tracker, but don't fail if it doesn't exist
+        if tracker:
+            match tracker.active_tracker:
+                case ProgressTrackerType.DOWNLOAD:
+                    download_tracker = get_download_tracker()
+                    
+                case ProgressTrackerType.SUBMIT_REQUEST:
+                    submit_request_tracker = get_submit_request_tracker()
+                    
+                case ProgressTrackerType.APPROVAL:
+                    approval_tracker = get_approval_tracker()
+        
+
+        if submit_request_tracker:
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
+        
         # 1️⃣ Fetch the flattened approval rows
         rows = await dbas.fetch_flat_approvals(db, ID=ID)
-        
+            
+        #!-PROGRESS TRACKING --------------------------------------------------------------
         # Only run if this is from the download pdf signal
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.FETCH_APPROVAL_DATA)
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.FETCH_FLAT_APPROVALS)
+        if download_tracker:
+            download_tracker.mark_step_done(DownloadStepName.FETCH_APPROVAL_DATA)
+            download_tracker.mark_step_done(DownloadStepName.FETCH_FLAT_APPROVALS)
         
         if not rows:
             raise HTTPException(status_code=404, detail="No approvals found for this ID")
@@ -82,12 +114,12 @@ class PDFService:
         # Build justifcation template if true for trainNotAval or needsNotMeet
         # Fetch additional comment from database if present
         additional_comments = await get_justifications_and_comments(db, ID)
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
+        if download_tracker:
+            download_tracker.mark_step_done(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
         
         contracting_officer = await dbas.get_contracting_officer_by_id(db, ID)
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
+        if download_tracker:
+            download_tracker.mark_step_done(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
         
         logger.info(f"contracting_officer: {contracting_officer}")
         
@@ -104,8 +136,9 @@ class PDFService:
         line_items_result = await db.execute(line_items_stmt)
         line_item_uuids = [row[0] for row in line_items_result.all()]
         
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_LINE_ITEMS)
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        if download_tracker:
+            download_tracker.mark_step_done(DownloadStepName.GET_LINE_ITEMS)
         
         # Get SonComments by line_item_uuid (more reliable)
         son_comments_stmt = (
@@ -130,10 +163,11 @@ class PDFService:
         all_son_comments = list(son_comments) + list(approvals_son_comments)
         unique_son_comments = list({comment.UUID: comment for comment in all_son_comments}.values())
         
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_SON_COMMENTS)
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        if download_tracker:
+            download_tracker.mark_step_done(DownloadStepName.GET_SON_COMMENTS)
         
-        # Build your comment array
+        # Build your comment arrayrrr
         comment_arr: list[str] = []
         for c in unique_son_comments:
             cdata = SonCommentSchema.model_validate(c)
@@ -144,16 +178,23 @@ class PDFService:
             comment_arr.extend(additional_comments)
 
         order_type = dbas.get_order_types(ID)
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.GET_ORDER_TYPES)
         
-        # Only run if this is from the download pdf signal
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.LOAD_PDF_TEMPLATE)
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        if download_tracker:
+            download_tracker.mark_step_done(DownloadStepName.GET_ORDER_TYPES)
+        
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        if download_tracker:
+            download_tracker.mark_step_done(DownloadStepName.LOAD_PDF_TEMPLATE)
+            
+        if submit_request_tracker:
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
         
         # 5️⃣ Render the PDF
         output_path = self.output_dir / f"statement_of_need-{ID}.pdf"
-        return self._make_purchase_request_pdf(
+        
+        result = await asyncio.to_thread(
+            self._make_purchase_request_pdf,
             rows=rows,
             output_path=output_path,
             is_cyber=is_cyber,
@@ -161,7 +202,21 @@ class PDFService:
             comments=comment_arr,
             order_type=order_type,
             contracting_officer=contracting_officer,
+            download_tracker=download_tracker,
         )
+        
+        # Progress tracking after PDF generation is complete
+        if download_tracker:
+            download_tracker.mark_step_done(DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
+            download_tracker.mark_step_done(DownloadStepName.RENDER_PDF_BINARY)
+            download_tracker.mark_step_done(DownloadStepName.SAVE_PDF_TO_DISK)
+        
+        if submit_request_tracker:
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
+        
+        return result
             
     """
         Generate a purchase request PDF.
@@ -188,13 +243,22 @@ class PDFService:
                                    comments: list[str]=None, 
                                    order_type: str=None,
                                    contracting_officer: str=None,
+                                   download_tracker=None,
                                    ) -> Path: 
         logger.info(f"#####################################################")
         logger.info("make_purchase_request_pdf()")
         logger.info(f"#####################################################")
-        logger.info(f"COMMENTS: {comments}")
+        
         # ensure output folder exists
         output_path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+        
+        # Try to get submit request tracker, but don't fail if it doesn't exist
+        submit_request_tracker = None
+        try:
+            submit_request_tracker = get_submit_request_tracker()
+        except RuntimeError:
+            # Submit request tracker doesn't exist, which is fine for download operations
+            pass
         
         #— fonts & logo setup
         project_root = Path(__file__).resolve().parent.parent.parent
@@ -269,8 +333,10 @@ class PDFService:
             # Format date needed
             if isinstance(date_val, (datetime, date)):
                 date_str = date_val.strftime("%Y-%m-%d")
+                
             elif isinstance(date_val, str) and date_val:
                 date_str = date_val.split("T", 1)[0]
+                
             elif isinstance(order_type_val_local, str):
                 if order_type_val_local == "QUARTERLY_ORDER":
                     date_str = "Quarterly Order"
@@ -308,9 +374,7 @@ class PDFService:
         headings = ["BOC","Fund","Location","Description","Qty","Price Each","Total Price","Justification"]
         table_data = [[Paragraph(h, header_style) for h in headings]]
         
-        # Signal for MERGE_DATA_INTO_TEMPLATE step
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
+        # Note: Progress tracking is handled in the main async method, not in this thread-based method
         
         for r in rows:
             table_data.append([
@@ -386,17 +450,11 @@ class PDFService:
             ("BOTTOMPADDING",   (0, 0), (-1, -1), 2),
         ]))
         elements.append(total_table)
-
+        
         # Build document
         doc.build(elements, onFirstPage=draw_header, onLaterPages=draw_header)
         
-        # Only run if this is from the download pdf signal
-        if download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.RENDER_PDF_BINARY)
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.SAVE_PDF_TO_DISK)
-        
-        if output_path.exists() and download_progress._start_download_tracking:
-            download_sig.send(sender="pdf_download", step_name=DownloadStepName.VERIFY_FILE_EXISTS)
+        # Note: Progress tracking is handled in the main async method, not in this thread-based method
         
         return output_path
+        

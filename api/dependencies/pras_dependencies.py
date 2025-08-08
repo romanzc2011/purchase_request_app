@@ -1,9 +1,7 @@
 # Dependencies for PRAS
 import os
 
-from api.services.websocket_manager import websock_conn
 from api.settings                           import settings
-from api.services.cache_service             import CacheService
 from api.services.smtp_service.renderer     import TemplateRenderer
 from api.services.smtp_service.smtp_service import SMTP_Service
 from api.services.ldap_service              import LDAPService
@@ -12,8 +10,6 @@ from api.services.pdf_service               import PDFService
 from api.services.uuid_service              import UUIDService
 from api.services.search_service            import SearchService
 from api.dependencies.pras_schemas          import *
-from api.services.progress_bar_state		import ProgressState, ProgressSharedMemory
-from api.services.progress_tracker          import download_progress
 
 # —————————————— Email Renderer ————————————————————
 renderer = TemplateRenderer(
@@ -59,18 +55,3 @@ search_service = SearchService()
 # Auth Service
 # -----------------------------------------------------
 auth_service = AuthService(ldap_service=ldap_service)
-
-# -----------------------------------------------------
-# Progress State Shared Memory
-# -----------------------------------------------------
-progress_state = ProgressState()
-
-# -----------------------------------------------------
-# Shared Memory Manager
-# -----------------------------------------------------
-shm_mgr = ProgressSharedMemory()
-
-# -----------------------------------------------------
-# WebSocket Connection
-# -----------------------------------------------------
-# Using singleton instance from websocket_manager.py
