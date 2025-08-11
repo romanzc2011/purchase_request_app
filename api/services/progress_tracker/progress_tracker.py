@@ -135,15 +135,12 @@ class ProgressTracker:
     def calculate_progress(self) -> int:
         if self.start_download_tracking:
             steps = self.download_steps
-            logger.debug("Calculating download progress")
             
         elif self.start_approval_tracking:
             steps = self.approval_steps
-            logger.debug("Calculating approval progress")
             
         elif self.start_submit_request_tracking:
             steps = self.submit_request_steps
-            logger.debug("Calculating submit request progress")
             
         else:
             return self._percent_complete

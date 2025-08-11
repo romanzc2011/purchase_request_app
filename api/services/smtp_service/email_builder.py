@@ -8,6 +8,7 @@ from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies.pras_dependencies import pdf_service
 from sqlalchemy import select
+import api.services.db_service as dbas
 from api.services.db_service import (
     PurchaseRequestHeader,
     PurchaseRequestLineItem,
@@ -110,6 +111,7 @@ class ApproverEmailBuilder(EmailBuilder):
             datereq=rows[0].datereq,
             dateneed=rows[0].dateneed,
             orderType=rows[0].orderType,
+            approval_date=dbas.utc_now_truncated().strftime("%Y-%m-%d"),
             subject=f"Purchase Request #{self.request.id}",
             sender=settings.smtp_email_addr,
             to=None,    # Assign this in the smtp service

@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from email.mime.application import MIMEApplication
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import Optional, Sequence
 from sqlalchemy import select
 
 from api.services.ldap_service import LDAPService
@@ -65,6 +65,7 @@ class SMTP_Service:
                 "requester": payload.requester,
                 "datereq": payload.datereq,
                 "dateneed": payload.dateneed,
+                "approval_date": payload.approval_date,
                 "orderType": payload.orderType,
                 "additional_comments": additional_comments,
                 "items": payload.items,
@@ -189,65 +190,93 @@ class SMTP_Service:
             result = await smtp_client.send_message(msg_root)
             logger.info(f"RESULT: {result}")
         
-    #-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
     # SEND EMAIL TO APPROVERS
     #-------------------------------------------------------------------------------
     async def send_approver_email(
         self, 
         payload: EmailPayloadRequest, 
         db: AsyncSession, 
-        send_to: str = None):
+        send_to: list[AssignedGroup] | None = None):
         """
         Send email to approvers
         """
         logger.debug(f"SENDING TO: {send_to} send_approver_email")
         
+        # Normalizing input - handle both strings and lists
+        if isinstance(send_to, str):
+            roles = [send_to]
+        elif isinstance(send_to, (list, tuple)):
+            roles = list(send_to)
+        else:
+            roles = []
+        
         # Initialize to_address with a default value
         to_address = []
         cc_address = []
+        to_username = []
+        cc_username = []
         
         logger.info(f"SEND_TO: {send_to}")
         
-        match send_to:
-            case AssignedGroup.IT.value:
-                # Send to IT
-                to_address, to_username = await self.get_toaddr(department=AssignedGroup.IT.value, db=db)
-                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
-                
-            case AssignedGroup.FINANCE.value:
-                # Query WorkflowUser table for finance users and see if active
-                # Lauren Lee, Peter Baltz
-                to_address, to_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
-                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
-                
-            case AssignedGroup.MANAGEMENT.value:
-                # Send to Management
-                to_address, to_username = await self.get_toaddr(department=AssignedGroup.MANAGEMENT.value, db=db)
-                deputy_clerk_addresses, deputy_clerk_username = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
-                to_username.extend(deputy_clerk_username)
-                
-                to_address.extend(deputy_clerk_addresses)  # Because deputy_clerk is also in management team
-                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
-                
-            case AssignedGroup.DEPUTY_CLERK.value:
-                # Send to deputy clerk
-                to_address, to_username = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
-                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
-                
-            case AssignedGroup.CHIEF_CLERK.value:
-                # Send to chief clerk
-                to_address, to_username = await self.get_toaddr(department=AssignedGroup.CHIEF_CLERK.value, db=db)
-                cc_address, cc_username = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
-                
-            case _:
-                # Default case, most likely testing
-                logger.debug("Default case, most likely testing")
-                logger.warning(f"SENDING TO: {to_address} send_approver_email")
-                logger.warning(f"CC TO: {cc_address} send_approver_email function")
-                # to_address already set to default above
+        for role in roles:
+            logger.debug(f"ROLE: {role}")
+            match role:
+                case AssignedGroup.IT.value:
+                    # Send to IT
+                    to, to_users = await self.get_toaddr(department=AssignedGroup.IT.value, db=db)
+                    cc, cc_users = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                    to_address.extend(to)
+                    cc_address.extend(cc)
+                    to_username.extend(to_users)
+                    cc_username.extend(cc_users)
+                    
+                case AssignedGroup.FINANCE.value:
+                    # Query WorkflowUser table for finance users and see if active
+                    # Lauren Lee, Peter Baltz
+                    to, to_users = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                    cc, cc_users = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                    to_address.extend(to)
+                    cc_address.extend(cc)
+                    to_username.extend(to_users)
+                    cc_username.extend(cc_users)
+                    
+                case AssignedGroup.MANAGEMENT.value:
+                    # Send to Management
+                    to, to_users = await self.get_toaddr(department=AssignedGroup.MANAGEMENT.value, db=db)
+                    deputy_clerk_addresses, deputy_clerk_username = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                    to_address.extend(to)
+                    to_address.extend(deputy_clerk_addresses)  # Because deputy_clerk is also in management team
+                    cc, cc_users = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                    to_username.extend(to_users)
+                    to_username.extend(deputy_clerk_username)
+                    cc_address.extend(cc)
+                    cc_username.extend(cc_users)
+                    
+                case AssignedGroup.DEPUTY_CLERK.value:
+                    # Send to deputy clerk
+                    to, to_users = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                    cc, cc_users = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                    to_address.extend(to)
+                    cc_address.extend(cc)
+                    to_username.extend(to_users)
+                    cc_username.extend(cc_users)
+                    
+                case AssignedGroup.CHIEF_CLERK.value:
+                    # Send to chief clerk
+                    to, to_users = await self.get_toaddr(department=AssignedGroup.CHIEF_CLERK.value, db=db)
+                    cc, cc_users = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                    to_address.extend(to) 
+                    cc_address.extend(cc)   
+                    to_username.extend(to_users)
+                    cc_username.extend(cc_users)
+                    
+                case _:
+                    # Default case, most likely testing
+                    logger.debug(f"Unknown recipient role: {role}")
         
-        logger.warning(f"SENDING TO: {to_address}::{to_username} send_approver_email function")
-        logger.warning(f"CC TO: {cc_address}::{cc_username} send_approver_enmail function")
+        logger.info(f"SENDING TO: {to_address} :: {to_username}")
+        logger.info(f"CC TO:     {cc_address} :: {cc_username}")
         await self._send_mail_async(
             payload,
             db=db,

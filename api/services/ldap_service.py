@@ -141,7 +141,6 @@ class LDAPService:
             raw_name = raw_name.lower()
             if "adu\\" in raw_name:
                 raw_name = raw_name.replace("adu\\", "")
-                logger.debug(f"Removed ADU\\ from username: {raw_name}")
             
             conn = self.get_service_connection()
             conn.search(
@@ -167,7 +166,6 @@ class LDAPService:
             username = username.lower()
             if "adu\\" in username:
                 username = username.replace("adu\\", "")
-                logger.debug(f"Removed ADU\\ from username: {username}")
             
             conn = self.get_service_connection()
             conn.search(
@@ -194,7 +192,6 @@ class LDAPService:
             username = username.lower()
             if "adu\\" in username:
                 username = username.replace("adu\\", "")
-                logger.debug(f"Removed ADU\\ from username: {username}")
             
             user_dn = self._subtree_user_search(username)
             if not user_dn:
@@ -247,9 +244,7 @@ class LDAPService:
 
         # Perform subtree search
         try:
-            logger.debug(f"Query: {query}")
             query = query.replace(" ", "")
-            logger.debug(f"Query: {query}")
             conn.search(
                 search_base='OU=LAWB,OU=USCOURTS,DC=ADU,DC=DCN',
                 search_filter=f'(sAMAccountName={query}*)',

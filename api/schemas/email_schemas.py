@@ -29,6 +29,7 @@ class EmailPayloadRequest(BaseModel):
     dateneed: Optional[date] = None
     orderType: Optional[str] = None 
     additional_comments: Optional[List[str]] = None
+    approval_date: Optional[str] = None
     subject: str
     sender: str
     to: Optional[List[str]] = None

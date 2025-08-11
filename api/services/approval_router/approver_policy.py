@@ -101,6 +101,7 @@ class ApproverPolicy:
     # DEPUTY/CHIEF CLERK APPROVAL LOGIC
     # ----------------------------------------------------------------------------------
     async def deputy_chief_clerk_policy(
+        # This is a policy for chief clerk and deputy clerk to approve requests based on testing the current user
         self,
         total_price: float,
         current_status: ItemStatus,
@@ -111,29 +112,25 @@ class ApproverPolicy:
         Determine if deputy or chief clerk can approve the request
         """
         # Check if user has clerk admin permissions
-        if not self.user.has_group(LDAPGroup.CUE_GROUP.value):
-            logger.debug("User does not have CUE_GROUP permissions")
-            return False
-        
-        # Check if the request is in a state that can be approved
-        if current_status not in [ItemStatus.NEW_REQUEST, ItemStatus.PENDING_APPROVAL]:
-            logger.debug(f"Request status {current_status} cannot be approved by clerk admin")
-            return False
-        
-        # Check if deputy can approve based on price
-        if (dbas.can_deputy_approve(total_price) and self.username == CueClerk.DEPUTY_CLERK.value) or (format_username(self.username) == CueClerk.TEST_USER.value and dbas.can_deputy_approve(total_price)):
-            logger.success("Deputy can approve based on price")
-            return True
-        
-        # Check if chief clerk is active and is the current user
-        if await self._is_chief_clerk_active(db) and self.username == CueClerk.CHIEF_CLERK.value:
-            logger.success("Chief clerk is active and can approve")
-            return True
-        
-        # Check if test user is active
-        if await self._is_test_user_active(db):
-            logger.success("Test user is active and can approve")
-            return True
+        if self.user.has_group(LDAPGroup.CUE_GROUP.value):
+            logger.debug("User has CUE_GROUP permissions")
+            
+            # Check if deputy can approve based on price
+            # TESTING ONLY
+            # if (dbas.can_deputy_approve(total_price) and self.username == CueClerk.DEPUTY_CLERK.value) or (format_username(self.username) == CueClerk.TEST_USER.value and dbas.can_deputy_approve(total_price)):
+            if (dbas.can_deputy_approve(total_price) and self.username == CueClerk.DEPUTY_CLERK.value):
+                logger.success("Deputy can approve based on price")
+                return True
+            
+            # Check if chief clerk is active and is the current user
+            if await self._is_chief_clerk_active(db) and self.username == CueClerk.CHIEF_CLERK.value:
+                logger.success("Chief clerk is active and can approve")
+                return True
+            
+            # Check if test user is active
+            if await self._is_test_user_active(db):
+                logger.success("Test user is active and can approve")
+                return True
         
         logger.debug("User cannot approve this request")
         return False
