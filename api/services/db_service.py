@@ -14,11 +14,12 @@ from sqlalchemy.orm import declarative_base, selectinload, aliased
 from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import select
-from sqlalchemy.orm import aliased, joinedload
+from sqlalchemy.orm import aliased
 from datetime import datetime, timezone
-from contextlib import contextmanager, asynccontextmanager
+from contextlib import contextmanager
 from typing import List, Optional
-from api.schemas.enums import AssignedGroup, ItemStatus, TaskStatus
+from api.schemas.enums import AssignedGroup, ItemStatus
+from api.utils.logging_utils import logger_init_ok
 import uuid
 import os
 import sqlite3
@@ -910,18 +911,18 @@ def init_db():
         # Create (sync) all tables
         Base.metadata.create_all(bind=engine)
         
-        logger.info(f"Initializing database with script: {settings.SQL_SCRIPT_PATH}")
         with sqlite3.connect(settings.DATABASE_FILE_PATH) as conn:
             cur = conn.cursor()
             with open(settings.SQL_SCRIPT_PATH, "r") as f:
                 cur.executescript(f.read())
                 
-        logger.info("SQL script executed successfully")
+        logger_init_ok("SQL script executed successfully")
                 
         # Seed justification templates
         with SessionLocal() as session:
             if not session.query(JustificationTemplate).first():
-                logger.info("Seeding justification templates")
+                logger_init_ok("Seeding justification templates")
+                
                 session.add_all([
                     JustificationTemplate(
                         code="NOT_AVAILABLE",
@@ -933,10 +934,10 @@ def init_db():
                     ),
                 ])
             if not session.query(WorkflowUser).first():
-                logger.info("Seeding workflow users")
+                logger_init_ok("Seeding workflow users")
                 session.add_all(users)
                 session.commit()
-        logger.info("Database initialized successfully")
+        logger_init_ok("Database initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing database: {e}")
         raise

@@ -60,7 +60,9 @@ from api.dependencies.pras_dependencies import settings
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
 from api.services.websocket_manager import websock_conn
-from api.services.progress_tracker.progress_manager import create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
+from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
+from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
+import time
 
 # Database ORM Model Imports
 from api.services.db_service import (
@@ -925,7 +927,14 @@ async def approve_deny_request(
 ):
     
     try:
-        logger.info(f"PAYLOAD: {payload}")
+        logger.debug("APPROVE/DENY REQUEST")
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        approval_tracker = create_approval_tracker()
+        approval_tracker.send_start_msg()
+        approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_STARTED)
+        time.sleep(1)
+        approval_tracker.mark_step_done(ApprovalStepName.PAYLOAD_VALIDATED)
+        #!---------------------------------------------------------------------------------
         # Process each item in the payload
         results = []
         for i, (item_uuid, item_fund, total_price, target_status) in enumerate(zip(
@@ -936,6 +945,9 @@ async def approve_deny_request(
                 PendingApproval.line_item_uuid == item_uuid,
                 PendingApproval.purchase_request_id == payload.ID
             )
+            #! - PROGRESS TRACKING --------------------------------------------------------
+            approval_tracker.mark_step_done(ApprovalStepName.CHAIN_STATUS_CHECKED)
+            
             result = await db.execute(stmt)
             status_row = result.scalar_one_or_none()
             already_in_chain = status_row == ItemStatus.PENDING_APPROVAL
@@ -945,6 +957,9 @@ async def approve_deny_request(
                 router = ApprovalRouter().start_handler(ClerkAdminHandler())
             else:
                 router = ApprovalRouter() # Defaults to full chain: IT -> Finance -> ClerkAdmin
+                
+            # Mark router configured
+            approval_tracker.mark_step_done(ApprovalStepName.ROUTER_CONFIGURED)
             #################################################################################################
             # START CHAIN
             # Get assigned group from pending_approvals via line_item_uuid/purchase_request_id
@@ -959,6 +974,9 @@ async def approve_deny_request(
             row = result.first()
             pending_approval_id = row.pending_approval_id
             assigned_group = row.assigned_group
+            
+            # Mark data retrieval steps as done
+            approval_tracker.mark_step_done(ApprovalStepName.PENDING_APPROVAL_DATA_RETRIEVED)
             
             logger.info(f"Assigned group: {assigned_group}")
             logger.info(f"Pending approval ID: {pending_approval_id}")
@@ -975,8 +993,16 @@ async def approve_deny_request(
                 action=payload.action,
                 approver=current_user.username
             )
+            
+            # Mark approval request built
+            approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_BUILT)
             result = await router.route(approval_request, db, current_user, ldap_service)
             logger.info(f"Result: {result}")
+            
+            # Mark final steps as done
+            approval_tracker.mark_step_done(ApprovalStepName.RESULT_OBJECT_BUILT)
+            approval_tracker.mark_step_done(ApprovalStepName.FINAL_RESULTS_RETURNED)
+            
             #################################################################################################
             # END CHAIN
             #################################################################################################

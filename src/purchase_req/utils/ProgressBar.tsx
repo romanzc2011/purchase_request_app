@@ -3,7 +3,7 @@ import { toast, Id } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../store/prasStore';
 import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
-import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig } from "./PrasSignals";
+import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
 import { ProgressToast } from "../components/ProgressToast";
 
@@ -13,7 +13,7 @@ import { ProgressToast } from "../components/ProgressToast";
 export function ProgressBar() {
     const toastIdRef = useRef<Id | null>(null);
     const dispatch = useDispatch<AppDispatch>();
-    const status = useSelector((s: RootState) => s.progress.status);
+    const status = useSelector((s: RootState) => (s as any).progress.status);
     const [lastHeartbeat, setLastHeartbeat] = useState<number>(Date.now());
     const [isConnected, setIsConnected] = useState(false);
     let socketSignal = socketSig.value;
@@ -41,6 +41,10 @@ export function ProgressBar() {
         if (isRequestSubmitted.value) {
             messageSig.value = "Submitting request";
         }
+
+        if (isApprovalSig.value) {
+            messageSig.value = "Approval request processing";
+        }
     });
 
     // Handle connection status changes
@@ -53,6 +57,7 @@ export function ProgressBar() {
                 isDownloadSig.value = false;
                 isSubmittedSig.value = false;
                 isRequestSubmitted.value = false;
+                isApprovalSig.value = false
                 if (toastIdRef.current !== null) {
                     toast.dismiss(toastIdRef.current);
                 }
@@ -109,11 +114,12 @@ export function ProgressBar() {
                 console.log("DATE.EVENT: ", data.event);
                 console.log("Download sig: ", isDownloadSig.value);
                 console.log("Submitted Sig: ", isSubmittedSig.value);
+                console.log("Approval request: ", isApprovalSig.value);
                 console.log("Percent: ", percent);
                 console.log("isRequestSubmitted: ", isRequestSubmitted.value);
 
                 // PROGRESS_UPDATE (for downloading pdf)
-                if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isRequestSubmitted.value) && percent != null) {
+                if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isRequestSubmitted.value || isRequestSubmitted.value || isApprovalSig.value) && percent != null) {
                     // create toast if needed
                     console.log("PROGRESS UPDATE SECTION");
                     if (toastIdRef.current === null) {
@@ -129,6 +135,7 @@ export function ProgressBar() {
                             position: "top-center",
                             type: percent === 100 ? "success" : undefined,
                         });
+                        console.log("TOAST.UPDATE ", percent);
                     }
 
                     // optionally dispatch "done" after the bar finishes its transition
@@ -138,6 +145,7 @@ export function ProgressBar() {
                             isDownloadSig.value = false; // Reset the signal when done
                             isSubmittedSig.value = false;
                             isRequestSubmitted.value = false;
+                            isApprovalSig.value = false;
                         }, 1000);
                     }
                 } else if (data.event === "NO_USER_FOUND") {
@@ -161,8 +169,6 @@ export function ProgressBar() {
             const now = Date.now();
             if (now - lastHeartbeat > 120000 && isConnected) { // 2 minutes
                 console.log("⚠️ No heartbeat received for 2 minutes, connection may be stale");
-                // Optionally trigger a reconnection by refreshing the page
-                // window.location.reload();
             }
         };
 

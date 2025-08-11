@@ -32,7 +32,6 @@ class PDFService:
     def __init__(self):
         self.output_dir = Path("output")
         self.output_dir.mkdir(exist_ok=True)
-
     """
     Generate a purchase request PDF.
 
@@ -56,10 +55,6 @@ class PDFService:
         logger.info(f"#####################################################")
         logger.info("create_pdf()")
         logger.info(f"#####################################################")
-        logger.info(f"ID: {ID}")
-        logger.info(f"payload: {payload}")
-        logger.info(f"comments: {comments}")
-        logger.info(f"is_cyber: {is_cyber}")
         
         if not ID:
             raise HTTPException(status_code=400, detail="ID is required")
@@ -87,7 +82,6 @@ class PDFService:
                 case ProgressTrackerType.APPROVAL:
                     approval_tracker = get_approval_tracker()
         
-
         if submit_request_tracker:
             submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
         

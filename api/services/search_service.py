@@ -17,7 +17,7 @@ from whoosh.fields import Schema, ID, TEXT, NUMERIC, BOOLEAN, DATETIME
 from whoosh.index import create_in, open_dir
 from whoosh.writing import AsyncWriter
 from whoosh.qparser import MultifieldParser, OrGroup
-from whoosh.query import Term, Prefix, Or
+from api.utils.logging_utils import logger_init_ok
 import os
 from functools import lru_cache
 from typing import Dict, List, Optional, Any
@@ -81,11 +81,11 @@ class SearchService:
                 self.ix = create_in(self.index_dir, schema=approval_schema)
             else:
                 self.ix = open_dir(self.index_dir)
-                logger.success("Index opened successfully")
+                logger_init_ok("Index opened successfully")
 
         # Build or rebuild the index
         self.create_whoosh_index()
-        logger.info("Search index initialized and ready")
+        logger_init_ok("Search index initialized and ready")
 
         # Analyzer for custom parsers
         self.analyzer = RegexTokenizer() | LowercaseFilter() | StopFilter()
@@ -157,7 +157,7 @@ class SearchService:
                 # Commit the changes
                 writer.commit()
                 
-            logger.info("Search index created successfully")
+            logger_init_ok("Search index created successfully")
             
         except Exception as e:
             logger.error(f"Error creating search index: {e}")

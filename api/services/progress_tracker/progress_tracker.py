@@ -86,18 +86,16 @@ class ProgressTracker:
         logger.debug("Sent start toast message")
     
     def mark_step_done(self, step_name):
+        
         """Mark a step as done and update progress"""
         if self.start_download_tracking:
             steps = self.download_steps
-            logger.debug("Marking download step as done")
             
         elif self.start_approval_tracking:
             steps = self.approval_steps
-            logger.debug("Marking approval step as done")
             
         elif self.start_submit_request_tracking:
             steps = self.submit_request_steps
-            logger.debug("Marking submit request step as done")
             
         else:
             return

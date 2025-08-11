@@ -14,6 +14,7 @@ from api.schemas.enums import LDAPGroup
 from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings 
 from api.services.websocket_manager import websock_conn
+from api.utils.logging_utils import logger_init_ok
 
 def run_in_thread(fn):
     async def wrapper(*args, **kwargs):
@@ -64,7 +65,7 @@ class LDAPService:
         host, port, use_ssl = self._parse_host_port(self.ldap_url)
         server = Server(host, port=port, use_ssl=use_ssl, get_info=ALL, tls=self.tls_config() if use_tls else None)
         conn = Connection(server, user=user_dn, password=password, auto_bind=True, receive_timeout=10)
-        logger.info(f"LDAP BOUND: {conn.bound}")
+        logger_init_ok(f"LDAP bound successful")
         return conn
     
     #-------------------------------------------------------------------------------------

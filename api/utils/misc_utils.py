@@ -79,3 +79,4 @@ async def get_justifications_and_comments(db: AsyncSession, ID: str) -> list[str
     
     
     return additional_comments
+

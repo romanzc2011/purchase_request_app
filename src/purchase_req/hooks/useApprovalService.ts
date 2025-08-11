@@ -4,6 +4,7 @@ import { ApprovalData, DataRow, DenialData } from "../types/approvalTypes";
 import { approveDenyRequest } from "../services/ApprovalService";
 import { toast } from "react-toastify";
 import { useCommentModal } from "./useCommentModal";
+import { isApprovalSig } from "../utils/PrasSignals";
 
 export function useApprovalService() {
     const [approvalPayload, setApprovalPayload] = useState<ApprovalData | null>(null);
@@ -30,9 +31,6 @@ export function useApprovalService() {
 				return oldData.map(row => row.UUID === newRow.UUID ? newRow : row);
 			});
 
-			// Optionally, you can also call an API to persist the change
-			// await updatePriceEachAPI(newRow.UUID, newRow.priceEach);
-
 			toast.success("Price updated successfully");
 		return newRow;
 		} catch (error) {
@@ -50,7 +48,9 @@ export function useApprovalService() {
         setIsLoading(true);
         setError(null);
         try {
+            isApprovalSig.value = true;  // Change signal to true to start progress bar updating
             const response = await approveDenyRequest(payload);
+            
             console.log("🔥 APPROVE/DENY RESPONSE", response);
             return response;
         } catch (error) {

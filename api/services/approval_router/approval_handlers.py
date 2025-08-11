@@ -1,22 +1,20 @@
 from __future__ import annotations
-import asyncio
-from http.client import HTTPException
 from typing import Optional
 from abc import ABC, abstractmethod
-from api import settings
-from api.schemas.email_schemas import EmailPayloadRequest, LineItemsPayload
 from api.schemas.enums import AssignedGroup
-from api.services import auth_service, cache_service
 from api.dependencies.pras_dependencies import smtp_service
 from api.services.approval_router.approval_utils import ApprovalUtils
+from api.services.progress_tracker.progress_manager import get_active_tracker, get_approval_tracker
+from api.services.progress_tracker.progress_tracker import ProgressTrackerType
+from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
 from api.utils.misc_utils import format_username
+from api.utils.logging_utils import logger_init_ok
 from loguru import logger
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
 import api.services.db_service as dbas
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from fastapi import Depends
 from api.schemas.ldap_schema import LDAPUser
 from api.services.approval_router.approver_policy import ApproverPolicy
 from api.services.smtp_service.email_builder import ApproverEmailBuilder
@@ -28,6 +26,18 @@ class Handler(ABC):
     def __init__(self):
         logger.info(f"Handler initialized")
         self._next: Optional["Handler"] = None
+        tracker = get_active_tracker()
+        
+        # Init local trackers to prevent error
+        approval_tracker = None
+
+        # Get download tracker
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+        
+        if approval_tracker:
+            approval_tracker.mark_step_done(ApprovalStepName.HANDLER_BASE_INITIALIZED)
+            logger_init_ok("Handler base initialized")
         
     def set_next(self, handler: "Handler") -> "Handler":
         logger.info(f"Setting next handler: {handler}")
@@ -59,9 +69,18 @@ class ITHandler(Handler):
         ldap_service: LDAPService
     ) -> ApprovalRequest:
         policy = ApproverPolicy(current_user)
+        
         if policy.can_it_approve(request.fund, ItemStatus.NEW_REQUEST):
             logger.debug("IT HANDLER CAN APPROVE HANDLER")
+            
+            # Mark IT handler initialized
+            tracker = get_active_tracker()
+            if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+                approval_tracker = get_approval_tracker()
+                approval_tracker.mark_step_done(ApprovalStepName.IT_HANDLER_INITIALIZED)
+            
             row = await ApprovalUtils.get_approval_data(db, request.uuid)
+            
             if not row:
                 logger.error(f"IT HANDLER: Could not find approval/task data for {request.uuid}")
                 return await super().handle(request, db, current_user, ldap_service)
@@ -75,8 +94,13 @@ class ITHandler(Handler):
                 current_user=current_user,
                 ldap_service=ldap_service
             )
+            
+            # Mark IT approval processed
+            if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+                approval_tracker = get_approval_tracker()
+                approval_tracker.mark_step_done(ApprovalStepName.IT_APPROVAL_PROCESSED)
+            
         return await super().handle(request, db, current_user, ldap_service)
-
 # ----------------------------------------------------------------------------------------
 # MANAGEMENT HANDLER
 # ----------------------------------------------------------------------------------------
@@ -98,10 +122,19 @@ class ManagementHandler(Handler):
         #!----------------------------------------------------------
         #! TEST USER OVERRIDE - REMOVED FOR PRODUCTION
         #!----------------------------------------------------------
+        
+      
+                    
         approver_policy = ApproverPolicy(current_user)
         
         # Management can approve any request that doesn't start with 511
         logger.debug("MANAGEMENT HANDLER PROCESSING REQUEST")
+        
+        # Mark Management handler initialized
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED)
         
         """
         Finance/Management 092x will email TO: Edmund Brown, Lela
@@ -162,9 +195,21 @@ class ManagementHandler(Handler):
                 await smtp_service.send_approver_email(email_payload, db=db, send_to=AssignedGroup.MANAGEMENT.value)
                 
                 logger.debug(f"MANAGEMENT HANDLER: Inserted final approval for {request.uuid}")
+                
+                # Mark Management approval processed
+                tracker = get_active_tracker()
+                if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+                    approval_tracker = get_approval_tracker()
+                    approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED)
             else:
                 logger.error(f"MANAGEMENT HANDLER: Could not find approval/task data for {request.uuid}")
         
+        # Mark Management approval processed (even if not approved, the step is complete)
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED)
+            
         return await super().handle(request, db, current_user, ldap_service)
     
 ###############################################################################################
@@ -184,6 +229,12 @@ class ClerkAdminHandler(Handler):
         
         # ClerkAdmin is the final handler - they can approve based on price
         logger.critical("CLERK ADMIN HANDLER PROCESSING REQUEST")
+        
+        # Mark Clerk Admin handler initialized
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.CLERK_ADMIN_HANDLER_INITIALIZED)
         approver_policy = ApproverPolicy(current_user)    # Create an instance of the approver policy
         
         # This is the current user who is trying to approve the request
@@ -209,6 +260,13 @@ class ClerkAdminHandler(Handler):
             db=db
         )
         
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        # Mark Clerk policy checked
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.CLERK_POLICY_CHECKED)
+        
         if not can_approve:
             logger.debug("CLERK ADMIN HANDLER: User is not allowed to approve this request")
             # Send email to Chief Clerk for escalation
@@ -218,6 +276,14 @@ class ClerkAdminHandler(Handler):
             
             email_payload = await approver_email_builder.build_email_payload()
             await smtp_service.send_approver_email(email_payload, db=db, send_to=AssignedGroup.CHIEF_CLERK.value)
+            
+            # Mark clerk approval processed (even if not approved, the step is complete)
+            #!-PROGRESS TRACKING --------------------------------------------------------------
+            tracker = get_active_tracker()
+            if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+                approval_tracker = get_approval_tracker()
+                approval_tracker.mark_step_done(ApprovalStepName.CLERK_APPROVAL_PROCESSED)
+                
             return await super().handle(request, db, current_user, ldap_service)
         
         #*#################################################################################
@@ -241,8 +307,23 @@ class ClerkAdminHandler(Handler):
             
         approvals_uuid = row[0]
         
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        # Mark approval UUID retrieved
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_UUID_RETRIEVED)
+        
+        #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark request as APPROVED
         await dbas.mark_final_approval_as_approved(db, approvals_uuid)
+        
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        # Mark request marked approved
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.REQUEST_MARKED_APPROVED)
             
         # Send email to requester that their request has been approved
         logger.debug(f"CLERK ADMIN HANDLER: Sending email to requester that their request has been approved for {request.uuid}")
@@ -250,7 +331,21 @@ class ClerkAdminHandler(Handler):
         approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
         email_payload = await approver_email_builder.build_email_payload()
         await smtp_service.send_request_approved_email(email_payload,db=db)
+        
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        # Mark approval email sent
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_EMAIL_SENT)
+            
         logger.debug(f"CLERK ADMIN HANDLER: Inserted final approval for {request.uuid}")
+        
+        #!-PROGRESS TRACKING --------------------------------------------------------------
+        # Mark clerk approval processed
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.CLERK_APPROVAL_PROCESSED)
         
         # Pass the request to the next handler
         if self._next:

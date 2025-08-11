@@ -1,4 +1,5 @@
 from .progress_tracker import ProgressTracker, ProgressTrackerType
+from loguru import logger
 
 download_progress: ProgressTracker | None = None
 approval_progress: ProgressTracker | None = None
@@ -99,3 +100,8 @@ def get_active_tracker() -> ProgressTracker:
             continue
         
     return None
+
+def print_tracker_statuses():
+    logger.success(f"Download tracker: {download_progress.start_download_tracking}")
+    logger.success(f"Approval tracker: {approval_progress.start_approval_tracking}")
+    logger.success(f"Submit request tracker: {submit_request_tracker.start_submit_request_tracking}")

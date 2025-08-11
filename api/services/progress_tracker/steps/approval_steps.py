@@ -9,6 +9,7 @@ class ApprovalStepName(Enum):
     # Initial Setup
     APPROVAL_REQUEST_STARTED = auto()
     PAYLOAD_VALIDATED = auto()
+    HANDLER_BASE_INITIALIZED = auto()
     
     # Chain Analysis
     CHAIN_STATUS_CHECKED = auto()
@@ -49,6 +50,7 @@ APPROVAL_STEPS: List[ApprovalStep] = [
     # Initial Setup (10%)
     ApprovalStep(ApprovalStepName.APPROVAL_REQUEST_STARTED, 5),
     ApprovalStep(ApprovalStepName.PAYLOAD_VALIDATED, 5),
+    ApprovalStep(ApprovalStepName.HANDLER_BASE_INITIALIZED, 0),
     
     # Chain Analysis (10%)
     ApprovalStep(ApprovalStepName.CHAIN_STATUS_CHECKED, 5),

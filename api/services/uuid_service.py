@@ -1,6 +1,7 @@
 from loguru import logger
 from sqlalchemy.orm import Session
 import api.services.db_service as dbas
+from api.utils.logging_utils import logger_init_ok
 
 class UUIDService:
     """
@@ -10,7 +11,7 @@ class UUIDService:
     
     def __init__(self):
         self._uuid_cache = {}
-        logger.info("UUIDService initialized")
+        logger_init_ok("UUIDService initialized")
     
     def get_uuid_by_id(self, db_session: Session, ID: str):
         """
