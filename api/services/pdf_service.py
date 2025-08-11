@@ -316,8 +316,6 @@ class PDFService:
             canvas.setFont("Play-Bold", 9)
             text_x = 0.2*inch
             text_y = y_logo - img_h - 20
-            logger.info(f"First row data for header: {first}")
-            logger.info(f"Date needed value: {first.get('dateneed')}")
             
             date_val = first.get("dateneed")
             # Use the function argument or fallback to row value

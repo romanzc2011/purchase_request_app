@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from typing import Optional
 from abc import ABC, abstractmethod
 from api.schemas.enums import AssignedGroup
@@ -19,6 +20,7 @@ from api.schemas.ldap_schema import LDAPUser
 from api.services.approval_router.approver_policy import ApproverPolicy
 from api.services.smtp_service.email_builder import ApproverEmailBuilder
 from api.services.ldap_service import LDAPService
+from api.utils.misc_utils import reset_signals
 
 
 # Approval Router to determine the routing of requests
@@ -55,6 +57,9 @@ class Handler(ABC):
         
         if self._next:
             return await self._next.handle(request, db, current_user, ldap_service)
+        
+        # Reset progress bar/signals, everything
+        reset_signals()
         return "No handler could process the request."
 
 # ----------------------------------------------------------------------------------------
@@ -70,14 +75,14 @@ class ITHandler(Handler):
     ) -> ApprovalRequest:
         policy = ApproverPolicy(current_user)
         
+        # Mark IT handler initialized
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.IT_HANDLER_INITIALIZED)
+        
         if policy.can_it_approve(request.fund, ItemStatus.NEW_REQUEST):
             logger.debug("IT HANDLER CAN APPROVE HANDLER")
-            
-            # Mark IT handler initialized
-            tracker = get_active_tracker()
-            if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
-                approval_tracker = get_approval_tracker()
-                approval_tracker.mark_step_done(ApprovalStepName.IT_HANDLER_INITIALIZED)
             
             row = await ApprovalUtils.get_approval_data(db, request.uuid)
             
@@ -94,11 +99,12 @@ class ITHandler(Handler):
                 current_user=current_user,
                 ldap_service=ldap_service
             )
-            
-            # Mark IT approval processed
-            if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
-                approval_tracker = get_approval_tracker()
-                approval_tracker.mark_step_done(ApprovalStepName.IT_APPROVAL_PROCESSED)
+        
+        # Mark IT approval processed (even if not approved, the step is complete)
+        tracker = get_active_tracker()
+        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+            approval_tracker = get_approval_tracker()
+            approval_tracker.mark_step_done(ApprovalStepName.IT_APPROVAL_PROCESSED)
             
         return await super().handle(request, db, current_user, ldap_service)
 # ----------------------------------------------------------------------------------------

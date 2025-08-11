@@ -3,7 +3,7 @@ import { toast, Id } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../store/prasStore';
 import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
-import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig } from "./PrasSignals";
+import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig, reset_signals } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
 import { ProgressToast } from "../components/ProgressToast";
 
@@ -119,7 +119,7 @@ export function ProgressBar() {
                 console.log("isRequestSubmitted: ", isRequestSubmitted.value);
 
                 // PROGRESS_UPDATE (for downloading pdf)
-                if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isRequestSubmitted.value || isRequestSubmitted.value || isApprovalSig.value) && percent != null) {
+                if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isRequestSubmitted.value || isRequestSubmitted.value || isApprovalSig) && percent != null) {
                     // create toast if needed
                     console.log("PROGRESS UPDATE SECTION");
                     if (toastIdRef.current === null) {
@@ -151,8 +151,20 @@ export function ProgressBar() {
                 } else if (data.event === "NO_USER_FOUND") {
                     toast.error(data.message);
                     userFoundSig.value = false;
+
                 } else if (data.event === "USER_FOUND") {
                     userFoundSig.value = true;
+
+                } else if (data.event == "SIGNAL_RESET") {
+                    console.log(data.event);
+                    console.log("SIGNAL RESET");
+                    reset_signals();
+                    //dispatch(resetProgress());
+
+                    if (toastIdRef.current !== null) {
+                        toast.dismiss(toastIdRef.current);
+                    }
+
                 }
             } catch (error) {
                 console.error("Error parsing WebSocket message:", error);
