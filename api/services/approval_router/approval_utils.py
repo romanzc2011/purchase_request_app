@@ -1,3 +1,4 @@
+import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.schemas.approval_schemas import ApprovalRequest
@@ -31,6 +32,17 @@ class ApprovalUtils:
             deputy_can_approve=dbas.can_deputy_approve(request.total_price),
             pending_approved_by=request.approver,
             final_approved_by=request.approver
+        )
+        
+    @staticmethod
+    async def update_final_approval(db: AsyncSession, approvals_uuid: str, request: ApprovalRequest, pending_approval_id: int):
+        await dbas.update_final_approval_status(
+            db=db,
+            approvals_uuid=approvals_uuid,
+            pending_approval_id=pending_approval_id,
+            status=ItemStatus.APPROVED,
+            final_approved_by=request.approver,
+            final_approved_at=dbas.utc_now_truncated()
         )
     
     @staticmethod

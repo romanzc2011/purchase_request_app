@@ -750,7 +750,8 @@ async def update_final_approval_status(
     line_item_uuid: str,
     pending_approval_id: int,
     status: ItemStatus,
-    approver: str
+    final_approved_by: str,
+    final_approved_at: datetime
 ) -> FinalApproval:
     """
     Update the status of a specific line item final approval.
@@ -777,8 +778,8 @@ async def update_final_approval_status(
         )
         .values(
             status=status,
-            approver=approver,
-            created_at=utc_now_truncated()
+            final_approved_by=final_approved_by,
+            final_approved_at=final_approved_at
         )
     )
     

@@ -129,8 +129,6 @@ class ManagementHandler(Handler):
         #! TEST USER OVERRIDE - REMOVED FOR PRODUCTION
         #!----------------------------------------------------------
         
-      
-                    
         approver_policy = ApproverPolicy(current_user)
         
         # Management can approve any request that doesn't start with 511
@@ -323,6 +321,25 @@ class ClerkAdminHandler(Handler):
         # Mark request as APPROVED
         logger.debug("MARKING FINAL APPROVAL AS APPROVED")
         await dbas.mark_final_approval_as_approved(db, approvals_uuid)
+        
+        row = await ApprovalUtils.get_approval_data(db, request.uuid)
+            
+        if not row:
+            logger.error(f"CLERK ADMIN HANDLER: Could not find approval/task data for {request.uuid}")
+            return await super().handle(request, db, current_user, ldap_service)
+            
+        approvals_uuid, pending_approval_id = row
+        await dbas.update_final_approval_status(
+            db=db,
+            approvals_uuid=approvals_uuid,
+            line_item_uuid=request.uuid,
+            pending_approval_id=pending_approval_id,
+            status=ItemStatus.APPROVED,
+            final_approved_by=current_user.username,
+            final_approved_at=dbas.utc_now_truncated()
+        )
+        
+        logger.debug(f"FINAL APPROVAL MARKED AS APPROVED: {approvals_uuid}, {request.uuid}, {pending_approval_id}")
         logger.debug("FINAL APPROVAL MARKED AS APPROVED")
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
