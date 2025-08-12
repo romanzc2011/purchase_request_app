@@ -279,6 +279,7 @@ function AddItemsForm({
                                 variant="button"
                                 component="label"
                                 htmlFor="requester"
+                                sx={{ fontFamily: "Play" }}
                             >
                                 <strong>Requester</strong>
                             </Typography>

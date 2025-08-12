@@ -16,7 +16,7 @@ const QuantityInput = ({ register, errors }: QuantityInputProps) => {
                     variant="button"
                     component="label"
                     htmlFor="quantity"
-                    sx={{ mr: 4, fontWeight: "bold" }}
+                    sx={{ mr: 4, fontWeight: "bold", fontFamily: "Play" }}
                 >
                     quantity:
                 </Typography>
@@ -31,7 +31,7 @@ const QuantityInput = ({ register, errors }: QuantityInputProps) => {
                     placeholder="Enter quantity"
                     error={!!errors.quantity}
                     helperText={errors.quantity?.message}
-                    sx={{ backgroundColor: "white" }}
+                    sx={{ backgroundColor: "white", fontFamily: "Play" }}
                     inputProps={{ min: 1 }}
                     {...register("quantity", { valueAsNumber: true })}
                 />

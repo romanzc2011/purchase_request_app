@@ -51,10 +51,16 @@ const FundPicker = ({
                                 field.onChange(e);
                                 onSelectFund(e.target.value as string);
                             }}
+                            sx={{
+                                "& .MuiSelect-select": {
+                                    fontFamily: "Play",
+                                    fontWeight: "bold",
+                                }
+                            }}
                         >
-                            <MenuItem value={"51140X"}>51140X</MenuItem>
-                            <MenuItem value={"51140E"}>51140E</MenuItem>
-                            <MenuItem value={"092000"}>092000</MenuItem>
+                            <MenuItem value={"51140X"} sx={{ fontFamily: "Play", fontWeight: "bold" }}>51140X</MenuItem>
+                            <MenuItem value={"51140E"} sx={{ fontFamily: "Play", fontWeight: "bold" }}>51140E</MenuItem>
+                            <MenuItem value={"092000"} sx={{ fontFamily: "Play", fontWeight: "bold" }}>092000</MenuItem>
                         </Select>
                         {fieldState.error && (
                             <FormHelperText>

@@ -16,7 +16,7 @@ const PriceInput = ({ register, errors }: PriceInputProps) => {
                     variant="button"
                     component="label"
                     htmlFor="price"
-                    sx={{ mr: 8, fontWeight: "bold" }}
+                    sx={{ mr: 8, fontWeight: "bold", fontFamily: "Play" }}
                 >
                     Price:
                 </Typography>
@@ -31,7 +31,7 @@ const PriceInput = ({ register, errors }: PriceInputProps) => {
                     placeholder="Enter Price"
                     error={!!errors.priceEach}
                     helperText={errors.priceEach?.message}
-                    sx={{ backgroundColor: "white" }}
+                    sx={{ backgroundColor: "white", fontFamily: "Play" }}
                     inputProps={{ min: 0, step: "0.01" }}
                     {...register("priceEach", { valueAsNumber: true })}
                 />

@@ -99,7 +99,6 @@ class PDFService:
         
         # Turn Pydantic models into dicts
         rows = [row.model_dump() for row in rows]
-        logger.info(f"rows: {rows}")
 
         # 2️⃣ Determine if any line items are cyber‐related
         is_cyber = any(r.get("isCyberSecRelated") for r in rows)
@@ -115,9 +114,7 @@ class PDFService:
         if download_tracker:
             download_tracker.mark_step_done(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
         
-        logger.info(f"contracting_officer: {contracting_officer}")
-        
-		        # ------------------------------------------------------------------------
+        # ------------------------------------------------------------------------
         # 3️⃣ Load SonComments via async select
         # Try to get SonComments through both line_item_uuid and approvals_uuid
         from api.services.db_service import PurchaseRequestLineItem

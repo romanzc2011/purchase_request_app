@@ -47,9 +47,15 @@ const LocationFilter = ({
                                 field.onChange(e);
                                 onSelectLocation(e.target.value as string);
                             }}
+                            sx={{
+                                "& .MuiSelect-select": {
+                                    fontFamily: "Play",
+                                    fontWeight: "bold",
+                                }
+                            }}
                         >
                             {locations.map((option, index) => (
-                                <MenuItem key={index} value={option}>
+                                <MenuItem key={index} value={option} sx={{ fontFamily: "Play", fontWeight: "bold" }}>
                                     {option}
                                 </MenuItem>
                             ))}

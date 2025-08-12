@@ -111,7 +111,7 @@ const BudgetCodePicker = ({
                                         )}
                                     </MenuItem>
                                 );
-                            })}
+                            }) || []}
                         </Select>
                         {fieldState.error && (
                             <FormHelperText>

@@ -29,7 +29,7 @@ from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
 from api.services.progress_tracker.steps.download_steps import DownloadStepName
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
-from api.utils.misc_utils import format_username
+from api.utils.misc_utils import format_username, reset_signals
 from pydantic import ValidationError
 from fastapi import (
     FastAPI, APIRouter, Depends, Form, 
@@ -368,7 +368,7 @@ async def send_purchase_request(
         )
         for item in payload.items
     ]
-    logger.debug(f"THIS IS PAYLOAD: {payload}")
+    
     # Build header & line items inside a single transaction
     pdf_path: str | None = None
     async with db.begin():
@@ -613,7 +613,6 @@ async def send_purchase_request(
     # But we need to also send a confirmation to requester that is has been sent to the approvers
     """
 
-    logger.info(f"EMAIL PAYLOAD REQUEST: {email_request_payload}")
     
     # Notify requester and approvers
     logger.info("Notifying requester and approvers")
@@ -1010,8 +1009,6 @@ async def approve_deny_request(
             approval_tracker.mark_step_done(ApprovalStepName.RESULT_OBJECT_BUILT)
             approval_tracker.mark_step_done(ApprovalStepName.FINAL_RESULTS_RETURNED)
             
-            approval_tracker.remaining_steps()
-            
             #################################################################################################
             # END CHAIN
             #################################################################################################
@@ -1023,6 +1020,7 @@ async def approve_deny_request(
         return results
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
+        reset_signals() # Send reset flag to front end to reset the approving/processing signals
         raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")
     
 ##########################################################################

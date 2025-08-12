@@ -60,7 +60,6 @@ async def get_justifications_and_comments(db: AsyncSession, ID: str) -> list[str
         templates.get(code, f"<no template for {code}>")
         for code in justification_codes
     ]
-    logger.info(f"Justifications: {additional_comments}")
     
     # -------------------------------------------------------
     # Get SonComments

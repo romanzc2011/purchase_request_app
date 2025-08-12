@@ -262,7 +262,6 @@ class ClerkAdminHandler(Handler):
             db=db
         )
         logger.warning(f"CAN APPROVE NOW: {can_approve_now}")
-        dbas.debug_check_workflow_user(db, format_username(current_user.username))
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark Clerk policy checked
