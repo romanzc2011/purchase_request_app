@@ -8,6 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import api.services.db_service as dbas
 
+def _norm(u: str) -> str:
+    return (u or "").strip().lower()
+
 class ApproverPolicy:
     def __init__(self, user: LDAPUser):
         self.user = user
@@ -30,10 +33,6 @@ class ApproverPolicy:
         
         if await self._is_deputy_clerk_active(db):
             logger.debug(f"Deputy Clerk is active, approving request")
-            return True
-        
-        if await self._is_test_user_active(db):
-            logger.debug(f"Test user is active, approving request")
             return True
         
         if await self._check_deputy_can_approve(request, db):
@@ -73,11 +72,11 @@ class ApproverPolicy:
     
     async def _is_test_user_active(self, db: AsyncSession) -> bool:
         stmt = select(dbas.WorkflowUser.active).where(
-            dbas.WorkflowUser.username == "roman_campbell"
+            dbas.WorkflowUser.username == CueClerk.TEST_USER.value
         )
         result = await db.execute(stmt)
         row = result.first()
-        return self.username == "romancampbell" and bool(row and row.active)
+        return format_username(self.username) == CueClerk.TEST_USER.value and bool(row and row.active)
     
     # ----------------------------------------------------------------------------------    
     # MANAGEMENT HANDLER APPROVAL LOGIC (LELA, EDMUND)
@@ -96,41 +95,39 @@ class ApproverPolicy:
             logger.warning(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False
         return self.user.has_group(LDAPGroup.IT_GROUP.value) and fund.startswith("511")
-
+    
     # ----------------------------------------------------------------------------------
-    # DEPUTY/CHIEF CLERK APPROVAL LOGIC
+    # CAN FULL APPROVE
     # ----------------------------------------------------------------------------------
-    async def deputy_chief_clerk_policy(
-        # This is a policy for chief clerk and deputy clerk to approve requests based on testing the current user
+    async def can_fully_approve(
         self,
         total_price: float,
         current_status: ItemStatus,
-        request: ApprovalRequest,
         db: AsyncSession
     ) -> bool:
-        """
-        Determine if deputy or chief clerk can approve the request
-        """
-        # Check if user has clerk admin permissions
-        if self.user.has_group(LDAPGroup.CUE_GROUP.value):
-            logger.debug("User has CUE_GROUP permissions")
-            
-            # Check if deputy can approve based on price
-            # TESTING ONLY
-            # if (dbas.can_deputy_approve(total_price) and self.username == CueClerk.DEPUTY_CLERK.value) or (format_username(self.username) == CueClerk.TEST_USER.value and dbas.can_deputy_approve(total_price)):
-            if (dbas.can_deputy_approve(total_price) and self.username == CueClerk.DEPUTY_CLERK.value):
-                logger.success("Deputy can approve based on price")
-                return True
-            
-            # Check if chief clerk is active and is the current user
-            if await self._is_chief_clerk_active(db) and self.username == CueClerk.CHIEF_CLERK.value:
-                logger.success("Chief clerk is active and can approve")
-                return True
-            
-            # Check if test user is active
-            if await self._is_test_user_active(db):
-                logger.success("Test user is active and can approve")
-                return True
+        # Must have clerk admin perms
+        logger.warning(f"DEBUG: {self.username}")
+        logger.warning(f"DEBUG {format_username(self.username)}")
         
-        logger.debug("User cannot approve this request")
+        if not self.user.has_group(LDAPGroup.CUE_GROUP.value):
+            logger.warning("User is not a member of CUE")
+            return False
+        
+        # Chief: must be active and be the chief account
+        if (await self._is_chief_clerk_active(db) and format_username(self.username) == CueClerk.CHIEF_CLERK.value):
+            logger.success("CHIEF CLERK is current user and can approve")
+            return True
+        
+        # Deputy: must be active , be the deputy account, and whithin price limit
+        if (await self._is_deputy_clerk_active(db)
+            and format_username(self.username) == CueClerk.DEPUTY_CLERK.value
+            and dbas.can_deputy_approve(total_price)):
+            logger.success("DEPUTY CLERK is current user and can approve")
+            return True
+        
+        # Test user override, must be active
+        if (await self._is_test_user_active(db) and format_username(self.username) == CueClerk.TEST_USER.value):
+            logger.success("TEST USER active")
+            return True
+        
         return False

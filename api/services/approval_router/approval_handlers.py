@@ -224,7 +224,7 @@ class ManagementHandler(Handler):
 class ClerkAdminHandler(Handler):
     def __init__(self):
         self._next: Optional[Handler] = None
-    # TODO: DEPUTY AND CHIEF CLERK CAN APPROVE NEW REQUESTS, NOT JUST PENDING APPROVAL
+        
     async def handle(
         self, 
         request: ApprovalRequest, 
@@ -243,9 +243,6 @@ class ClerkAdminHandler(Handler):
             approval_tracker.mark_step_done(ApprovalStepName.CLERK_ADMIN_HANDLER_INITIALIZED)
         approver_policy = ApproverPolicy(current_user)    # Create an instance of the approver policy
         
-        # This is the current user who is trying to approve the request
-        can_approve: bool = False
-        
         # Get current status from pending_approvals table
         stmt = select(dbas.PendingApproval.status).where(dbas.PendingApproval.line_item_uuid == request.uuid)
         result = await db.execute(stmt)		
@@ -259,12 +256,13 @@ class ClerkAdminHandler(Handler):
         logger.debug(f"CURRENT STATUS: {current_status}")
         
         logger.debug("CLERK ADMIN HANDLER PROCESSING REQUEST")
-        deputy_can_approve = await approver_policy.deputy_chief_clerk_policy(
+        can_approve_now = await approver_policy.can_fully_approve(
             total_price=request.total_price,
             current_status=current_status,
-            request=request,
             db=db
         )
+        logger.warning(f"CAN APPROVE NOW: {can_approve_now}")
+        dbas.debug_check_workflow_user(db, format_username(current_user.username))
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark Clerk policy checked
@@ -272,50 +270,32 @@ class ClerkAdminHandler(Handler):
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.CLERK_POLICY_CHECKED)
-        
-        if not deputy_can_approve:
+            
+        if not can_approve_now:
             logger.debug("CLERK ADMIN HANDLER: Current user is not allowed to approve this request")
             
-            # Check if deputy can approve based on price and if not current user then send email to deputy
-            if (dbas.can_deputy_approve(request.total_price) 
-                and current_user.username != CueClerk.DEPUTY_CLERK.value
-                and current_user.username != CueClerk.CHIEF_CLERK.value
-                and await approver_policy._is_deputy_clerk_active(db)
-            ) or (current_user.username == CueClerk.TEST_USER.value and dbas.can_deputy_approve(request.total_price)):
-                # TESTING ONLY
-                logger.debug("CLERK ADMIN HANDLER: Deputy can approve based on price, but is not the current user, sending email to deputy and chief clerk")
-                approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
-                email_payload = await approver_email_builder.build_email_payload()
-                
-                await smtp_service.send_approver_email(
-                    email_payload, 
-                    db=db, 
-                    send_to=[AssignedGroup.DEPUTY_CLERK.value, AssignedGroup.CHIEF_CLERK.value])
-                
-            # DEPUTY CANT APPROVE over $250
-            elif not dbas.can_deputy_approve(request.total_price):
-                logger.debug("Chief Clerk must approve, escalating request")
-                approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
-                email_payload = await approver_email_builder.build_email_payload()
-                
-                await smtp_service.send_approver_email(
-                    email_payload, 
-                    db=db, 
-                    send_to=[AssignedGroup.CHIEF_CLERK.value])
+            approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
+            email_payload = await approver_email_builder.build_email_payload()
             
-        # Mark clerk approval processed (even if not approved, the step is complete)
-        #!-PROGRESS TRACKING --------------------------------------------------------------
-        tracker = get_active_tracker()
-        if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
-            approval_tracker = get_approval_tracker()
-            approval_tracker.mark_step_done(ApprovalStepName.CLERK_APPROVAL_PROCESSED)
-            return await super().handle(request, db, current_user, ldap_service)
+            await smtp_service.send_approver_email(
+                email_payload, 
+                db=db, 
+                send_to=[AssignedGroup.DEPUTY_CLERK.value, AssignedGroup.CHIEF_CLERK.value])
+            
+            # Mark clerk approval processed (even if not approved, the step is complete)
+            #!-PROGRESS TRACKING --------------------------------------------------------------
+            tracker = get_active_tracker()
+            if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
+                approval_tracker = get_approval_tracker()
+                approval_tracker.mark_step_done(ApprovalStepName.CLERK_APPROVAL_PROCESSED)
+                return await super().handle(request, db, current_user, ldap_service)
         
         #*#################################################################################
         #*#################################################################################
         # * Code below is for if the request was approved
         #*#################################################################################
         #*#################################################################################
+        logger.debug("PROCESS APPROVAL")
         # Get the approval UUID for this line item
         stmt = select(dbas.Approval.UUID).join(
             dbas.PendingApproval,
@@ -331,6 +311,7 @@ class ClerkAdminHandler(Handler):
             return await super().handle(request, db, current_user, ldap_service)
             
         approvals_uuid = row[0]
+        logger.debug(f"APPROVAL UUID RETRIEVED: {approvals_uuid}")
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark approval UUID retrieved
@@ -341,7 +322,9 @@ class ClerkAdminHandler(Handler):
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark request as APPROVED
+        logger.debug("MARKING FINAL APPROVAL AS APPROVED")
         await dbas.mark_final_approval_as_approved(db, approvals_uuid)
+        logger.debug("FINAL APPROVAL MARKED AS APPROVED")
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark request marked approved
@@ -353,9 +336,14 @@ class ClerkAdminHandler(Handler):
         # Send email to requester that their request has been approved
         logger.debug(f"CLERK ADMIN HANDLER: Sending email to requester that their request has been approved for {request.uuid}")
         
+        logger.debug("BUILDING EMAIL PAYLOAD")
         approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
         email_payload = await approver_email_builder.build_email_payload()
+        logger.debug("EMAIL PAYLOAD BUILT")
+        
+        logger.debug("SENDING REQUEST APPROVED EMAIL")
         await smtp_service.send_request_approved_email(email_payload,db=db)
+        logger.debug("REQUEST APPROVED EMAIL SENT")
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark approval email sent

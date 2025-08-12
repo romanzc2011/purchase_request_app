@@ -955,6 +955,13 @@ async def approve_deny_request(
             # Decide which chain to use as in the request is already in approval chain
             if already_in_chain:
                 router = ApprovalRouter().start_handler(ClerkAdminHandler())
+                # Mark the steps that were ignored
+                approval_tracker.mark_step_done(ApprovalStepName.IT_HANDLER_INITIALIZED)
+                approval_tracker.mark_step_done(ApprovalStepName.IT_APPROVAL_PROCESSED)
+                approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED)
+                approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED)
+                
+                
             else:
                 router = ApprovalRouter() # Defaults to full chain: IT -> Finance -> ClerkAdmin
                 
@@ -1002,6 +1009,8 @@ async def approve_deny_request(
             # Mark final steps as done
             approval_tracker.mark_step_done(ApprovalStepName.RESULT_OBJECT_BUILT)
             approval_tracker.mark_step_done(ApprovalStepName.FINAL_RESULTS_RETURNED)
+            
+            approval_tracker.remaining_steps()
             
             #################################################################################################
             # END CHAIN

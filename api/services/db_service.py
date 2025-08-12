@@ -943,6 +943,25 @@ def init_db():
         raise
 
 ###################################################################################################
+# DEBUG: CHECK WORKFLOW USER STATUS
+###################################################################################################
+async def debug_check_workflow_user(db_session: AsyncSession, username: str) -> Optional[dict]:
+    """Debug function to check workflow user status"""
+    stmt = select(WorkflowUser.username, WorkflowUser.active, WorkflowUser.department).where(
+        WorkflowUser.username == username
+    )
+    result = await db_session.execute(stmt)
+    row = result.first()
+    
+    if row:
+        return {
+            "username": row.username,
+            "active": row.active,
+            "department": row.department
+        }
+    return None
+
+###################################################################################################
 # GET UUID BY ID (UNCACHED)
 ###################################################################################################
 async def get_uuid_by_id(db_session: AsyncSession, ID: str) -> Optional[str]:
