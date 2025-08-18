@@ -8,7 +8,6 @@ from api.services.approval_router.approval_utils import ApprovalUtils
 from api.services.progress_tracker.progress_manager import get_active_tracker, get_approval_tracker
 from api.services.progress_tracker.progress_tracker import ProgressTrackerType
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
-from api.utils.misc_utils import format_username
 from api.utils.logging_utils import logger_init_ok
 from loguru import logger
 from api.schemas.misc_schemas import ItemStatus
@@ -20,7 +19,7 @@ from api.schemas.ldap_schema import LDAPUser
 from api.services.approval_router.approver_policy import ApproverPolicy
 from api.services.smtp_service.email_builder import ApproverEmailBuilder
 from api.services.ldap_service import LDAPService
-from api.utils.misc_utils import reset_signals
+from api.utils.misc_utils import reset_signals, format_username
 
 
 # Approval Router to determine the routing of requests
@@ -335,7 +334,7 @@ class ClerkAdminHandler(Handler):
             line_item_uuid=request.uuid,
             pending_approval_id=pending_approval_id,
             status=ItemStatus.APPROVED,
-            final_approved_by=current_user.username,
+            final_approved_by=format_username(current_user.username),
             final_approved_at=dbas.utc_now_truncated()
         )
         

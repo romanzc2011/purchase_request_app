@@ -26,8 +26,14 @@ from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.services.progress_tracker.steps.download_steps import DownloadStepName
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
-from api.services.progress_tracker.progress_manager import get_active_tracker, get_approval_tracker, get_download_tracker, get_submit_request_tracker, ProgressTrackerType
-
+from api.services.progress_tracker.progress_manager import (
+    get_active_tracker, 
+    get_approval_tracker, 
+    get_download_tracker, 
+    get_submit_request_tracker, 
+    ProgressTrackerType
+)
+from api.settings import settings
 class PDFService:
     def __init__(self):
         self.output_dir = Path("output")
@@ -252,11 +258,10 @@ class PDFService:
             pass
         
         #— fonts & logo setup
-        project_root = Path(__file__).resolve().parent.parent.parent
-        pdfmetrics.registerFont(TTFont("Play", str(project_root / "src/assets/fonts/Play-Regular.ttf")))
-        pdfmetrics.registerFont(TTFont("Play-Bold", str(project_root / "src/assets/fonts/Play-Bold.ttf")))
+        pdfmetrics.registerFont(TTFont("Play", str(settings.BASE_DIR / "src/assets/fonts/Play-Regular.ttf")))
+        pdfmetrics.registerFont(TTFont("Play-Bold", str(settings.BASE_DIR / "src/assets/fonts/Play-Bold.ttf")))
 
-        logo_path = project_root / "src/assets/seal_no_border.png"
+        logo_path = settings.BKSEAL_PATH
         img_w, img_h = 0.85 * inch, 0.85 * inch
         gap = 6  # points of breathing room
 

@@ -26,10 +26,6 @@ import RequesterAutocomplete from "../approval_table/ui/RequesterAutocomplete";
 import { usePurchaseForm } from "../../hooks/usePurchaseForm";
 import { toast } from "react-toastify";
 import { isSubmittedSig } from "../../utils/PrasSignals";
-import { signal } from "@preact/signals-react";
-
-// Create a local test signal
-const localTestSig = signal<boolean>(false);
 
 /*************************************************************************************** */
 /* INTERFACE PROPS */

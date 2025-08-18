@@ -5,7 +5,7 @@ from pydantic import Field
 class Settings(BaseSettings):
     # -- Application URL
     app_base_url: str = Field(
-        default="http://localhost:5004",  # Default for development
+        default="http://127.0.0.1:5004",
         env="VITE_API_URL",
     )
     link_to_request: str = f"{app_base_url}/approval"
@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SQL_SCRIPT_PATH: Path = BASE_DIR / "api" / "db" / "pras_sql_script.sql"
     PDF_OUTPUT_FOLDER: Path = BASE_DIR / "api" / "pdf_output"
     UPLOAD_FOLDER: Path = BASE_DIR / "api" / "uploads"
+    BKSEAL_PATH: Path = BASE_DIR / "src" / "assets" / "images" / "seal_no_border.png"
 
     # -- LDAP configuration
     ldap_server: str

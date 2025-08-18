@@ -2,9 +2,11 @@ from loguru import logger
 from sqlalchemy.orm import Session
 import services.db_service as dbas
 
-# UUID cache to improve performance
 _uuid_cache = {}
 
+# -------------------------------------------------------------------
+# GET UUID BY ID
+# -------------------------------------------------------------------
 def get_uuid_by_id(db_session: Session, ID: str):
     """
     Get UUID by ID with caching for better performance.
@@ -32,6 +34,9 @@ def get_uuid_by_id(db_session: Session, ID: str):
         logger.error(f"Error getting UUID for ID {ID}: {e}")
         return None
 
+# -------------------------------------------------------------------
+# GET UUIDS BY IDS
+# -------------------------------------------------------------------
 def get_uuids_by_ids(db_session: Session, ids: list):
     """
     Get UUIDs for multiple IDs.
@@ -47,6 +52,9 @@ def get_uuids_by_ids(db_session: Session, ids: list):
     
     return result
 
+# -------------------------------------------------------------------
+# CLEAR UUID CACHE
+# -------------------------------------------------------------------
 def clear_uuid_cache():
     """
     Clear the UUID cache.

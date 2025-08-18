@@ -48,3 +48,4 @@ class CueClerk(Enum):
     CHIEF_CLERK = "edwardtakara"
     MANAGER = "lelarobichaux"
     TEST_USER = "romancampbell"
+    TEST_USER_2 = "matthewstrong"

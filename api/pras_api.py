@@ -88,6 +88,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5002",
+        "http://10.234.198.113:5002",  # Your local IP address
+        "http://127.0.0.1:5002",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -402,7 +404,7 @@ async def send_purchase_request(
 			.where(PurchaseRequestHeader.ID == purchase_req_id)
 			.values(
 				IRQ1_ID=payload.irq1_id,
-				requester=current_user.username,
+				requester=format_username(current_user.username),
 				phoneext=payload.items[0].phoneext,
 				datereq=payload.items[0].datereq,
 				dateneed=payload.items[0].dateneed,
@@ -1412,7 +1414,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         "timestamp": asyncio.get_event_loop().time()
                     })
             except json.JSONDecodeError:
-                logger.error("Received non-JSON data")
+                logger.error(f"Received non-JSON data: {incoming_data}")
     except WebSocketDisconnect:
         await websock_conn.disconnect(websocket)
 

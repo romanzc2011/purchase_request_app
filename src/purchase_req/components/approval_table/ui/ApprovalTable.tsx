@@ -435,24 +435,15 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
     const handleCommentClick = async () => {
         if (!groupCommentPayload) return;
 
-        const { groupKey, item_uuids, item_desc, group_count } = groupCommentPayload;
+        const { item_uuids, group_count } = groupCommentPayload;
         const entries: CommentEntry[] = [];
 
         // Loop through this and get the comment for each item
         for (let i = 0; i < group_count; i++) {
             const uuid = item_uuids[i];
-            const desc = item_desc[i];
 
             // Skip if this is a group header
             if (uuid.startsWith('header-')) continue;
-
-            const singlePayLoad: GroupCommentPayload = {
-                groupKey,
-                item_uuids: [uuid],
-                item_desc: [desc],
-                group_count: 1,
-                comment: []
-            }
 
             const userComment = await openCommentModal();
             entries.push({ uuid, comment: userComment });
@@ -693,7 +684,11 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
             sortable: true,
             renderCell: params => {
                 if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                return params.value;
+                return (
+                    <span style={{ fontSize: "1rem" }}>
+                        {params.value}
+                    </span>
+                );
             }
         },
 

@@ -24,15 +24,22 @@ interface AppProps {
     IT_GROUP: boolean;
 }
 
+function computeWebSocketURL(path = "/communicate") {
+    const protocol = window.location.protocol === "http:" ? "wss" : "ws";
+    const base = (import.meta.env.VITE_API_URL || "/").replace(/\/$/, "");
+    const p = path.startsWith("/") ? path : `/${path}`;
+    return `${protocol}://${window.location.host}${base}${p}`;
+}
+
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 
     // Bring custom hook for purchase form
     const { createNewID } = usePurchaseForm();
 
-    // Websocket URL
-    const WEBSOCKET_URL = "ws://localhost:5002/communicate";
+    // Websocket URL - use dynamic protocol and host for production
+    const WEBSOCKET_URL = computeWebSocketURL();
     const { socket: socket, isConnected: _isConnected } = useWebSockets(WEBSOCKET_URL);
-    socketSig.value = socket;
+    socketSig.value = socket || undefined;
 
     // Local state for reserved ID
     const [ID, setID] = useState<string>("");

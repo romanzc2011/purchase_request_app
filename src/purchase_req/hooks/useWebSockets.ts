@@ -1,75 +1,94 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-// #########################################################################################
-// WEBSOCKETS HOOK 
-// #########################################################################################
-export function useWebSockets(
-	WEBSOCKET_URL: string, 
-	onMessage?: (msg: MessageEvent) => void
-) {
-	const [isConnected, setIsConnected] = useState(false);
-	const [socket, setSocket] = useState<WebSocket>();
-	const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
-	const reconnectAttemptsRef = useRef(0);
-	const maxReconnectAttempts = 5;
-	const baseReconnectDelay = 1000; // 1 second
+export function useWebSockets(WEBSOCKET_URL: string, onMessage?: (e: MessageEvent) => void) {
+  const wsRef = useRef<WebSocket | null>(null);
+  const onMsgRef = useRef(onMessage);
+  const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const [isConnected, setIsConnected] = useState(false);
 
-	// Create the connection to backend
-	useEffect(() => {
-		const connectWebSocket = () => {
-			const ws = new WebSocket(WEBSOCKET_URL);
-			setSocket(ws)
+  const maxReconnectAttempts = 5;
+  const baseReconnectDelay = 1000; // ms
 
-			// These are event listeners
-			ws.onopen = (event) => {
-				console.log("✅ WEBSOCKET CONNECTED ", event);
-				setIsConnected(true);
-				reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
-				ws.send('HELO SERVER');
-			};
-			
-			ws.onmessage = (event) => {
-				if(onMessage) {
-                    onMessage(event);
-                    console.log("🔴 WEBSOCKET MESSAGE RECEIVED", event);
-				}
-			}
+  // keep latest onMessage without re-creating the socket
+  useEffect(() => { onMsgRef.current = onMessage; }, [onMessage]);
 
-			ws.onclose = (event) => {
-				console.log("❌ WEBSOCKET DISCONNECTED", event.code, event.reason);
-				setIsConnected(false);
-				
-				// Attempt to reconnect if not a normal closure
-				if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
-					const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-					console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`);
-					
-					reconnectTimeoutRef.current = setTimeout(() => {
-						reconnectAttemptsRef.current++;
-						connectWebSocket();
-					}, delay);
-				}
-			};
+  useEffect(() => {
+    let unmounted = false;
 
-			ws.onerror = (err) => {
-				console.log("⚠️ WEBSOCKET ERROR", err);
-			}
-		};
+    const connect = () => {
+      // prevent duplicates (StrictMode, re-renders, etc.)
+      const s = wsRef.current;
+      if (s && (s.readyState === WebSocket.OPEN || s.readyState === WebSocket.CONNECTING)) return;
 
-		connectWebSocket();
+      const ws = new WebSocket(WEBSOCKET_URL);
+      wsRef.current = ws;
 
-		return () => {
-			if (reconnectTimeoutRef.current) {
-				clearTimeout(reconnectTimeoutRef.current);
-			}
-			if (socket) {
-				socket.close();
-			}
-		};
-	}, [WEBSOCKET_URL]); // Removed onMessage from dependencies to prevent reconnections
+      ws.onopen = () => {
+        setIsConnected(true);
+        reconnectAttemptsRef.current = 0;
 
-	return {
-		socket,
-		isConnected
-	}
+        // heartbeat every 25s to keep proxies happy
+        if (!pingRef.current) {
+          pingRef.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ t: "ping" }));
+            }
+          }, 25000);
+        }
+      };
+
+      ws.onmessage = (e) => {
+        onMsgRef.current?.(e);
+      };
+
+      ws.onclose = (e) => {
+        setIsConnected(false);
+
+        // clear heartbeat
+        if (pingRef.current) {
+          clearInterval(pingRef.current);
+          pingRef.current = null;
+        }
+
+        // normal close (1000) or unmounted: don't reconnect
+        if (unmounted || e.code === 1000) return;
+
+        // backoff reconnect
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          const delay = baseReconnectDelay * 2 ** reconnectAttemptsRef.current;
+          reconnectTimerRef.current = setTimeout(() => {
+            reconnectAttemptsRef.current++;
+            connect();
+          }, delay);
+        }
+      };
+
+      ws.onerror = () => {
+        // let onclose handle reconnection
+      };
+    };
+
+    connect();
+
+    return () => {
+      unmounted = true;
+
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (pingRef.current) {
+        clearInterval(pingRef.current);
+        pingRef.current = null;
+      }
+      // close the *actual* socket
+      const s = wsRef.current;
+      if (s && s.readyState === WebSocket.OPEN) s.close(1000, "unmount");
+      wsRef.current = null;
+    };
+  }, [WEBSOCKET_URL]);
+
+  return { socket: wsRef.current, isConnected };
 }

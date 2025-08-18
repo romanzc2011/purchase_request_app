@@ -1,8 +1,6 @@
 from email.mime.image import MIMEImage
 import mimetypes
-import os
 import aiosmtplib
-import json
 
 from loguru import logger
 from api.settings import settings
@@ -11,7 +9,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from email.mime.application import MIMEApplication
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, Sequence
+from typing import Optional
 from sqlalchemy import select
 
 from api.services.ldap_service import LDAPService
@@ -33,7 +31,7 @@ class SMTP_Service:
         self.smtp_email_addr = settings.smtp_email_addr
         self.renderer = renderer
         self.ldap_service = ldap_service
-        self.logo_file_path = os.path.join(settings.BASE_DIR, "src", "assets", "seal_no_border.png")
+        self.logo_file_path = settings.BKSEAL_PATH
         
     #-------------------------------------------------------------------------------
     # SEND EMAIL - async
