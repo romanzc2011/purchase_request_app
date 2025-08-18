@@ -7,22 +7,39 @@ from fastapi import WebSocket
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
-        self.heartbeat_task = None
-        self.start_heartbeat()
+        self._heartbeat_task: asyncio.Task | None = None
+        self._stop = asyncio.Event()
 
 	#-------------------------------------------------------------
 	# START HEARTBEAT
 	#-------------------------------------------------------------
-    def start_heartbeat(self):
+    async def start(self):
         """Start heartbeat to keep connections alive"""
-        if self.heartbeat_task is None:
-            self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        if not self._heartbeat_task:
+            self._stop.clear()
+            self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
+	#-------------------------------------------------------------
+	# STOP HEARTBEAT
+	#-------------------------------------------------------------
+    async def stop(self):
+        self._stop.set()
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            self._heartbeat_task = None
+
+	#-------------------------------------------------------------
+	# HEARTBEAT LOOP
+	#-------------------------------------------------------------
     async def _heartbeat_loop(self):
         """Send heartbeat every 30 seconds to keep connections alive"""
-        while True:
+        while not self._stop.is_set():
             try:
-                await asyncio.sleep(30)  # Send heartbeat every 30 seconds
+                await asyncio.sleep(25)
                 if self.active_connections:
                     await self.broadcast({"event": "heartbeat", "timestamp": asyncio.get_event_loop().time()})
                     logger.debug(f"Sent heartbeat to {len(self.active_connections)} connections")
@@ -57,17 +74,17 @@ class ConnectionManager:
             "percent": percent
         }
         """
-        disconnected = []
-        for connection in self.active_connections:
+        dead = []
+        for ws in self.active_connections:
             try:
-                await connection.send_json(message)
+                await ws.send_json(message)
             except Exception as e:
                 logger.warning(f"Failed to send message to connection: {e}")
-                disconnected.append(connection)
+                dead.append(ws)
         
-        # Remove disconnected connections
-        for connection in disconnected:
-            await self.disconnect(connection)
+        # Remove dead connections
+        for ws in dead:
+            await self.disconnect(ws)
                 
 	#-------------------------------------------------------------
 	# BROADCAST BOOLEAN
