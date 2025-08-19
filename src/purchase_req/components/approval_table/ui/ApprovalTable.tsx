@@ -25,7 +25,7 @@ import { useApprovalService } from "../../../hooks/useApprovalService";
 import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 import { toast } from "react-toastify";
 import { isDownloadSig } from "../../../utils/PrasSignals";
-
+import { computeHTTPURL } from "../../../utils/ws";
 
 /***********************************************************************************/
 // PROPS
@@ -38,9 +38,9 @@ interface ApprovalTableProps {
 }
 
 /* API URLs */
-const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
-const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
+const API_URL_APPROVAL_DATA = computeHTTPURL("/api/getApprovalData");
+const API_URL_CYBERSEC_RELATED = computeHTTPURL("/api/cyberSecRelated");
+const API_URL_STATEMENT_OF_NEED_FORM = computeHTTPURL("/api/downloadStatementOfNeedForm");
 
 // Define a type for the DataGrid sx prop
 type DataGridSxProps = {

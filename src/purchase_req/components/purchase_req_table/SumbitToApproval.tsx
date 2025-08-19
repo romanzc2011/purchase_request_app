@@ -25,10 +25,9 @@ import { ItemStatus } from "../../types/approvalTypes";
 import { OrderType } from "../../schemas/purchaseSchema";
 import { isRequestSubmitted, isSubmittedSig } from "../../utils/PrasSignals";
 import { effect } from "@preact/signals-react";
+import { computeHTTPURL } from "../../utils/ws";
 
-const baseURL = import.meta.env.VITE_API_URL;
-const API_CALL: string = "/api/sendToPurchaseReq";
-const API_URL = `${baseURL}${API_CALL}`;
+const API_URL = computeHTTPURL("/api/sendToPurchaseReq");
 
 /************************************************************************************ */
 /* INTERFACE PROPS */
@@ -101,7 +100,7 @@ function SubmitApprovalTable({
 
         try {
             // Get a proper ID from the backend
-            const idRequest = await fetch(`${baseURL}/api/createNewID`, {
+            const idRequest = await fetch(computeHTTPURL("/api/createNewID"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -188,7 +187,6 @@ function SubmitApprovalTable({
 
             // Reset the form and data buffer
             isSubmittedSig.value = true;
-            console.log("IS SUBMITTED SIG: ", isSubmittedSig.value);
             setDataBuffer([]);
 
             // Update the ID if setID is provided

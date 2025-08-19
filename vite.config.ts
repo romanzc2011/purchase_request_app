@@ -9,14 +9,20 @@ export default defineConfig({
   base: "/",
 
   server: {
-    host: true,
     port: 5002,
+    host: true,
     proxy: {
-      "/api": { target: "http://127.0.0.1:5004", changeOrigin: true },
-      "/communicate": { target: "http://127.0.0.1:5004", ws: true, changeOrigin: true },
-      "/ws": { target: "http://127.0.0.1:5004", ws: true, changeOrigin: true },
+      "/api": {
+        target: "http://127.0.0.1:5004",
+        changeOrigin: true,
+      },
+      "/communicate": {
+        target: "http://127.0.0.1:5004", // stays http://
+        ws: true,                        // enables WS upgrade
+        changeOrigin: true,
+      },
     },
-  },
+},
 
   build: {
     outDir: "dist",

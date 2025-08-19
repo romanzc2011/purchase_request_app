@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { purchaseItemSchema, PurchaseItem, OrderType } from "../schemas/purchaseSchema";
 import { toast } from "react-toastify";
 import { useCallback } from "react";
+import { computeHTTPURL } from "../utils/ws";
 
 export const usePurchaseForm = () => {
 	const today = new Date().toISOString().split("T")[0];
@@ -30,7 +31,7 @@ export const usePurchaseForm = () => {
 	shouldFocusError: true,
 	});
 
-	const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
+	const API_URL_ASSIGN_CO = computeHTTPURL("/api/assignCO");
 
 	/*************************************************************************************** */
 	/* ASSIGN CO -- assign CO to request */
@@ -67,7 +68,7 @@ export const usePurchaseForm = () => {
 	/*************************************************************************************** */
 	const createNewID = useCallback(async () => {
 		const response = await fetch(
-			`${import.meta.env.VITE_API_URL}/api/createNewID`,
+			computeHTTPURL("/api/createNewID"),
 			{
 				method: "POST",
 				headers: {

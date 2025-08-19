@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { ContractingOfficer } from '../../types/approvalTypes';
 import Buttons from './Buttons';
 import { toast } from "react-toastify";
+import { computeHTTPURL } from '../../utils/ws';
 
 type Props = {
     value: number | "";
@@ -12,7 +13,7 @@ type Props = {
 }
 
 /* API URLs */
-const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_contracting_officer`;
+const API_URL_CONTRACTING_OFFICER = computeHTTPURL("/api/get_contracting_officer");
 
 // ------------------------------------------------------------
 // CONTRACTING OFFICER DROPDOWN COMPONENT

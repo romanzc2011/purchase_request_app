@@ -62,7 +62,6 @@ from api.services.db_service import utc_now_truncated
 from api.services.websocket_manager import websock_conn
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
-from contextlib import asynccontextmanager, suppress
 import time
 import socket
 
@@ -82,36 +81,58 @@ import api.services.db_service as dbas
 import tracemalloc
 tracemalloc.start(10)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("🚀 Starting FastAPI application lifespan")
-    await websock_conn.start()
-    logger.info("✅ WebSocket connection manager started")
-    try:
-        yield
-    finally:
-        logger.info("🛑 Stopping FastAPI application lifespan")
-        await websock_conn.stop()
-        logger.info("✅ WebSocket connection manager stopped")
-
 # Initialize FastAPI app
-app = FastAPI(title="PRAS API", lifespan=lifespan)
+app = FastAPI(title="PRAS API")
+
+@app.on_event("startup")
+async def startup_event():
+    await websock_conn.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await websock_conn.stop()
+    
+@app.websocket("/communicate")
+async def communicate(ws: WebSocket):
+    await websock_conn.connect(ws)
+    try:
+        while True:
+            try:
+                msg = await asyncio.wait_for(ws.receive_text(), timeout=90)
+                logger.info(f"🔴 MESSAGE RECEIVED: {msg}")
+                try:
+                    data = json.loads(msg)
+                    if data.get("event") == "ping":
+                        await ws.send_json({"event": "pong"})
+                        continue
+                except Exception:
+                    pass
+            except asyncio.TimeoutError:
+                await ws.send_json({"event": "srv_heartbeat"})
+            except Exception as e:
+                logger.error(f"Error in websocket: {e}")
+                await ws.send_json({"event": "srv_heartbeat"})
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await websock_conn.disconnect(ws)
 
 # Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5002",
-        "http://127.0.0.1:5002",
-        f"http://{socket.gethostbyname(socket.gethostname())}:5002",
-        f"https://{socket.gethostbyname(socket.gethostname())}:5002",
-        f"wss://{socket.gethostbyname(socket.gethostname())}:5002",
-        f"ws://{socket.gethostbyname(socket.gethostname())}:5002",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=[
+#         "http://localhost:5002",
+#         "http://127.0.0.1:5002",
+#         f"http://{socket.gethostbyname(socket.gethostname())}:5002",
+#         f"https://{socket.gethostbyname(socket.gethostname())}:5002",
+#         f"wss://{socket.gethostbyname(socket.gethostname())}:5002",
+#         f"ws://{socket.gethostbyname(socket.gethostname())}:5002",
+#     ],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -122,8 +143,6 @@ lock = threading.Lock()
 # Set generic return type/ arg types
 P = ParamSpec("P")
 R = TypeVar("R")
-
-
 
 ##########################################################################
 # API router
@@ -1402,40 +1421,40 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 ##########################################################################
 app.include_router(api_router)
 
-##########################################################################
-## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
-##########################################################################
-@app.websocket("/communicate")
-async def websocket_endpoint(websocket: WebSocket):
-    await websock_conn.connect(websocket)
-    try:
-        while True:
-            incoming_data = await websocket.receive_text()
-            logger.success(f"RECV data: {incoming_data}")
+# ##########################################################################
+# ## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
+# ##########################################################################
+# @app.websocket("/communicate")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websock_conn.connect(websocket)
+#     try:
+#         while True:
+#             incoming_data = await websocket.receive_text()
+#             logger.success(f"RECV data: {incoming_data}")
             
-            # Convert to json, if reset_data then reset shm, percent everything
-            try:
-                message = json.loads(incoming_data)
-                if message.get("event") == "reset_data":
-                    # reset shm
-                    logger.info("Progress state cleared via WebSocket reset")
-                elif message.get("event") == "check_connection":
-                    # Send connection status back
-                    await websocket.send_json({
-                        "event": "connection_status",
-                        "connected": True,
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-                elif message.get("event") == "clear_stale_state":
-                    # Clear stale progress state
-                    await websocket.send_json({
-                        "event": "state_cleared",
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-            except json.JSONDecodeError:
-                logger.error("Received non-JSON data")
-    except WebSocketDisconnect:
-        await websock_conn.disconnect(websocket)
+#             # Convert to json, if reset_data then reset shm, percent everything
+#             try:
+#                 message = json.loads(incoming_data)
+#                 if message.get("event") == "reset_data":
+#                     # reset shm
+#                     logger.info("Progress state cleared via WebSocket reset")
+#                 elif message.get("event") == "check_connection":
+#                     # Send connection status back
+#                     await websocket.send_json({
+#                         "event": "connection_status",
+#                         "connected": True,
+#                         "timestamp": asyncio.get_event_loop().time()
+#                     })
+#                 elif message.get("event") == "clear_stale_state":
+#                     # Clear stale progress state
+#                     await websocket.send_json({
+#                         "event": "state_cleared",
+#                         "timestamp": asyncio.get_event_loop().time()
+#                     })
+#             except json.JSONDecodeError:
+#                 logger.error("Received non-JSON data")
+#     except WebSocketDisconnect:
+#         await websock_conn.disconnect(websocket)
 
 
 ##########################################################################
@@ -1479,4 +1498,12 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
+    #     uvicorn.run(
+    #     "pras_api:app",
+    #     host="0.0.0.0",
+    #     port=5004,
+    #     reload=True,
+    #     ssl_certfile=pras_cert,
+    #     ssl_keyfile=pras_key,
+    # )
     uvicorn.run("pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004, reload=True)

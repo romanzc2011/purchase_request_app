@@ -51,7 +51,7 @@ export const purchaseItemSchema = z
     location:        z.string().min(1, "Location is required"),
 
     priceEach:       z.number().nonnegative("Price cannot be negative"),
-    quantity:        z.number().min(1, "Quantity must be at least 1"),
+    quantity:        z.number().int("Quantity must be a whole number").min(1, "Quantity must be at least 1"),
 	
 	totalPrice: z
 		.number()

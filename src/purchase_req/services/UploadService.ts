@@ -1,5 +1,6 @@
 import axios from "axios";
 import { FormValues } from "../types/formTypes";
+import { computeHTTPURL } from "../utils/ws";
 
 interface FileInfo {
     name: string;
@@ -12,10 +13,8 @@ interface UploadParamsProps {
     api_call: string;
 }
 
-const baseURL = import.meta.env.VITE_API_URL;
-
 const api = axios.create({
-    baseURL,
+    baseURL: computeHTTPURL(""),
     headers: {
         "Content-Type": "application/json",
     },

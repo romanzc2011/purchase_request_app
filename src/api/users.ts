@@ -1,6 +1,8 @@
+import { computeHTTPURL } from "../purchase_req/utils/ws";
+
 export async function fetchUsernames(query: string): Promise<string[]> {
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/usernames?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${computeHTTPURL("/api/usernames")}?q=${encodeURIComponent(query)}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

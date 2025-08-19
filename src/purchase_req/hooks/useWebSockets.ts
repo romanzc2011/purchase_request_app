@@ -1,75 +1,61 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { computeWSURL } from "../utils/ws";
 
-// #########################################################################################
-// WEBSOCKETS HOOK 
-// #########################################################################################
-export function useWebSockets(
-	WEBSOCKET_URL: string, 
-	onMessage?: (msg: MessageEvent) => void
-) {
-	const [isConnected, setIsConnected] = useState(false);
-	const [socket, setSocket] = useState<WebSocket>();
-	const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
-	const reconnectAttemptsRef = useRef(0);
-	const maxReconnectAttempts = 5;
-	const baseReconnectDelay = 1000; // 1 second
+export function useWebSockets(path = "/communicate", onMessage?: (e: MessageEvent)=>void) {
+  const url = useMemo(() => computeWSURL(path), [path]);
+  const wsRef = useRef<WebSocket | null>(null);
+  const onMsgRef = useRef(onMessage);
+  const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptsRef = useRef(0);
+  const [isConnected, setIsConnected] = useState(false);
 
-	// Create the connection to backend
-	useEffect(() => {
-		const connectWebSocket = () => {
-			const ws = new WebSocket(WEBSOCKET_URL);
-			setSocket(ws)
+  useEffect(() => { onMsgRef.current = onMessage; }, [onMessage]);
 
-			// These are event listeners
-			ws.onopen = (event) => {
-				console.log("✅ WEBSOCKET CONNECTED ", event);
-				setIsConnected(true);
-				reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
-				ws.send('HELO SERVER');
-			};
-			
-			ws.onmessage = (event) => {
-				if(onMessage) {
-                    onMessage(event);
-                    console.log("🔴 WEBSOCKET MESSAGE RECEIVED", event);
-				}
-			}
+  useEffect(() => {
+    let unmounted = false;
 
-			ws.onclose = (event) => {
-				console.log("❌ WEBSOCKET DISCONNECTED", event.code, event.reason);
-				setIsConnected(false);
-				
-				// Attempt to reconnect if not a normal closure
-				if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
-					const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-					console.log(`🔄 Attempting to reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`);
-					
-					reconnectTimeoutRef.current = setTimeout(() => {
-						reconnectAttemptsRef.current++;
-						connectWebSocket();
-					}, delay);
-				}
-			};
+    const connect = () => {
+      const s = wsRef.current;
+      if (s && (s.readyState === WebSocket.OPEN || s.readyState === WebSocket.CONNECTING)) return;
 
-			ws.onerror = (err) => {
-				console.log("⚠️ WEBSOCKET ERROR", err);
-			}
-		};
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
 
-		connectWebSocket();
+      ws.onopen = () => {
+        setIsConnected(true);
+        attemptsRef.current = 0;
+        if (!pingRef.current) {
+          pingRef.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) ws.send('{"t":"ping"}');
+          }, 25000);
+        }
+      };
 
-		return () => {
-			if (reconnectTimeoutRef.current) {
-				clearTimeout(reconnectTimeoutRef.current);
-			}
-			if (socket) {
-				socket.close();
-			}
-		};
-	}, [WEBSOCKET_URL]); // Removed onMessage from dependencies to prevent reconnections
+      ws.onmessage = (e) => onMsgRef.current?.(e);
 
-	return {
-		socket,
-		isConnected
-	}
+      ws.onclose = (e) => {
+        setIsConnected(false);
+        if (pingRef.current) { clearInterval(pingRef.current); pingRef.current = null; }
+        if (unmounted || e.code === 1000) return;
+        if (attemptsRef.current < 5) {
+          const delay = 1000 * 2 ** attemptsRef.current++;
+          retryRef.current = setTimeout(connect, delay);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      unmounted = true;
+      if (retryRef.current) clearTimeout(retryRef.current);
+      if (pingRef.current) clearInterval(pingRef.current);
+      const s = wsRef.current;
+      if (s && s.readyState === WebSocket.OPEN) s.close(1000, "unmount");
+      wsRef.current = null;
+    };
+  }, [url]);
+
+  return { socket: wsRef.current, isConnected };
 }

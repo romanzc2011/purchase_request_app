@@ -119,7 +119,7 @@ export function ProgressBar() {
                 console.log("isRequestSubmitted: ", isRequestSubmitted.value);
 
                 // PROGRESS_UPDATE (for downloading pdf)
-                if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isRequestSubmitted.value || isRequestSubmitted.value || isApprovalSig) && percent != null) {
+                if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isRequestSubmitted.value || isApprovalSig.value) && percent != null) {
                     // create toast if needed
                     console.log("PROGRESS UPDATE SECTION");
                     if (toastIdRef.current === null) {

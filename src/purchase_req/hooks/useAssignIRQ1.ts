@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { useUUIDStore } from "../services/UUIDService";
+import { computeHTTPURL } from "../utils/ws";
 
-const API_URL_ASSIGN_IRQ1 = `${import.meta.env.VITE_API_URL}/api/assignIRQ1_ID`;
+const API_URL_ASSIGN_IRQ1 = `${computeHTTPURL("/api/assignIRQ1_ID")}`;
 /**
  * 
  * Args for the assignIRQ1 mutation
