@@ -26,6 +26,7 @@ export function useWebSockets(WEBSOCKET_URL: string, onMessage?: (e: MessageEven
       wsRef.current = ws;
 
       ws.onopen = () => {
+        console.log("🔗 WebSocket connected to:", WEBSOCKET_URL);
         setIsConnected(true);
         reconnectAttemptsRef.current = 0;
 
@@ -44,6 +45,7 @@ export function useWebSockets(WEBSOCKET_URL: string, onMessage?: (e: MessageEven
       };
 
       ws.onclose = (e) => {
+        console.log("🔌 WebSocket disconnected, code:", e.code, "reason:", e.reason);
         setIsConnected(false);
 
         // clear heartbeat

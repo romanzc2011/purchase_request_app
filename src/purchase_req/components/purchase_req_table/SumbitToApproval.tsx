@@ -454,9 +454,12 @@ function SubmitApprovalTable({
                                 className="me-3 btn btn-maroon"
                                 disabled={dataBuffer.length === 0}
                                 onClick={() => {
+                                    console.log("Submit button clicked - setting signals");
                                     isRequestSubmitted.value = true;
+                                    console.log("isRequestSubmitted set to:", isRequestSubmitted.value);
                                     handleSubmitData(processedData);
                                     isSubmittedSig.value = true;
+                                    console.log("isSubmittedSig set to:", isSubmittedSig.value);
                                     setFileInfo([]);
                                 }}
                             />

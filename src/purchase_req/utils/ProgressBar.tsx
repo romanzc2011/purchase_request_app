@@ -85,9 +85,13 @@ export function ProgressBar() {
     console.log("45: isRequestSubmitted: ", isRequestSubmitted.value);
     // Listen for WebSocket messages and update progress
     useEffect(() => {
-        if (!socketSignal) return;
+        if (!socketSignal) {
+            console.log("❌ No WebSocket connection available for progress tracking");
+            return;
+        }
 
         const handleMessage = (event: MessageEvent) => {
+            console.log("📨 Received WebSocket message:", event.data);
             try {
                 const data = JSON.parse(event.data);
 

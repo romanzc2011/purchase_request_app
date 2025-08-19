@@ -85,13 +85,7 @@ class ConnectionManager:
         # Remove dead connections
         for ws in dead:
             await self.disconnect(ws)
-                
-	#-------------------------------------------------------------
-	# BROADCAST BOOLEAN
-	#-------------------------------------------------------------
-    async def broadcast_boolean(self, value: bool):
-        await self.broadcast(json.dumps({"boolean": value}))
-        
+ 
 	#-------------------------------------------------------------
 	# GET CONNECTION COUNT
 	#-------------------------------------------------------------

@@ -25,10 +25,10 @@ interface AppProps {
 }
 
 function computeWebSocketURL(path = "/communicate") {
-    const protocol = window.location.protocol === "http:" ? "wss" : "ws";
-    const base = (import.meta.env.VITE_API_URL || "/").replace(/\/$/, "");
-    const p = path.startsWith("/") ? path : `/${path}`;
-    return `${protocol}://${window.location.host}${base}${p}`;
+    const protocol = window.location.protocol === "http:" ? "ws" : "wss";
+
+    // The Vite proxy will handle forwarding to the backend
+    return `${protocol}://${window.location.host}${path}`;
 }
 
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {

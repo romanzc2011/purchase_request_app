@@ -45,6 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update, select, text, func
 from api.services.db_service import get_async_session
 from api.schemas.enums import AssignedGroup, CueClerk, ItemStatus, LDAPGroup
+from api.utils.logging_utils import logger_init_ok
 import asyncio
 
 # PRAS Miscellaneous Dependencies
@@ -59,7 +60,7 @@ from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import settings
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
-from api.services.websocket_manager import websock_conn
+from api.services.websocket_manager import ConnectionManager
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
 import time
@@ -82,6 +83,9 @@ tracemalloc.start(10)
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
+manager = ConnectionManager()
+
+
 
 # Add CORS middleware
 app.add_middleware(
@@ -105,6 +109,67 @@ lock = threading.Lock()
 # Set generic return type/ arg types
 P = ParamSpec("P")
 R = TypeVar("R")
+
+@app.on_event("startup")
+async def _startup():
+    await manager.start()
+    logger_init_ok("PRAS API Startup")
+    
+@app.on_event("shutdown")
+async def _shutdown():
+    await manager.stop()
+    
+@app.websocket("/communicate")
+async def communicate(ws: WebSocket):
+    await manager.connect(ws)
+    try:
+        while True:
+            try:
+                msg = await asyncio.wait_for(ws.receive_text(), timeout=90)
+                logger.debug(f"Received WebSocket message: {msg}")
+                
+                # Handle ping/pong for keep-alive
+                if msg == '{"t":"ping"}':
+                    logger.debug("Sending pong response")
+                    await ws.send_text('{"t":"pong"}')
+                    continue
+                
+                # Handle JSON events for progress tracking
+                try:
+                    message = json.loads(msg)
+                    logger.success(f"RECV data: {msg}")
+                    
+                    if message.get("event") == "reset_data":
+                        # reset shm
+                        logger.info("Progress state cleared via WebSocket reset")
+                    elif message.get("event") == "check_connection":
+                        # Send connection status back
+                        await ws.send_json({
+                            "event": "connection_status",
+                            "connected": True,
+                            "timestamp": asyncio.get_event_loop().time()
+                        })
+                    elif message.get("event") == "clear_stale_state":
+                        # Clear stale progress state
+                        await ws.send_json({
+                            "event": "state_cleared",
+                            "timestamp": asyncio.get_event_loop().time()
+                        })
+                    else:
+                        logger.debug(f"Unhandled event: {message.get('event', 'unknown')}")
+                        
+                except json.JSONDecodeError:
+                    # Only log as error if it's not a ping message
+                    if msg != '{"t":"ping"}':
+                        logger.error(f"Received non-JSON data: {msg}")
+                    
+            except asyncio.TimeoutError:
+                # optional server heartbeat
+                await ws.send_text('{"t":"srv_heartbeat"}')
+    except WebSocketDisconnect:
+        logger.critical("WebSocketDisconnect, keep alive failed")
+    finally:
+        await manager.disconnect(ws)
     
 ##########################################################################
 # API router
@@ -679,7 +744,7 @@ async def send_purchase_request(
         "percent_complete": final_percent
     }  
     
-    await websock_conn.broadcast(final_send_data)
+    await manager.broadcast(final_send_data)
     #!-----------------------------------------------------------------------------
     
     return JSONResponse({"message": "All work completed"})
@@ -715,7 +780,7 @@ async def send_socket_data(
 		"event": "PROGRESS_UPDATE",
 		"percent_complete": percent
 	}
-    await websock_conn.broadcast(send_data)
+    await manager.broadcast(send_data)
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -824,7 +889,7 @@ async def assign_IRQ1_ID(
         pass
     else:
         logger.debug("AUTHORIZATION FAILED")
-        await websock_conn.broadcast({"event": "error", 
+        await manager.broadcast({"event": "error", 
                                       "status_code": "403",
                                       "message": "You are not authorized to assign requisition IDs"})
         raise HTTPException(status_code=403, detail="You are not authorized to assign requisition IDs")
@@ -1386,37 +1451,8 @@ app.include_router(api_router)
 ##########################################################################
 ## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
 ##########################################################################
-@app.websocket("/communicate")
-async def websocket_endpoint(websocket: WebSocket):
-    await websock_conn.connect(websocket)
-    try:
-        while True:
-            incoming_data = await websocket.receive_text()
-            logger.success(f"RECV data: {incoming_data}")
-            
-            # Convert to json, if reset_data then reset shm, percent everything
-            try:
-                message = json.loads(incoming_data)
-                if message.get("event") == "reset_data":
-                    # reset shm
-                    logger.info("Progress state cleared via WebSocket reset")
-                elif message.get("event") == "check_connection":
-                    # Send connection status back
-                    await websocket.send_json({
-                        "event": "connection_status",
-                        "connected": True,
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-                elif message.get("event") == "clear_stale_state":
-                    # Clear stale progress state
-                    await websocket.send_json({
-                        "event": "state_cleared",
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-            except json.JSONDecodeError:
-                logger.error(f"Received non-JSON data: {incoming_data}")
-    except WebSocketDisconnect:
-        await websock_conn.disconnect(websocket)
+# Note: WebSocket endpoint is already defined above at line 121
+# This duplicate endpoint has been removed to prevent conflicts
 
 
 ##########################################################################
