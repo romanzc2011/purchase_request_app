@@ -16,6 +16,7 @@ import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
 import { useWebSockets } from "../hooks/useWebSockets";
 import { socketSig } from "../utils/PrasSignals";
+import { computerWSURL } from "../utils/ws";
 
 interface AppProps {
     isLoggedIn: boolean;
@@ -30,7 +31,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const { createNewID } = usePurchaseForm();
 
     // Websocket URL
-    const WEBSOCKET_URL = "ws://localhost:5002/communicate";
+    const WEBSOCKET_URL = computerWSURL();
     const { socket: socket, isConnected: _isConnected } = useWebSockets(WEBSOCKET_URL);
     socketSig.value = socket;
 

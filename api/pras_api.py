@@ -62,7 +62,9 @@ from api.services.db_service import utc_now_truncated
 from api.services.websocket_manager import websock_conn
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
+from contextlib import asynccontextmanager, suppress
 import time
+import socket
 
 # Database ORM Model Imports
 from api.services.db_service import (
@@ -80,14 +82,31 @@ import api.services.db_service as dbas
 import tracemalloc
 tracemalloc.start(10)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🚀 Starting FastAPI application lifespan")
+    await websock_conn.start()
+    logger.info("✅ WebSocket connection manager started")
+    try:
+        yield
+    finally:
+        logger.info("🛑 Stopping FastAPI application lifespan")
+        await websock_conn.stop()
+        logger.info("✅ WebSocket connection manager stopped")
+
 # Initialize FastAPI app
-app = FastAPI(title="PRAS API")
+app = FastAPI(title="PRAS API", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5002",
+        "http://127.0.0.1:5002",
+        f"http://{socket.gethostbyname(socket.gethostname())}:5002",
+        f"https://{socket.gethostbyname(socket.gethostname())}:5002",
+        f"wss://{socket.gethostbyname(socket.gethostname())}:5002",
+        f"ws://{socket.gethostbyname(socket.gethostname())}:5002",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -103,7 +122,9 @@ lock = threading.Lock()
 # Set generic return type/ arg types
 P = ParamSpec("P")
 R = TypeVar("R")
-    
+
+
+
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
@@ -1458,4 +1479,4 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
-    uvicorn.run("pras_api:app", host="localhost", port=5004, reload=True)
+    uvicorn.run("pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004, reload=True)
