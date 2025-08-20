@@ -46,6 +46,8 @@ from sqlalchemy import update, select, text, func
 from api.services.db_service import get_async_session
 from api.schemas.enums import AssignedGroup, CueClerk, ItemStatus, LDAPGroup
 import asyncio
+from hypercorn.config import Config
+from hypercorn.asyncio import serve
 
 # PRAS Miscellaneous Dependencies
 from api.dependencies.misc_dependencies import *
@@ -84,45 +86,125 @@ tracemalloc.start(10)
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
 
-@app.on_event("startup")
-async def startup_event():
-    await websock_conn.start()
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for IIS/ARR"""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    await websock_conn.stop()
-        
 @app.websocket("/communicate")
 async def websocket_endpoint(websocket: WebSocket):
-    await websock_conn.connect(websocket)
-    try:
-        while True:
-            incoming_data = await websocket.receive_text()
-            logger.info(f"🔴 MESSAGE RECEIVED: {incoming_data}")
-            
-            # Convert to json, if reset_data then reset shm, percent everything
-            try:
-                message = json.loads(incoming_data)
-                if message.get("event") == "reset_data":
-                    # reset shm
-                    logger.info("Progress state cleared via WebSocket reset")
-                elif message.get("event") == "check_connection":
-                    # Send connection status back
-                    await websocket.send_json({
-                        "event": "connection_status",
-                        "connected": True,
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-                elif message.get("event") == "clear_stale_state":
-                    # Clear stale progress state
-                    await websocket.send_json({
-                        "event": "state_cleared",
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-            except json.JSONDecodeError:
-                logger.error("Received non-JSON data")
-    except WebSocketDisconnect:
-        await websock_conn.disconnect(websocket)
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        logger.info(f"🔴 MESSAGE RECEIVED from {websocket.client.host}:{websocket.client.port}: {data}")
+        await websocket.send_text(f"Server received: {data}")
+
+# @app.websocket("/communicate")
+# async def websocket_endpoint(websocket: WebSocket):
+#     client_info = f"{websocket.client.host}:{websocket.client.port}" if websocket.client else "unknown"
+#     logger.info(f"🔌 WebSocket connection attempt received from {client_info}")
+    
+#     # Log headers for debugging
+#     headers = dict(websocket.headers)
+#     logger.info(f"📋 WebSocket headers from {client_info}: {headers}")
+    
+#     # Check for authentication token in headers
+#     auth_token = None
+#     if "authorization" in headers:
+#         auth_header = headers["authorization"]
+#         if auth_header.startswith("Bearer "):
+#             auth_token = auth_header[7:]  # Remove "Bearer " prefix
+#             logger.info(f"🔑 Found auth token in WebSocket headers for {client_info}")
+    
+#     # If no token in headers, check query parameters
+#     if not auth_token:
+#         query_params = websocket.query_params
+#         auth_token = query_params.get("token")
+#         if auth_token:
+#             logger.info(f"🔑 Found auth token in query params for {client_info}")
+    
+#     # For now, accept the connection even without authentication
+#     # In production, you might want to validate the token here
+#     if not auth_token:
+#         logger.warning(f"⚠️ No authentication token found for WebSocket connection from {client_info}")
+    
+#     try:
+#         await websock_conn.connect(websocket)
+#         logger.info(f"✅ WebSocket connected successfully for {client_info}")
+        
+#         # Don't send initial message - let client initiate communication
+#         logger.info(f"🔍 WebSocket ready for communication with {client_info}")
+        
+#         while True:
+#             try:
+#                 incoming_data = await websocket.receive_text()
+#                 logger.info(f"🔴 MESSAGE RECEIVED from {client_info}: {incoming_data}")
+                
+#                 # Convert to json, if reset_data then reset shm, percent everything
+#                 try:
+#                     message = json.loads(incoming_data)
+#                     if message.get("event") == "reset_data":
+#                         # reset shm
+#                         logger.info(f"Progress state cleared via WebSocket reset for {client_info}")
+#                     elif message.get("event") == "check_connection":
+#                         # Send connection status back
+#                         await websocket.send_json({
+#                             "event": "connection_status",
+#                             "connected": True,
+#                             "timestamp": asyncio.get_event_loop().time(),
+#                             "client": client_info
+#                         })
+#                         logger.info(f"📤 Sent connection_status to {client_info}")
+#                     elif message.get("event") == "clear_stale_state":
+#                         # Clear stale progress state
+#                         await websocket.send_json({
+#                             "event": "state_cleared",
+#                             "timestamp": asyncio.get_event_loop().time(),
+#                             "client": client_info
+#                         })
+#                         logger.info(f"📤 Sent state_cleared to {client_info}")
+#                     elif message.get("event") == "ping":
+#                         # Handle ping/pong for keep-alive
+#                         await websocket.send_json({
+#                             "event": "pong",
+#                             "timestamp": asyncio.get_event_loop().time(),
+#                             "client": client_info
+#                         })
+#                         logger.info(f"📤 Sent pong to {client_info}")
+#                     elif message.get("event") == "client_test":
+#                         # Handle client test message
+#                         await websocket.send_json({
+#                             "event": "server_response",
+#                             "message": "Hello client! Server received your test message.",
+#                             "timestamp": asyncio.get_event_loop().time(),
+#                             "client": client_info
+#                         })
+#                         logger.info(f"📤 Sent server response to {client_info}")
+#                 except json.JSONDecodeError:
+#                     logger.error(f"Received non-JSON data from {client_info}: {incoming_data}")
+#             except asyncio.TimeoutError:
+#                 logger.warning(f"WebSocket timeout for {client_info}, sending heartbeat")
+#                 await websocket.send_json({
+#                     "event": "heartbeat",
+#                     "timestamp": asyncio.get_event_loop().time(),
+#                     "client": client_info
+#                 })
+#             except Exception as e:
+#                 logger.error(f"Error processing message from {client_info}: {e}")
+#                 # Don't break on ABNORMAL_CLOSURE, just log and continue
+#                 if "ABNORMAL_CLOSURE" in str(e) or "1006" in str(e):
+#                     logger.warning(f"Client {client_info} closed connection abnormally, this is normal in some cases")
+#                     break
+#                 else:
+#                     logger.error(f"Unexpected error for {client_info}: {e}")
+#                     break
+                
+#     except WebSocketDisconnect:
+#         logger.info(f"❌ WebSocket disconnected for {client_info}")
+#         await websock_conn.disconnect(websocket)
+#     except Exception as e:
+#         logger.error(f"❌ WebSocket error for {client_info}: {e}")
+#         await websock_conn.disconnect(websocket)
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -1450,6 +1532,8 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 
     return {"delete": True}
 
+
+
 ##########################################################################
 ## WEBSOCKET PROGRESS
 ##########################################################################
@@ -1458,4 +1542,16 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
-    uvicorn.run("pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004, reload=True)
+    config = Config()
+    config.bind = ["0.0.0.0:5004"]  # Bind to all interfaces, not just localhost
+    config.reload = True
+    config.log_level = "debug"
+    config.access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+    
+    # WebSocket specific settings
+    config.websocket_ping_interval = 25.0  # Send ping every 20 seconds
+    config.websocket_timeout = 600.0  # Close connection after 120 seconds of inactivity
+    
+    # Run the server
+    asyncio.run(serve(app, config))
+    

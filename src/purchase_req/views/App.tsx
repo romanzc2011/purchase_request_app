@@ -14,8 +14,17 @@ import ApprovalPageMain from "../components/approval_table/containers/ApprovalPa
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
-import { socketSig } from "../utils/PrasSignals";
 import { computeWSURL } from "../utils/ws";
+
+const ws = new WebSocket(computeWSURL("/communicate"));
+ws.onmessage = (event) => {
+    console.log("📨 WebSocket message received in App:", event.data);
+}
+
+ws.onopen = () => {
+    console.log("✅ WebSocket connected in App");
+    ws.send(JSON.stringify({ event: "heartbeat" }));
+}
 
 interface AppProps {
     isLoggedIn: boolean;
@@ -37,38 +46,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     const [dataBuffer, setDataBuffer] = useState<FormValues[]>([]);
     const [fileInfo, setFileInfo] = useState<IFile[]>([]);
     const [loginOpen, setLoginOpen] = useState(!isLoggedIn);
-
-    // Initialize WebSocket connection
-    useEffect(() => {
-        const wsUrl = computeWSURL("/communicate");
-        console.log("🔌 Connecting to WebSocket:", wsUrl);
-        const ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-            console.log("✅ WebSocket connected in App component");
-            socketSig.value = ws;
-        };
-
-        ws.onclose = (e) => {
-            console.log("❌ WebSocket disconnected in App component", { code: e.code, reason: e.reason });
-            socketSig.value = undefined;
-        };
-
-        ws.onerror = (error) => {
-            console.error("WebSocket error:", error);
-        };
-
-        ws.onmessage = (event) => {
-            console.log("📨 WebSocket message received:", event.data);
-        };
-
-        // Cleanup on unmount
-        return () => {
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.close();
-            }
-        };
-    }, []);
 
     // Reserve the ID for the request
     useEffect(() => {

@@ -2,8 +2,9 @@ export function computeWSURL(path = "/communicate") {
     const { protocol, host } = window.location;
     const wsProto = protocol === "https:" ? "wss:" : "ws:";
     const base = `${wsProto}//${host}`;
-    console.log("🔌 COMPUTE WS URL", `${base}${path.startsWith("/") ? path : `/${path}`}`);
-    return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+    const fullUrl = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+    console.log("🔌 COMPUTE WS URL", fullUrl);
+    return fullUrl;
 }
 
 export function computeHTTPURL(path: string) { 

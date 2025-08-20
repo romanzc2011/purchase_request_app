@@ -50,35 +50,16 @@ export function ProgressBar() {
     // Handle connection status changes
     useEffect(() => {
         if (socketSignal) {
-            const handleOpen = () => {
-                console.log("✅ WebSocket connected");
-                setIsConnected(true);
-                // Reset signals when reconnecting
-                isDownloadSig.value = false;
-                isSubmittedSig.value = false;
-                isRequestSubmitted.value = false;
-                isApprovalSig.value = false
-                if (toastIdRef.current !== null) {
-                    toast.dismiss(toastIdRef.current);
-                }
-            };
-
-            const handleClose = () => {
-                console.log("❌ WebSocket disconnected");
-                setIsConnected(false);
-                // Clear any existing toasts when disconnected
-                if (toastIdRef.current !== null) {
-                    toast.dismiss(toastIdRef.current);
-                }
-            };
-
-            socketSignal.addEventListener('open', handleOpen);
-            socketSignal.addEventListener('close', handleClose);
-
-            return () => {
-                socketSignal.removeEventListener('open', handleOpen);
-                socketSignal.removeEventListener('close', handleClose);
-            };
+            console.log("✅ WebSocket connected in ProgressBar");
+            setIsConnected(true);
+            // Reset signals when reconnecting
+            isDownloadSig.value = false;
+            isSubmittedSig.value = false;
+            isRequestSubmitted.value = false;
+            isApprovalSig.value = false;
+            if (toastIdRef.current !== null) {
+                toast.dismiss(toastIdRef.current);
+            }
         }
     }, [socketSignal]);
 
@@ -87,9 +68,10 @@ export function ProgressBar() {
     useEffect(() => {
         if (!socketSignal) return;
 
-        const handleMessage = (event: MessageEvent) => {
+        // Create a custom event listener that will be triggered by App.tsx
+        const handleProgressMessage = (event: CustomEvent) => {
             try {
-                const data = JSON.parse(event.data);
+                const data = event.detail;
 
                 // Handle heartbeat
                 if (data.event === "heartbeat") {
@@ -171,8 +153,9 @@ export function ProgressBar() {
             }
         };
 
-        socketSignal.addEventListener('message', handleMessage);
-        return () => socketSignal.removeEventListener('message', handleMessage);
+        // Listen for custom progress events
+        window.addEventListener('progress-message', handleProgressMessage as EventListener);
+        return () => window.removeEventListener('progress-message', handleProgressMessage as EventListener);
     }, [socketSignal, dispatch]);
 
     // Check for stale connection (no heartbeat for 2 minutes)
