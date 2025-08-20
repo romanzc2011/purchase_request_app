@@ -7,45 +7,32 @@ class WebSocketService {
 
     connect() {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            return; // Already connected
+            return;  // Already established
+        }
+        else if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
+            console.log("🔌 Attempting WebSocket connection.");
         }
 
-        this.socket = new WebSocket(computeWSURL());
-        
+        this.socket = new WebSocket(computeWSURL("/communicate"));
+
+        // On open send message to backend that we are connected
         this.socket.onopen = () => {
             console.log("✅ WebSocket connected");
             this.isConnected = true;
-        };
+        }
 
-        this.socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                this.notifyListeners(data);
-            } catch (e) {
-                console.error("Error parsing WebSocket message:", e);
-            }
-        };
-
-        this.socket.onclose = () => {
-            console.log("❌ WebSocket disconnected");
-            this.isConnected = false;
-        };
-
-        this.socket.onerror = (error) => {
-            console.error("WebSocket error:", error);
-        };
     }
 
     disconnect() {
         if (this.socket) {
-            this.socket.close();
+            this.socket.close()
             this.socket = null;
             this.isConnected = false;
         }
     }
 
     send(data: any) {
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        if (this.socket && this.isConnected) {
             this.socket.send(JSON.stringify(data));
         }
     }
@@ -68,18 +55,18 @@ class WebSocketService {
         };
     }
 
-    private notifyListeners(data: any) {
-        const event = data.event || 'message';
-        const callbacks = this.listeners.get(event);
-        if (callbacks) {
-            callbacks.forEach(callback => callback(data));
-        }
-    }
+    // private notifyListeners(data: any) {
+    //     const event = data.event || 'message';
+    //     const callbacks = this.listeners.get(event);
+    //     if (callbacks) {
+    //         callbacks.forEach(callback => callback(data));
+    //     }
+    // }
 
     getConnectionStatus() {
         return this.isConnected;
     }
 }
 
-// Create singleton instance
+// Singelton instance
 export const webSocketService = new WebSocketService();

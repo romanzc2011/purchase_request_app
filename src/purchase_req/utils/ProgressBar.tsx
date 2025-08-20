@@ -6,6 +6,8 @@ import { startTest, completeProgress, resetProgress } from '../../store/progress
 import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig, reset_signals } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
 import { ProgressToast } from "../components/ProgressToast";
+import { webSocketService } from "../services/WebSocketService";
+
 
 // #########################################################################################
 // PROGRESS BAR COMPONENT
@@ -17,6 +19,11 @@ export function ProgressBar() {
     const [lastHeartbeat, setLastHeartbeat] = useState<number>(Date.now());
     const [isConnected, setIsConnected] = useState(false);
     let socketSignal = socketSig.value;
+
+    webSocketService.connect();
+    webSocketService.subscribe("PROGRESS_UPDATE", (data: any) => {
+        console.log("PROGRESS_UPDATE: ", data);
+    });
 
     console.log("IS SUBMITTED SIG: ", isSubmittedSig.value);
 

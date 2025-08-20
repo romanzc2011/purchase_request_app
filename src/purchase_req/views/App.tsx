@@ -14,17 +14,8 @@ import ApprovalPageMain from "../components/approval_table/containers/ApprovalPa
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
-import { computeWSURL } from "../utils/ws";
+import { webSocketService } from "../services/WebSocketService";
 
-const ws = new WebSocket(computeWSURL("/communicate"));
-ws.onmessage = (event) => {
-    console.log("📨 WebSocket message received in App:", event.data);
-}
-
-ws.onopen = () => {
-    console.log("✅ WebSocket connected in App");
-    ws.send(JSON.stringify({ event: "heartbeat" }));
-}
 
 interface AppProps {
     isLoggedIn: boolean;
@@ -32,6 +23,8 @@ interface AppProps {
     CUE_GROUP: boolean;
     IT_GROUP: boolean;
 }
+
+
 
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 
@@ -59,6 +52,12 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
             }
         })();
     }, [createNewID]);
+
+    useEffect(() => {
+        // Testing
+        webSocketService.connect();
+
+    });
 
     /* *********************************************************************************** */
     // Reset the Submit Table after submission
