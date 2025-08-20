@@ -12,4 +12,4 @@ export function computeHTTPURL(path: string) {
     const p = path.startsWith("/") ? path : `/${path}`;
     console.log("🔌 COMPUTE HTTP URL", `${proto}//${window.location.host}${p}`);
     return `${proto}//${window.location.host}${p}`;
-} 
+}
