@@ -1,3 +1,5 @@
+import { io } from "socket.io-client";
+
 export function computeWSURL(path = "/communicate") { 
     const { protocol, host } = window.location;
     const wsProto = protocol === "https:" ? "wss:" : "ws:";
@@ -12,4 +14,10 @@ export function computeHTTPURL(path: string) {
     const p = path.startsWith("/") ? path : `/${path}`;
     console.log("🔌 COMPUTE HTTP URL", `${proto}//${window.location.host}${p}`);
     return `${proto}//${window.location.host}${p}`;
-} 
+}
+
+const socket = io(computeHTTPURL("/communicate"));
+
+socket.on("connect", () => {
+    console.log("🔌 WebSocket connected");
+});

@@ -118,22 +118,6 @@ async def communicate(ws: WebSocket):
     finally:
         await websock_conn.disconnect(ws)
 
-# Add CORS middleware
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=[
-#         "http://localhost:5002",
-#         "http://127.0.0.1:5002",
-#         f"http://{socket.gethostbyname(socket.gethostname())}:5002",
-#         f"https://{socket.gethostbyname(socket.gethostname())}:5002",
-#         f"wss://{socket.gethostbyname(socket.gethostname())}:5002",
-#         f"ws://{socket.gethostbyname(socket.gethostname())}:5002",
-#     ],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
