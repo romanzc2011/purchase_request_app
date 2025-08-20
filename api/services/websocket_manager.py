@@ -7,54 +7,63 @@ from fastapi import WebSocket
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
-        self.heartbeat_task = None
-        self._heartbeat_started = False
-
-	#-------------------------------------------------------------
-	# START HEARTBEAT
-	#-------------------------------------------------------------
-    def start_heartbeat(self):
-        """Start heartbeat to keep connections alive"""
-        if self.heartbeat_task is None and not self._heartbeat_started:
-            try:
-                # Only create task if there's a running event loop
-                loop = asyncio.get_running_loop()
-                self.heartbeat_task = loop.create_task(self._heartbeat_loop())
-                self._heartbeat_started = True
-                logger.debug("Heartbeat task started")
-            except RuntimeError:
-                # No running event loop, will start when connect is called
-                logger.debug("No running event loop, heartbeat will start when first connection is made")
-                self._heartbeat_started = True
-
-    async def _heartbeat_loop(self):
-        """Send heartbeat every 30 seconds to keep connections alive"""
-        while True:
-            try:
-                await asyncio.sleep(30)  # Send heartbeat every 30 seconds
-                if self.active_connections:
-                    await self.broadcast({"event": "heartbeat", "timestamp": asyncio.get_event_loop().time()})
-                    logger.debug(f"Sent heartbeat to {len(self.active_connections)} connections")
-            except Exception as e:
-                logger.error(f"Heartbeat error: {e}")
 
 	#-------------------------------------------------------------
 	# CONNECT
 	#-------------------------------------------------------------
-    async def connect(self, websocket: WebSocket):
+    async def accept_connections(self, websocket: WebSocket):
         logger.info("🔌 ConnectionManager: Accepting WebSocket connection")
+        # Accept the connection
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info(f"✅ ConnectionManager: WebSocket connected. Total connections: {len(self.active_connections)}")
         
-        # Start heartbeat if this is the first connection and heartbeat hasn't been started
-        if len(self.active_connections) == 1 and self.heartbeat_task is None and self._heartbeat_started:
+        # Send initial message to client to let them know they are connected
+        await websocket.send_json({
+            "event": "connection_status",
+            "connected": True,
+            "timestamp": asyncio.get_event_loop().time(),
+        })
+        
+    async def filter_events(self, websocket: WebSocket, incoming_data: str):
+        # Convert to json, if reset_data then reset shm, percent everything
             try:
-                loop = asyncio.get_running_loop()
-                self.heartbeat_task = loop.create_task(self._heartbeat_loop())
-                logger.debug("Heartbeat task started on first connection")
-            except RuntimeError:
-                logger.warning("Could not start heartbeat task - no running event loop")
+                message = json.loads(incoming_data)
+                if message.get("event") == "reset_data":
+                    # reset shm
+                    logger.info(f"Progress state cleared via WebSocket reset")
+                elif message.get("event") == "check_connection":
+                    # Send connection status back
+                    await websocket.send_json({
+                        "event": "connection_status",
+                        "connected": True,
+                        "timestamp": asyncio.get_event_loop().time(),
+                    })
+                    logger.info(f"📤 Sent connection_status")
+                elif message.get("event") == "clear_stale_state":
+                    # Clear stale progress state
+                    await websocket.send_json({
+                        "event": "state_cleared",
+                        "timestamp": asyncio.get_event_loop().time(),
+                    })
+                    logger.info(f"📤 Sent state_cleared")
+                elif message.get("event") == "ping":
+                    # Handle ping/pong for keep-alive
+                    await websocket.send_json({
+                        "event": "pong",
+                        "timestamp": asyncio.get_event_loop().time(),
+                    })
+                    logger.info(f"📤 Sent pong")
+                elif message.get("event") == "client_test":
+                    # Handle client test message
+                    await websocket.send_json({
+                        "event": "server_response",
+                        "message": "Hello client! Server received your test message.",
+                        "timestamp": asyncio.get_event_loop().time(),
+                    })
+                    logger.info(f"📤 Sent server response")
+            except json.JSONDecodeError:
+                logger.error(f"Received non-JSON data: {incoming_data}")
 
 	#-------------------------------------------------------------
 	# DISCONNECT

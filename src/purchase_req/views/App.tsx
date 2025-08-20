@@ -24,8 +24,6 @@ interface AppProps {
     IT_GROUP: boolean;
 }
 
-
-
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
 
     // Bring custom hook for purchase form
@@ -52,12 +50,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
             }
         })();
     }, [createNewID]);
-
-    useEffect(() => {
-        // Testing
-        webSocketService.connect();
-
-    });
 
     /* *********************************************************************************** */
     // Reset the Submit Table after submission
