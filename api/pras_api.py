@@ -34,11 +34,12 @@ from pydantic import ValidationError
 from fastapi import (
     FastAPI, APIRouter, Depends, Form, 
     File, UploadFile, HTTPException, Request, 
-    Query, status, WebSocket, WebSocketDisconnect)
+    Query, status, WebSocket)
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.websockets import WebSocketDisconnect
 
 # SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,7 +66,6 @@ from api.services.websocket_manager import websock_conn
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
 import time
-import socket
 
 # Database ORM Model Imports
 from api.services.db_service import (
@@ -86,56 +86,19 @@ tracemalloc.start(10)
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for IIS/ARR"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-# @app.websocket("/communicate")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     while True:
-#         data = await websocket.receive_text()
-#         logger.info(f"🔴 MESSAGE RECEIVED from {websocket.client.host}:{websocket.client.port}: {data}")
-#         await websocket.send_text(f"Server received: {data}")
 
 @app.websocket("/communicate")
 async def websocket_endpoint(websocket: WebSocket):
     try:
-        await websock_conn.accept_connections(websocket)
-        logger.info(f"✅ WebSocket connected successfully")
+        await websocket.accept()
         
         while True:
-            try:
-                incoming_data = await websocket.receive_text()
-                logger.info(f"🔴 MESSAGE RECEIVED: {incoming_data}")
-                    
-                # Make decisions based on event
-                await websock_conn.filter_events(websocket, incoming_data)
-                
-            except asyncio.TimeoutError:
-                logger.warning(f"WebSocket timeout, sending heartbeat")
-                await websocket.send_json({
-                    "event": "heartbeat",
-                    "timestamp": asyncio.get_event_loop().time(),
-                })
-                
-            except Exception as e:
-                logger.error(f"Error processing message: {e}")
-                # Don't break on ABNORMAL_CLOSURE, just log and continue
-                if "ABNORMAL_CLOSURE" in str(e) or "1006" in str(e):
-                    logger.warning(f"Client closed connection abnormally")
-                    break
-                else:
-                    logger.error(f"Unexpected error: {e}")
-                    break
-                
-    except WebSocketDisconnect:
-        logger.info(f"❌ WebSocket disconnected")
-        await websock_conn.disconnect(websocket)
-    except Exception as e:
-        logger.error(f"❌ WebSocket error: {e}")
-        await websock_conn.disconnect(websocket)
+            data = await websocket.receive_text()
+            logger.info(f"🔴 MESSAGE RECEIVED from {websocket.client.host}:{websocket.client.port}: {data}")
+            await websocket.send_text(f"Server received: {data}")
+    except WebSocketDisconnect as e:
+        logger.info(f"WS disconnected: code={getattr(e, 'code', None)}")
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")

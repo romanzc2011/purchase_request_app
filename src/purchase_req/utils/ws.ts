@@ -1,8 +1,9 @@
-export function computeWSURL(path = "/communicate") { 
+export function computeWSURL() {
+    const path = "/communicate";
     const { protocol, host } = window.location;
     const wsProto = protocol === "https:" ? "wss:" : "ws:";
     const base = `${wsProto}//${host}`;
-    const fullUrl = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+    const fullUrl = `${base}${path}`;
     console.log("🔌 COMPUTE WS URL", fullUrl);
     return fullUrl;
 }

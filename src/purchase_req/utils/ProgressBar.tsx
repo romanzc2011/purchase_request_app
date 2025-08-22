@@ -1,47 +1,47 @@
 import { useEffect, useRef, useState } from "react";
 import { toast, Id } from "react-toastify";
-import { useDispatch, useSelector } from "react-redux";
-import { AppDispatch, RootState } from "../../store/prasStore";
-import { completeProgress, resetProgress } from "../../store/progressSlice";
-import { isDownloadSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig, reset_signals } from "./PrasSignals";
-import { effect as signalsEffect } from "@preact/signals-react";
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../../store/prasStore';
+import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
+import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig, reset_signals } from "./PrasSignals";
+import { effect } from "@preact/signals-react";
 import { ProgressToast } from "../components/ProgressToast";
 import { webSocketService } from "../services/WebSocketService";
+import { computeWSURL } from "./ws";
 
-export function ProgressBar() {
-    const toastIdRef = useRef<Id | null>(null);
-    const dispatch = useDispatch<AppDispatch>();
-    const status = useSelector((s: RootState) => (s as any).progress.status);
+// #########################################################################################
+// PROGRESS BAR COMPONENT
+// #########################################################################################
 
-    const [isConnected, setIsConnected] = useState(false);
-    const [lastHeartbeat, setLastHeartbeat] = useState<number>(Date.now());
+const handleMessage = (event: MessageEvent, dispatch: AppDispatch, toastIdRef: React.MutableRefObject<Id | null>) => {
+    try {
+        const data = JSON.parse(event.data);
+        dispatch(startTest());
 
-    // One-time connect + subscriptions
-    useEffect(() => {
-        webSocketService.connect();
+        const percent = data.percent_complete;
+        console.log("PERCENT: ", percent);
 
-        // connection state
-        const unsubOpen = webSocketService.subscribe("open", () => {
-            setIsConnected(true);
-            // optional reset when reconnecting
-            isDownloadSig.value = false;
-            isSubmittedSig.value = false;
-            isRequestSubmitted.value = false;
-            isApprovalSig.value = false;
-            if (toastIdRef.current) toast.dismiss(toastIdRef.current);
-        });
-        const unsubClose = webSocketService.subscribe("close", () => setIsConnected(false));
+        // START TOAST
+        if (data.event === "START_TOAST") {
+            toastIdRef.current = toast.loading(
+                <ProgressToast percent={0} message={messageSig.value} />,
+                { position: "top-center", autoClose: false }
+            );
+            return;
+        }
 
-        // keep last heartbeat fresh (use any server “heartbeat” or “connection_status” event)
-        const unsubHeartbeat = webSocketService.subscribe("heartbeat", () => setLastHeartbeat(Date.now()));
-        const unsubConnStatus = webSocketService.subscribe("connection_status", () => setLastHeartbeat(Date.now()));
+        console.log("DATE.EVENT: ", data.event);
+        console.log("Download sig: ", isDownloadSig.value);
+        console.log("Submitted Sig: ", isSubmittedSig.value);
+        console.log("Approval request: ", isApprovalSig.value);
+        console.log("Percent: ", percent);
+        console.log("isRequestSubmitted: ", isRequestSubmitted.value);
 
-        // toast progress
-        const unsubProgress = webSocketService.subscribe("PROGRESS_UPDATE", (data) => {
-            const percent = data?.percent_complete;
-            if (percent == null) return;
-
-            if (toastIdRef.current == null) {
+        // PROGRESS_UPDATE (for downloading pdf)
+        if (data.event === "PROGRESS_UPDATE" && (isDownloadSig.value || isRequestSubmitted.value || isRequestSubmitted.value || isApprovalSig) && percent != null) {
+            // create toast if needed
+            console.log("PROGRESS UPDATE SECTION");
+            if (toastIdRef.current === null) {
                 toastIdRef.current = toast.loading(
                     <ProgressToast percent={percent} message={messageSig.value} />,
                     { position: "top-center", autoClose: false }
@@ -54,86 +54,160 @@ export function ProgressBar() {
                     position: "top-center",
                     type: percent === 100 ? "success" : undefined,
                 });
+                console.log("TOAST.UPDATE ", percent);
             }
 
+            // optionally dispatch "done" after the bar finishes its transition
             if (percent === 100) {
                 setTimeout(() => {
                     dispatch(completeProgress());
-                    isDownloadSig.value = false;
+                    isDownloadSig.value = false; // Reset the signal when done
                     isSubmittedSig.value = false;
                     isRequestSubmitted.value = false;
                     isApprovalSig.value = false;
                 }, 1000);
             }
-        });
-
-        // other events
-        const unsubStartToast = webSocketService.subscribe("START_TOAST", () => {
-            toastIdRef.current = toast.loading(<ProgressToast percent={0} message={messageSig.value} />, {
-                position: "top-center",
-                autoClose: false,
-            });
-        });
-
-        const unsubNoUser = webSocketService.subscribe("NO_USER_FOUND", (d) => {
-            toast.error(d.message);
+        } else if (data.event === "NO_USER_FOUND") {
+            toast.error(data.message);
             userFoundSig.value = false;
-        });
-        const unsubUser = webSocketService.subscribe("USER_FOUND", () => {
+
+        } else if (data.event === "USER_FOUND") {
             userFoundSig.value = true;
-        });
-        const unsubReset = webSocketService.subscribe("SIGNAL_RESET", () => {
+
+        } else if (data.event == "SIGNAL_RESET") {
+            console.log(data.event);
+            console.log("SIGNAL RESET");
             reset_signals();
-            if (toastIdRef.current) toast.dismiss(toastIdRef.current);
-        });
+            //dispatch(resetProgress());
 
-        // optional client ping if your server isn’t sending WS pings
-        const pingId = setInterval(() => webSocketService.send({ event: "ping" }), 25000);
-        // initial “are we good?”
-        webSocketService.send({ event: "check_connection" });
-
-        return () => {
-            clearInterval(pingId);
-            unsubOpen(); unsubClose();
-            unsubHeartbeat(); unsubConnStatus();
-            unsubProgress(); unsubStartToast();
-            unsubNoUser(); unsubUser(); unsubReset();
-            webSocketService.disconnect(); // if ProgressBar is global, this is fine
-        };
-    }, [dispatch]);
-
-    // Tie signals to the message text (create once, dispose on unmount)
-    useEffect(() => {
-        const disposeOrEffect = signalsEffect(() => {
-            if (isDownloadSig.value) messageSig.value = "Downloading PDF";
-            if (isRequestSubmitted.value) messageSig.value = "Submitting request";
-            if (isApprovalSig.value) messageSig.value = "Approval request processing";
-        });
-        // Some versions return a disposer function, others an object with .dispose()
-        return () => {
-            if (typeof disposeOrEffect === "function") disposeOrEffect();
-            else (disposeOrEffect as any)?.dispose?.();
-        };
-    }, []);
-
-    // When Redux says “done”, tell server to reset & clear toast
-    useEffect(() => {
-        if (status === "done" && isConnected) {
-            webSocketService.send({ event: "reset_data" });
-            dispatch(resetProgress());
-            if (toastIdRef.current) toast.dismiss(toastIdRef.current);
-        }
-    }, [status, isConnected, dispatch]);
-
-    // Stale-connection watcher (if you care)
-    useEffect(() => {
-        const id = setInterval(() => {
-            if (isConnected && Date.now() - lastHeartbeat > 120_000) {
-                console.warn("⚠️ No heartbeat for 2 minutes; connection may be stale");
+            if (toastIdRef.current !== null) {
+                toast.dismiss(toastIdRef.current);
             }
-        }, 30_000);
-        return () => clearInterval(id);
-    }, [isConnected, lastHeartbeat]);
+
+        }
+    } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+    }
+};
+export function ProgressBar() {
+    const toastIdRef = useRef<Id | null>(null);
+    const dispatch = useDispatch<AppDispatch>();
+    const status = useSelector((s: RootState) => (s as any).progress.status);
+    const [lastHeartbeat, setLastHeartbeat] = useState<number>(Date.now());
+    const [isConnected, setIsConnected] = useState(false);
+    let socketSignal = socketSig.value;
+
+    console.log("IS SUBMITTED SIG: ", isSubmittedSig.value);
+
+    // Create WebSocket connection and assign to signal
+    useEffect(() => {
+        // Create the WebSocket connection));
+        webSocketService.connect();
+        webSocketService.send("hello from client");
+
+        // // Fires when connection to websocket server is established
+        // socket.onopen = (event) => {
+        //     console.log("✅ WebSocket connected:", event);
+        //     socket.send("Hello from client");
+        // };
+
+        // // Fires when a message is received from the websocket server
+        // socket.onmessage = (event) => {
+        //     console.log(`Received message: ${event.data}`);
+        // };
+
+        // // Fires when connection to server is closed
+        // socket.onclose = (event) => {
+        //     if (event.wasClean) {
+        //         console.log(`Connection closed cleanly: code=${event.code}, reason=${event.reason}`);
+        //     } else {
+        //         console.error(`CONNECTION DIED UNEXPECTEDLY: code=${event.code}, reason=${event.reason}`);
+        //     }
+        //     // Clear the signal when connection closes
+        //     socketSig.value = undefined;
+        // };
+
+        // // Fires when there's an error
+        // socket.onerror = (error) => {
+        //     console.error("WEBSOCKET ERROR: ", error);
+        // }
+
+        // // Cleanup function
+        // return () => {
+        //     if (socket.readyState === WebSocket.OPEN) {
+        //         socket.close();
+        //     }
+        //     socketSig.value = undefined;
+        // };
+    }, []); // Empty dependency array - only run once on mount
+
+    // Subscribe to the status to send reset message on complete
+    useEffect(() => {
+        if (status === 'done' && socketSignal) {
+            socketSignal.send(JSON.stringify({ event: 'reset_data' }));
+            dispatch(resetProgress());
+
+            if (toastIdRef.current !== null) {
+                toast.dismiss(toastIdRef.current);
+            }
+        }
+    }, [status, socketSignal, dispatch])
+
+    // Capture signal trigger and change
+    effect(() => {
+        if (isDownloadSig.value) {
+            messageSig.value = "Downloading PDF";
+        }
+
+        if (isRequestSubmitted.value) {
+            messageSig.value = "Submitting request";
+        }
+
+        if (isApprovalSig.value) {
+            messageSig.value = "Approval request processing";
+        }
+    });
+
+    // Handle connection status changes
+    // useEffect(() => {
+    //     if (socketSignal) {
+    //         const handleOpen = () => {
+    //             console.log("✅ WebSocket connected");
+    //             setIsConnected(true);
+    //             // Reset signals when reconnecting
+    //             isDownloadSig.value = false;
+    //             isSubmittedSig.value = false;
+    //             isRequestSubmitted.value = false;
+    //             isApprovalSig.value = false
+    //             if (toastIdRef.current !== null) {
+    //                 toast.dismiss(toastIdRef.current);
+    //             }
+    //         };
+
+    //         const handleClose = () => {
+    //             console.log("❌ WebSocket disconnected");
+    //             setIsConnected(false);
+    //             // Clear any existing toasts when disconnected
+    //             if (toastIdRef.current !== null) {
+    //                 toast.dismiss(toastIdRef.current);
+    //             }
+    //         };
+
+    //         return () => {
+    //             socketSignal.removeEventListener('open', handleOpen);
+    //             socketSignal.removeEventListener('close', handleClose);
+    //         };
+    //     }
+    // }, [socketSignal]);
+
+    console.log("45: isRequestSubmitted: ", isRequestSubmitted.value);
+    // Listen for WebSocket messages and update progress
+    useEffect(() => {
+        if (!socketSignal) return;
+
+
+
+    }, [socketSignal, dispatch]);
 
     return null;
 }

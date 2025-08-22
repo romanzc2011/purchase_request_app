@@ -2,82 +2,137 @@ import { computeWSURL } from "../utils/ws";
 
 class WebSocketService {
     private socket: WebSocket | null = null;
-    private listeners = new Map<string, Array<(d: any) => void>>();
-    private isConnected = false;
+    private listeners: Map<string, ((data: any) => void)[]> = new Map();
     private queue: string[] = [];
-    
-    //-------------------------------------------------------------
+    private heartbeatId: number | null = null;
+
+    // ---------------------------------------------------------------
     // CONNECT
-    //-------------------------------------------------------------
-    connect() {
-      if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) return;
-  
-      this.socket = new WebSocket(computeWSURL("/communicate"));
-  
-      this.socket.onopen = () => {
-        this.isConnected = true;
-        for (const m of this.queue) this.socket!.send(m);
-        this.queue.length = 0;
-        this.notifyListeners({ event: "open" });
-      };
-  
-      this.socket.onmessage = (evt) => {
-        let payload: any = evt.data;
-        try { if (typeof payload === "string") payload = JSON.parse(payload); } catch {}
-        this.notifyListeners(payload);
-      };
-  
-      this.socket.onclose = (e) => {
-        this.isConnected = false;
-        this.notifyListeners({ event: "close", code: e.code, reason: e.reason });
-      };
-  
-      this.socket.onerror = (e) => this.notifyListeners({ event: "error", error: e });
+    // ---------------------------------------------------------------
+    public connect() {
+        // Guard against multiple connections
+        if (this.socket && (
+            this.socket.readyState === WebSocket.OPEN ||
+            this.socket.readyState === WebSocket.CONNECTING
+        )) {
+            return;
+        }
+
+        this.socket = new WebSocket(computeWSURL());
+
+        // On open send message to backend that we are connected
+        this.socket.onopen = () => {
+            console.log("✅ WebSocket is connected");
+
+            // Flush queued outbound messages
+            for (const msg of this.queue) this.socket!.send(msg);
+            this.queue.length = 0;
+            this.startHeartbeat();
+            console.log("✅ WebSocket is connected");
+        };
+
+        // On MEssagees 
+        this.socket.onmessage = (event) => {
+            let data: any = event.data;
+
+            if (data.type === "json") {
+                data = JSON.parse(data);
+            }
+            this.notifyListeners(data);
+        };
+
+        this.socket.onclose = (e) => { 
+            this.stopHeartbeat();
+            this.disconnect();
+            console.log("❌ WebSocket is disconnected, event triggered: ", e);
+        }
+
     }
-  
-    //-------------------------------------------------------------
+
+    // Send message to websocket server
+    public send(payload: any) { 
+        const data = JSON.stringify(payload);
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(data);
+        } else {
+            // Queue the message until the socket is open
+            this.queue.push(data);
+            if (!this.socket || this.socket.readyState === WebSocket.CLOSED) { 
+                this.connect();
+            }
+        }
+    }
+
+    // Get Status of connection
+    public getConnectionStatus(): boolean { 
+        if(this.socket && this.socket.readyState === WebSocket.OPEN) {
+            return true;
+        }
+        return false;
+    }
+
+    // ---------------------------------------------------------------
     // DISCONNECT
-    //-------------------------------------------------------------
-    disconnect() {
-      this.socket?.close();
-      this.socket = null;
-      this.isConnected = false;
+    // ---------------------------------------------------------------
+    public disconnect() {
+        if (this.socket) {
+            this.socket.close()
+            this.socket = null;
+        }
     }
-  
-    //-------------------------------------------------------------
-    // SEND
-    //-------------------------------------------------------------
-    send(obj: any) {
-      const msg = JSON.stringify(obj);
-      if (this.socket && this.isConnected) this.socket.send(msg);
-      else this.queue.push(msg);
-    }
-  
-    //-------------------------------------------------------------
+
+    // ---------------------------------------------------------------
     // SUBSCRIBE
-    //-------------------------------------------------------------
-    subscribe(event: string, cb: (data: any) => void) {
-      const arr = this.listeners.get(event) ?? [];
-      arr.push(cb);
-      this.listeners.set(event, arr);
-      return () => {
-        const list = this.listeners.get(event);
-        if (!list) return;
-        const i = list.indexOf(cb);
-        if (i > -1) list.splice(i, 1);
-        if (list.length === 0) this.listeners.delete(event);
-      };
+    // ---------------------------------------------------------------
+    public subscribe(event: string, callback: (data: any) => void) {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+        this.listeners.get(event)!.push(callback);
+
+        // Return unsubscribe function
+        return () => {
+            const callbacks = this.listeners.get(event);
+            if (callbacks) {
+                const index = callbacks.indexOf(callback);
+                if (index > -1) {
+                    callbacks.splice(index, 1);
+                }
+            }
+        };
     }
-  
-    private notifyListeners(data: any) {
-      const evt = data?.event ?? "message";
-      this.listeners.get(evt)?.forEach(cb => cb(data));
-      if (evt !== "message") this.listeners.get("message")?.forEach(cb => cb(data));
+
+    // ---------------------------------------------------------------
+    // NOTIFY LISTENERS
+    // ---------------------------------------------------------------
+    private notifyListeners(data: any) { 
+        console.log("NOTIFYING LISTENERS: ", data);
+        const event = data.event || 'message';
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            callbacks.forEach(callback => callback(data));
+        }
     }
-  
-    getConnectionStatus() { return this.isConnected; }
-  }
-  
+
+    // ---------------------------------------------------------------
+    // START HEARTBEAT
+    // ---------------------------------------------------------------
+    private startHeartbeat() {
+        if (this.heartbeatId != null) return;
+
+        this.heartbeatId = window.setInterval(() => this.send({ event:"ping" }), 25000);
+      }
+
+    // ---------------------------------------------------------------
+    // STOP HEARTBEAT
+    // ---------------------------------------------------------------
+    private stopHeartbeat() {
+        if (this.heartbeatId != null) {
+            clearInterval(this.heartbeatId);
+            this.heartbeatId = null;
+        }
+    }
+}
 
 // Singelton instance
 export const webSocketService = new WebSocketService();
