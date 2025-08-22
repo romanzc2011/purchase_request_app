@@ -83,12 +83,10 @@ tracemalloc.start(10)
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
 
-# Add CORS middleware
+# Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5002",
-    ],
+    allow_origins=["http://localhost:5002", "http://127.0.0.1:5004", "http://127.0.0.1:5002", "http://127.0.0.1:5004"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -817,7 +815,7 @@ async def assign_IRQ1_ID(
     # Only lela can assign RQ1 IDs
     if (current_user.has_group(LDAPGroup.CUE_GROUP.value) 
             and 
-        (format_username(current_user.username) == CueClerk.MANAGER.value)):
+        (format_username(current_user.username) == CueClerk.MANAGER.value or format_username(current_user.username) == CueClerk.TEST_USER.value)):
         logger.debug("AUTHORIZATION SUCCESSFUL")
         pass
     else:

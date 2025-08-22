@@ -6,6 +6,7 @@ import { Box, IconButton } from "@mui/material";
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import Input from '@mui/material/Input';
 import SearchIcon from "@mui/icons-material/Search";
+import { computeHTTPURL } from "../../../utils/misc_utils";
 
 interface SearchBarProps {
     setSearchQuery: (query: string) => void;
@@ -16,9 +17,7 @@ interface SearchBarProps {
 /************************************************************************************ */
 /* CONFIG API URL- */
 /************************************************************************************ */
-const baseURL = import.meta.env.VITE_API_URL;
-const API_CALL: string = "/api/getSearchData";
-const API_URL = `${baseURL}${API_CALL}`;
+const API_URL = computeHTTPURL("/api/getSearchData");
 const DEBOUNCE_MS = 100;
 
 /* FETCHING APPROVAL DATA FUNCTION for useQuery */

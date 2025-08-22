@@ -3,7 +3,6 @@ import React from "react";
 import ApprovalTable from "../ui/ApprovalTable";
 import SearchBar from "../ui/SearchBar";
 import { Box } from "@mui/material";
-import { DataRow } from "../../../types/approvalTypes";
 /* INTERFACE */
 interface ApprovalTableProps {
     onDelete: (ID: string) => void;
@@ -14,7 +13,7 @@ const ApprovalPageMain = React.memo(({ resetTable }: ApprovalTableProps) => {
     const [searchQuery, setSearchQuery] = useState("");
 
     // Optimize event handlers with useCallback
-    const handleDelete = useCallback((ID: string) => {
+    const handleDelete = useCallback(() => {
         // Removed dataBuffer usage since it's not being used
     }, []);
 

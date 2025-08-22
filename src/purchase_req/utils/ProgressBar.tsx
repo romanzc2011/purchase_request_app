@@ -6,11 +6,17 @@ import { startTest, completeProgress, resetProgress } from '../../store/progress
 import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig, reset_signals } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
 import { ProgressToast } from "../components/ProgressToast";
+import { useWebSockets } from "../hooks/useWebSockets";
+import { computeWSURL } from "./misc_utils";
 
 // #########################################################################################
 // PROGRESS BAR COMPONENT
 // #########################################################################################
 export function ProgressBar() {
+    // Websocket URL - moved inside the component
+    const { socket: socket, isConnected: _isConnected } = useWebSockets(computeWSURL('/communicate'));
+
+    socketSig.value = socket;
     const toastIdRef = useRef<Id | null>(null);
     const dispatch = useDispatch<AppDispatch>();
     const status = useSelector((s: RootState) => (s as any).progress.status);

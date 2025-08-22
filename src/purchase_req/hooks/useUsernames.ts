@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchUsernames } from "../../../api/users";
+import { fetchUsernames } from "../utils/misc_utils";
 
 export function useUsernames(query: string) {
     return useQuery({

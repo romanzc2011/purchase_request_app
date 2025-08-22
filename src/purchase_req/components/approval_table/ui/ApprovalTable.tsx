@@ -25,7 +25,7 @@ import { useApprovalService } from "../../../hooks/useApprovalService";
 import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 import { toast } from "react-toastify";
 import { isDownloadSig } from "../../../utils/PrasSignals";
-
+import { computeHTTPURL } from "../../../utils/misc_utils";
 
 /***********************************************************************************/
 // PROPS
@@ -38,9 +38,9 @@ interface ApprovalTableProps {
 }
 
 /* API URLs */
-const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
-const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
+const API_URL_APPROVAL_DATA = computeHTTPURL("/api/getApprovalData");
+const API_URL_CYBERSEC_RELATED = computeHTTPURL("/api/cyberSecRelated");
+const API_URL_STATEMENT_OF_NEED_FORM = computeHTTPURL("/api/downloadStatementOfNeedForm");
 
 // Define a type for the DataGrid sx prop
 type DataGridSxProps = {
@@ -435,24 +435,24 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
     const handleCommentClick = async () => {
         if (!groupCommentPayload) return;
 
-        const { groupKey, item_uuids, item_desc, group_count } = groupCommentPayload;
+        const { item_uuids, group_count } = groupCommentPayload;
         const entries: CommentEntry[] = [];
 
         // Loop through this and get the comment for each item
         for (let i = 0; i < group_count; i++) {
             const uuid = item_uuids[i];
-            const desc = item_desc[i];
 
             // Skip if this is a group header
             if (uuid.startsWith('header-')) continue;
 
-            const singlePayLoad: GroupCommentPayload = {
-                groupKey,
-                item_uuids: [uuid],
-                item_desc: [desc],
-                group_count: 1,
-                comment: []
-            }
+            // GroupCommentPayload structure for single item
+            // const singlePayLoad: GroupCommentPayload = {
+            //     groupKey,
+            //     item_uuids: [uuid],
+            //     item_desc: [desc],
+            //     group_count: 1,
+            //     comment: []
+            // }
 
             const userComment = await openCommentModal();
             entries.push({ uuid, comment: userComment });

@@ -1,7 +1,8 @@
 import { GroupCommentPayload } from "../types/approvalTypes";
 import { authFetch } from "../utils/authFetch";
+import { computeHTTPURL } from "../utils/misc_utils";
 
-const API_URL_ADD_COMMENTS_BULK = `${import.meta.env.VITE_API_URL}/api/add_comments`
+const API_URL_ADD_COMMENTS_BULK = `${computeHTTPURL("/api/add_comments")}`;
 
 // #########################################################################################
 // Add comments

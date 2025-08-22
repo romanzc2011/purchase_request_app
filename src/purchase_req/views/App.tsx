@@ -29,10 +29,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     // Bring custom hook for purchase form
     const { createNewID } = usePurchaseForm();
 
-    // Websocket URL
-    const WEBSOCKET_URL = "ws://localhost:5002/communicate";
-    const { socket: socket, isConnected: _isConnected } = useWebSockets(WEBSOCKET_URL);
-    socketSig.value = socket;
+
 
     // Local state for reserved ID
     const [ID, setID] = useState<string>("");
