@@ -1,6 +1,6 @@
 /*
 USAGE:
-const resp = await authFetch(`${import.meta.env.VITE_API_URL}/api/getApprovalData`);
+const resp = await authFetch(`/api/getApprovalData`);
 */
 
 export function authFetch(input: RequestInfo, init: RequestInit) {

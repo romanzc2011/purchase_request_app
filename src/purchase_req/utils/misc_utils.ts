@@ -1,6 +1,6 @@
 export function computeWSURL(path = "/communicate") { 
-    const { protocol, host } = window.location;
-    const wsProto = protocol === "https:" ? "wss:" : "ws:";
+    const { host } = window.location;
+    const wsProto = "ws:";
     const base = `${wsProto}//${host}`;
     const fullUrl = `${base}${path.startsWith("/") ? path : `/${path}`}`;
     console.log("🔌 COMPUTE WS URL", fullUrl);
@@ -11,10 +11,8 @@ export function computeHTTPURL(path: string) {
     const isHTTPS = window.location.protocol === "https:";
     const proto = isHTTPS ? "https:" : "http:";
     const p = path.startsWith("/") ? path : `/${path}`;
-    // Use API port 5004 instead of frontend port 5002
-    const apiHost = window.location.hostname + ":5004";
-    console.log("🔌 COMPUTE HTTP URL", `${proto}//${apiHost}${p}`);
-    return `${proto}//${apiHost}${p}`;
+    console.log("🔌 COMPUTE HTTP URL", `${proto}//${window.location.host}${p}`);
+    return `${proto}//${window.location.host}${p}`;
 }
 
 export async function fetchUsernames(query: string): Promise<string[]> {

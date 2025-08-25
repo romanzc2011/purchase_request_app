@@ -8,7 +8,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         self.heartbeat_task = None
-        self.start_heartbeat()
+        # Don't start heartbeat during initialization - it will be started when needed
 
 	#-------------------------------------------------------------
 	# START HEARTBEAT
@@ -16,7 +16,14 @@ class ConnectionManager:
     def start_heartbeat(self):
         """Start heartbeat to keep connections alive"""
         if self.heartbeat_task is None:
-            self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+            try:
+                # Only create task if there's a running event loop
+                loop = asyncio.get_running_loop()
+                self.heartbeat_task = loop.create_task(self._heartbeat_loop())
+            except RuntimeError:
+                # No running event loop, heartbeat will be started when needed
+                logger.debug("No running event loop, heartbeat will be started later")
+                pass
 
     async def _heartbeat_loop(self):
         """Send heartbeat every 30 seconds to keep connections alive"""
@@ -35,6 +42,9 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        # Start heartbeat when first connection is made
+        if self.heartbeat_task is None:
+            self.start_heartbeat()
 
 	#-------------------------------------------------------------
 	# DISCONNECT

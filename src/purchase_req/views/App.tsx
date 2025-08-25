@@ -14,8 +14,6 @@ import ApprovalPageMain from "../components/approval_table/containers/ApprovalPa
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
-import { useWebSockets } from "../hooks/useWebSockets";
-import { socketSig } from "../utils/PrasSignals";
 
 interface AppProps {
     isLoggedIn: boolean;

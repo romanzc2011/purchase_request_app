@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { toast, Id } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../store/prasStore';
@@ -13,8 +13,8 @@ import { computeWSURL } from "./misc_utils";
 // PROGRESS BAR COMPONENT
 // #########################################################################################
 export function ProgressBar() {
-    // Websocket URL - moved inside the component
-    const { socket: socket, isConnected: _isConnected } = useWebSockets(computeWSURL('/communicate'));
+
+    const { socket: socket, isConnected: _isConnected } = useWebSockets("ws://127.0.0.1/communicate");
 
     socketSig.value = socket;
     const toastIdRef = useRef<Id | null>(null);

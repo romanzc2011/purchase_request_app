@@ -19,9 +19,21 @@ EXPLANATION OF COMMENT COLORS:
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
-from datetime import datetime, timezone
-import json
+import sys
+import os
 from pathlib import Path
+
+# Add the project root to Python path when running the script directly
+if __name__ == "__main__":
+    # Get the current file's directory
+    current_dir = Path(__file__).parent
+    # Get the project root (parent of api directory)
+    project_root = current_dir.parent
+    # Add project root to Python path
+    sys.path.insert(0, str(project_root))
+
+from datetime import datetime, timezone
+
 from typing import Awaitable, Callable, ParamSpec, TypeVar
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
@@ -63,6 +75,9 @@ from api.services.websocket_manager import websock_conn
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
 import time
+import json
+import ssl
+import api.services.db_service as dbas
 
 # Database ORM Model Imports
 from api.services.db_service import (
@@ -76,21 +91,19 @@ from api.services.db_service import (
 # Schemas
 from api.dependencies.pras_schemas import *
 
-import api.services.db_service as dbas
-import tracemalloc
-tracemalloc.start(10)
-
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
 
+cert_pem = os.path.join(settings.TLS_CERT_DIR, "pras_cert.pem")
+key_pem = os.path.join(settings.TLS_CERT_DIR, "pras_key.pem")
 # Configure CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5002", "http://127.0.0.1:5004", "http://127.0.0.1:5002", "http://127.0.0.1:5004"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["http://localhost:5002", "http://127.0.0.1:5004", "http://127.0.0.1:5002", "http://127.0.0.1:5004"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -105,6 +118,25 @@ R = TypeVar("R")
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
+
+# Cert directory
+
+
+##########################################################################
+## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
+##########################################################################
+
+@app.websocket("/communicate")
+async def ws_test(ws: WebSocket):
+    await ws.accept()  # no auth, no extra headers
+    logger.debug("WEBSOCKET CONNECTED")
+    try:
+        while True:
+            msg = await ws.receive_text()
+            await ws.send_text(f"echo:{msg}")
+    except WebSocketDisconnect as e:
+        print("ws-test closed:", e.code)
+    
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
@@ -1379,40 +1411,7 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 ##########################################################################
 app.include_router(api_router)
 
-##########################################################################
-## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
-##########################################################################
-@app.websocket("/communicate")
-async def websocket_endpoint(websocket: WebSocket):
-    await websock_conn.connect(websocket)
-    try:
-        while True:
-            incoming_data = await websocket.receive_text()
-            logger.success(f"RECV data: {incoming_data}")
-            
-            # Convert to json, if reset_data then reset shm, percent everything
-            try:
-                message = json.loads(incoming_data)
-                if message.get("event") == "reset_data":
-                    # reset shm
-                    logger.info("Progress state cleared via WebSocket reset")
-                elif message.get("event") == "check_connection":
-                    # Send connection status back
-                    await websocket.send_json({
-                        "event": "connection_status",
-                        "connected": True,
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-                elif message.get("event") == "clear_stale_state":
-                    # Clear stale progress state
-                    await websocket.send_json({
-                        "event": "state_cleared",
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-            except json.JSONDecodeError:
-                logger.error("Received non-JSON data")
-    except WebSocketDisconnect:
-        await websock_conn.disconnect(websocket)
+
 
 
 ##########################################################################
@@ -1456,4 +1455,8 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
-    uvicorn.run("pras_api:app", host="localhost", port=5004, reload=True)
+    uvicorn.run(
+            "pras_api:app", 
+            host="127.0.0.1", 
+            port=5004
+        )

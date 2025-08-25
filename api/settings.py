@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SQL_SCRIPT_PATH: Path = BASE_DIR / "api" / "db" / "pras_sql_script.sql"
     PDF_OUTPUT_FOLDER: Path = BASE_DIR / "api" / "pdf_output"
     UPLOAD_FOLDER: Path = BASE_DIR / "api" / "uploads"
+    TLS_CERT_DIR: Path = BASE_DIR / "api" / "tls_certs"
 
     # -- LDAP configuration
     ldap_server: str
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     vite_api_url: str
 
     # -- JWT
-    jwt_secret_key: str
+    jwt_secret_key: str = Field(env="JWT_SECRET_KEY")
 
     # -- Application settings
     approvals_link: str
