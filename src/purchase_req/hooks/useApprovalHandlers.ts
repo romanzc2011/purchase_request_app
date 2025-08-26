@@ -7,12 +7,7 @@ import { useCommentModal } from "./useCommentModal";
 import { useApprovalService } from "./useApprovalService";
 import { GridRowId } from "@mui/x-data-grid";
 import { DataRow, ItemStatus } from "../types/approvalTypes";
-
-// API URLs
-const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
-const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
-const API_URL_UPDATE_PRICES = `${import.meta.env.VITE_API_URL}/api/updatePrices`;
-const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
+import { computeAPIURL } from "../utils/misc_utils";
 
 // #########################################################################################
 // FETCH APPROVAL DATA
@@ -20,7 +15,7 @@ const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalDa
 async function fetchApprovalData(ID?: string) {
 
 	if (ID) {
-		const response = await fetch(`${API_URL_APPROVAL_DATA}?ID=${ID}`, {
+		const response = await fetch(computeAPIURL(`/api/getApprovalData?ID=${ID}`), {
 		method: "GET",
 		headers: {
 			"Authorization": `Bearer ${localStorage.getItem("access_token")}`
@@ -30,7 +25,7 @@ async function fetchApprovalData(ID?: string) {
 		const data = await response.json();
 		return data;
 	} else {
-	const response = await fetch(API_URL_APPROVAL_DATA, {
+	const response = await fetch(computeAPIURL("/api/getApprovalData"), {
 	headers: {
 		"Authorization": `Bearer ${localStorage.getItem("access_token")}`
 	}
@@ -53,7 +48,7 @@ try {
 	const approvalDataArray = Array.isArray(approvalData) ? approvalData : [approvalData];
 
 	// send approval data to backend
-	const response = await fetch(API_URL_STATEMENT_OF_NEED_FORM, {
+	const response = await fetch(computeAPIURL("/api/downloadStatementOfNeedForm"), {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
@@ -102,7 +97,7 @@ async function updatePriceEachTotalPrice(
 	newTotalPrice: number,
 	status: ItemStatus
 ) {
-	const response = await fetch(API_URL_UPDATE_PRICES, {
+	const response = await fetch(computeAPIURL("/api/updatePrices"), {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
@@ -210,7 +205,7 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 		}
 
 		try {
-			const response = await fetch(API_URL_ASSIGN_CO, {
+			const response = await fetch(computeAPIURL("/api/assignCO"), {
 				method: "POST",
 				headers: {
 					"Authorization": `Bearer ${localStorage.getItem("access_token")}`,

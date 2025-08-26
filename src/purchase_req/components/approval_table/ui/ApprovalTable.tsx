@@ -25,6 +25,7 @@ import { useApprovalService } from "../../../hooks/useApprovalService";
 import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 import { toast } from "react-toastify";
 import { isDownloadSig } from "../../../utils/PrasSignals";
+import { computeAPIURL } from "../../../utils/misc_utils";
 
 
 /***********************************************************************************/
@@ -37,11 +38,6 @@ interface ApprovalTableProps {
     onClearSearch?: () => void;
 }
 
-/* API URLs */
-const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
-const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
-
 // Define a type for the DataGrid sx prop
 type DataGridSxProps = {
     bgcolor: string;
@@ -53,7 +49,7 @@ type DataGridSxProps = {
 /***********************************************************************************/
 async function fetchApprovalData(ID?: string) {
     if (ID) {
-        const response = await fetch(`${API_URL_APPROVAL_DATA}?ID=${ID}`, {
+        const response = await fetch(computeAPIURL(`/api/getApprovalData?ID=${ID}`), {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${localStorage.getItem("access_token")}`
@@ -64,7 +60,7 @@ async function fetchApprovalData(ID?: string) {
 
         return data;
     } else {
-        const response = await fetch(API_URL_APPROVAL_DATA, {
+        const response = await fetch(computeAPIURL("/api/getApprovalData"), {
             headers: {
                 "Authorization": `Bearer ${localStorage.getItem("access_token")}`
             }
@@ -80,7 +76,7 @@ async function fetchApprovalData(ID?: string) {
 // FETCH CYBERSECURITY RELATED
 /***********************************************************************************/
 async function fetchCyberSecRelated(UUID: string) {
-    const response = await fetch(`${API_URL_CYBERSEC_RELATED}/${UUID}`, {
+    const response = await fetch(computeAPIURL(`/api/cyberSecRelated/${UUID}`), {
         method: "PUT",
         headers: {
             "Content-Type": "application/json",
@@ -107,7 +103,7 @@ async function downloadStatementOfNeedForm(ID: string) {
         const approvalDataArray = Array.isArray(approvalData) ? approvalData : [approvalData];
 
         // send approval data to backend
-        const response = await fetch(API_URL_STATEMENT_OF_NEED_FORM, {
+        const response = await fetch(computeAPIURL("/api/downloadStatementOfNeedForm"), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

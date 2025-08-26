@@ -1,6 +1,14 @@
+export function computeAPIURL(path: string) {
+    return `${window.location.origin}${path}`;
+}
+
+export function computerWSURL(path: string) {
+    return window.location.origin.replace(/^http/, 'ws') + path;
+}
+
 export async function fetchUsernames(query: string): Promise<string[]> {
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/usernames?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${computeAPIURL("/api/usernames")}?q=${encodeURIComponent(query)}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

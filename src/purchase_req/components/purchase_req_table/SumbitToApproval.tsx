@@ -25,6 +25,7 @@ import { ItemStatus } from "../../types/approvalTypes";
 import { OrderType } from "../../schemas/purchaseSchema";
 import { isRequestSubmitted, isSubmittedSig } from "../../utils/PrasSignals";
 import { effect } from "@preact/signals-react";
+import { computeAPIURL } from "../../utils/misc_utils";
 
 const baseURL = import.meta.env.VITE_API_URL;
 const API_CALL: string = "/api/sendToPurchaseReq";
@@ -101,7 +102,7 @@ function SubmitApprovalTable({
 
         try {
             // Get a proper ID from the backend
-            const idRequest = await fetch(`${baseURL}/api/createNewID`, {
+            const idRequest = await fetch(computeAPIURL("/api/createNewID"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

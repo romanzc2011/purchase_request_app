@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { ContractingOfficer } from '../../types/approvalTypes';
 import Buttons from './Buttons';
 import { toast } from "react-toastify";
+import { computeAPIURL } from "../../utils/misc_utils";
 
 type Props = {
     value: number | "";
@@ -10,9 +11,6 @@ type Props = {
     onChange: (id: number | "") => void;
     onClickOK: (requestId: string, officerId: number, username: string) => void;
 }
-
-/* API URLs */
-const API_URL_CONTRACTING_OFFICER = `${import.meta.env.VITE_API_URL}/api/get_contracting_officer`;
 
 // ------------------------------------------------------------
 // CONTRACTING OFFICER DROPDOWN COMPONENT
@@ -23,7 +21,7 @@ function ContractingOfficerDropdown({ value, requestID, onChange, onClickOK }: P
     // Fetch contracting officers from PRAS backend
     const fetchContractingOfficers = async () => {
         try {
-            const response = await fetch(API_URL_CONTRACTING_OFFICER, {
+            const response = await fetch(computeAPIURL("/api/get_contracting_officer"), {
                 method: 'GET',
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem('access_token')}`

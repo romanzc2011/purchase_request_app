@@ -1,5 +1,6 @@
 import axios from "axios";
 import { FormValues } from "../types/formTypes";
+import { computeAPIURL } from "../utils/misc_utils";
 
 interface FileInfo {
     name: string;
@@ -12,10 +13,7 @@ interface UploadParamsProps {
     api_call: string;
 }
 
-const baseURL = import.meta.env.VITE_API_URL;
-
 const api = axios.create({
-    baseURL,
     headers: {
         "Content-Type": "application/json",
     },
@@ -29,7 +27,7 @@ function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
     formData.append("ID", ID);
 
     if(api_call == "/api/upload_file") {
-        return api.post("/api/upload_file", formData, {
+        return api.post(computeAPIURL("/api/upload_file"), formData, {
             headers: { 
                 "Content-Type": "multipart/form-data",
                 'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -38,7 +36,7 @@ function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
     }
 
     if(api_call == "/api/sendToPurchaseReq") {
-        return api.post(api_call, dataBuffer, {
+        return api.post(computeAPIURL(api_call), dataBuffer, {
             headers: { "Content-Type": "multipart/form-data" },
         });
     }
@@ -46,7 +44,7 @@ function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
 };
 
 const getFiles = (): Promise<FileInfo[]> => {
-    return api.get("/api/getfiles");
+    return api.get(computeAPIURL("/api/getfiles"));
 };
 
 const UploadService = {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApprovalData, DataRow, DenialData } from "../types/approvalTypes";
-import { approveDenyRequest } from "../services/ApprovalService";
+import { useApprovalService as useApprovalServiceHook } from "../services/ApprovalService";
 import { toast } from "react-toastify";
 import { useCommentModal } from "./useCommentModal";
 import { isApprovalSig } from "../utils/PrasSignals";
@@ -13,6 +13,7 @@ export function useApprovalService() {
     const [error, setError] = useState<string | null>(null);
     const queryClient = useQueryClient();
 	const { openCommentModal, close, handleSubmit } = useCommentModal();
+	const { processPayload: processPayloadService } = useApprovalServiceHook();
 	
     /* The approvalPayload is used to store the payload that will be sent to the server
     The approval payload will be coming in from ApprovalTable as approvalPayload. We will then 
@@ -43,13 +44,12 @@ export function useApprovalService() {
     // PROCESS PAYLOAD
     // This function is called when the user clicks on the approve/deny button
     // It takes the payload as an argument and sends it to the server
-    // processPayload --> approveDenyRequest (ApprovalService.ts)
     const processPayload = async (payload: ApprovalData | DenialData) => {
         setIsLoading(true);
         setError(null);
         try {
             isApprovalSig.value = true;  // Change signal to true to start progress bar updating
-            const response = await approveDenyRequest(payload);
+            const response = await processPayloadService(payload);
             
             console.log("🔥 APPROVE/DENY RESPONSE", response);
             return response;

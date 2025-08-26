@@ -1,21 +1,21 @@
 import { GroupCommentPayload } from "../types/approvalTypes";
-import { authFetch } from "../utils/authFetch";
+import { computeAPIURL } from "../utils/misc_utils";
 
-const API_URL_ADD_COMMENTS_BULK = `${import.meta.env.VITE_API_URL}/api/add_comments`
+export async function addComments(payload: GroupCommentPayload): Promise<any> {
+	const response = await fetch(computeAPIURL("/api/add_comments"), {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${localStorage.getItem("access_token")}`
+		},
+		body: JSON.stringify(payload)
+	});
 
-// #########################################################################################
-// Add comments
-// #########################################################################################
-export async function addComments(payload: GroupCommentPayload) {
-    const response = await authFetch(API_URL_ADD_COMMENTS_BULK, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-        throw new Error("Failed to add comments bulk");
-    }
-    return response.json();
+	if (!response.ok) {
+		throw new Error(`HTTP error! status: ${response.status}`);
+	}
+
+	return response.json();
 }
 
 // #########################################################################################

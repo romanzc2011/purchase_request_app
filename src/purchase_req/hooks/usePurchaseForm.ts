@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { purchaseItemSchema, PurchaseItem, OrderType } from "../schemas/purchaseSchema";
 import { toast } from "react-toastify";
 import { useCallback } from "react";
+import { computeAPIURL } from "../utils/misc_utils";
 
 export const usePurchaseForm = () => {
 	const today = new Date().toISOString().split("T")[0];
@@ -30,8 +31,6 @@ export const usePurchaseForm = () => {
 	shouldFocusError: true,
 	});
 
-	const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
-
 	/*************************************************************************************** */
 	/* ASSIGN CO -- assign CO to request */
 	/*************************************************************************************** */
@@ -42,7 +41,7 @@ export const usePurchaseForm = () => {
 			contracting_officer: username,
 		};
 		try {
-			const response = await fetch(API_URL_ASSIGN_CO, {
+			const response = await fetch(computeAPIURL("/api/assignCO"), {
 				method: "POST",
 				headers: {
 					"Authorization": `Bearer ${localStorage.getItem("access_token")}`,
@@ -67,7 +66,7 @@ export const usePurchaseForm = () => {
 	/*************************************************************************************** */
 	const createNewID = useCallback(async () => {
 		const response = await fetch(
-			`${import.meta.env.VITE_API_URL}/api/createNewID`,
+			computeAPIURL("/api/createNewID"),
 			{
 				method: "POST",
 				headers: {
