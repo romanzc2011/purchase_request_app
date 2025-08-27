@@ -3,10 +3,20 @@ from enum import Enum, auto
 from typing import List
 import asyncio
 from loguru import logger
-from api.services.websocket_manager import websock_conn
 from api.services.progress_tracker.steps.download_steps import DOWNLOAD_STEPS, DownloadStep
 from api.services.progress_tracker.steps.approval_steps import APPROVAL_STEPS, ApprovalStep
 from api.services.progress_tracker.steps.submit_request_steps import SUBMIT_REQUEST_STEPS, SubmitRequestStep
+
+# Import the SSE broadcast function from the main API
+try:
+    from api.pras_api import broadcast_sse_event
+except ImportError:
+    # Fallback for when the function isn't available yet
+    async def broadcast_sse_event(data: dict):
+        logger.warning("SSE broadcast function not available")
+
+# Import threading for async operations
+import threading
  
 # -----------------------------------------------------------------------------
 # PROGRESS TRACKER TYPE
@@ -79,10 +89,20 @@ class ProgressTracker:
             step.done = False
             
     def send_start_msg(self):
-        asyncio.create_task(websock_conn.broadcast({
-            "event": "START_TOAST",
-            "percent_complete": 0
-        }));
+        # Run the async broadcast in a new thread to avoid blocking
+        def run_broadcast():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(broadcast_sse_event({
+                    "event": "START_TOAST",
+                    "percent_complete": 0
+                }))
+            finally:
+                loop.close()
+        
+        thread = threading.Thread(target=run_broadcast)
+        thread.start()
         logger.debug("Sent start toast message")
     
     def mark_step_done(self, step_name):
@@ -107,10 +127,19 @@ class ProgressTracker:
             self.percent_complete = self.calculate_progress()
             
             # Broadcast progress update
-            asyncio.create_task(websock_conn.broadcast({
-                "event": "PROGRESS_UPDATE",
-                "percent_complete": self._percent_complete
-            }))
+            def run_broadcast():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(broadcast_sse_event({
+                        "event": "PROGRESS_UPDATE",
+                        "percent_complete": self._percent_complete
+                    }))
+                finally:
+                    loop.close()
+            
+            thread = threading.Thread(target=run_broadcast)
+            thread.start()
     
     def remaining_steps(self) -> List[DownloadStep | ApprovalStep | SubmitRequestStep]:
         active = self.active_tracker

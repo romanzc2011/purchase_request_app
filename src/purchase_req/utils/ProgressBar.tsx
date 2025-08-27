@@ -3,9 +3,10 @@ import { toast, Id } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../store/prasStore';
 import { startTest, completeProgress, resetProgress } from '../../store/progressSlice';
-import { isDownloadSig, socketSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig, reset_signals } from "./PrasSignals";
+import { isDownloadSig, isSubmittedSig, messageSig, isRequestSubmitted, userFoundSig, isApprovalSig, reset_signals } from "./PrasSignals";
 import { effect } from "@preact/signals-react";
 import { ProgressToast } from "../components/ProgressToast";
+import { computeAPIURL } from "./misc_utils";
 
 // #########################################################################################
 // PROGRESS BAR COMPONENT
@@ -16,21 +17,32 @@ export function ProgressBar() {
     const status = useSelector((s: RootState) => (s as any).progress.status);
     const [lastHeartbeat, setLastHeartbeat] = useState<number>(Date.now());
     const [isConnected, setIsConnected] = useState(false);
-    let socketSignal = socketSig.value;
+    //let socketSignal = socketSig.value;
+    const eventSource = new EventSource(computeAPIURL("/sse"), {
+        withCredentials: true
+    });
 
-    console.log("IS SUBMITTED SIG: ", isSubmittedSig.value);
+    eventSource.onopen = () => {
+        console.log("✅ SSE OPENED");
+    }
 
-    // Subscribe to the status to send reset message on complete
-    useEffect(() => {
-        if (status === 'done' && socketSignal) {
-            socketSignal.send(JSON.stringify({ event: 'reset_data' }));
-            dispatch(resetProgress());
+    eventSource.onmessage = (event) => {
+        console.log("SERVER EVENT: ", event);
+        console.log("EVENT.DATA: ", event.data)
+    }
 
+    eventSource.onerror = (event) => {
+        console.log("❌ SSE ERROR: ", event);
+        // event is of type Event, which does not have readyState.
+        // Use eventSource.readyState instead.
+        if (eventSource.readyState === EventSource.CLOSED) {
+            console.log("SSE connection closed.");
+            setIsConnected(false);
             if (toastIdRef.current !== null) {
                 toast.dismiss(toastIdRef.current);
             }
         }
-    }, [status, socketSignal, dispatch])
+    }
 
     // Capture signal trigger and change
     effect(() => {
@@ -49,43 +61,40 @@ export function ProgressBar() {
 
     // Handle connection status changes
     useEffect(() => {
-        if (socketSignal) {
-            const handleOpen = () => {
-                console.log("✅ WebSocket connected");
-                setIsConnected(true);
-                // Reset signals when reconnecting
-                isDownloadSig.value = false;
-                isSubmittedSig.value = false;
-                isRequestSubmitted.value = false;
-                isApprovalSig.value = false
-                if (toastIdRef.current !== null) {
-                    toast.dismiss(toastIdRef.current);
-                }
-            };
+        //if (socketSignal) {
+        console.log(eventSource.readyState);
 
-            const handleClose = () => {
-                console.log("❌ WebSocket disconnected");
-                setIsConnected(false);
-                // Clear any existing toasts when disconnected
-                if (toastIdRef.current !== null) {
-                    toast.dismiss(toastIdRef.current);
-                }
-            };
-
-            socketSignal.addEventListener('open', handleOpen);
-            socketSignal.addEventListener('close', handleClose);
-
-            return () => {
-                socketSignal.removeEventListener('open', handleOpen);
-                socketSignal.removeEventListener('close', handleClose);
-            };
+        if (eventSource.readyState === EventSource.OPEN) {
+            console.log("READY TO RECEIVE MESSAGES");
         }
-    }, [socketSignal]);
+        const handleOpen = () => {
+            console.log("✅ SSE RECEIVED");
+            setIsConnected(true);
+            // Reset signals when reconnecting
+            isDownloadSig.value = false;
+            isSubmittedSig.value = false;
+            isRequestSubmitted.value = false;
+            isApprovalSig.value = false
+            if (toastIdRef.current !== null) {
+                toast.dismiss(toastIdRef.current);
+            }
+        };
+
+        const handleClose = () => {
+            console.log("❌ WebSocket disconnected");
+            setIsConnected(false);
+            // Clear any existing toasts when disconnected
+            if (toastIdRef.current !== null) {
+                toast.dismiss(toastIdRef.current);
+            }
+        };
+
+    }, []);
 
     console.log("45: isRequestSubmitted: ", isRequestSubmitted.value);
     // Listen for WebSocket messages and update progress
     useEffect(() => {
-        if (!socketSignal) return;
+        //if (!socketSignal) return;
 
         const handleMessage = (event: MessageEvent) => {
             try {
@@ -171,9 +180,9 @@ export function ProgressBar() {
             }
         };
 
-        socketSignal.addEventListener('message', handleMessage);
-        return () => socketSignal.removeEventListener('message', handleMessage);
-    }, [socketSignal, dispatch]);
+        // socketSignal.addEventListener('message', handleMessage);
+        // return () => socketSignal.removeEventListener('message', handleMessage);
+    }, []);
 
     // Check for stale connection (no heartbeat for 2 minutes)
     useEffect(() => {

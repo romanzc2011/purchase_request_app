@@ -16,9 +16,8 @@ export default defineConfig({
         target: "http://127.0.0.1:5004",
         changeOrigin: true,
       },
-      "/communicate": {
+      "/sse": {
         target: "http://127.0.0.1:5004", // stays http://
-        ws: true,                        // enables WS upgrade
         changeOrigin: true,
       },
     },

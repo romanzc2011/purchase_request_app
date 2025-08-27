@@ -2,9 +2,7 @@ export function computeAPIURL(path: string) {
     return `${window.location.origin}${path}`;
 }
 
-export function computerWSURL(path: string) {
-    return window.location.origin.replace(/^http/, 'ws') + path;
-}
+// WebSocket URL function removed - using SSE instead
 
 export async function fetchUsernames(query: string): Promise<string[]> {
     try {

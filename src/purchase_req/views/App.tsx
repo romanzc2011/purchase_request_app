@@ -14,9 +14,6 @@ import ApprovalPageMain from "../components/approval_table/containers/ApprovalPa
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
-import { useWebSockets } from "../hooks/useWebSockets";
-import { socketSig } from "../utils/PrasSignals";
-import { computerWSURL } from "../utils/misc_utils";
 
 interface AppProps {
     isLoggedIn: boolean;
@@ -30,10 +27,11 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
     // Bring custom hook for purchase form
     const { createNewID } = usePurchaseForm();
 
-    // Websocket URL
-    const WEBSOCKET_URL = computerWSURL("/communicate");
-    const { socket: socket, isConnected: _isConnected } = useWebSockets(WEBSOCKET_URL);
-    socketSig.value = socket;
+    // Initialize SSE service
+    useEffect(() => {
+        // SSE service is automatically initialized when imported
+        console.log("SSE service initialized");
+    }, []);
 
     // Local state for reserved ID
     const [ID, setID] = useState<string>("");

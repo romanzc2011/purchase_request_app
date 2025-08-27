@@ -81,7 +81,7 @@ class ProgressState:
     email_sent_approver:         bool = False
     pending_approval_inserted:   bool = False
 
-from api.services.websocket_manager import websock_conn
+# WebSocket manager removed - using SSE instead
 
 class ProgressSharedMemory:
     
@@ -163,8 +163,15 @@ class ProgressSharedMemory:
             progress_dict = asdict(current_state) 
             percent = self.calc_progress_percentage()
             progress_dict["percent_complete"] = percent
-            send_data = percent
-            await websock_conn.broadcast(send_data)
+            send_data = {
+                "event": "PROGRESS_UPDATE",
+                "percent_complete": percent
+            }
+            try:
+                from api.pras_api import broadcast_sse_event
+                await broadcast_sse_event(send_data)
+            except ImportError:
+                logger.warning("SSE broadcast function not available")
         else:
             logger.error(f"Field {field} does not exist")
             
@@ -194,12 +201,16 @@ class ProgressSharedMemory:
         percent = self.calc_download_progress(completed)
         logger.success(f"Percent: {percent}")
         
-        # broadcast to front end
-        asyncio.create_task(websock_conn.broadcast({
-			"event": "PROGRESS_UPDATE",
-			"percent_complete": percent,
-			"complete_steps": completed
-		}))
+        # broadcast to front end via SSE
+        try:
+            from api.pras_api import broadcast_sse_event
+            asyncio.create_task(broadcast_sse_event({
+				"event": "PROGRESS_UPDATE",
+				"percent_complete": percent,
+				"complete_steps": completed
+			}))
+        except ImportError:
+            logger.warning("SSE broadcast function not available")
 
     #-------------------------------------------------------------
     # TO BYTES

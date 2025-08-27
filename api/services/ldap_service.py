@@ -13,7 +13,7 @@ from loguru import logger
 from api.schemas.enums import LDAPGroup
 from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings 
-from api.services.websocket_manager import websock_conn
+# WebSocket manager removed - using SSE instead
 from api.utils.logging_utils import logger_init_ok
 
 def run_in_thread(fn):
@@ -254,18 +254,26 @@ class LDAPService:
             )
             
             if conn.entries:
-                # Inform frontend that user was found
-                asyncio.run(websock_conn.broadcast({"event": "USER_FOUND", 
+                # Inform frontend that user was found via SSE
+                try:
+                    from api.pras_api import broadcast_sse_event
+                    asyncio.run(broadcast_sse_event({"event": "USER_FOUND", 
                                               "status_code": "200",
                                               "message": "User found for query"}))
+                except ImportError:
+                    logger.warning("SSE broadcast function not available")
                 return [entry.sAMAccountName.value for entry in conn.entries]
             else:
                 logger.error(f"No user found for query: {query}")
                 
-                # Inform frontend that no user was found
-                asyncio.run(websock_conn.broadcast({"event": "NO_USER_FOUND", 
+                # Inform frontend that no user was found via SSE
+                try:
+                    from api.pras_api import broadcast_sse_event
+                    asyncio.run(broadcast_sse_event({"event": "NO_USER_FOUND", 
                                               "status_code": "404",
                                               "message": "No user found for query"}))
+                except ImportError:
+                    logger.warning("SSE broadcast function not available")
                 return ["Error"]
         except Exception as e:
             logger.error(f"Error getting username: {e}")

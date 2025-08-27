@@ -34,11 +34,12 @@ from pydantic import ValidationError
 from fastapi import (
     FastAPI, APIRouter, Depends, Form, 
     File, UploadFile, HTTPException, Request, 
-    Query, status, WebSocket, WebSocketDisconnect)
-from fastapi.responses import JSONResponse, FileResponse
+    Query, status)
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sse_starlette.sse import EventSourceResponse
 
 # SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,6 +47,7 @@ from sqlalchemy import update, select, text, func
 from api.services.db_service import get_async_session
 from api.schemas.enums import AssignedGroup, CueClerk, ItemStatus, LDAPGroup
 import asyncio
+import anyio
 
 # PRAS Miscellaneous Dependencies
 from api.dependencies.misc_dependencies import *
@@ -57,11 +59,12 @@ from api.dependencies.pras_dependencies import auth_service
 from api.dependencies.pras_dependencies import pdf_service
 from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import settings
+from api.utils.progress_event import subscribe, post_event
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
-from api.services.websocket_manager import websock_conn
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
+from api.utils.progress_event import ProgressQ
 import time
 
 # Database ORM Model Imports
@@ -75,24 +78,34 @@ from api.services.db_service import (
 )
 # Schemas
 from api.dependencies.pras_schemas import *
-
 import api.services.db_service as dbas
-import tracemalloc
-tracemalloc.start(10)
+
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
+origins = [
+    "http://localhost:5002",
+    "https://localhost:5002",
+    "https://10.222.128.114:5002",
+    "http://10.222.128.114:5002",
+]
+
+headers = ["Content-Type", "Authorization", "Accept", "X-Request-ID"]
+methods = ["GET", "POST", "PUT"]
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5002",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=methods,
+    allow_headers=headers,
 )
+
+@app.middleware("http")
+async def my_middleware(request, call_next):
+    response = await call_next(request)
+    return response
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -107,6 +120,28 @@ R = TypeVar("R")
 ##########################################################################
 # API router
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
+
+MESSAGE_STREAM_DELAY = 1
+MESSAGE_STREAM_RETRY_TIMEOUT = 15000
+
+@app.get("/sse")
+async def sse():
+    async def event_generator():
+        try:
+            while True:
+                # produce data
+                payload = await asyncio.to_thread(ProgressQ.get())
+                yield {"event": "message", "data": json.dumps(payload)}
+                await asyncio.to_thread(ProgressQ.task_done())
+                
+        except (anyio.get_cancelled_exc_class(), Exception):
+            # client disconnected or task cancelled
+            logger.info("SSE client disconnected")
+            return
+        except asyncio.CancelledError:
+            return
+
+    return EventSourceResponse(event_generator(), ping=15)
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
@@ -677,7 +712,7 @@ async def send_purchase_request(
         "percent_complete": final_percent
     }  
     
-    await websock_conn.broadcast(final_send_data)
+    await broadcast_sse_event(final_send_data)
     #!-----------------------------------------------------------------------------
     
     return JSONResponse({"message": "All work completed"})
@@ -713,7 +748,7 @@ async def send_socket_data(
 		"event": "PROGRESS_UPDATE",
 		"percent_complete": percent
 	}
-    await websock_conn.broadcast(send_data)
+    await broadcast_sse_event(send_data)
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -822,9 +857,9 @@ async def assign_IRQ1_ID(
         pass
     else:
         logger.debug("AUTHORIZATION FAILED")
-        await websock_conn.broadcast({"event": "error", 
-                                      "status_code": "403",
-                                      "message": "You are not authorized to assign requisition IDs"})
+        await broadcast_sse_event({"event": "error",
+                                  "status_code": "403",
+                                  "message": "You are not authorized to assign requisition IDs"})
         raise HTTPException(status_code=403, detail="You are not authorized to assign requisition IDs")
     
     # Get the original ID from the request
@@ -1381,40 +1416,7 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 ##########################################################################
 app.include_router(api_router)
 
-##########################################################################
-## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
-##########################################################################
-@app.websocket("/communicate")
-async def websocket_endpoint(websocket: WebSocket):
-    await websock_conn.connect(websocket)
-    try:
-        while True:
-            incoming_data = await websocket.receive_text()
-            logger.success(f"RECV data: {incoming_data}")
-            
-            # Convert to json, if reset_data then reset shm, percent everything
-            try:
-                message = json.loads(incoming_data)
-                if message.get("event") == "reset_data":
-                    # reset shm
-                    logger.info("Progress state cleared via WebSocket reset")
-                elif message.get("event") == "check_connection":
-                    # Send connection status back
-                    await websocket.send_json({
-                        "event": "connection_status",
-                        "connected": True,
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-                elif message.get("event") == "clear_stale_state":
-                    # Clear stale progress state
-                    await websocket.send_json({
-                        "event": "state_cleared",
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-            except json.JSONDecodeError:
-                logger.error("Received non-JSON data")
-    except WebSocketDisconnect:
-        await websock_conn.disconnect(websocket)
+
 
 
 ##########################################################################
