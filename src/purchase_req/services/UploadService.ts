@@ -1,5 +1,6 @@
 import axios from "axios";
 import { FormValues } from "../types/formTypes";
+import { computeAPIURL } from "../utils/misc_utils";
 
 interface FileInfo {
     name: string;
@@ -12,15 +13,12 @@ interface UploadParamsProps {
     api_call: string;
 }
 
-const baseURL = import.meta.env.VITE_API_URL;
-
 const api = axios.create({
-    baseURL,
+    baseURL: computeAPIURL("/api"),
     headers: {
         "Content-Type": "application/json",
     },
 });
-
 
 function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
     const formData = new FormData();
@@ -28,8 +26,8 @@ function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
     formData.append("file", file);
     formData.append("ID", ID);
 
-    if(api_call == "/api/upload") {
-        return api.post("/api/upload", formData, {
+    if(api_call == "/upload") {
+        return api.post("/upload", formData, {
             headers: { 
                 "Content-Type": "multipart/form-data",
                 'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -37,7 +35,7 @@ function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
         });
     }
 
-    if(api_call == "/api/sendToPurchaseReq") {
+    if(api_call == "/sendToPurchaseReq") {
         return api.post(api_call, dataBuffer, {
             headers: { "Content-Type": "multipart/form-data" },
         });
@@ -46,7 +44,7 @@ function upload({ file, ID, dataBuffer, api_call }: UploadParamsProps) {
 };
 
 const getFiles = (): Promise<FileInfo[]> => {
-    return api.get("/api/getfiles");
+    return api.get("/getfiles");
 };
 
 const UploadService = {

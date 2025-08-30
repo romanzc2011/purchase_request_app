@@ -1,1 +1,3 @@
-export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5004'; 
+import { computeAPIURL } from "./utils/misc_utils";
+
+export const API_URL = computeAPIURL(""); 

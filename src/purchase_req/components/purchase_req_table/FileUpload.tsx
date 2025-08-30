@@ -7,6 +7,7 @@ import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { IFile } from "../../types/IFile";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Button from "@mui/material/Button";
+import { computeAPIURL } from "../../utils/misc_utils";
 
 interface FileUploadProps {
     ID?: string;
@@ -113,7 +114,7 @@ function FileUpload({ ID, fileInfo, setFileInfo }: FileUploadProps) {
         ID: string,
         filename: string
     ): Promise<number> {
-        const API_URL = `${import.meta.env.VITE_API_URL}/api/deleteFile`;
+        const API_URL = computeAPIURL("/api/deleteFile");
         const accessToken = localStorage.getItem("access_token");
         const response = await fetch(API_URL, {
             method: "POST",

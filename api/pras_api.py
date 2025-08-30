@@ -77,15 +77,20 @@ tracemalloc.start(10)
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
+allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5002",
+        "http://127.0.0.1:5002",
+        "https://localhost:5002",
+        "http://10.222.1.205:5002",
+        "https://10.222.1.205:5002",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=allowed_methods,
     allow_headers=["*"],
 )
 

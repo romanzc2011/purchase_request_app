@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import {addComments } from "../services/CommentService";
+import {addComments } from "../services/commentService";
 import { GroupCommentPayload } from "../types/approvalTypes";
 import { toast } from "react-toastify";
 
@@ -8,7 +8,7 @@ export function useCommentModal() {
   const resolverRef                 = useRef<(value: string) => void>();
 
   // open with whatever payload you have (single or multi)
-  const openCommentModal = useCallback((payload: GroupCommentPayload) => {
+  const openCommentModal = useCallback((_payload: GroupCommentPayload) => {
     setIsOpen(true);
     return new Promise<string>(resolve => {
       resolverRef.current = resolve;

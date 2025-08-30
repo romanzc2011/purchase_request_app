@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { computeAPIURL } from "../utils/misc_utils";
 
-const API_URL_ITEM_UUIDS = `${import.meta.env.VITE_API_URL}/api/getItemUUIDs`
+// const API_URL_ITEM_UUIDS = `${import.meta.env.VITE_API_URL}/api/getItemUUIDs`
 const STORAGE_KEY = 'UUID_store';
 
 export const useUUIDStore = () => {
@@ -64,7 +65,7 @@ export const useUUIDStore = () => {
         // If not found in cache or localStorage, try to fetch from backend
         console.log(`UUID not found in cache for ID ${ID}, trying backend...`);
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/getUUID/${ID}`, {
+            const response = await fetch(`${computeAPIURL("/api/getUUID")}/${ID}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',

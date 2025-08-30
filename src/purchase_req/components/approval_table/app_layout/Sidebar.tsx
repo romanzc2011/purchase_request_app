@@ -17,7 +17,7 @@ interface SidebarProps {
     IT_GROUP: boolean;
 }
 
-const Sidebar = ({ isOpen, toggleSidebar, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: SidebarProps) => {
+const Sidebar = ({ isOpen, CUE_GROUP, IT_GROUP }: Omit<SidebarProps, 'toggleSidebar' | 'ACCESS_GROUP'>) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [toggled, setToggled] = useState(false);
     const navigate = useNavigate();

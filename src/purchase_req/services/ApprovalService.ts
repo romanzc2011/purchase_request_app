@@ -1,7 +1,8 @@
 import { ApprovalData, DenialData } from "../types/approvalTypes";
+import { computeAPIURL } from "../utils/misc_utils";
 
-const API_URL_APPROVE_REQUEST = `${import.meta.env.VITE_API_URL}/api/approveRequest`
-const API_URL_DENY_REQUEST = `${import.meta.env.VITE_API_URL}/api/denyRequest`
+const API_URL_APPROVE_REQUEST = computeAPIURL("/api/approveRequest")
+const API_URL_DENY_REQUEST = computeAPIURL("/api/denyRequest")
 
 // ##############################################################
 // Approve/Deny request

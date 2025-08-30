@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { useUUIDStore } from "../services/UUIDService";
+import { computeAPIURL } from "../utils/misc_utils";
 
-const API_URL_ASSIGN_IRQ1 = `${import.meta.env.VITE_API_URL}/api/assignIRQ1_ID`;
+const API_URL_ASSIGN_IRQ1 = computeAPIURL("/api/assignIRQ1_ID");
 /**
  * 
  * Args for the assignIRQ1 mutation
@@ -52,7 +53,7 @@ export function useAssignIRQ1() {
             }
             return res.json();
         },
-        onSuccess: (data, { ID }) => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["approvalData"] });
             queryClient.invalidateQueries({ queryKey: ["search"] });
             toast.success("IRQ1 ID assigned successfully");

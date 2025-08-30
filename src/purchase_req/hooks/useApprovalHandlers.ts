@@ -7,12 +7,13 @@ import { useCommentModal } from "./useCommentModal";
 import { useApprovalService } from "./useApprovalService";
 import { GridRowId } from "@mui/x-data-grid";
 import { DataRow, ItemStatus } from "../types/approvalTypes";
+import { computeAPIURL } from "../utils/misc_utils";
 
 // API URLs
-const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
-const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
-const API_URL_UPDATE_PRICES = `${import.meta.env.VITE_API_URL}/api/updatePrices`;
-const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
+const API_URL_STATEMENT_OF_NEED_FORM = computeAPIURL("/api/downloadStatementOfNeedForm");
+const API_URL_ASSIGN_CO = computeAPIURL("/api/assignCO");
+const API_URL_UPDATE_PRICES = computeAPIURL("/api/updatePrices");
+const API_URL_APPROVAL_DATA = computeAPIURL("/api/getApprovalData");
 
 // #########################################################################################
 // FETCH APPROVAL DATA
@@ -20,7 +21,7 @@ const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalDa
 async function fetchApprovalData(ID?: string) {
 
 	if (ID) {
-		const response = await fetch(`${API_URL_APPROVAL_DATA}?ID=${ID}`, {
+		const response = await fetch(`${computeAPIURL("/api/getApprovalData")}?ID=${ID}`, {
 		method: "GET",
 		headers: {
 			"Authorization": `Bearer ${localStorage.getItem("access_token")}`
