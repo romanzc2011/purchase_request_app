@@ -14,27 +14,27 @@ export async function approveDenyRequest(payload: ApprovalData | DenialData): Pr
     }   
 
     // Determine which endpoint to use based on action
-    const isDeny = payload.action === "DENY" || payload.action === "deny";
-    const url = isDeny ? API_URL_DENY_REQUEST : API_URL_APPROVE_REQUEST;
+    const isApproved = payload.action === "APPROVE" || payload.action === "approve";
+    const url = isApproved ? API_URL_APPROVE_REQUEST : API_URL_DENY_REQUEST;
     
     // Format payload for the correct endpoint
     let formattedPayload;
-    if (isDeny) {
+    if (isApproved) {
+        // For approve endpoint, use RequestPayload format
+        formattedPayload = {
+            ID: payload.ID,
+            item_uuids: payload.item_uuids,
+            item_funds: (payload as ApprovalData).item_funds ?? [],
+            totalPrice: (payload as ApprovalData).totalPrice ?? [],
+            target_status: payload.target_status,
+            action: payload.action
+        };
+    } else {
         // For deny endpoint, use DenyPayload format
         formattedPayload = {
             ID: payload.ID,
             item_uuids: payload.item_uuids,
             target_status: payload.target_status, // Keep as array since backend now expects it
-            action: payload.action
-        };
-    } else {
-        // For approve endpoint, use RequestPayload format
-        formattedPayload = {
-            ID: payload.ID,
-            item_uuids: payload.item_uuids,
-            item_funds: (payload as ApprovalData).item_funds,
-            totalPrice: (payload as ApprovalData).totalPrice,
-            target_status: payload.target_status,
             action: payload.action
         };
     }

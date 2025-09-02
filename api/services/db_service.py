@@ -86,7 +86,7 @@ class PurchaseRequestHeader(Base):
                                                           server_default="IN_PROGRESS")
     created_time = mapped_column(DateTime(timezone=True), default=utc_now_truncated, nullable=False)
 
-    # 1️⃣ headers → line‐items
+    # headers → line‐items
     pr_line_items      : Mapped[List[PurchaseRequestLineItem]] = relationship(
                             "PurchaseRequestLineItem",
                             back_populates="purchase_request_header",
@@ -94,7 +94,7 @@ class PurchaseRequestHeader(Base):
                             foreign_keys="[PurchaseRequestLineItem.purchase_request_id]"
                          )
 
-    # 2️⃣ headers → approvals
+    # headers → approvals
     approvals          : Mapped[List[Approval]] = relationship(
                             "Approval",
                             back_populates="purchase_request_header",
@@ -102,7 +102,7 @@ class PurchaseRequestHeader(Base):
                             foreign_keys="[Approval.purchase_request_id]"
                          )
 
-    # 3️⃣ headers → pending approvals
+    # headers → pending approvals
     pending_approvals  : Mapped[List[PendingApproval]] = relationship(
                             "PendingApproval",
                             back_populates="purchase_request_header",
@@ -319,10 +319,13 @@ class FinalApproval(Base):
     pending_approval_id         : Mapped[int] = mapped_column(Integer, ForeignKey("pending_approvals.pending_approval_id"), nullable=False)
     approvals_uuid  : Mapped[str] = mapped_column(String, ForeignKey("approvals.UUID"), nullable=False)
     line_item_uuid  : Mapped[str] = mapped_column(String, ForeignKey("pr_line_items.UUID"), nullable=False)
-    approver        = mapped_column(String, nullable=False)
     status          = mapped_column(SQLEnum(ItemStatus), nullable=False)
     created_at      = mapped_column(DateTime, default=utc_now_truncated, nullable=False)
     deputy_can_approve = mapped_column(Boolean, nullable=False)  # total price must be equal to or less than $250
+    pending_approved_by = mapped_column(String, nullable=True)
+    pending_approved_at = mapped_column(DateTime, nullable=True)
+    final_approved_by = mapped_column(String, nullable=True)
+    final_approved_at = mapped_column(DateTime, nullable=True)
 
     # back to Approval
     approval        : Mapped[Approval] = relationship(
@@ -647,9 +650,12 @@ async def insert_final_approval(
     purchase_request_id: str,
     line_item_uuid: str,
     pending_approval_id: int,
-    approver: str,
     status: ItemStatus,
-    deputy_can_approve: bool = False
+    deputy_can_approve: bool = False,
+    pending_approved_by: str = None,
+    final_approved_by: str = None,
+    pending_approved_at: datetime = None,
+    final_approved_at: datetime = None,
 ) -> FinalApproval:
     """
     Insert a new record into the line_item_final_approvals table.
@@ -668,18 +674,22 @@ async def insert_final_approval(
         The created FinalApproval object
     """
     logger.info(f"Inserting line item final approval: {approvals_uuid}, {line_item_uuid}, {pending_approval_id}")
-    
+
     # Create the new approval record
     final_approval = FinalApproval(
         approvals_uuid=approvals_uuid,
         purchase_request_id=purchase_request_id,
         line_item_uuid=line_item_uuid,
         pending_approval_id=pending_approval_id,
-        approver=approver,
         status=status,
-        created_at=utc_now_truncated(),
-        deputy_can_approve=deputy_can_approve
+        deputy_can_approve=deputy_can_approve,
+        pending_approved_by=pending_approved_by,
+        pending_approved_at=pending_approved_at,
+        final_approved_by=final_approved_by,
+        final_approved_at=final_approved_at,
     )
+    logger.debug(f"DATA: {final_approval}")
+    
     
     db.add(final_approval)
     await db.flush()

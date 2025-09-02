@@ -31,7 +31,7 @@ export const usePurchaseForm = () => {
 	shouldFocusError: true,
 	});
 
-	const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
+	const API_URL_ASSIGN_CO = computeAPIURL("/api/assignCO");
 
 	/*************************************************************************************** */
 	/* ASSIGN CO -- assign CO to request */

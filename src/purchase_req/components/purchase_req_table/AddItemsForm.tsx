@@ -54,11 +54,11 @@ function AddItemsForm({
         register,
         control,
         handleSubmit,
+        handleAssignCO,
         formState,
         watch,
         reset,
         trigger,
-        handleAssignCO,
     } = form;
     const { errors, isValid, isSubmitted } = formState;
     const [showSuccess, setShowSuccess] = useState(false);

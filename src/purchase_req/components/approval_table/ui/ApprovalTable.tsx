@@ -26,6 +26,7 @@ import { useApprovalService } from "../../../hooks/useApprovalService";
 import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 import { toast } from "react-toastify";
 import { isDownloadSig } from "../../../utils/PrasSignals";
+import { computeAPIURL } from "../../../utils/misc_utils";
 
 
 /***********************************************************************************/
@@ -39,10 +40,10 @@ interface ApprovalTableProps {
 }
 
 /* API URLs */
-const API_URL_APPROVAL_DATA = `${import.meta.env.VITE_API_URL}/api/getApprovalData`;
-const API_URL_CYBERSEC_RELATED = `${import.meta.env.VITE_API_URL}/api/cyberSecRelated`;
-// const API_URL_ASSIGN_CO = `${import.meta.env.VITE_API_URL}/api/assignCO`;
-const API_URL_STATEMENT_OF_NEED_FORM = `${import.meta.env.VITE_API_URL}/api/downloadStatementOfNeedForm`;
+const API_URL_APPROVAL_DATA = computeAPIURL("/api/getApprovalData");
+const API_URL_CYBERSEC_RELATED = computeAPIURL("/api/cyberSecRelated");
+const API_URL_ASSIGN_CO = computeAPIURL("/api/assignCO");
+const API_URL_STATEMENT_OF_NEED_FORM = computeAPIURL("/api/downloadStatementOfNeedForm");
 
 // Define a type for the DataGrid sx prop
 type DataGridSxProps = {
@@ -565,53 +566,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
         // Deselect all rows
         setRowSelectionModel({ ids: new Set(), type: 'include' });
     }
-
-    //####################################################################
-    // HANDLE CONTRACTING OFFICER
-    //####################################################################
-    // async function handleAssignCO(officerId: number, username: string) {
-
-    //     // Get selected Rows
-    //     const selectedItemUUIDs = Array.from(rowSelectionModel.ids)
-    //         .filter(id => !String(id).startsWith("header-"));
-
-    //     if (selectedItemUUIDs.length === 0) {
-    //         toast.error("No items selected");
-    //         return;
-    //     }
-
-    //     const requestIDs = [
-    //         ...new Set(filteredApprovalData
-    //             .filter(item => selectedItemUUIDs.includes(item.UUID))
-    //             .map(item => item.ID)
-    //         )
-    //     ];
-
-    //     try {
-    //         const response = await fetch(API_URL_ASSIGN_CO, {
-    //         method: "POST",
-    //         headers: {
-    //             "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-    //             "Content-Type": "application/json"
-    //         },
-    //         body: JSON.stringify({
-    //             request_ids: requestIDs,
-    //             contracting_officer_id: officerId,
-    //             contracting_officer: username
-    //         })
-    //     });
-
-    //     if (!response.ok) {
-    //         throw new Error("Failed to assign CO");
-    //     }
-
-    //     toast.success("CO assigned successfully");
-    //     queryClient.invalidateQueries({ queryKey: ["approvalData"] });
-    //     } catch (error) {
-    //         console.error("Failed to assign CO:", error);
-    //         toast.error("Failed to assign CO");
-    //     }
-    // }
 
     // the "toggle" column for group headers
     const toggleColumn: GridColDef = {
