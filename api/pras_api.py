@@ -38,7 +38,6 @@ from fastapi import (
     Query, status, WebSocket, WebSocketDisconnect)
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 # SQLAlchemy
@@ -85,8 +84,7 @@ tracemalloc.start(10)
 app = FastAPI(title="PRAS API")
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
-socketio_app = socketio.ASGIApp(sio,socketio_path="communicate")
-app.mount("/realtime", socketio_app)
+app.mount("/realtime", socketio.ASGIApp(sio, socketio_path="communicate"))
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
