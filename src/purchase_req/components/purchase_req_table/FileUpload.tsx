@@ -7,7 +7,7 @@ import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { IFile } from "../../types/IFile";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Button from "@mui/material/Button";
-import { computeHTTPURL } from "../../utils/ws";
+import { computeHTTPURL } from "../../utils/sio_client";
 
 interface FileUploadProps {
     ID?: string;

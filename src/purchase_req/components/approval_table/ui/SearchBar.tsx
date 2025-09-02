@@ -6,7 +6,7 @@ import { Box, IconButton } from "@mui/material";
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import Input from '@mui/material/Input';
 import SearchIcon from "@mui/icons-material/Search";
-import { computeHTTPURL } from "../../../utils/ws";
+import { computeHTTPURL } from "../../../utils/sio_client";
 
 interface SearchBarProps {
     setSearchQuery: (query: string) => void;

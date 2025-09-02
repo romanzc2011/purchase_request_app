@@ -3,10 +3,10 @@ from enum import Enum, auto
 from typing import List
 import asyncio
 from loguru import logger
-from api.services.websocket_manager import websock_conn
 from api.services.progress_tracker.steps.download_steps import DOWNLOAD_STEPS, DownloadStep
 from api.services.progress_tracker.steps.approval_steps import APPROVAL_STEPS, ApprovalStep
 from api.services.progress_tracker.steps.submit_request_steps import SUBMIT_REQUEST_STEPS, SubmitRequestStep
+import api.services.socketio_server.sio_events
  
 # -----------------------------------------------------------------------------
 # PROGRESS TRACKER TYPE

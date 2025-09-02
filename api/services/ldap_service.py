@@ -13,7 +13,6 @@ from loguru import logger
 from api.schemas.enums import LDAPGroup
 from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings 
-from api.services.websocket_manager import websock_conn
 from api.utils.logging_utils import logger_init_ok
 
 def run_in_thread(fn):

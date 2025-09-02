@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { computeWSURL } from "../utils/ws";
+import { computeWSURL } from "../utils/sio_client";
 
 export function useWebSockets(path = "/communicate", onMessage?: (e: MessageEvent)=>void) {
   const url = useMemo(() => computeWSURL(path), [path]);

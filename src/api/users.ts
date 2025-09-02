@@ -1,4 +1,4 @@
-import { computeHTTPURL } from "../purchase_req/utils/ws";
+import { computeHTTPURL } from "../purchase_req/utils/sio_client";
 
 export async function fetchUsernames(query: string): Promise<string[]> {
     try {

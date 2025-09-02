@@ -25,7 +25,7 @@ import { useApprovalService } from "../../../hooks/useApprovalService";
 import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 import { toast } from "react-toastify";
 import { isDownloadSig } from "../../../utils/PrasSignals";
-import { computeHTTPURL } from "../../../utils/ws";
+import { computeHTTPURL } from "../../../utils/sio_client";
 
 /***********************************************************************************/
 // PROPS

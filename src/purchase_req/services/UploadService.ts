@@ -1,6 +1,6 @@
 import axios from "axios";
 import { FormValues } from "../types/formTypes";
-import { computeHTTPURL } from "../utils/ws";
+import { computeHTTPURL } from "../utils/sio_client";
 
 interface FileInfo {
     name: string;

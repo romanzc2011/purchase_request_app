@@ -25,7 +25,7 @@ import { ItemStatus } from "../../types/approvalTypes";
 import { OrderType } from "../../schemas/purchaseSchema";
 import { isRequestSubmitted, isSubmittedSig } from "../../utils/PrasSignals";
 import { effect } from "@preact/signals-react";
-import { computeHTTPURL } from "../../utils/ws";
+import { computeHTTPURL } from "../../utils/sio_client";
 
 const API_URL = computeHTTPURL("/api/sendToPurchaseReq");
 
@@ -237,21 +237,22 @@ function SubmitApprovalTable({
                     {Object.entries(groupedItems).map(([id, items]) => (
                         <React.Fragment key={id}>
                             {/* Main row with expand/collapse button */}
-                            <TableRow><TableCell>
-                                {items.length > 1 && (
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => toggleRowExpanded(id)}
-                                        sx={{ color: "white" }}
-                                    >
-                                        {expandedRows[id] ? (
-                                            <KeyboardArrowUpIcon />
-                                        ) : (
-                                            <KeyboardArrowDownIcon />
-                                        )}
-                                    </IconButton>
-                                )}
-                            </TableCell>
+                            <TableRow>
+                                <TableCell>
+                                    {items.length > 1 && (
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => toggleRowExpanded(id)}
+                                            sx={{ color: "white" }}
+                                        >
+                                            {expandedRows[id] ? (
+                                                <KeyboardArrowUpIcon />
+                                            ) : (
+                                                <KeyboardArrowDownIcon />
+                                            )}
+                                        </IconButton>
+                                    )}
+                                </TableCell>
                                 <TableCell sx={{
                                     color: "white",
                                     fontFamily: "'Play', sans-serif !important",
@@ -317,106 +318,109 @@ function SubmitApprovalTable({
 
                             {/* Collapsible rows for additional items */}
                             {items.length > 1 && (
-                                <TableRow><TableCell
-                                    colSpan={9}
-                                    sx={{ p: 0, background: "#3c3c3c" }}
-                                >
-                                    <Collapse
-                                        in={expandedRows[id]}
-                                        timeout="auto"
-                                        unmountOnExit
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={9}
+                                        sx={{ p: 0, background: "#3c3c3c" }}
                                     >
-                                        <Box sx={{ m: 2 }}>
-                                            <Typography
-                                                variant="h6"
-                                                gutterBottom
-                                                component="div"
-                                                sx={{ color: "white" }}
-                                            >
-                                                Additional Items
-                                            </Typography>
-                                            <Table size="small" aria-label="additional items">
-                                                <TableHead>
-                                                    <TableRow>{[
-                                                        "ID",
-                                                        "Budget Object Code",
-                                                        "Fund",
-                                                        "Location",
-                                                        "Quantity",
-                                                        "Price Each",
-                                                        "Line Total",
-                                                    ].map((label) => (
-                                                        <TableCell
-                                                            key={label}
-                                                            sx={{
-                                                                color: "white",
-                                                                fontWeight: "bold",
-                                                            }}
-                                                        >
-                                                            {label}
-                                                        </TableCell>
-                                                    ))}</TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {items.slice(1).map((item, idx) => (
-                                                        <TableRow key={idx}>
-                                                            <TableCell sx={{
-                                                                color: "white",
-                                                                fontFamily: "'Play', sans-serif !important",
-                                                                fontSize: "1rem"
-                                                            }}>
-                                                                {item.ID}
-                                                            </TableCell>
-                                                            <TableCell sx={{
-                                                                color: "white",
-                                                                fontFamily: "'Play', sans-serif !important",
-                                                                fontSize: "1rem"
-                                                            }}>
-                                                                {item.budgetObjCode}
-                                                            </TableCell>
-                                                            <TableCell sx={{
-                                                                color: "white",
-                                                                fontFamily: "'Play', sans-serif !important",
-                                                                fontSize: "1rem"
-                                                            }}>
-                                                                {item.fund}
-                                                            </TableCell>
-                                                            <TableCell sx={{
-                                                                color: "white",
-                                                                fontFamily: "'Play', sans-serif !important",
-                                                                fontSize: "1rem"
-                                                            }}>
-                                                                {item.location}
-                                                            </TableCell>
-                                                            <TableCell sx={{
-                                                                color: "white",
-                                                                fontFamily: "'Play', sans-serif !important",
-                                                                fontSize: "1rem"
-                                                            }}>
-                                                                {item.quantity}
-                                                            </TableCell>
-                                                            <TableCell sx={{
-                                                                color: "white",
-                                                                fontFamily: "'Play', sans-serif !important",
-                                                                fontSize: "1rem"
-                                                            }}>
-                                                                {typeof item.priceEach === "number"
-                                                                    ? item.priceEach.toFixed(2)
-                                                                    : "0.00"}
-                                                            </TableCell>
-                                                            <TableCell sx={{
-                                                                color: "white",
-                                                                fontFamily: "'Play', sans-serif !important",
-                                                                fontSize: "1rem"
-                                                            }}>
-                                                                {calculatePrice(item).toFixed(2)}
-                                                            </TableCell></TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </Box>
-                                    </Collapse>
-                                </TableCell>
+                                        <Collapse
+                                            in={expandedRows[id]}
+                                            timeout="auto"
+                                            unmountOnExit
+                                        >
+                                            <Box sx={{ m: 2 }}>
+                                                <Typography
+                                                    variant="h6"
+                                                    gutterBottom
+                                                    component="div"
+                                                    sx={{ color: "white" }}
+                                                >
+                                                    Additional Items
+                                                </Typography>
+                                                <Table size="small" aria-label="additional items">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            {[
+                                                                "ID",
+                                                                "Budget Object Code",
+                                                                "Fund",
+                                                                "Location",
+                                                                "Quantity",
+                                                                "Price Each",
+                                                                "Line Total",
+                                                            ].map((label) => (
+                                                                <TableCell
+                                                                    key={label}
+                                                                    sx={{
+                                                                        color: "white",
+                                                                        fontWeight: "bold",
+                                                                    }}
+                                                                >
+                                                                    {label}
+                                                                </TableCell>
+                                                            ))}</TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {items.slice(1).map((item, idx) => (
+                                                            <TableRow key={idx}>
+                                                                <TableCell sx={{
+                                                                    color: "white",
+                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontSize: "1rem"
+                                                                }}>
+                                                                    {item.ID}
+                                                                </TableCell>
+                                                                <TableCell sx={{
+                                                                    color: "white",
+                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontSize: "1rem"
+                                                                }}>
+                                                                    {item.budgetObjCode}
+                                                                </TableCell>
+                                                                <TableCell sx={{
+                                                                    color: "white",
+                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontSize: "1rem"
+                                                                }}>
+                                                                    {item.fund}
+                                                                </TableCell>
+                                                                <TableCell sx={{
+                                                                    color: "white",
+                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontSize: "1rem"
+                                                                }}>
+                                                                    {item.location}
+                                                                </TableCell>
+                                                                <TableCell sx={{
+                                                                    color: "white",
+                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontSize: "1rem"
+                                                                }}>
+                                                                    {item.quantity}
+                                                                </TableCell>
+                                                                <TableCell sx={{
+                                                                    color: "white",
+                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontSize: "1rem"
+                                                                }}>
+                                                                    {typeof item.priceEach === "number"
+                                                                        ? item.priceEach.toFixed(2)
+                                                                        : "0.00"}
+                                                                </TableCell>
+                                                                <TableCell sx={{
+                                                                    color: "white",
+                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontSize: "1rem"
+                                                                }}>
+                                                                    {calculatePrice(item).toFixed(2)}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </Box>
+                                        </Collapse>
+                                    </TableCell>
                                 </TableRow>
                             )}
                         </React.Fragment>

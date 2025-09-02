@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { ContractingOfficer } from '../../types/approvalTypes';
 import Buttons from './Buttons';
 import { toast } from "react-toastify";
-import { computeHTTPURL } from '../../utils/ws';
+import { computeHTTPURL } from '../../utils/sio_client';
 
 type Props = {
     value: number | "";

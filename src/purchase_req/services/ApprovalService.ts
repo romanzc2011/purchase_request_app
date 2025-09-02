@@ -1,5 +1,5 @@
 import { ApprovalData, DenialData } from "../types/approvalTypes";
-import { computeHTTPURL } from "../utils/ws";
+import { computeHTTPURL } from "../utils/sio_client";
 
 const API_URL_APPROVE_REQUEST = computeHTTPURL("/api/approveRequest");
 const API_URL_DENY_REQUEST = computeHTTPURL("/api/denyRequest");

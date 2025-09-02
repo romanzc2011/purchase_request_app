@@ -5,7 +5,6 @@ import api.services.db_service as dbas
 from sqlalchemy import select
 from api.services.db_service import SonComment, Approval
 from api.services.db_service import PurchaseRequestLineItem
-from api.services.websocket_manager import websock_conn
 
 
 """
@@ -26,9 +25,7 @@ def format_username(username: str) -> str:
 
 def reset_signals():
         # Broadcast progress update
-    asyncio.create_task(websock_conn.broadcast({
-                "event": "SIGNAL_RESET",
-    }))
+    pass
 #--------------------------------------------------------------------------------------------------
 # RUN IN THREAD
 #--------------------------------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { computeHTTPURL } from "../utils/ws";
+import { computeHTTPURL } from "../utils/sio_client";
 
 const STORAGE_KEY = 'UUID_store';
 

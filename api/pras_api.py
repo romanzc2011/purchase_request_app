@@ -19,8 +19,9 @@ EXPLANATION OF COMMENT COLORS:
 TO LAUNCH SERVER:
 uvicorn pras_api:app --port 5004
 """
-from datetime import datetime, timezone
+from datetime import datetime
 import json
+import socketio
 from pathlib import Path
 from typing import Awaitable, Callable, ParamSpec, TypeVar
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
@@ -59,11 +60,10 @@ from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import settings
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
-from api.services.websocket_manager import websock_conn
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
+from api.services.socketio_server.sio_instance import sio
 import time
-import socket
 
 # Database ORM Model Imports
 from api.services.db_service import (
@@ -83,40 +83,10 @@ tracemalloc.start(10)
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
+api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
-@app.on_event("startup")
-async def startup_event():
-    await websock_conn.start()
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    await websock_conn.stop()
-    
-@app.websocket("/communicate")
-async def communicate(ws: WebSocket):
-    await websock_conn.connect(ws)
-    try:
-        while True:
-            try:
-                msg = await asyncio.wait_for(ws.receive_text(), timeout=90)
-                logger.info(f"🔴 MESSAGE RECEIVED: {msg}")
-                try:
-                    data = json.loads(msg)
-                    if data.get("event") == "ping":
-                        await ws.send_json({"event": "pong"})
-                        continue
-                except Exception:
-                    pass
-            except asyncio.TimeoutError:
-                await ws.send_json({"event": "srv_heartbeat"})
-            except Exception as e:
-                logger.error(f"Error in websocket: {e}")
-                await ws.send_json({"event": "srv_heartbeat"})
-
-    except WebSocketDisconnect:
-        pass
-    finally:
-        await websock_conn.disconnect(ws)
+socketio_app = socketio.ASGIApp(sio,socketio_path="communicate")
+app.mount("/realtime", socketio_app)
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -127,10 +97,6 @@ lock = threading.Lock()
 # Set generic return type/ arg types
 P = ParamSpec("P")
 R = TypeVar("R")
-
-##########################################################################
-# API router
-api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
