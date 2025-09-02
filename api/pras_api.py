@@ -21,6 +21,7 @@ uvicorn pras_api:app --port 5004
 """
 from datetime import datetime, timezone
 import json
+import traceback
 from typing import Awaitable, Callable, ParamSpec, TypeVar
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
 from api.schemas.purchase_schemas import AssignCOPayload
@@ -78,6 +79,27 @@ tracemalloc.start(10)
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
 allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allowed_headers = [
+    "cache-control",
+    "connection",
+    "pragma",
+    "upgrade",
+    "accept-encoding",
+    "accept-language",
+    "host",
+    "max-forwards",
+    "user-agent",
+    "origin",
+    "sec-websocket-version",
+    "sec-websocket-key",
+    "sec-websocket-extensions",
+    "x-original-url",
+    "x-forwarded-for",
+    "x-arr-ssl",
+    "x-arr-log-id",
+]
+
+
 
 # Add CORS middleware
 app.add_middleware(
@@ -86,13 +108,52 @@ app.add_middleware(
         "http://localhost:5002",
         "http://127.0.0.1:5002",
         "https://localhost:5002",
+        "http://localhost:5004",
+        "https://localhost:5004",
+        "http://localhost:5004",
+        "http://localhost:5002",
         "http://10.222.1.205:5002",
         "https://10.222.1.205:5002",
+        "https://10.222.50.225:5002",
+        "http://10.222.50.225:5002",
     ],
     allow_credentials=True,
     allow_methods=allowed_methods,
-    allow_headers=["*"],
+    allow_headers=allowed_headers,
 )
+
+##########################################################################
+## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
+##########################################################################
+@app.websocket("/communicate")
+async def websocket_endpoint(websocket: WebSocket):
+    await websock_conn.connect(websocket)
+    try:
+        while True:  # Keep the connection alive
+            incoming_data = await websocket.receive_json()
+            logger.success(f"RECV data: {incoming_data}")
+            
+            # Convert to json, if reset_data then reset shm, percent everything
+            try:
+                message = incoming_data
+                if message.get("event") == "reset_data":
+                    # reset shm
+                    shm_mgr.clear_state()
+                    logger.info("Progress state cleared via WebSocket reset")
+                elif message.get("event") == "check_connection":
+                    # Send connection status back
+                    await websocket.send_json({"event": "connection_status", "connected": True, "timestamp": asyncio.get_event_loop().time()})
+                elif message.get("event") == "clear_stale_state":
+                    # Clear stale progress state
+                    await shm_mgr.check_and_clear_stale_state() 
+                    await websocket.send_json({"event": "state_cleared", "timestamp": asyncio.get_event_loop().time()})
+                    
+            except json.JSONDecodeError:
+                logger.error(f"Received non-JSON data: {incoming_data}")
+                
+                
+    except WebSocketDisconnect:
+        await websock_conn.disconnect(websocket)
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -1312,42 +1373,7 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 ##########################################################################
 app.include_router(api_router)
 
-##########################################################################
-## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
-##########################################################################
-@app.websocket("/communicate")
-async def websocket_endpoint(websocket: WebSocket):
-    await websock_conn.connect(websocket)
-    try:
-        while True:
-            incoming_data = await websocket.receive_text()
-            logger.success(f"RECV data: {incoming_data}")
-            
-            # Convert to json, if reset_data then reset shm, percent everything
-            try:
-                message = json.loads(incoming_data)
-                if message.get("event") == "reset_data":
-                    # reset shm
-                    shm_mgr.clear_state()
-                    logger.info("Progress state cleared via WebSocket reset")
-                elif message.get("event") == "check_connection":
-                    # Send connection status back
-                    await websocket.send_json({
-                        "event": "connection_status",
-                        "connected": True,
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-                elif message.get("event") == "clear_stale_state":
-                    # Clear stale progress state
-                    await shm_mgr.check_and_clear_stale_state()
-                    await websocket.send_json({
-                        "event": "state_cleared",
-                        "timestamp": asyncio.get_event_loop().time()
-                    })
-            except json.JSONDecodeError:
-                logger.error("Received non-JSON data")
-    except WebSocketDisconnect:
-        await websock_conn.disconnect(websocket)
+
 
 
 ##########################################################################
@@ -1384,11 +1410,26 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
     return {"delete": True}
 
 ##########################################################################
-## WEBSOCKET PROGRESS
-##########################################################################
-
-##########################################################################
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
-    uvicorn.run("pras_api:app", host="localhost", port=5004, reload=True)
+    try:
+        uvicorn.run("api.pras_api:app", host="127.0.0.1", port=5004, reload=True)
+    except Exception as e:
+        try:
+            # Ensure the logs directory exists
+            settings.UVICORN_ERRORS.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Write error with timestamp
+            with open(settings.UVICORN_ERRORS, "a", encoding="utf-8") as f:
+                f.write(f"\n{'='*50}\n")
+                f.write(f"Error occurred at: {datetime.now()}\n")
+                f.write(f"Exception: {str(e)}\n")
+                f.write(f"{'='*50}\n")
+                traceback.print_exc(file=f)
+                f.write(f"\n{'='*50}\n\n")
+        except Exception as log_error:
+            # If we can't write to the log file, print to console as fallback
+            print(f"Failed to write error to log file: {log_error}")
+            print(f"Original error: {e}")
+            traceback.print_exc()

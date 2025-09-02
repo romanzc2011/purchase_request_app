@@ -12,7 +12,6 @@ import ApprovalIcon from "@mui/icons-material/Approval";
 interface SidebarProps {
     isOpen: boolean;
     toggleSidebar: () => void;
-    ACCESS_GROUP: boolean;
     CUE_GROUP: boolean;
     IT_GROUP: boolean;
 }

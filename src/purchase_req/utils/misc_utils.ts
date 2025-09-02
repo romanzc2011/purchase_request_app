@@ -3,7 +3,8 @@ export function computeAPIURL(path: string) {
 }
 
 export function computeWSURL(path: string) {
-    return window.location.origin.replace(/^http/, 'ws') + path;
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${window.location.host}${path}`;
 }
 
 export async function fetchUsernames(query: string): Promise<string[]> {

@@ -7,35 +7,24 @@ from fastapi import WebSocket
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
-        self.heartbeat_task = None
-        self.start_heartbeat()
+        self.heartbeat_task: asyncio.Task | None = None
 
-	#-------------------------------------------------------------
-	# START HEARTBEAT
-	#-------------------------------------------------------------
-    def start_heartbeat(self):
-        """Start heartbeat to keep connections alive"""
-        if self.heartbeat_task is None:
-            self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+    def ensure_heartbeat(self):
+        if not self.heartbeat_task or self.heartbeat_task.done():
+            self.heartbeat_task = asyncio.create_task(self.heartbeat_loop())
 
-    async def _heartbeat_loop(self):
-        """Send heartbeat every 30 seconds to keep connections alive"""
-        while True:
-            try:
-                await asyncio.sleep(30)  # Send heartbeat every 30 seconds
-                if self.active_connections:
-                    await self.broadcast({"event": "heartbeat", "timestamp": asyncio.get_event_loop().time()})
-                    logger.debug(f"Sent heartbeat to {len(self.active_connections)} connections")
-            except Exception as e:
-                logger.error(f"Heartbeat error: {e}")
-
-	#-------------------------------------------------------------
-	# CONNECT
-	#-------------------------------------------------------------
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        self.ensure_heartbeat()
         logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
+
+    async def heartbeat_loop(self):
+        while True:
+            await asyncio.sleep(30)
+            await self.broadcast({"event": "heartbeat", "timestamp": asyncio.get_event_loop().time()})
+            logger.debug(f"Sent heartbeat to {len(self.active_connections)} connections")
+
 
 	#-------------------------------------------------------------
 	# DISCONNECT

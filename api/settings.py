@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SQL_SCRIPT_PATH: Path = BASE_DIR / "api" / "db" / "pras_sql_script.sql"
     PDF_OUTPUT_FOLDER: Path = BASE_DIR / "api" / "pdf_output"
     UPLOAD_FOLDER: Path = BASE_DIR / "api" / "uploads"
+    UVICORN_ERRORS: Path = BASE_DIR / "api" / "logs" / "uvicorn_errors.txt"
 
     # -- LDAP configuration
     ldap_server: str
@@ -48,6 +49,8 @@ class Settings(BaseSettings):
         # Ensure required directories exist
         self.PDF_OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)
         self.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True, mode=0o750)
+        # Ensure logs directory exists for error logging
+        self.UVICORN_ERRORS.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
 
     model_config = SettingsConfigDict(
         env_file           = ".env",

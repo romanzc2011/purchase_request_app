@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from "react";
-// import { isDownloadSig } from "../utils/PrasSignals";
 
 // #########################################################################################
 // WEBSOCKETS HOOK 
@@ -19,20 +18,20 @@ export function useWebSockets(
 	useEffect(() => {
 		const connectWebSocket = () => {
 			const ws = new WebSocket(WEBSOCKET_URL);
-			setSocket(ws)
+            setSocket(ws)
 
 			// These are event listeners
 			ws.onopen = (event) => {
 				console.log("✅ WEBSOCKET CONNECTED ", event);
 				setIsConnected(true);
 				reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
-				ws.send('HELO SERVER');
 			};
 			
 			ws.onmessage = (event) => {
 				if(onMessage) {
 					onMessage(event);
 				}
+                console.log("✅ WEBSOCKET RECV MESSAGE", event);
 			}
 
 			ws.onclose = (event) => {
@@ -53,6 +52,7 @@ export function useWebSockets(
 
 			ws.onerror = (err) => {
 				console.log("⚠️ WEBSOCKET ERROR", err);
+                setIsConnected(false);
 			}
 		};
 

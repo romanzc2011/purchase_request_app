@@ -107,7 +107,14 @@ class ProgressSharedMemory:
     def start_cleanup_task(self):
         """Start periodic cleanup of stale progress state"""
         if self.cleanup_task is None:
-            self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+                else:
+                    logger.warning("No running event loop, cleanup task not started")
+            except RuntimeError:
+                logger.warning("No running event loop, cleanup task not started")
             
     async def _cleanup_loop(self):
         """Periodically check and clear stale progress state"""
