@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { useUUIDStore } from "../services/UUIDService";
-import { computeHTTPURL } from "../utils/sio_client";
+import { computeHTTPURL } from "../utils/misc_utils";
 
 const API_URL_ASSIGN_IRQ1 = `${computeHTTPURL("/api/assignIRQ1_ID")}`;
 /**

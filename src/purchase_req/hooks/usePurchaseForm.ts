@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { purchaseItemSchema, PurchaseItem, OrderType } from "../schemas/purchaseSchema";
 import { toast } from "react-toastify";
 import { useCallback } from "react";
-import { computeHTTPURL } from "../utils/sio_client";
+import { computeHTTPURL } from "../utils/misc_utils";
 
 export const usePurchaseForm = () => {
 	const today = new Date().toISOString().split("T")[0];

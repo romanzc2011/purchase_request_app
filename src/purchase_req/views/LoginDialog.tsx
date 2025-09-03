@@ -9,7 +9,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import { Box, CircularProgress } from "@mui/material";
 import BKSeal from "../../assets/seal_no_border.png";
 import { toast } from "react-toastify";
-import { computeHTTPURL } from "../utils/sio_client";
+import { computeHTTPURL } from "../utils/misc_utils";
 
 interface LoginDialogProps {
     open: boolean;

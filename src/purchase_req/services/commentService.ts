@@ -1,6 +1,6 @@
 import { GroupCommentPayload } from "../types/approvalTypes";
 import { authFetch } from "../utils/authFetch";
-import { computeHTTPURL } from "../utils/sio_client";
+import { computeHTTPURL } from "../utils/misc_utils";
 
 const API_URL_ADD_COMMENTS_BULK = `${computeHTTPURL("/api/add_comments")}`;
 

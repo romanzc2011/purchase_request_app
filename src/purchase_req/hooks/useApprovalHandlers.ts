@@ -7,7 +7,7 @@ import { useCommentModal } from "./useCommentModal";
 import { useApprovalService } from "./useApprovalService";
 import { GridRowId } from "@mui/x-data-grid";
 import { DataRow, ItemStatus } from "../types/approvalTypes";
-import { computeHTTPURL } from "../utils/sio_client";
+import { computeHTTPURL } from "../utils/misc_utils";
 
 // API URLs
 const API_URL_STATEMENT_OF_NEED_FORM = computeHTTPURL("/api/downloadStatementOfNeedForm");

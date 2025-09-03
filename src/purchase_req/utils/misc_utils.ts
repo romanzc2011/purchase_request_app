@@ -1,5 +1,3 @@
-import { io } from "socket.io-client";
-
 export function computeWSURL(path?: string) { 
     const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
@@ -16,8 +14,16 @@ export function computeHTTPURL(path: string) {
     return `${proto}//${host}${p}`;
 }
 
-const socket = io(computeWSURL("/realtime/communicate"), { path: "/realtime/communicate" });
-
-socket.on("connect", () => {
-  console.log("🔌 connected");
-});
+export async function fetchUsernames(query: string): Promise<string[]> {
+    try {
+        const response = await fetch(`${computeHTTPURL("/api/usernames")}?q=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error('Error fetching usernames:', error);
+        return [];
+    }
+}

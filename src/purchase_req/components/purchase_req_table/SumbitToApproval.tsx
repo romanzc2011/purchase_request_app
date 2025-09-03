@@ -25,7 +25,7 @@ import { ItemStatus } from "../../types/approvalTypes";
 import { OrderType } from "../../schemas/purchaseSchema";
 import { isRequestSubmitted, isSubmittedSig } from "../../utils/PrasSignals";
 import { effect } from "@preact/signals-react";
-import { computeHTTPURL } from "../../utils/sio_client";
+import { computeHTTPURL } from "../../utils/misc_utils";
 
 const API_URL = computeHTTPURL("/api/sendToPurchaseReq");
 
