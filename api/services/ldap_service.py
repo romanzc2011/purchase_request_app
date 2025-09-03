@@ -14,6 +14,7 @@ from api.schemas.enums import LDAPGroup
 from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings 
 from api.utils.logging_utils import logger_init_ok
+from api.services.socketio_server.sio_instance import sio
 
 def run_in_thread(fn):
     async def wrapper(*args, **kwargs):
@@ -254,18 +255,18 @@ class LDAPService:
             
             if conn.entries:
                 # Inform frontend that user was found
-                asyncio.run(websock_conn.broadcast({"event": "USER_FOUND", 
+                asyncio.run(sio.emit("USER_FOUND", {"event": "USER_FOUND", 
                                               "status_code": "200",
-                                              "message": "User found for query"}))
+                                              "message": "User found for query"}, broadcast=True))
                 return [entry.sAMAccountName.value for entry in conn.entries]
             else:
                 logger.error(f"No user found for query: {query}")
                 
                 # Inform frontend that no user was found
-                asyncio.run(websock_conn.broadcast({"event": "NO_USER_FOUND", 
+                asyncio.run(sio.emit("NO_USER_FOUND", {"event": "NO_USER_FOUND", 
                                               "status_code": "404",
-                                              "message": "No user found for query"}))
-                return ["Error"]
+                                              "message": "No user found for query"}, broadcast=True))
+            #     return ["Error"]
         except Exception as e:
             logger.error(f"Error getting username: {e}")
             return ["Error"]

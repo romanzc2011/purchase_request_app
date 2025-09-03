@@ -7,6 +7,7 @@ from api.services.progress_tracker.steps.download_steps import DOWNLOAD_STEPS, D
 from api.services.progress_tracker.steps.approval_steps import APPROVAL_STEPS, ApprovalStep
 from api.services.progress_tracker.steps.submit_request_steps import SUBMIT_REQUEST_STEPS, SubmitRequestStep
 import api.services.socketio_server.sio_events
+from api.services.socketio_server.sio_instance import sio
  
 # -----------------------------------------------------------------------------
 # PROGRESS TRACKER TYPE
@@ -79,10 +80,10 @@ class ProgressTracker:
             step.done = False
             
     def send_start_msg(self):
-        asyncio.create_task(websock_conn.broadcast({
+        asyncio.create_task(sio.emit("start_toast", {
             "event": "START_TOAST",
             "percent_complete": 0
-        }));
+        }, broadcast=True));
         logger.debug("Sent start toast message")
     
     def mark_step_done(self, step_name):
@@ -107,10 +108,10 @@ class ProgressTracker:
             self.percent_complete = self.calculate_progress()
             
             # Broadcast progress update
-            asyncio.create_task(websock_conn.broadcast({
+            asyncio.create_task(sio.emit("progress_update", {
                 "event": "PROGRESS_UPDATE",
                 "percent_complete": self._percent_complete
-            }))
+            }, broadcast=True))
     
     def remaining_steps(self) -> List[DownloadStep | ApprovalStep | SubmitRequestStep]:
         active = self.active_tracker

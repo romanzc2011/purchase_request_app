@@ -676,7 +676,7 @@ async def send_purchase_request(
         "percent_complete": final_percent
     }  
     
-    await websock_conn.broadcast(final_send_data)
+    await sio.emit("progress_update", final_send_data, broadcast=True)
     #!-----------------------------------------------------------------------------
     
     return JSONResponse({"message": "All work completed"})
@@ -712,7 +712,7 @@ async def send_socket_data(
 		"event": "PROGRESS_UPDATE",
 		"percent_complete": percent
 	}
-    await websock_conn.broadcast(send_data)
+    await sio.emit("progress_update", send_data, broadcast=True)
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -821,9 +821,9 @@ async def assign_IRQ1_ID(
         pass
     else:
         logger.debug("AUTHORIZATION FAILED")
-        await websock_conn.broadcast({"event": "error", 
+        await sio.emit("error", {"event": "error", 
                                       "status_code": "403",
-                                      "message": "You are not authorized to assign requisition IDs"})
+                                      "message": "You are not authorized to assign requisition IDs"}, broadcast=True)
         raise HTTPException(status_code=403, detail="You are not authorized to assign requisition IDs")
     
     # Get the original ID from the request

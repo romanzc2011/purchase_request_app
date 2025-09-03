@@ -81,7 +81,7 @@ class ProgressState:
     email_sent_approver:         bool = False
     pending_approval_inserted:   bool = False
 
-from api.services.websocket_manager import websock_conn
+from api.services.socketio_server.sio_instance import sio
 
 class ProgressSharedMemory:
     
@@ -164,7 +164,7 @@ class ProgressSharedMemory:
             percent = self.calc_progress_percentage()
             progress_dict["percent_complete"] = percent
             send_data = percent
-            await websock_conn.broadcast(send_data)
+            await sio.emit("progress_update", send_data, broadcast=True)
         else:
             logger.error(f"Field {field} does not exist")
             
@@ -195,11 +195,11 @@ class ProgressSharedMemory:
         logger.success(f"Percent: {percent}")
         
         # broadcast to front end
-        asyncio.create_task(websock_conn.broadcast({
+        asyncio.create_task(sio.emit("progress_update", {
 			"event": "PROGRESS_UPDATE",
 			"percent_complete": percent,
 			"complete_steps": completed
-		}))
+		}, broadcast=True))
 
     #-------------------------------------------------------------
     # TO BYTES
