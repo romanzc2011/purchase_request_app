@@ -165,6 +165,9 @@ async def download_statement_of_need_form(
     This endpoint is used to download the statement of need form for a given ID.
     """
     #!-PROGRESS TRACKING --------------------------------------------------------------
+    sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
+    logger.debug("PROGRESS BAR: START TOAST EMITTED")
+    
     download_tracker = create_download_tracker()
     download_tracker.start_download_tracking = True
     download_tracker.send_start_msg()
@@ -301,6 +304,9 @@ async def send_purchase_request(
 ):
     
     #! PROGRESS TRACKING ---------------------------------------------------------
+    sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
+    logger.debug("PROGRESS BAR: START TOAST EMITTED")
+    
     submit_request_tracker = create_submit_request_tracker()
     submit_request_tracker.start_submit_request_tracking = True
     
@@ -677,7 +683,7 @@ async def send_purchase_request(
         "percent_complete": final_percent
     }  
     
-    await sio.emit("progress_update", final_send_data, broadcast=True)
+    await sio.emit("PROGRESS_UPDATE", final_send_data)
     #!-----------------------------------------------------------------------------
     
     return JSONResponse({"message": "All work completed"})
@@ -713,7 +719,7 @@ async def send_socket_data(
 		"event": "PROGRESS_UPDATE",
 		"percent_complete": percent
 	}
-    await sio.emit("progress_update", send_data, broadcast=True)
+    await sio.emit("PROGRESS_UPDATE", send_data)
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -824,7 +830,7 @@ async def assign_IRQ1_ID(
         logger.debug("AUTHORIZATION FAILED")
         await sio.emit("error", {"event": "error", 
                                       "status_code": "403",
-                                      "message": "You are not authorized to assign requisition IDs"}, broadcast=True)
+                                      "message": "You are not authorized to assign requisition IDs"})
         raise HTTPException(status_code=403, detail="You are not authorized to assign requisition IDs")
     
     # Get the original ID from the request

@@ -164,7 +164,7 @@ class ProgressSharedMemory:
             percent = self.calc_progress_percentage()
             progress_dict["percent_complete"] = percent
             send_data = percent
-            await sio.emit("progress_update", send_data, broadcast=True)
+            await sio.emit("PROGRESS_UPDATE", send_data)
         else:
             logger.error(f"Field {field} does not exist")
             
@@ -195,11 +195,11 @@ class ProgressSharedMemory:
         logger.success(f"Percent: {percent}")
         
         # broadcast to front end
-        asyncio.create_task(sio.emit("progress_update", {
+        asyncio.create_task(sio.emit("PROGRESS_UPDATE", {
 			"event": "PROGRESS_UPDATE",
 			"percent_complete": percent,
 			"complete_steps": completed
-		}, broadcast=True))
+		}))
 
     #-------------------------------------------------------------
     # TO BYTES

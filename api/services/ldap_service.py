@@ -257,7 +257,7 @@ class LDAPService:
                 # Inform frontend that user was found
                 asyncio.run(sio.emit("USER_FOUND", {"event": "USER_FOUND", 
                                               "status_code": "200",
-                                              "message": "User found for query"}, broadcast=True))
+                                              "message": "User found for query"}))
                 return [entry.sAMAccountName.value for entry in conn.entries]
             else:
                 logger.error(f"No user found for query: {query}")
@@ -265,7 +265,7 @@ class LDAPService:
                 # Inform frontend that no user was found
                 asyncio.run(sio.emit("NO_USER_FOUND", {"event": "NO_USER_FOUND", 
                                               "status_code": "404",
-                                              "message": "No user found for query"}, broadcast=True))
+                                              "message": "No user found for query"}))
             #     return ["Error"]
         except Exception as e:
             logger.error(f"Error getting username: {e}")

@@ -9,7 +9,7 @@ import SubmitApprovalTable from "../components/purchase_req_table/SumbitToApprov
 import { Layout } from "../components/approval_table/app_layout";
 import { Box } from "@mui/material";
 import { FormValues } from "../types/formTypes";
-import { ProgressBar } from "../utils/ProgressBar";
+//import { ProgressBar } from "../utils/ProgressBar";
 import ApprovalPageMain from "../components/approval_table/containers/ApprovalPageMain";
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
