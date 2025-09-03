@@ -39,6 +39,7 @@ from fastapi import (
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 
 # SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,6 +83,16 @@ tracemalloc.start(10)
 
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://10.222.49.26:5002"],  # Your frontend domain
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+)
+
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
 app.mount("/realtime", socketio.ASGIApp(sio, socketio_path="communicate"))
