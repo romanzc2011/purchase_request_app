@@ -165,7 +165,7 @@ async def download_statement_of_need_form(
     This endpoint is used to download the statement of need form for a given ID.
     """
     #!-PROGRESS TRACKING --------------------------------------------------------------
-    sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
+    await sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
     logger.debug("PROGRESS BAR: START TOAST EMITTED")
     
     download_tracker = create_download_tracker()

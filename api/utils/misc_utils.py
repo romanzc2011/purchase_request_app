@@ -3,8 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 import api.services.db_service as dbas
 from sqlalchemy import select
-from api.services.db_service import SonComment, Approval
-from api.services.db_service import PurchaseRequestLineItem
 
 
 """
@@ -41,6 +39,7 @@ def run_in_thread(fn):
 Utility function to get justifications from the database for PDFs and emails
 """
 async def get_justifications_and_comments(db: AsyncSession, ID: str) -> list[str]:
+    from api.services.db_service import SonComment, PurchaseRequestLineItem
     codes = await dbas.get_justifications_by_id(db, ID)
     templates = await dbas.get_justification_templates(db)
     

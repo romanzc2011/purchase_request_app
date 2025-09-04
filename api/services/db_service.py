@@ -1,9 +1,9 @@
 from __future__ import annotations
-from datetime import datetime, timezone
 from api.settings import settings
 from http.client import HTTPException
 from api.schemas.approval_schemas import ApprovalSchema, ApprovalView
 from api.schemas.ldap_schema import LDAPUser
+from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from loguru import logger
 from aiocache import Cache, cached
@@ -592,6 +592,7 @@ async def fetch_flat_approvals(
     ID: Optional[str] = None,
 ) -> List[ApprovalSchema]:
     
+    logger.debug(f"Fetching flat approvals for ID: {ID}")
     # alias each table for clarity
     hdr = aliased(PurchaseRequestHeader)
     li = aliased(PurchaseRequestLineItem)
@@ -680,9 +681,9 @@ async def insert_final_approval(
         pending_approval_id=pending_approval_id,
         status=status,
         deputy_can_approve=deputy_can_approve,
-        pending_approved_by=pending_approved_by,
+        pending_approved_by=format_username(pending_approved_by),
         pending_approved_at=pending_approved_at,
-        final_approved_by=final_approved_by,
+        final_approved_by=format_username(final_approved_by),
         final_approved_at=final_approved_at,
     )
     
@@ -778,7 +779,7 @@ async def update_final_approval_status(
         )
         .values(
             status=status,
-            final_approved_by=final_approved_by,
+            final_approved_by=format_username(final_approved_by),
             final_approved_at=final_approved_at
         )
     )
@@ -864,6 +865,21 @@ async def mark_final_approval_as_approved(
         .values(status=ItemStatus.APPROVED)
     )
     await db.commit()
+    
+###################################################################################################
+# GET FINAL APPROVED
+###################################################################################################
+
+async def get_final_approved_by_id(db: AsyncSession, ID: str) -> Optional[FinalApproval]:
+    stmt = (
+        select(FinalApproval.final_approved_by, FinalApproval.final_approved_at)
+        .where(FinalApproval.purchase_request_id == ID)
+    )
+    result = await db.execute(stmt)
+    row = result.one_or_none()
+    if row is None:
+        return None
+    return row.final_approved_by, row.final_approved_at
     
 ###################################################################################################
 # GET CONTRACTING OFFICER BY ID

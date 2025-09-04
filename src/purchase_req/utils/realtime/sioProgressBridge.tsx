@@ -12,7 +12,9 @@ import {
 } from "../PrasSignals";
 
 // Create and export a single socket instance you use everywhere
-export const socketioInstance: Socket = io("", { path: "/realtime/communicate" });
+export const socketioInstance: Socket = io("", {
+    path: "/realtime/communicate",
+});
 
 export const isIOConnectedSig = signal<boolean>(false);
 export const transportSig = signal<string>(socketioInstance.io.engine.transport.name);

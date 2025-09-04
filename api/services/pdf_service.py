@@ -1,4 +1,5 @@
 import asyncio
+from api.schemas.enums import ItemStatus
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
 from fastapi import HTTPException
 from reportlab.lib.pagesizes import LETTER
@@ -85,8 +86,9 @@ class PDFService:
         if submit_request_tracker:
             submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
         
-        # 1️⃣ Fetch the flattened approval rows
+        # Fetch the flattened approval rows, and final approve data with timestamps
         rows = await dbas.fetch_flat_approvals(db, ID=ID)
+        final_approved, final_approved_at = await dbas.get_final_approved_by_id(db, ID)
             
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Only run if this is from the download pdf signal
@@ -105,7 +107,7 @@ class PDFService:
         
         # ------------------------------------------------------------------------
         # Build justifcation template if true for trainNotAval or needsNotMeet
-        # Fetch additional comment from database if present
+        # Fetch additional comment fr   om database if present
         additional_comments = await get_justifications_and_comments(db, ID)
         if download_tracker:
             download_tracker.mark_step_done(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
@@ -194,6 +196,8 @@ class PDFService:
             order_type=order_type,
             contracting_officer=contracting_officer,
             download_tracker=download_tracker,
+            final_approved=format_username(final_approved),
+            final_approved_at=final_approved_at,
         )
         
         # Progress tracking after PDF generation is complete
@@ -235,6 +239,8 @@ class PDFService:
                                    order_type: str=None,
                                    contracting_officer: str=None,
                                    download_tracker=None,
+                                   final_approved: str=None,
+                                   final_approved_at: datetime=None,
                                    ) -> Path: 
         logger.info(f"#####################################################")
         logger.info("make_purchase_request_pdf()")
@@ -272,17 +278,6 @@ class PDFService:
         )
         header_style = ParagraphStyle("Header", parent=normal, fontSize=9, leading=10, fontName="Play-Bold")
         cell_style = ParagraphStyle("Cell", parent=normal, fontSize=9, leading=11, fontName="Play")
-        no_wrap = ParagraphStyle("NoWrap", parent=normal, fontSize=8, leading=10, fontName="Play")
-
-        comment_style = ParagraphStyle(
-            "CommentStyle",
-            parent=cell_style,
-            fontName="Play-Bold",
-            fontSize=9,
-            alignment=TA_LEFT,
-            allowWidows=1,
-            allowOrphans=1
-        )
 
         #— document setup
         doc = SimpleDocTemplate(
@@ -294,31 +289,39 @@ class PDFService:
 
         # Get first row data
         first = rows[0] if rows else {}
+        logger.debug(f"first: {first}")
+
+        # Get the final approved by
+        logger.debug(f"final_approved: {final_approved}")
 
         #— draw header on canvas
         def draw_header(canvas, doc):
             canvas.saveState()
             canvas.setTitle("Statement of Need")
 
+            # ----------------------------------------------------------------------------
             # logo
             x_logo = 0.2*inch
             y_logo = LETTER[1] - 0.2*inch
             canvas.drawImage(str(logo_path), x_logo, y_logo - img_h, width=img_w, height=img_h, mask='auto')
 
+            # ----------------------------------------------------------------------------
             # title
             canvas.setFont("Play-Bold", 16)
             canvas.drawCentredString(LETTER[0]/2, LETTER[1] - 0.6*inch, "STATEMENT OF NEED")
             
+            # ----------------------------------------------------------------------------
             # header text
             canvas.setFont("Play-Bold", 9)
             text_x = 0.2*inch
             text_y = y_logo - img_h - 20
-            
             date_val = first.get("dateneed")
+            
             # Use the function argument or fallback to row value
             order_type_val_local = order_type if order_type else first.get("orderType")
             date_str = None
 
+            # ----------------------------------------------------------------------------
             # Format date needed
             if isinstance(date_val, (datetime, date)):
                 date_str = date_val.strftime("%Y-%m-%d")
@@ -335,16 +338,23 @@ class PDFService:
                     date_str = "Not specified"
             else:
                 date_str = "Not specified"
-            
+                
+            # Format final approved at
+            if final_approved and final_approved_at:
+                approved_text = f"{final_approved} at {final_approved_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            else:
+                approved_text = "None"
+                
             items = [
                 ("Purchase Request ID:", first.get("purchase_request_id","")),
-                ("IRQ1:", first.get("IRQ1_ID","")),
+                ("RQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", format_username(first.get("requester","") or "")),
                 ("CO:", contracting_officer or "None"),
                 ("Date Needed:", date_str),
-                
+                ("Status:", ItemStatus(first.get("status","")).value),
+                ("Approved By:", approved_text),
             ]
-            logger.info(f"items: {items}")
+            
             for label, value in items:
                 canvas.drawString(text_x, text_y, label)
                 canvas.setFont("Play", 9)
@@ -357,10 +367,10 @@ class PDFService:
 
         #— build flowables
         elements = []
-        elements.append(Spacer(1, 36))
+        elements.append(Spacer(1, 56))
 
         # line-items table
-        headings = ["BOC","Fund","Location","Description","Qty","Price Each","Total Price","Justification"]
+        headings = ["BOC","Fund","Location","Description","Qty","Price Each","Total Price","Statement of Need/Justification"]
         table_data = [[Paragraph(h, header_style) for h in headings]]
         
         # Note: Progress tracking is handled in the main async method, not in this thread-based method
@@ -406,7 +416,14 @@ class PDFService:
             '<font name="Play-Bold">Cybersecurity related - consider funding:</font> <font name="Play">{}</font>'.format(use_cyber),
             cell_style
         )
+        
+        
+        
+        
         elements.append(cyber_para)
+        elements.append(Spacer(1, 6))
+        
+        elements.append(legal_10_percent_para)
         elements.append(Spacer(1, 6))
 
         # Comments paragraph with all collected comments
@@ -440,10 +457,29 @@ class PDFService:
         ]))
         elements.append(total_table)
         
+        # Legal 10% paragraph
+        legal_10_percent_para = Paragraph(
+            '<font name="Play">*This statement of need approved with a 10% or $100 allowance, whichever is lower, for any additional cost over the estimated amount.</font>',
+            cell_style
+        )
+        legal_table = Table(
+            [[Paragraph(legal_10_percent_para, cell_style)]],
+            colWidths=[doc.width],
+            repeatRows=1
+        )
+        
+        legal_table.setStyle(TableStyle([
+            ("LEFTPADDING",  (0,0), (-1,-1), 0),
+            ("RIGHTPADDING", (0,0), (-1,-1), 0),
+            ("TOPPADDING",   (0,0), (-1,-1), 2),
+            ("BOTTOMPADDING",(0,0), (-1,-1), 2),
+        ]))
+        elements.append(legal_table)
+        elements.append(Spacer(1, 6))
+        
+        #elements.append(Spacer(1, 6))
+
         # Build document
         doc.build(elements, onFirstPage=draw_header, onLaterPages=draw_header)
-        
-        # Note: Progress tracking is handled in the main async method, not in this thread-based method
-        
         return output_path
         

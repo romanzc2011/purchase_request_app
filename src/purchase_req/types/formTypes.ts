@@ -70,14 +70,16 @@ export const BOCMenuItems = [
 /* LOCATIONS */
 /********************************************************/
 export const locations = [
-  "ALEX/C",
-  "ALEX/J",
-  "LAFY/C",
-  "LAFY/J",
-  "LKCH/J",
-  "MONR/J",
-  "SHVT/C",
-  "SHVT/J"
+    "ALEX/C",
+    "ALEX/J",
+    "LAFY/C",
+    "LAFY/J",
+    "LKCH/J",
+    "MONR/J",
+    "SHVT/C",
+    "SHVT/J",
+    "ALL/C",
+    "ALL/J"
 ];
 
 /********************************************************/
