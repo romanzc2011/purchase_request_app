@@ -88,7 +88,13 @@ class PDFService:
         
         # Fetch the flattened approval rows, and final approve data with timestamps
         rows = await dbas.fetch_flat_approvals(db, ID=ID)
-        final_approved, final_approved_at = await dbas.get_final_approved_by_id(db, ID)
+        final_approved_result = await dbas.get_final_approved_by_id(db, ID)
+        if final_approved_result:
+            final_approved = final_approved_result[0]
+            final_approved_at = final_approved_result[1]
+        else:
+            final_approved = None
+            final_approved_at = None
             
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Only run if this is from the download pdf signal
@@ -196,7 +202,7 @@ class PDFService:
             order_type=order_type,
             contracting_officer=contracting_officer,
             download_tracker=download_tracker,
-            final_approved=format_username(final_approved),
+            final_approved=format_username(final_approved) if final_approved else None,
             final_approved_at=final_approved_at,
         )
         
@@ -417,9 +423,10 @@ class PDFService:
             cell_style
         )
         
-        
-        
-        
+        legal_10_percent_para = Paragraph(
+            '<font name="Play">*This statement of need approved with a 10% or $100 allowance, whichever is lower, for any additional cost over the estimated amount.</font>',
+            cell_style
+        )
         elements.append(cyber_para)
         elements.append(Spacer(1, 6))
         
@@ -457,29 +464,10 @@ class PDFService:
         ]))
         elements.append(total_table)
         
-        # Legal 10% paragraph
-        legal_10_percent_para = Paragraph(
-            '<font name="Play">*This statement of need approved with a 10% or $100 allowance, whichever is lower, for any additional cost over the estimated amount.</font>',
-            cell_style
-        )
-        legal_table = Table(
-            [[Paragraph(legal_10_percent_para, cell_style)]],
-            colWidths=[doc.width],
-            repeatRows=1
-        )
-        
-        legal_table.setStyle(TableStyle([
-            ("LEFTPADDING",  (0,0), (-1,-1), 0),
-            ("RIGHTPADDING", (0,0), (-1,-1), 0),
-            ("TOPPADDING",   (0,0), (-1,-1), 2),
-            ("BOTTOMPADDING",(0,0), (-1,-1), 2),
-        ]))
-        elements.append(legal_table)
-        elements.append(Spacer(1, 6))
-        
-        #elements.append(Spacer(1, 6))
-
         # Build document
         doc.build(elements, onFirstPage=draw_header, onLaterPages=draw_header)
+        
+        # Note: Progress tracking is handled in the main async method, not in this thread-based method
+        
         return output_path
         

@@ -134,6 +134,7 @@ class PurchaseRequestLineItem(Base):
     fund                   : Mapped[str] = mapped_column(String)
     quantity               : Mapped[int] = mapped_column(Integer)
     priceEach              : Mapped[float] = mapped_column(Float)
+    originalPriceEach      : Mapped[float] = mapped_column(Float)
     totalPrice             : Mapped[float] = mapped_column(Float)
     location               : Mapped[str] = mapped_column(String)
     isCyberSecRelated      : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)

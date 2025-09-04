@@ -165,7 +165,7 @@ async def download_statement_of_need_form(
     This endpoint is used to download the statement of need form for a given ID.
     """
     #!-PROGRESS TRACKING --------------------------------------------------------------
-    await sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
+    sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
     logger.debug("PROGRESS BAR: START TOAST EMITTED")
     
     download_tracker = create_download_tracker()
@@ -448,6 +448,7 @@ async def send_purchase_request(
                 fund=item.fund,
                 quantity=item.quantity,
                 priceEach=item.price_each,
+                originalPriceEach=item.price_each,
                 totalPrice=item.total_price,
                 location=item.location,
                 isCyberSecRelated=item.is_cyber_sec_related,
@@ -1338,10 +1339,23 @@ async def update_prices(
     logger.info(f"Updating prices for purchase request ID: {payload.purchase_request_id} and item UUID: {payload.item_uuid}")
     logger.debug(f"Payload: {payload}")
     
+    # Grab original price each for item uuid
+    stmt = select(
+        PurchaseRequestLineItem.originalPriceEach).where(PurchaseRequestLineItem.UUID == payload.item_uuid)
+    result = await db.execute(stmt)
+    originalPriceEach = result.scalar_one_or_none()
+    new_price_each = payload.new_price_each
+    
+    # Calculate 10% and $100 allowances
+    price_allowance_ok = False
+    
+    # Allowance is ok if new price each is less than or equal to original price each + 10% or $100
+    allowed_increase = min(originalPriceEach * 0.1, 100)
+    price_allowance_ok = (new_price_each - originalPriceEach) <= allowed_increase
+    
     # Only allow updating prices for NEW_REQUEST or PENDING_APPROVAL statuses, not APPROVED or DENIED
-    if ((payload.status is ItemStatus.NEW_REQUEST or payload.status is ItemStatus.PENDING_APPROVAL) 
-        and (payload.status is not ItemStatus.APPROVED and payload.status is not ItemStatus.DENIED)
-    ):
+    if (payload.status is not ItemStatus.DENIED) and price_allowance_ok:
+        logger.info(f"payload: {payload}")
         stmt = (update(PurchaseRequestLineItem)
                 .where(PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id)
                 .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
