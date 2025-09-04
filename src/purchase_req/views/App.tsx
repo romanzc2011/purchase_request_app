@@ -14,6 +14,7 @@ import ApprovalPageMain from "../components/approval_table/containers/ApprovalPa
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
+import { setupSocketProgressBridge } from "../utils/realtime/sioProgressBridge";
 
 
 interface AppProps {
@@ -24,6 +25,9 @@ interface AppProps {
 }
 
 function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
+    useEffect(() => {
+        setupSocketProgressBridge();
+    }, []);
 
     // Bring custom hook for purchase form
     const { createNewID } = usePurchaseForm();
@@ -112,8 +116,6 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                 pauseOnHover
                 theme="dark"
             />
-
-            {<ProgressBar />}
 
             {/* Sidebar Navigation */}
             {/* Layout component has the sidebar/header/main content */}
