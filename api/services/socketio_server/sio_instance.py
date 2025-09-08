@@ -9,6 +9,7 @@ allowed = [
 sio = socketio.AsyncServer(
     async_mode="asgi",
     cors_allowed_origins="*",           # TEMP: prove connectivity
+    transports=["polling"],
     logger=True,
     engineio_logger=True,
     ping_interval=25,

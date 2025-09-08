@@ -87,7 +87,7 @@ app = FastAPI(title="PRAS API")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://10.222.49.26:5002", "http://localhost:5002", "http://127.0.0.1:5002", "http://10.234.198.113:5002"],  # Your frontend domain
+    allow_origins=["https://10.222.49.26:5002", "http://localhost:5002", "http://127.0.0.1:5002", "https://10.234.198.113:5002", "https://LAWB-SHCOL-7920.adu.dcn:5002"],  # Your frontend domain
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
