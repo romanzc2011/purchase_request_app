@@ -63,6 +63,8 @@ from api.services.db_service import utc_now_truncated
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
 from api.services.socketio_server.sio_instance import sio
+from api.services.socketio_server.sio_events import sio
+import api.services.socketio_server.sio_events as sio_events
 import time
 
 # Database ORM Model Imports
@@ -298,10 +300,10 @@ async def generate_pdf(
 @api_router.post("/sendToPurchaseReq", response_model=PurchaseResponse)
 async def send_purchase_request(
     payload_json: str = Form(..., description="JSON payload as string"),
-    files: Optional[List[UploadFile]] = File(None, description="Multiple files"),
     current_user: LDAPUser = Depends(auth_service.get_current_user),
     db: AsyncSession = Depends(get_async_session)
 ):
+    logger.debug(f"PAYLOAD JSON: {payload_json}")
     
     #! PROGRESS TRACKING ---------------------------------------------------------
     sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
@@ -319,13 +321,15 @@ async def send_purchase_request(
       - Ensures the user is active via the LDAPUser we got from the token
       - Commits the request, tagging line items with current_user.username
     """
+    
     try:
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
         submit_request_tracker.mark_step_done(SubmitRequestStepName.PAYLOAD_VALIDATED)
-        
+    
     except ValidationError as e:
         error_details = e.errors()
         logger.error("PurchaseRequestPayload validation errors: %s", error_details)
+        logger.error("Raw payload_json: %s", payload_json)  # Add this line
         # Return them to the client so you know exactly what's wrong:
         return JSONResponse(
             status_code=422,
@@ -428,7 +432,7 @@ async def send_purchase_request(
         uploaded_files: List[str] = []
         
         # Handle case where no files are provided
-        files_list = files or []
+        files_list = []
         
         #?#################################################################################
         #? INSERTING THE LINE ITEMS TO DB
@@ -462,28 +466,31 @@ async def send_purchase_request(
             submit_request_tracker.mark_step_done(SubmitRequestStepName.LINE_ITEMS_INSERTED)
             #!-----------------------------------------------------------------------------
             
-            #?#################################################################################
-            #? UPLOADING FILES IF USER ADDED ANY
-            #?#################################################################################
-            # Save uploaded file if exists
-            if file and file.filename:
-                upload_dir = Path("uploads")
-                upload_dir.mkdir(exist_ok=True)
+            # #?#################################################################################
+            # #? UPLOADING FILES IF USER ADDED ANY
+            # #?#################################################################################
+            # # Save uploaded file if exists
+            # if file and file.filename:
+            #     upload_dir = Path("uploads")
+            #     upload_dir.mkdir(exist_ok=True)
                 
-                filename = f"{orm_pr_line_item.UUID}_{file.filename}"
-                full_path = upload_dir / filename
+            #     filename = f"{orm_pr_line_item.UUID}_{file.filename}"
+            #     logger.debug(f"FILENAME: {filename}")
+            #     full_path = upload_dir / filename
+            #     logger.debug(f"FULL PATH: {full_path}")
                 
-                with open(full_path, "wb") as f:
-                    f.write(await file.read())
+            #     with open(full_path, "wb") as f:
+            #         f.write(await file.read())
+            #     logger.debug(f"FILE WRITTEN")
                     
-                # Save file path to table in ORM model
-                orm_pr_line_item.uploaded_file_path = str(full_path.resolve())
-                uploaded_files.append(str(full_path.resolve()))
+            #     # Save file path to table in ORM model
+            #     orm_pr_line_item.uploaded_file_path = str(full_path.resolve())
+            #     uploaded_files.append(str(full_path.resolve()))
+            #     logger.debug(f"UPLOADED FILES: {uploaded_files}")
+            # # UUID tracking
+            # pr_line_item_uuids.append(orm_pr_line_item.UUID)
+            # submit_request_tracker.mark_step_done(SubmitRequestStepName.FILES_UPLOADED)
             
-            # UUID tracking
-            pr_line_item_uuids.append(orm_pr_line_item.UUID)
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.FILES_UPLOADED)
-
         #?#################################################################################
         #? SETTING THE CONTRACTING OFFICER
         #?#################################################################################
@@ -1373,8 +1380,11 @@ async def update_prices(
 ##########################################################################
 ## HANDLE FILE UPLOAD
 ##########################################################################
-@api_router.post("/upload_file")
-async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current_user: LDAPUser = Depends(auth_service.get_current_user)):
+@api_router.post("/uploadFile")
+async def upload_file(
+    ID: str = Form(...), 
+    file: UploadFile = File(...), 
+    current_user: LDAPUser = Depends(auth_service.get_current_user)):
     # Ensure the upload directory exists
     if not os.path.exists(settings.UPLOAD_FOLDER):
         os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
@@ -1400,42 +1410,6 @@ async def upload_file(ID: str = Form(...), file: UploadFile = File(...), current
 # REGISTER ROUTES -- routes must be above this to be visible
 ##########################################################################
 app.include_router(api_router)
-
-# ##########################################################################
-# ## WEBSOCKET ENDPOINTS - keep track of progress of purchase request
-# ##########################################################################
-# @app.websocket("/communicate")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websock_conn.connect(websocket)
-#     try:
-#         while True:
-#             incoming_data = await websocket.receive_text()
-#             logger.success(f"RECV data: {incoming_data}")
-            
-#             # Convert to json, if reset_data then reset shm, percent everything
-#             try:
-#                 message = json.loads(incoming_data)
-#                 if message.get("event") == "reset_data":
-#                     # reset shm
-#                     logger.info("Progress state cleared via WebSocket reset")
-#                 elif message.get("event") == "check_connection":
-#                     # Send connection status back
-#                     await websocket.send_json({
-#                         "event": "connection_status",
-#                         "connected": True,
-#                         "timestamp": asyncio.get_event_loop().time()
-#                     })
-#                 elif message.get("event") == "clear_stale_state":
-#                     # Clear stale progress state
-#                     await websocket.send_json({
-#                         "event": "state_cleared",
-#                         "timestamp": asyncio.get_event_loop().time()
-#                     })
-#             except json.JSONDecodeError:
-#                 logger.error("Received non-JSON data")
-#     except WebSocketDisconnect:
-#         await websock_conn.disconnect(websocket)
-
 
 ##########################################################################
 ## DELETE PURCHASE REQUEST table, condition, params

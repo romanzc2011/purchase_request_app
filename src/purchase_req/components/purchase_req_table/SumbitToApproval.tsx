@@ -88,16 +88,50 @@ function SubmitApprovalTable({
     effect(() => {
         if (isSubmittedSig.value) {
             setDataBuffer([]);
-            // Don't reset immediately - let the progress bar handle it
-            // isSubmittedSig.value = false;
         }
     });
+
+    /************************************************************************************ */
+    /* FILE UPLOAD */
+    /************************************************************************************ */
+    const handleFileUpload = async (ID: string) => {
+        // Check if there are any files to attach
+        const formFileData = new FormData();
+        formFileData.append("ID", ID);
+
+        fileInfo.forEach(file => {
+            if (file.file && file.status === "ready") {
+                formFileData.append("file", file.file);
+            }
+        });
+
+        // Debug: Log what we're sending
+        console.log("File upload FormData contents:");
+        for (let [key, value] of formFileData.entries()) {
+            console.log(key, value);
+        }
+
+        try {
+            const fileUploadRequest = await fetch(computeHTTPURL("/api/uploadFile"), {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                },
+                body: formFileData
+            });
+
+            if (!fileUploadRequest.ok) {
+                throw new Error(`HTTP error! status: ${fileUploadRequest.status}`);
+            }
+        } catch (error) {
+            console.error("Error submitting data:", error);
+        }
+    }
 
     /************************************************************************************ */
     /* SUBMIT DATA --- send to backend to add to database */
     /************************************************************************************ */
     const handleSubmitData = async (processedData: FormValues[]) => {
-
         try {
             // Get a proper ID from the backend
             const idRequest = await fetch(computeHTTPURL("/api/createNewID"), {
@@ -147,12 +181,6 @@ function SubmitApprovalTable({
                 location: item.location,
                 budgetObjCode: String(item.budgetObjCode).padStart(4, '0'),
                 status: ItemStatus.NEW_REQUEST,
-                fileAttachments: fileInfo.map(file => ({
-                    name: file.name,
-                    file: file.file,
-                    type: file.file?.type || '',
-                    size: file.file?.size || 0
-                }))
             }));
 
             // Create a single object with the requester and items
@@ -162,15 +190,10 @@ function SubmitApprovalTable({
                 itemCount: itemCount
             };
 
+            console.log("requestData", requestData);
+
             const formData = new FormData();
             formData.append("payload_json", JSON.stringify(requestData));
-
-            // Attach files from fileInfo
-            fileInfo.forEach(file => {
-                if (file.file && file.status === "ready") {
-                    formData.append("files", file.file);
-                }
-            });
 
             // Send the data to the backend
             const response = await fetch(API_URL, {
@@ -194,6 +217,11 @@ function SubmitApprovalTable({
                 setID(requestId);
             }
 
+            // Upload files if any exist
+            // if (fileInfo.length > 0) {
+            //     await handleFileUpload(requestId);
+            // }
+
         } catch (error) {
             console.error("Error submitting data:", error);
         }
@@ -213,15 +241,15 @@ function SubmitApprovalTable({
             <Table sx={{
                 width: "100%",
                 tableLayout: "auto",
-                fontFamily: "'Play', sans-serif !important",
+                fontFamily: "Tahoma !important",
             }}>
                 <TableHead
                     sx={{
                         ...tableHeaderStyles,
-                        fontFamily: "'Play', sans-serif !important"
+                        fontFamily: "Tahoma !important"
                     }}
                 >
-                    <TableRow sx={{ fontFamily: "'Play', sans-serif !important", fontSize: "1.1rem" }}>
+                    <TableRow sx={{ fontFamily: "Tahoma !important", fontSize: "1.1rem" }}>
                         <TableCell sx={{ width: 40 }} /> {/* expand/collapse */}
                         <TableCell>ID</TableCell>
                         <TableCell>Budget Object Code</TableCell>
@@ -255,42 +283,42 @@ function SubmitApprovalTable({
                                 </TableCell>
                                 <TableCell sx={{
                                     color: "white",
-                                    fontFamily: "'Play', sans-serif !important",
+                                    fontFamily: "Tahoma !important",
                                     fontSize: "1rem"
                                 }}>
                                     {items[0].ID}
                                 </TableCell>
                                 <TableCell sx={{
                                     color: "white",
-                                    fontFamily: "'Play', sans-serif !important",
+                                    fontFamily: "Tahoma !important",
                                     fontSize: "1rem"
                                 }}>
                                     {items[0].budgetObjCode}
                                 </TableCell>
                                 <TableCell sx={{
                                     color: "white",
-                                    fontFamily: "'Play', sans-serif !important",
+                                    fontFamily: "Tahoma !important",
                                     fontSize: "1rem"
                                 }}>
                                     {items[0].fund}
                                 </TableCell>
                                 <TableCell sx={{
                                     color: "white",
-                                    fontFamily: "'Play', sans-serif !important",
+                                    fontFamily: "Tahoma !important",
                                     fontSize: "1rem"
                                 }}>
                                     {items[0].location}
                                 </TableCell>
                                 <TableCell sx={{
                                     color: "white",
-                                    fontFamily: "'Play', sans-serif !important",
+                                    fontFamily: "Tahoma !important",
                                     fontSize: "1rem"
                                 }}>
                                     {items[0].quantity}
                                 </TableCell>
                                 <TableCell sx={{
                                     color: "white",
-                                    fontFamily: "'Play', sans-serif !important",
+                                    fontFamily: "Tahoma !important",
                                     fontSize: "1rem"
                                 }}>
                                     {typeof items[0].priceEach === "number"
@@ -299,7 +327,7 @@ function SubmitApprovalTable({
                                 </TableCell>
                                 <TableCell sx={{
                                     color: "white",
-                                    fontFamily: "'Play', sans-serif !important",
+                                    fontFamily: "Tahoma !important",
                                     fontSize: "1rem"
                                 }}>
                                     {calculatePrice(items[0]).toFixed(2)}
@@ -365,42 +393,42 @@ function SubmitApprovalTable({
                                                             <TableRow key={idx}>
                                                                 <TableCell sx={{
                                                                     color: "white",
-                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontFamily: "Tahoma !important",
                                                                     fontSize: "1rem"
                                                                 }}>
                                                                     {item.ID}
                                                                 </TableCell>
                                                                 <TableCell sx={{
                                                                     color: "white",
-                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontFamily: "Tahoma !important",
                                                                     fontSize: "1rem"
                                                                 }}>
                                                                     {item.budgetObjCode}
                                                                 </TableCell>
                                                                 <TableCell sx={{
                                                                     color: "white",
-                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontFamily: "Tahoma !important",
                                                                     fontSize: "1rem"
                                                                 }}>
                                                                     {item.fund}
                                                                 </TableCell>
                                                                 <TableCell sx={{
                                                                     color: "white",
-                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontFamily: "Tahoma !important",
                                                                     fontSize: "1rem"
                                                                 }}>
                                                                     {item.location}
                                                                 </TableCell>
                                                                 <TableCell sx={{
                                                                     color: "white",
-                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontFamily: "Tahoma !important",
                                                                     fontSize: "1rem"
                                                                 }}>
                                                                     {item.quantity}
                                                                 </TableCell>
                                                                 <TableCell sx={{
                                                                     color: "white",
-                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontFamily: "Tahoma !important",
                                                                     fontSize: "1rem"
                                                                 }}>
                                                                     {typeof item.priceEach === "number"
@@ -409,7 +437,7 @@ function SubmitApprovalTable({
                                                                 </TableCell>
                                                                 <TableCell sx={{
                                                                     color: "white",
-                                                                    fontFamily: "'Play', sans-serif !important",
+                                                                    fontFamily: "Tahoma !important",
                                                                     fontSize: "1rem"
                                                                 }}>
                                                                     {calculatePrice(item).toFixed(2)}
@@ -431,21 +459,7 @@ function SubmitApprovalTable({
                 <TableBody>
                     <TableRow>
                         <TableCell colSpan={6}>
-                            {/* Display current files */}
-                            {fileInfo.length > 0 && (
-                                <Box sx={{ mb: 2 }}>
-                                    <Typography variant="subtitle2" sx={{ color: "white" }}>
-                                        Attached Files:
-                                    </Typography>
-                                    <ul style={{ color: "white", listStyle: "none", padding: 0 }}>
-                                        {fileInfo.map((file, index) => (
-                                            <li key={index}>
-                                                {file.name} - {file.status}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </Box>
-                            )}
+
 
                             {/************************************************************************************ */}
                             {/* BUTTONS: SUBMIT */}
@@ -455,9 +469,9 @@ function SubmitApprovalTable({
                                 label="Submit Form"
                                 className="me-3 btn btn-maroon"
                                 disabled={dataBuffer.length === 0}
-                                onClick={() => {
+                                onClick={async () => {
                                     isRequestSubmitted.value = true;
-                                    handleSubmitData(processedData);
+                                    await handleSubmitData(processedData);
                                     isSubmittedSig.value = true;
                                     setFileInfo([]);
                                 }}
@@ -476,7 +490,7 @@ function SubmitApprovalTable({
                                 color: "#16fdda",
                                 textAlign: "left",
                                 fontSize: "1.15rem",
-                                fontFamily: "'Play', sans-serif !important"
+                                fontFamily: "Tahoma !important"
                             }}
                         >
                             Total: $

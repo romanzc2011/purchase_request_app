@@ -10,7 +10,6 @@ export function computeHTTPURL(path: string) {
     const proto = window.location.protocol;
     const host = window.location.host;
     const p = path.startsWith("/") ? path : `/${path}`;
-    console.log("🔌 COMPUTE HTTP URL", `${proto}//${host}${p}`);
     return `${proto}//${host}${p}`;
 }
 

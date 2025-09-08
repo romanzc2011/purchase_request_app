@@ -275,7 +275,7 @@ function AddItemsForm({
                                 variant="button"
                                 component="label"
                                 htmlFor="requester"
-                                sx={{ fontFamily: "Play" }}
+                                sx={{ fontFamily: "Tahoma" }}
                             >
                                 <strong>Requester</strong>
                             </Typography>
@@ -344,86 +344,6 @@ function AddItemsForm({
                         </Grid>
                     </Grid>
 
-                    {/*************************************************************************************** */}
-                    {/** DATE ITEMS NEEDED ****************************************************************** */}
-                    {/*************************************************************************************** */}
-                    <Grid container spacing={1} className="row" sx={{ mt: 2 }}>
-                        {/* Label: Date Items Needed */}
-                        <Grid size={{ xs: 2 }}>
-                            <Typography
-                                variant="button"
-                                component="label"
-                                htmlFor="dateneed"
-                                sx={{ whiteSpace: "nowrap" }}
-                            >
-                                <strong>Date Item(s) Needed</strong>
-                            </Typography>
-                        </Grid>
-
-                        {/* Date Picker Input */}
-                        <Grid size={{ xs: "auto" }} mr={4}>
-                            <input
-                                id="dateneed"
-                                type="date"
-                                style={{ width: "150px" }}
-                                className="form-control"
-                                {...register("dateneed")}
-                            />
-                        </Grid>
-
-                        {/* OR Label */}
-                        <Grid size={{ xs: "auto" }}>
-                            <strong>OR</strong>
-                        </Grid>
-
-                        {/* Quarterly Order Option */}
-                        <Grid size={{ xs: "auto" }} mr={4}>
-                            <label
-                                htmlFor="quarterlyOrder"
-                                style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
-                            >
-                                <input
-                                    id="quarterlyOrder"
-                                    type="radio"
-                                    value="QUARTERLY_ORDER"
-                                    {...register("orderType", {
-                                        onChange: () => {
-                                            trigger("dateneed");
-                                        }
-                                    })}
-                                    style={{ marginRight: "5px" }}
-                                />
-                                Inclusion w/quarterly office supply order
-                            </label>
-                        </Grid>
-
-                        {/* OR Label */}
-                        <Grid size={{ xs: "auto" }}>
-                            <strong>OR</strong>
-                        </Grid>
-
-                        {/* No Rush Option */}
-                        <Grid size={{ xs: 3 }}>
-                            <label
-                                htmlFor="noRush"
-                                style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
-                            >
-                                <input
-                                    id="noRush"
-                                    type="radio"
-                                    value="NO_RUSH"
-                                    {...register("orderType", {
-                                        onChange: () => {
-                                            trigger("dateneed");
-                                        }
-                                    })}
-                                    style={{ marginRight: "5px" }}
-                                />
-                                No Rush
-                            </label>
-                        </Grid>
-                    </Grid>
-
                     {/* Error message for Date Needed validation */}
                     <Grid size={{ xs: 12 }}>
                         <p className="error">{errors.dateneed?.message}</p>
@@ -448,51 +368,6 @@ function AddItemsForm({
                         }}
                     />
                     <hr />
-
-                    {/******************************************************************************************* */}
-                    {/** FILE ATTACHMENTS *********************************************************************** */}
-                    {/******************************************************************************************* */}
-                    <Grid container sx={{ mt: 4 }}>
-                        {/* Left Side - Label and Description */}
-                        <Grid size={{ xs: 3 }}>
-                            <Typography
-                                variant="button"
-                                component="label"
-                                htmlFor="fileAttachments"
-                            >
-                                <strong>Attachments included?</strong>
-                            </Typography>
-                            <Typography
-                                variant="button"
-                                component="label"
-                                htmlFor="fileAttachments"
-                                sx={{ fontSize: "12px", mt: 0.5 }}
-                            ></Typography>
-
-                            <Tooltip
-                                title="Training information, pictures, web pages, screen shots, etc."
-                                arrow
-                            >
-                                <InfoIcon
-                                    sx={{
-                                        fontSize: "16px",
-                                        ml: 1,
-                                        verticalAlign: "middle",
-                                    }}
-                                />
-                            </Tooltip>
-                        </Grid>
-
-                        {/* Right Side - File Upload Component */}
-                        <Grid size={{ xs: "auto" }} sx={{ ml: 2 }}>
-                            <FileUpload
-                                ID={ID}
-                                isSubmitted={isSubmitted}
-                                fileInfo={fileInfo}
-                                setFileInfo={setFileInfo}
-                            />
-                        </Grid>
-                    </Grid>
 
                     {/******************************************************************************************* */}
                     {/** ITEM DESCRIPTION *********************************************************************** */}

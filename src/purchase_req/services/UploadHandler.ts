@@ -29,7 +29,7 @@ async function UploadFile({ file, ID, setFileInfo }: UploadFileProps) {
             file: file.file,
             ID,
             dataBuffer: [],
-            api_call: "/api/upload",
+            api_call: "/api/upload_file",
         });
 
         if (response && response.status === 200) {

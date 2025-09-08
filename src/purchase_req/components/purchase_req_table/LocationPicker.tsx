@@ -49,13 +49,13 @@ const LocationFilter = ({
                             }}
                             sx={{
                                 "& .MuiSelect-select": {
-                                    fontFamily: "Play",
+                                    fontFamily: "Tahoma",
                                     fontWeight: "bold",
                                 }
                             }}
                         >
                             {locations.map((option, index) => (
-                                <MenuItem key={index} value={option} sx={{ fontFamily: "Play", fontWeight: "bold" }}>
+                                <MenuItem key={index} value={option} sx={{ fontFamily: "Tahoma", fontWeight: "bold" }}>
                                     {option}
                                 </MenuItem>
                             ))}

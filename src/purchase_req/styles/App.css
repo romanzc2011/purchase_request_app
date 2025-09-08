@@ -3,7 +3,7 @@
   background-color: maroon;
   color: white;
   border-color: maroon;
-  font-family: 'Play', sans-serif !important;
+  font-family: Tahoma, sans-serif !important;
 }
 
 /* Main Content Area */
@@ -46,7 +46,7 @@
 /* Background and Font Styling */
 body {
   background-color: #212528;
-  font-family: 'Play', sans-serif;
+  font-family: Tahoma, sans-serif;
   color: white;
 }
 
@@ -61,6 +61,6 @@ body {
 }
 
 * {
-  font-family: 'Play', sans-serif;
+  font-family: Tahoma, sans-serif;
 }
 

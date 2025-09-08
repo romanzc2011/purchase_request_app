@@ -88,7 +88,7 @@ const BudgetCodePicker = ({
                                             key={option.value}
                                             disableSticky
                                             sx={{
-                                                fontFamily: "Play",
+                                                fontFamily: "Tahoma",
                                                 fontWeight: "bold", color: "blue"
                                             }}
                                         >
