@@ -2,7 +2,7 @@ from api.schemas.ldap_schema import LDAPUser
 from api.utils.misc_utils import format_username
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
-from api.schemas.enums import AssignedGroup, CueClerk, LDAPGroup
+from api.schemas.enums import AssignedGroup, CueClerk, LDAPGroup, is_test_user_active
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,14 +70,14 @@ class ApproverPolicy:
         row = result.first()
         return bool(row and row.deputy_can_approve)
     
-    async def _is_test_user_active(self, db: AsyncSession) -> bool:
-        stmt = select(dbas.WorkflowUser.active).where(
-            dbas.WorkflowUser.username == CueClerk.TEST_USER.value
-        )
-        result = await db.execute(stmt)
-        row = result.first()
-        #return format_username(self.username) == CueClerk.TEST_USER.value and bool(row and row.active)
-        return False # TESTING
+    # async def _is_test_user_active(self, db: AsyncSession) -> bool:
+    #     stmt = select(dbas.WorkflowUser.active).where(
+    #         dbas.WorkflowUser.username == CueClerk.TEST_USER.value
+    #     )
+    #     result = await db.execute(stmt)
+    #     row = result.first()
+    #     #return format_username(self.username) == CueClerk.TEST_USER.value and bool(row and row.active)
+    #     return False # TESTING
     
     # ----------------------------------------------------------------------------------    
     # MANAGEMENT HANDLER APPROVAL LOGIC (LELA, EDMUND)
@@ -127,7 +127,7 @@ class ApproverPolicy:
             return True
         
         # Test user override, must be active
-        if (await self._is_test_user_active(db) and format_username(self.username) == CueClerk.TEST_USER.value):
+        if (is_test_user_active(format_username(self.username))):
             logger.success("TEST USER active")
             return True
         

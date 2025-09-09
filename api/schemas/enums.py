@@ -48,3 +48,8 @@ class CueClerk(Enum):
     CHIEF_CLERK = "edwardtakara"
     MANAGER = "lelarobichaux"
     TEST_USER = "romancampbell"
+    
+TEST_USER_ACTIVE = False
+
+def is_test_user_active(username: str) -> bool:
+    return username == CueClerk.TEST_USER.value and TEST_USER_ACTIVE

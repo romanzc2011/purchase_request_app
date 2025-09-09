@@ -307,7 +307,7 @@ async def send_purchase_request(
     logger.debug(f"PAYLOAD JSON: {payload_json}")
     
     #! PROGRESS TRACKING ---------------------------------------------------------
-    sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
+    await sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
     logger.debug("PROGRESS BAR: START TOAST EMITTED")
     
     submit_request_tracker = create_submit_request_tracker()
@@ -407,6 +407,26 @@ async def send_purchase_request(
         ##################################################################################
         logger.debug(f"PURCHASE REQUEST ID: {purchase_req_id}")
         
+        # Check if IRQ1_ID already exists (if provided)
+        if payload.irq1_id:
+            # Check PurchaseRequestHeader table
+            existing_pr_stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.IRQ1_ID == payload.irq1_id)
+            existing_pr_result = await db.execute(existing_pr_stmt)
+            existing_pr = existing_pr_result.scalar_one_or_none()
+            
+            if existing_pr and existing_pr.ID != purchase_req_id:
+                logger.warning(f"IRQ1_ID {payload.irq1_id} already exists for purchase request {existing_pr.ID}")
+                raise HTTPException(status_code=409, detail=f"IRQ1_ID {payload.irq1_id} is already assigned to purchase request {existing_pr.ID}")
+            
+            # Check Approval table
+            existing_approval_stmt = select(Approval).where(Approval.IRQ1_ID == payload.irq1_id)
+            existing_approval_result = await db.execute(existing_approval_stmt)
+            existing_approval = existing_approval_result.scalar_one_or_none()
+            
+            if existing_approval and existing_approval.purchase_request_id != purchase_req_id:
+                logger.warning(f"IRQ1_ID {payload.irq1_id} already exists in approvals for purchase request {existing_approval.purchase_request_id}")
+                raise HTTPException(status_code=409, detail=f"IRQ1_ID {payload.irq1_id} is already assigned to purchase request {existing_approval.purchase_request_id}")
+
         # Update Header table with rest of data
         stmt = (
 			update(PurchaseRequestHeader)
@@ -831,22 +851,34 @@ async def assign_IRQ1_ID(
     logger.info(f"Assigning requisition ID: {data.get('IRQ1_ID')}")
     user = format_username(current_user.username)
     
-    # Only lela or TEST USER can assign RQ1 IDs
-    if (user == CueClerk.MANAGER.value and current_user.has_group(LDAPGroup.CUE_GROUP.value)) \
-       or user == CueClerk.TEST_USER.value:
-        logger.debug("AUTHORIZATION SUCCESSFUL")
-        pass
-    else:
-        logger.debug("AUTHORIZATION FAILED")
-        await sio.emit("error", {"event": "error", 
-                                      "status_code": "403",
-                                      "message": "You are not authorized to assign requisition IDs"})
-        raise HTTPException(status_code=403, detail="You are not authorized to assign requisition IDs")
+    try:
+        # Only lela or TEST USER can assign RQ1 IDs
+        if (user == CueClerk.MANAGER.value and current_user.has_group(LDAPGroup.CUE_GROUP.value)) \
+        or user == CueClerk.TEST_USER.value: # TODO: REMOVE TEST USER FOR PROD
+            logger.debug("AUTHORIZATION SUCCESSFUL")
+            pass
+        else:
+            logger.debug("AUTHORIZATION FAILED")
+            await sio.emit("ERROR", {"event": "ERROR", 
+                                        "status_code": "403",
+                                        "message": "You are not authorized to assign requisition IDs"})
+            raise HTTPException(status_code=403, detail="You are not authorized to assign requisition IDs")
+    except Exception as e:
+        logger.error(f"Error assigning requisition ID: {e}")
+        # Send error to frontend
+        await sio.emit("ERROR", {"event": "ERROR", 
+                                    "status_code": "500",
+                                    "message": f"Error assigning requisition ID: {e}"})
+        raise HTTPException(status_code=500, detail=f"Error assigning requisition ID: {e}")
     
     # Get the original ID from the request
     irq1_id = data.get('IRQ1_ID')
     original_id = data.get('ID')
     if not original_id or not irq1_id:
+        # Send error to frontend
+        await sio.emit("ERROR", {"event": "ERROR", 
+                                    "status_code": "400",
+                                    "message": "Missing ID in request"})
         raise HTTPException(status_code=400, detail="Missing ID in request")
     
     # Verify PurchaseRequestHeader exists
@@ -855,18 +887,105 @@ async def assign_IRQ1_ID(
     pr_header = result.scalar_one_or_none()
     
     if not pr_header:
+        # Send error to frontend
+        await sio.emit("ERROR", {"event": "ERROR", 
+                                    "status_code": "400",
+                                    "message": "PurchaseRequestHeader not found"})
         raise HTTPException(status_code=400, detail="PurchaseRequestHeader not found")
     
-    # Update the IRQ1_ID
-    await db.execute(
-        update(PurchaseRequestHeader)
-        .where(PurchaseRequestHeader.ID == original_id)
-        .values(IRQ1_ID=irq1_id)
-    )
-    await db.commit()
-    await db.refresh(pr_header)
+    # Check if IRQ1_ID already exists in PurchaseRequestHeader table
+    existing_pr_stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.IRQ1_ID == irq1_id)
+    existing_pr_result = await db.execute(existing_pr_stmt)
+    existing_pr = existing_pr_result.scalar_one_or_none()
+    
+    if existing_pr and existing_pr.ID != original_id:
+        # Send error to frontend
+        await sio.emit("ERROR", {"event": "ERROR", 
+                                    "status_code": "409",
+                                    "message": f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_pr.ID}"})
+        logger.warning(f"IRQ1_ID {irq1_id} already exists for purchase request {existing_pr.ID}")
+        raise HTTPException(status_code=409, detail=f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_pr.ID}")
+    
+    # Check if IRQ1_ID already exists in Approval table
+    existing_approval_stmt = select(Approval).where(Approval.IRQ1_ID == irq1_id)
+    existing_approval_result = await db.execute(existing_approval_stmt)
+    existing_approval = existing_approval_result.scalar_one_or_none()
+    
+    if existing_approval and existing_approval.purchase_request_id != original_id:
+        # Send error to frontend
+        await sio.emit("ERROR", {"event": "ERROR", 
+                                    "status_code": "409",
+                                    "message": f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_approval.purchase_request_id}"})
+        logger.warning(f"IRQ1_ID {irq1_id} already exists in approvals for purchase request {existing_approval.purchase_request_id}")
+        raise HTTPException(status_code=409, detail=f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_approval.purchase_request_id}")
+    
+    try:
+        # Update the IRQ1_ID
+        await db.execute(
+            update(PurchaseRequestHeader)
+            .where(PurchaseRequestHeader.ID == original_id)
+            .values(IRQ1_ID=irq1_id)
+        )
+        await db.commit()
+        await db.refresh(pr_header)
+        logger.info(f"Successfully assigned IRQ1_ID {irq1_id} to purchase request {original_id}")
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Database error while assigning IRQ1_ID {irq1_id} to {original_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error while assigning IRQ1_ID: {str(e)}")
     
     return {"IRQ1_ID_ASSIGNED": True}
+
+#########################################################################
+## CHECK IRQ1_ID AVAILABILITY
+##########################################################################
+@api_router.get("/checkIRQ1_ID/{irq1_id}")
+async def check_irq1_id_availability(
+    irq1_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    """
+    Check if an IRQ1_ID is available for assignment.
+    Returns information about existing usage if found.
+    """
+    user = format_username(current_user.username)
+    
+    # Only authorized users can check IRQ1_ID availability
+    if not ((user == CueClerk.MANAGER.value and current_user.has_group(LDAPGroup.CUE_GROUP.value)) 
+            or user == CueClerk.TEST_USER.value):
+        raise HTTPException(status_code=403, detail="You are not authorized to check IRQ1_ID availability")
+    
+    # Check PurchaseRequestHeader table
+    pr_stmt = select(PurchaseRequestHeader).where(PurchaseRequestHeader.IRQ1_ID == irq1_id)
+    pr_result = await db.execute(pr_stmt)
+    existing_pr = pr_result.scalar_one_or_none()
+    
+    # Check Approval table
+    approval_stmt = select(Approval).where(Approval.IRQ1_ID == irq1_id)
+    approval_result = await db.execute(approval_stmt)
+    existing_approval = approval_result.scalar_one_or_none()
+    
+    if existing_pr:
+        return {
+            "available": False,
+            "message": f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_pr.ID}",
+            "purchase_request_id": existing_pr.ID,
+            "table": "purchase_request_headers"
+        }
+    
+    if existing_approval:
+        return {
+            "available": False,
+            "message": f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_approval.purchase_request_id}",
+            "purchase_request_id": existing_approval.purchase_request_id,
+            "table": "approvals"
+        }
+    
+    return {
+        "available": True,
+        "message": f"IRQ1_ID {irq1_id} is available for assignment"
+    }
 
 #########################################################################
 ## ASSIGN CONTRACTING OFFICER
@@ -898,6 +1017,10 @@ async def assign_contracting_officer(
         
     except Exception as e:
         logger.error(f"Error assigning CO: {e}")
+        # Send error to frontend
+        await sio.emit("ERROR", {"event": "ERROR", 
+                                    "status_code": "500",
+                                    "message": f"Error assigning CO: {e}"})
         raise HTTPException(status_code=500, detail=f"Error assigning CO: {e}")
     return {"message": "CO assigned successfully"}
 
@@ -928,6 +1051,10 @@ async def deny_request(
         logger.info("REQUEST DENIED")
     except Exception as e:
         logger.error(f"Error denying request: {e}")
+        # Send error to frontend
+        await sio.emit("ERROR", {"event": "ERROR", 
+                                    "status_code": "500",
+                                    "message": f"Error denying request: {e}"})
         raise HTTPException(status_code=500, detail=f"Error denying request: {e}")
 
 ##########################################################################
