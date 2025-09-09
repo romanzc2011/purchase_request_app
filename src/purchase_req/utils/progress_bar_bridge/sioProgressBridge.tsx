@@ -1,4 +1,3 @@
-// realtime/setupSocketProgressBridge.tsx
 import { effect, signal } from "@preact/signals-react";
 import { Socket, io } from "socket.io-client";
 import { Id, toast } from "react-toastify";
@@ -13,7 +12,7 @@ import {
 
 // Create and export a single socket instance you use everywhere
 export const socketioInstance: Socket = io(window.location.origin, {
-    path: "/realtime/communicate",
+    path: "/progress_bar_bridge/communicate",
     transports: ["polling"],
 });
 
@@ -75,6 +74,7 @@ export function setupSocketProgressBridge() {
     };
 
     // --- SERVER EVENTS ---
+    // Starting Toast which is the progress bar to keep up with progress
     const onStartToast = (payload: { percent_complete: number }) => {
         toastId = toast.loading(
             <ProgressToast
@@ -85,6 +85,9 @@ export function setupSocketProgressBridge() {
         );
     };
 
+    /****************************************************************************************/
+    /* PROGRESS BAR */
+    /****************************************************************************************/
     const onProgressUpdate = (payload: { percent_complete: number }) => {
         const percent = payload.percent_complete ?? 0;
 

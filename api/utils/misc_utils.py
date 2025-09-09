@@ -16,6 +16,8 @@ run_in_thread: Runs a function in a thread @decorator.
 # FORMAT USERNAME
 #--------------------------------------------------------------------------------------------------
 def format_username(username: str) -> str:
+    if username is None:
+        return ""
     raw_name = username.lower()
     if "adu\\" in raw_name:
         raw_name = raw_name.replace("adu\\", "")

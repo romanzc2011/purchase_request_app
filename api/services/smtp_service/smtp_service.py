@@ -2,6 +2,7 @@ from email.mime.image import MIMEImage
 import mimetypes
 import os
 import aiosmtplib
+import asyncio
 import json
 
 from loguru import logger
@@ -21,6 +22,8 @@ from api.settings import settings
 import api.services.db_service as dbas
 from api.utils.misc_utils import get_justifications_and_comments
 from api.schemas.enums import AssignedGroup
+from api.services.ipc_status import ipc_status
+from api.services.socketio_server.sio_instance import sio
 
 class SMTP_Service:
     def __init__(

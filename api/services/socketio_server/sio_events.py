@@ -37,3 +37,7 @@ async def user_found(sid, data):
 @sio.on("SIGNAL_RESET")
 async def signal_reset(sid, data):
     logger.debug("socketio: signal_reset", sid)
+    
+@sio.on("EMAIL_SENT")
+async def email_sent(sid, data):
+    logger.debug(f"Email sent, progress is complete if approval === PENDING: {sid}: {data}")

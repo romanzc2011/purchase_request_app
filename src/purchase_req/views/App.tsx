@@ -14,7 +14,7 @@ import ApprovalPageMain from "../components/approval_table/containers/ApprovalPa
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
 import { usePurchaseForm } from "../hooks/usePurchaseForm";
-import { setupSocketProgressBridge } from "../utils/realtime/sioProgressBridge";
+import { setupSocketProgressBridge } from "../utils/progress_bar_bridge/sioProgressBridge";
 
 
 interface AppProps {

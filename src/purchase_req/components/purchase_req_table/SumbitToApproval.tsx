@@ -16,7 +16,7 @@ import {
 import { tableHeaderStyles } from "../../styles/DataGridStyles";
 import { FormValues } from "../../types/formTypes";
 import { IFile } from "../../types/IFile";
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { v4 as uuidv4 } from 'uuid';
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -24,7 +24,6 @@ import { toast } from "react-toastify";
 import { ItemStatus } from "../../types/approvalTypes";
 import { OrderType } from "../../schemas/purchaseSchema";
 import { isRequestSubmitted, isSubmittedSig } from "../../utils/PrasSignals";
-import { effect } from "@preact/signals-react";
 import { computeHTTPURL } from "../../utils/misc_utils";
 
 const API_URL = computeHTTPURL("/api/sendToPurchaseReq");
@@ -85,11 +84,11 @@ function SubmitApprovalTable({
             [id]: !prev[id],
         })), []);
 
-    effect(() => {
+    useEffect(() => {
         if (isSubmittedSig.value) {
             setDataBuffer([]);
         }
-    });
+    }, [isSubmittedSig.value, setDataBuffer]);
 
     /************************************************************************************ */
     /* FILE UPLOAD */

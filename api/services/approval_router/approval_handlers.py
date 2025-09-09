@@ -21,6 +21,7 @@ from api.services.approval_router.approver_policy import ApproverPolicy
 from api.services.smtp_service.email_builder import ApproverEmailBuilder
 from api.services.ldap_service import LDAPService
 from api.utils.misc_utils import reset_signals
+from api.services.ipc_status import ipc_status
 
 
 # Approval Router to determine the routing of requests
@@ -172,11 +173,13 @@ class ManagementHandler(Handler):
                 if request.status is ItemStatus.PENDING_APPROVAL:
                     pending_approved_by = format_username(request.approver)
                     pending_approved_at = dbas.utc_now_truncated()
+                    await ipc_status.update(field="request_pending", value=True)
                 
                 if request.status is ItemStatus.APPROVED:
                     final_approved_by = format_username(request.approver)
                     final_approved_at = dbas.utc_now_truncated()
-                
+                    await ipc_status.update(field="request_approved", value=True)
+                    
                 # Use the insert_final_approval function, this is just a table, its not making it final approved
                 await dbas.insert_final_approval(
                     db=db,
@@ -196,8 +199,9 @@ class ManagementHandler(Handler):
                 logger.debug(f"MANAGEMENT HANDLER: Sending email to clerk admins requesting approval for {request.uuid}")
                 approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
                 email_payload = await approver_email_builder.build_email_payload()
-                await smtp_service.send_approver_email(email_payload, db=db, send_to=AssignedGroup.MANAGEMENT.value)
                 
+                await smtp_service.send_approver_email(email_payload, db=db, send_to=AssignedGroup.MANAGEMENT.value)
+                await ipc_status.update(field="approval_email_sent", value=True)
                 logger.debug(f"MANAGEMENT HANDLER: Inserted final approval for {request.uuid}")
                 
                 # Mark Management approval processed

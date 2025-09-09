@@ -65,6 +65,7 @@ from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
 from api.services.socketio_server.sio_instance import sio
 from api.services.socketio_server.sio_events import sio
 import api.services.socketio_server.sio_events as sio_events
+from api.services.ipc_status import ipc_status
 import time
 
 # Database ORM Model Imports
@@ -98,7 +99,7 @@ app.add_middleware(
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
 # Create socketio server
-app.mount("/realtime", socketio.ASGIApp(sio, app, socketio_path="communicate"))
+app.mount("/progress_bar_bridge", socketio.ASGIApp(sio, app, socketio_path="communicate"))
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -412,7 +413,7 @@ async def send_purchase_request(
 			.where(PurchaseRequestHeader.ID == purchase_req_id)
 			.values(
 				IRQ1_ID=payload.irq1_id,
-				requester=current_user.username,
+				requester=format_username(current_user.username),
 				phoneext=payload.items[0].phoneext,
 				datereq=payload.items[0].datereq,
 				dateneed=payload.items[0].dateneed,
@@ -487,9 +488,9 @@ async def send_purchase_request(
             #     orm_pr_line_item.uploaded_file_path = str(full_path.resolve())
             #     uploaded_files.append(str(full_path.resolve()))
             #     logger.debug(f"UPLOADED FILES: {uploaded_files}")
-            # # UUID tracking
-            # pr_line_item_uuids.append(orm_pr_line_item.UUID)
-            # submit_request_tracker.mark_step_done(SubmitRequestStepName.FILES_UPLOADED)
+            # UUID tracking
+            pr_line_item_uuids.append(orm_pr_line_item.UUID)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.FILES_UPLOADED)
             
         #?#################################################################################
         #? SETTING THE CONTRACTING OFFICER
@@ -516,7 +517,7 @@ async def send_purchase_request(
             appr = Approval(
                 UUID=str(uuid.uuid4()),
                 purchase_request_id=purchase_req_id,
-                requester=payload.requester,
+                requester=format_username(payload.requester),
                 CO=contracting_officer_username,
                 phoneext=item.phoneext,
                 datereq=item.datereq,
@@ -572,6 +573,9 @@ async def send_purchase_request(
             
             # Generate PDF once for the entire purchase request
             logger.info("Generating PDF document")
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
             pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
             
             
@@ -678,6 +682,14 @@ async def send_purchase_request(
 		)
         #!-----------------------------------------------------------------------------------------
     
+    # Broadcast progress after both emails complete
+    percent = submit_request_tracker.calculate_progress()
+    send_data = {
+        "event": "PROGRESS_UPDATE",
+        "percent_complete": percent
+    }
+    await sio.emit("PROGRESS_UPDATE", send_data)
+    
     #! PROGRESS TRACKING ----------------------------------------------------------
     # Mark final steps as done and broadcast final progress
     submit_request_tracker.mark_step_done(SubmitRequestStepName.EMAIL_PAYLOAD_BUILT)
@@ -718,16 +730,6 @@ async def send_socket_data(
         submit_request_tracker.mark_step_done(SubmitRequestStepName.APPROVER_EMAIL_SENT)
     elif step_name == "send_requester_email":
         submit_request_tracker.mark_step_done(SubmitRequestStepName.REQUESTER_EMAIL_SENT)
-    
-    # Calculate progress and broadcast
-    percent = submit_request_tracker.calculate_progress()
-    
-    # Structure send data
-    send_data = {
-		"event": "PROGRESS_UPDATE",
-		"percent_complete": percent
-	}
-    await sio.emit("PROGRESS_UPDATE", send_data)
 
 #########################################################################
 ## LOGGING FUNCTION - for middleware
@@ -827,11 +829,11 @@ async def assign_IRQ1_ID(
     IRQ number that is retrieved from JFIMS by Lela
     """
     logger.info(f"Assigning requisition ID: {data.get('IRQ1_ID')}")
+    user = format_username(current_user.username)
     
-    # Only lela can assign RQ1 IDs
-    if (current_user.has_group(LDAPGroup.CUE_GROUP.value) 
-            and 
-        (format_username(current_user.username) == CueClerk.MANAGER.value)):
+    # Only lela or TEST USER can assign RQ1 IDs
+    if (user == CueClerk.MANAGER.value and current_user.has_group(LDAPGroup.CUE_GROUP.value)) \
+       or user == CueClerk.TEST_USER.value:
         logger.debug("AUTHORIZATION SUCCESSFUL")
         pass
     else:
@@ -1019,9 +1021,7 @@ async def approve_deny_request(
             result = await router.route(approval_request, db, current_user, ldap_service)
             logger.info(f"Result: {result}")
             
-            # Mark final steps as done
-            approval_tracker.mark_step_done(ApprovalStepName.RESULT_OBJECT_BUILT)
-            approval_tracker.mark_step_done(ApprovalStepName.FINAL_RESULTS_RETURNED)
+            logger.debug(f"IPC STATUS: {ipc_status.read()}")
             
             #################################################################################################
             # END CHAIN

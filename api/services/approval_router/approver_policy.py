@@ -76,7 +76,8 @@ class ApproverPolicy:
         )
         result = await db.execute(stmt)
         row = result.first()
-        return format_username(self.username) == CueClerk.TEST_USER.value and bool(row and row.active)
+        #return format_username(self.username) == CueClerk.TEST_USER.value and bool(row and row.active)
+        return False # TESTING
     
     # ----------------------------------------------------------------------------------    
     # MANAGEMENT HANDLER APPROVAL LOGIC (LELA, EDMUND)

@@ -26,67 +26,16 @@ shm_mgr.write(read_shm)
 read_shm = shm_mgr.read()
 """
 
-#-------------------------------------------------------------
-# DOWNLOAD STEPS
-#-------------------------------------------------------------
-class DownloadStepName(Enum):
-    FETCH_APPROVAL_DATA = auto()
-    FETCH_FLAT_APPROVALS = auto()
-    GET_JUSTIFICATIONS_AND_COMMENTS = auto()
-    GET_CONTRACTING_OFFICER_BY_ID = auto()
-    GET_LINE_ITEMS = auto()
-    GET_SON_COMMENTS = auto()
-    GET_ORDER_TYPES = auto()
-    LOAD_PDF_TEMPLATE = auto()
-    MERGE_DATA_INTO_TEMPLATE = auto()
-    RENDER_PDF_BINARY = auto()
-    SAVE_PDF_TO_DISK = auto()
-    VERIFY_FILE_EXISTS = auto()
-    
 @dataclass
-class DownloadStep:
-    step_name: DownloadStepName
-    weight: int
-    done: bool = False
-    download_state: bool = False
-    
-STEPS: List[DownloadStep] = [
-    # DATABASE & DATA FETCHING
-    DownloadStep(DownloadStepName.FETCH_APPROVAL_DATA,             10, False),  # Just a DB fetch (already very fast)
-    DownloadStep(DownloadStepName.FETCH_FLAT_APPROVALS,            10, False),  # Related to above; medium-light work
-    DownloadStep(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS,  5, False),  # Lightweight
-    DownloadStep(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID,    5, False),  # simple lookup
-    DownloadStep(DownloadStepName.GET_LINE_ITEMS,                  10, False),  # multiple rows
-    DownloadStep(DownloadStepName.GET_SON_COMMENTS,                 5, False),  # Lightweight again
-    DownloadStep(DownloadStepName.GET_ORDER_TYPES,                  5, False),  # Very quick small query
+class IPCState:
+    request_pending: bool = False
+    request_approved: bool = False
+    approval_email_sent: bool = False
 
-    # PDF PROCESSING
-    DownloadStep(DownloadStepName.LOAD_PDF_TEMPLATE,                5, False),  # Style and assets load, small
-    DownloadStep(DownloadStepName.MERGE_DATA_INTO_TEMPLATE,        15, False),  # This is a major content-binding step
-    DownloadStep(DownloadStepName.RENDER_PDF_BINARY,               15, False),  # ReportLab rendering can be slow
-    DownloadStep(DownloadStepName.SAVE_PDF_TO_DISK,                 5, False),  # Just file write
-    DownloadStep(DownloadStepName.VERIFY_FILE_EXISTS,               5, False),  # Simple filesystem check
-]
-
-@dataclass
-class ProgressState:
-    id_generated:                bool = False
-    pr_headers_inserted:         bool = False
-    pdf_generated:               bool = False
-    line_items_inserted:         bool = False
-    generate_pdf:                bool = False
-    send_approver_email:         bool = False
-    send_requester_email:        bool = False
-    email_sent_requester:        bool = False
-    email_sent_approver:         bool = False
-    pending_approval_inserted:   bool = False
-
-from api.services.socketio_server.sio_instance import sio
-
-class ProgressSharedMemory:
+class IPCSharedMemory:
     
     def __init__(self, name="shm_progress_state"):
-        self.STRUCT_FMT = '<' + '?' * 10
+        self.STRUCT_FMT = '<' + '?' * 3  # Match IPCState fields: request_pending, request_approved, approval_email_sent
         self.STRUCT_SIZE = struct.calcsize(self.STRUCT_FMT)
         self.value: bool = False
         self._keep_bytes: bool = False
@@ -135,13 +84,13 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     # WRITE
     #-------------------------------------------------------------
-    def write(self, state: ProgressState):
+    def write(self, state: IPCState):
         self.shm.buf[:self.STRUCT_SIZE] = self.to_bytes(state)
         
     #-------------------------------------------------------------
     # READ
     #-------------------------------------------------------------
-    def read(self) -> ProgressState:
+    def read(self) -> IPCState:
         packed_data = bytes(self.shm.buf[:self.STRUCT_SIZE])
         np_array = np.frombuffer(packed_data, dtype=np.uint8)
         return self.from_bytes(np_array)
@@ -161,73 +110,42 @@ class ProgressSharedMemory:
             
             # Convert current_state to dict
             progress_dict = asdict(current_state) 
-            percent = self.calc_progress_percentage()
-            progress_dict["percent_complete"] = percent
-            send_data = percent
-            await sio.emit("PROGRESS_UPDATE", send_data)
+            send_data = progress_dict
+            logger.debug(f"SEND DATA: {send_data}")
         else:
             logger.error(f"Field {field} does not exist")
             
-    #-------------------------------------------------------------
-    # CALC PROGRESS PERCENTAGE
-    #-------------------------------------------------------------
-    def calc_progress_percentage(self) -> float:
-        current_state = self.read()
-        step_count = sum(
-            1 for field in vars(current_state).values()
-            if isinstance(field, bool) and field
-        )
-        percent_complete = (step_count / self.total_steps) * 100
-        return percent_complete
-    
-    #-------------------------------------------------------------
-    # CALC PROGRESS DOWNLOAD
-    #-------------------------------------------------------------
-    def calc_download_progress(self, completed: list[DownloadStepName]) -> int:
-        total_weight = sum(step.weight for step in STEPS)
-        done_weight = sum(
-			step.weight for step in STEPS if step.name in completed
-		)
-        return int((done_weight / total_weight) * 100)
-    
-    def on_steps_updated(self, completed: list[DownloadStepName]):
-        percent = self.calc_download_progress(completed)
-        logger.success(f"Percent: {percent}")
+    # def on_steps_updated(self, completed: list[ApprovalStepName]):
+    #     percent = self.calc_download_progress(completed)
+    #     logger.success(f"Percent: {percent}")
         
-        # broadcast to front end
-        asyncio.create_task(sio.emit("PROGRESS_UPDATE", {
-			"event": "PROGRESS_UPDATE",
-			"percent_complete": percent,
-			"complete_steps": completed
-		}))
+    #     # broadcast to front end
+    #     asyncio.create_task(sio.emit("PROGRESS_UPDATE", {
+	# 		"event": "PROGRESS_UPDATE",
+	# 		"percent_complete": percent,
+	# 		"complete_steps": completed
+	# 	}))
 
     #-------------------------------------------------------------
     # TO BYTES
     #-------------------------------------------------------------
-    def to_bytes(self, state: ProgressState) -> bytes:
+    def to_bytes(self, state: IPCState) -> bytes:
         return struct.pack(
             self.STRUCT_FMT,
-            state.id_generated,
-            state.pr_headers_inserted,
-            state.pdf_generated,
-            state.line_items_inserted,
-            state.generate_pdf,
-            state.send_approver_email,
-            state.send_requester_email,
-            state.email_sent_requester,
-            state.email_sent_approver,
-            state.pending_approval_inserted,
+            state.request_pending,
+            state.request_approved,
+            state.approval_email_sent,
         )
         
     #-------------------------------------------------------------
     # FROM BYTES
     #-------------------------------------------------------------
-    def from_bytes(self, b: bytes) -> ProgressState:
+    def from_bytes(self, b: bytes) -> IPCState:
         if isinstance(b, np.ndarray):
             b = b.tobytes()
             
         unpacked = struct.unpack(self.STRUCT_FMT, b)
-        return ProgressState(*unpacked)
+        return IPCState(*unpacked)
     
     #-------------------------------------------------------------
     # CLEAR STATE
@@ -274,3 +192,6 @@ class ProgressSharedMemory:
     #-------------------------------------------------------------
     def unlink(self):
         self.shm.unlink()
+
+# Create the global instance outside the class
+ipc_status = IPCSharedMemory()

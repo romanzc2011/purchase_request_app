@@ -138,6 +138,8 @@ class LDAPService:
         Get email address from LDAP.
         """
         try:
+            if raw_name is None:
+                return None
             raw_name = raw_name.lower()
             if "adu\\" in raw_name:
                 raw_name = raw_name.replace("adu\\", "")
@@ -163,6 +165,8 @@ class LDAPService:
         Sync method to fetch full DN of user
         """
         try:
+            if username is None:
+                return None
             username = username.lower()
             if "adu\\" in username:
                 username = username.replace("adu\\", "")
@@ -188,6 +192,8 @@ class LDAPService:
         Sync method to fetch membership of user
         """
         try:
+            if username is None:
+                return {}
             # String ADU\\ from username if present
             username = username.lower()
             if "adu\\" in username:
