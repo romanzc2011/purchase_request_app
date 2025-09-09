@@ -43,7 +43,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update, select, text, func
+from sqlalchemy import update, select, text, func, exists
 from api.services.db_service import get_async_session
 from api.schemas.enums import AssignedGroup, CueClerk, ItemStatus, LDAPGroup
 import asyncio
@@ -1147,18 +1147,21 @@ async def approve_deny_request(
             payload.UUID, payload.item_funds, payload.totalPrice, payload.target_status
         ):
             # Chain status checked
-            stmt = select(PendingApproval.status).where(
-                PendingApproval.line_item_uuid == item_uuid,
-                PendingApproval.purchase_request_id == payload.ID
+            # Check if already in approval chain with PENDING_APPROVAL status
+            exists_stmt = select(
+                exists().where(
+                    PendingApproval.line_item_uuid == item_uuid,
+                    PendingApproval.purchase_request_id == payload.ID,
+                    PendingApproval.status == ItemStatus.PENDING_APPROVAL
+                )
             )
+
+            already_in_chain = await db.scalar(exists_stmt)
+            
             if sid:
                 step_data = approval_tracker.mark_step_done(ApprovalStepName.CHAIN_STATUS_CHECKED)
                 if step_data:
                     await sio_events.progress_update(sid, step_data)
-
-            result = await db.execute(stmt)
-            status_row = result.scalar_one_or_none()
-            already_in_chain = status_row == ItemStatus.PENDING_APPROVAL
 
             if already_in_chain:
                 router = ApprovalRouter().start_handler(ClerkAdminHandler())
