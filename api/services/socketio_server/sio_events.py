@@ -6,6 +6,7 @@ from api.services.ldap_service import LDAPService
 from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings
 from api.services.socketio_server.socket_state import user_sids, sid_user as sid_user_map
+from fastapi import Depends
 
 # Create auth service instance locally to prevent the circular import issue
 ldap_service = LDAPService(
@@ -22,6 +23,22 @@ auth_service = AuthService(ldap_service=ldap_service)
 
 async def decode_and_validate_token(token: str) -> LDAPUser:
     return await auth_service.get_current_user(token)
+
+# Extract sid helper function
+def get_user_sid(current_user: LDAPUser = Depends(auth_service.get_current_user)):
+    user_sid_set = user_sids.get(current_user.username, set())
+    
+    # Extract specific sid from the user_sid_set
+    if not user_sid_set:
+        logger.warning(f"No SocketIO session found for user {current_user.username}")
+        # Continue without progress tracking if no session
+        sid = None
+        return sid
+    else:
+        # Use the first available session ID
+        sid = next(iter(user_sid_set))
+        logger.debug(f"SID: {sid}")
+        return sid
 
 # SocketIO events
 @sio.event
@@ -40,6 +57,30 @@ async def connect(sid, environ, auth):
     sid_user_map[sid] = user.username
     logger.debug(f"socketio: connect {sid} {user.username}")
     
+    return sid_user_map
+
+@sio.event
+async def progress_update(sid: str, payload: Dict[str, Any]) -> None:
+    await sio.emit("PROGRESS_UPDATE", payload, to=sid)
+
+@sio.event
+async def start_toast(sid: str, percent: int = 0) -> None:
+    await sio.emit("START_TOAST", {"percent_complete": percent}, to=sid)
+
+def get_user_sid(current_user) -> str | None:
+    """
+    Get the SocketIO session ID for the current user.
+    Returns None if no session is found.
+    """
+    from api.services.socketio_server.socket_state import user_sids
+    user_sid_set = user_sids.get(current_user.username, set())
+    if not user_sid_set:
+        logger.warning(f"No SocketIO session found for user {current_user.username}")
+        return None
+    else:
+        # Use the first available session ID
+        return next(iter(user_sid_set))
+    
     
 @sio.event
 async def disconnect(sid):
@@ -53,11 +94,7 @@ async def ping_from_client(sid, data):
 async def reset_data(sid):
     logger.debug("socketio: reset_data", sid)
     
-async def progress_update(sid: str, payload: Dict[str, Any]) -> None:
-    await sio.emit("PROGRESS_UPDATE", payload, to=sid)
-    
-async def start_toast(sid: str, percent: int = 0) -> None:
-    await sio.emit("START_TOAST", {"percent_complete": percent}, to=sid)
+
     
 @sio.on("NO_USER_FOUND")
 async def no_user_found(sid, data):

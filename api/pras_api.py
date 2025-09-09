@@ -305,16 +305,21 @@ async def send_purchase_request(
     db: AsyncSession = Depends(get_async_session)
 ):
     logger.debug(f"PAYLOAD JSON: {payload_json}")
+    # Get user sid
+    sid = sio_events.get_user_sid(current_user)
     
     #! PROGRESS TRACKING ---------------------------------------------------------
     await sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
     logger.debug("PROGRESS BAR: START TOAST EMITTED")
-    
+
     submit_request_tracker = create_submit_request_tracker()
     submit_request_tracker.start_submit_request_tracking = True
     
-    submit_request_tracker.send_start_msg()
-    submit_request_tracker.mark_step_done(SubmitRequestStepName.REQUEST_STARTED)
+    if sid:
+        submit_request_tracker.send_start_msg(sid)
+        step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.REQUEST_STARTED)
+        await sio_events.progress_update(sid, step_data)
+
     #!----------------------------------------------------------------------------
     """
     This endpoint:
@@ -322,11 +327,13 @@ async def send_purchase_request(
       - Ensures the user is active via the LDAPUser we got from the token
       - Commits the request, tagging line items with current_user.username
     """
-    
     try:
         payload: PurchaseRequestPayload = PurchaseRequestPayload.model_validate_json(payload_json)
-        submit_request_tracker.mark_step_done(SubmitRequestStepName.PAYLOAD_VALIDATED)
-    
+        if sid:
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PAYLOAD_VALIDATED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
+            
     except ValidationError as e:
         error_details = e.errors()
         logger.error("PurchaseRequestPayload validation errors: %s", error_details)
@@ -342,7 +349,9 @@ async def send_purchase_request(
 
     logger.info("###########################################################")
     logger.info(f"CURRENT USER: {current_user}")
-    submit_request_tracker.mark_step_done(SubmitRequestStepName.USER_AUTHENTICATED)
+    if sid:
+        step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.USER_AUTHENTICATED)
+        await sio_events.progress_update(sid, step_data)
     logger.info("###########################################################")
     
     # Use current_user's email instead of doing another LDAP lookup to validate requester
@@ -399,7 +408,10 @@ async def send_purchase_request(
         purchase_req_id = result.scalar_one_or_none()
         
         #! PROGRESS TRACKING ----------------------------------------------------------
-        submit_request_tracker.mark_step_done(SubmitRequestStepName.PURCHASE_REQUEST_ID_GENERATED)
+        if sid:
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PURCHASE_REQUEST_ID_GENERATED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         #!-----------------------------------------------------------------------------
         
         ##################################################################################
@@ -446,7 +458,10 @@ async def send_purchase_request(
         await db.flush()
         
         #! PROGRESS TRACKING ----------------------------------------------------------
-        submit_request_tracker.mark_step_done(SubmitRequestStepName.PR_HEADER_UPDATED)
+        if sid:
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PR_HEADER_UPDATED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         #!-----------------------------------------------------------------------------
         
         pr_line_item_uuids: List[str] = []
@@ -484,7 +499,10 @@ async def send_purchase_request(
             await db.flush() # UUID is now available
             
             #! PROGRESS TRACKING ----------------------------------------------------------
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.LINE_ITEMS_INSERTED)
+            if sid:
+                step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.LINE_ITEMS_INSERTED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
             #!-----------------------------------------------------------------------------
             
             # #?#################################################################################
@@ -510,7 +528,10 @@ async def send_purchase_request(
             #     logger.debug(f"UPLOADED FILES: {uploaded_files}")
             # UUID tracking
             pr_line_item_uuids.append(orm_pr_line_item.UUID)
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.FILES_UPLOADED)
+            if sid:
+                step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.FILES_UPLOADED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
             
         #?#################################################################################
         #? SETTING THE CONTRACTING OFFICER
@@ -526,7 +547,10 @@ async def send_purchase_request(
         )
         result = await db.execute(stmt)
         contracting_officer_username = result.scalar_one_or_none()
-        submit_request_tracker.mark_step_done(SubmitRequestStepName.CONTRACTING_OFFICER_RETRIEVED)
+        if sid:
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.CONTRACTING_OFFICER_RETRIEVED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         logger.info(f"Contracting officer username: {contracting_officer_username}")
         
         #?#################################################################################
@@ -559,7 +583,10 @@ async def send_purchase_request(
             db.add(appr)
             await db.flush()
             approvals.append(appr)
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.APPROVAL_RECORDS_CREATED)
+            if sid:
+                step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.APPROVAL_RECORDS_CREATED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
             
             """
             Separating the requests based on the fund
@@ -593,14 +620,26 @@ async def send_purchase_request(
             
             # Generate PDF once for the entire purchase request
             logger.info("Generating PDF document")
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
+            if sid:
+                step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
+                
+                step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
+                
+                step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
             pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
             
             
             #! PROGRESS TRACKING ----------------------------------------------------------
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
+            if sid:
+                step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
             #!-----------------------------------------------------------------------------
             
             orm_pr_header.pdf_output_path = pdf_path
@@ -618,8 +657,11 @@ async def send_purchase_request(
         if path is not None:
             attachments_list.append(path)
             
-    submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
-    
+    if sid:
+        step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
+        if step_data:
+            await sio_events.progress_update(sid, step_data)
+            
     # Build kwargs dict for Pydantic, omitting attachments until confirmed present
     payload_kwargs = {
         "model_type": "email_request",
@@ -712,10 +754,18 @@ async def send_purchase_request(
     
     #! PROGRESS TRACKING ----------------------------------------------------------
     # Mark final steps as done and broadcast final progress
-    submit_request_tracker.mark_step_done(SubmitRequestStepName.EMAIL_PAYLOAD_BUILT)
-    submit_request_tracker.mark_step_done(SubmitRequestStepName.TRANSACTION_COMMITTED)
-    submit_request_tracker.mark_step_done(SubmitRequestStepName.REQUEST_COMPLETED)
-    
+    if sid:
+        step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.EMAIL_PAYLOAD_BUILT)
+        if step_data:
+            await sio_events.progress_update(sid, step_data)
+        
+        step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.TRANSACTION_COMMITTED)
+        if step_data:
+            await sio_events.progress_update(sid, step_data)
+        
+        step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.REQUEST_COMPLETED)
+        if step_data:
+            await sio_events.progress_update(sid, step_data)
     # Calculate final progress and broadcast
     final_percent = submit_request_tracker.calculate_progress()
     final_send_data = {
@@ -1067,19 +1117,28 @@ async def approve_deny_request(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
-    
+    """
+    Each step is going to enolve returning what step was completed and wrapped in sid to ensure sid is available 
+    """
     try:
         logger.debug("APPROVE/DENY REQUEST")
         approval_tracker = create_approval_tracker()
 
-        # Start toast once
-        await sio_events.start_toast(sid, percent=0)
+        # Get the SocketIO session ID for the current user
+        sid = sio_events.get_user_sid(current_user)
 
         # Mark steps (these functions should RETURN a dict, not emit)
-        await sio_events.progress_update(sid, approval_tracker.send_start_msg())
-        await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_STARTED))
-        await asyncio.sleep(1)  # ✅ don't block the event loop
-        await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.PAYLOAD_VALIDATED))
+        if sid:
+            logger.debug(f"SID: {sid}")
+            start_msg_data = approval_tracker.send_start_msg(sid)
+            await sio_events.start_toast(sid, start_msg_data.get("percent_complete", 0))
+            step_data = approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_STARTED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
+            await asyncio.sleep(1)  # ✅ don't block the event loop
+            step_data = approval_tracker.mark_step_done(ApprovalStepName.PAYLOAD_VALIDATED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
 
         results = []
         for item_uuid, item_fund, total_price, target_status in zip(
@@ -1090,7 +1149,10 @@ async def approve_deny_request(
                 PendingApproval.line_item_uuid == item_uuid,
                 PendingApproval.purchase_request_id == payload.ID
             )
-            await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.CHAIN_STATUS_CHECKED))
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.CHAIN_STATUS_CHECKED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
 
             result = await db.execute(stmt)
             status_row = result.scalar_one_or_none()
@@ -1099,17 +1161,23 @@ async def approve_deny_request(
             if already_in_chain:
                 router = ApprovalRouter().start_handler(ClerkAdminHandler())
                 # Mark skipped steps explicitly
-                for step in (
-                    ApprovalStepName.IT_HANDLER_INITIALIZED,
-                    ApprovalStepName.IT_APPROVAL_PROCESSED,
-                    ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED,
-                    ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED,
-                ):
-                    await sio_events.progress_update(sid, approval_tracker.mark_step_done(step))
+                if sid:
+                    for step in (
+                        ApprovalStepName.IT_HANDLER_INITIALIZED,
+                        ApprovalStepName.IT_APPROVAL_PROCESSED,
+                        ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED,
+                        ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED,
+                    ):
+                        step_data = approval_tracker.mark_step_done(step)
+                        if step_data:
+                            await sio_events.progress_update(sid, step_data)
             else:
                 router = ApprovalRouter()  # full chain
 
-            await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.ROUTER_CONFIGURED))
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.ROUTER_CONFIGURED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
 
             # Data retrieval
             stmt = select(
@@ -1123,7 +1191,10 @@ async def approve_deny_request(
             pending_approval_id = row.pending_approval_id
             assigned_group = row.assigned_group
 
-            await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.PENDING_APPROVAL_DATA_RETRIEVED))
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.PENDING_APPROVAL_DATA_RETRIEVED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
 
             approval_request = ApprovalRequest(
                 id=payload.ID,
@@ -1137,7 +1208,10 @@ async def approve_deny_request(
                 approver=current_user.username
             )
 
-            await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_BUILT))
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_BUILT)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
             router_result = await router.route(approval_request, db, current_user, ldap_service)
 
             ipc_data = await ipc_status.read()
@@ -1145,14 +1219,15 @@ async def approve_deny_request(
 
             # If pending but email sent, finish progress UI
             if (ipc_data.request_pending and not ipc_data.request_approved) and ipc_data.approval_email_sent:
-                await sio_events.progress_update(sid, {
-                    "event": "PROGRESS_UPDATE",
-                    "percent_complete": 100,
-                    "complete_steps": [
-                        ApprovalStepName.REQUEST_MARKED_APPROVED.value,
-                        ApprovalStepName.APPROVAL_EMAIL_SENT.value
-                    ]
-                })
+                if sid:
+                    await sio_events.progress_update(sid, {
+                        "event": "PROGRESS_UPDATE",
+                        "percent_complete": 100,
+                        "complete_steps": [
+                            ApprovalStepName.REQUEST_MARKED_APPROVED.value,
+                            ApprovalStepName.APPROVAL_EMAIL_SENT.value
+                        ]
+                    })
             await ipc_status.reset_progress_state()
 
             results.append({

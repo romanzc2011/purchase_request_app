@@ -22,6 +22,7 @@ from api.services.smtp_service.email_builder import ApproverEmailBuilder
 from api.services.ldap_service import LDAPService
 from api.utils.misc_utils import reset_signals
 from api.services.ipc_status import ipc_status
+import api.services.socketio_server.sio_events as sio_events
 
 
 # Approval Router to determine the routing of requests
@@ -33,13 +34,17 @@ class Handler(ABC):
         
         # Init local trackers to prevent error
         approval_tracker = None
+        
+        # Get sid for current user
+        sid = sio_events.get_user_sid(current_user)
 
         # Get download tracker
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
         
-        if approval_tracker:
+        if approval_tracker and sid:
             approval_tracker.mark_step_done(ApprovalStepName.HANDLER_BASE_INITIALIZED)
+            sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.HANDLER_BASE_INITIALIZED))
             logger_init_ok("Handler base initialized")
         
     def set_next(self, handler: "Handler") -> "Handler":
@@ -53,11 +58,12 @@ class Handler(ABC):
         request: ApprovalRequest, 
         db: AsyncSession,
         current_user: LDAPUser,
-        ldap_service: LDAPService
+        ldap_service: LDAPService,
+        sid: str
     ) -> ApprovalRequest:
         
         if self._next:
-            return await self._next.handle(request, db, current_user, ldap_service)
+            return await self._next.handle(request, db, current_user, ldap_service, sid)
         
         # Reset progress bar/signals, everything
         reset_signals()
@@ -72,7 +78,8 @@ class ITHandler(Handler):
         request: ApprovalRequest, 
         db: AsyncSession,
         current_user: LDAPUser,
-        ldap_service: LDAPService
+        ldap_service: LDAPService,
+        sid: str
     ) -> ApprovalRequest:
         policy = ApproverPolicy(current_user)
         
@@ -81,7 +88,11 @@ class ITHandler(Handler):
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.IT_HANDLER_INITIALIZED)
-        
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.IT_HANDLER_INITIALIZED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
+            
         if policy.can_it_approve(request.fund, ItemStatus.NEW_REQUEST):
             logger.debug("IT HANDLER CAN APPROVE HANDLER")
             
@@ -89,7 +100,12 @@ class ITHandler(Handler):
             
             if not row:
                 logger.error(f"IT HANDLER: Could not find approval/task data for {request.uuid}")
-                return await super().handle(request, db, current_user, ldap_service)
+                return await super().handle(request, db, current_user, ldap_service, sid)
+            
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.IT_HANDLER_INITIALIZED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
             
             approvals_uuid, pending_approval_id = row
             await ApprovalUtils.insert_pending_approval(db, approvals_uuid, request, pending_approval_id)
@@ -107,7 +123,8 @@ class ITHandler(Handler):
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.IT_APPROVAL_PROCESSED)
             
-        return await super().handle(request, db, current_user, ldap_service)
+            
+        return await super().handle(request, db, current_user, ldap_service, sid)
 # ----------------------------------------------------------------------------------------
 # MANAGEMENT HANDLER
 # ----------------------------------------------------------------------------------------
@@ -124,7 +141,8 @@ class ManagementHandler(Handler):
         request: ApprovalRequest, 
         db: AsyncSession,
         current_user: LDAPUser,
-        ldap_service: LDAPService
+        ldap_service: LDAPService,
+        sid: str
     ) -> ApprovalRequest:
         #!----------------------------------------------------------
         #! TEST USER OVERRIDE - REMOVED FOR PRODUCTION
@@ -140,7 +158,11 @@ class ManagementHandler(Handler):
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED)
-        
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
+            
         """
         Finance/Management 092x will email TO: Edmund Brown, Lela
         CC Peter, Lauren
@@ -164,6 +186,11 @@ class ManagementHandler(Handler):
             if row:
                 approvals_uuid, pending_approval_id = row
                 
+                if sid:
+                    step_data = approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED)
+                    if step_data:
+                        await sio_events.progress_update(sid, step_data)
+                    
                 # Initialize variables
                 pending_approved_by = None
                 final_approved_by = None
@@ -218,7 +245,7 @@ class ManagementHandler(Handler):
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED)
             
-        return await super().handle(request, db, current_user, ldap_service)
+        return await super().handle(request, db, current_user, ldap_service, sid)
     
 ###############################################################################################
 # CLERK ADMIN HANDLER
@@ -232,7 +259,8 @@ class ClerkAdminHandler(Handler):
         request: ApprovalRequest, 
         db: AsyncSession,
         current_user: LDAPUser,
-        ldap_service: LDAPService
+        ldap_service: LDAPService,
+        sid: str
     ) -> ApprovalRequest:
         
         # ClerkAdmin is the final handler - they can approve based on price
@@ -252,11 +280,16 @@ class ClerkAdminHandler(Handler):
         
         if not row:
             logger.warning(f"CLERK ADMIN HANDLER: No pending approval found for {request.uuid}")
-            return await super().handle(request, db, current_user, ldap_service)
+            return await super().handle(request, db, current_user, ldap_service, sid)
         
         current_status = row[0]
         logger.debug(f"CURRENT STATUS: {current_status}")
         
+        if sid:
+            step_data = approval_tracker.mark_step_done(ApprovalStepName.CLERK_ADMIN_HANDLER_INITIALIZED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
+            
         logger.debug("CLERK ADMIN HANDLER PROCESSING REQUEST")
         can_approve_now = await approver_policy.can_fully_approve(
             total_price=request.total_price,
@@ -271,6 +304,10 @@ class ClerkAdminHandler(Handler):
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.CLERK_POLICY_CHECKED)
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.CLERK_POLICY_CHECKED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
             
         if not can_approve_now:
             logger.debug("CLERK ADMIN HANDLER: Current user is not allowed to approve this request")
@@ -289,7 +326,11 @@ class ClerkAdminHandler(Handler):
             if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
                 approval_tracker = get_approval_tracker()
                 approval_tracker.mark_step_done(ApprovalStepName.CLERK_APPROVAL_PROCESSED)
-                return await super().handle(request, db, current_user, ldap_service)
+                if sid:
+                    step_data = approval_tracker.mark_step_done(ApprovalStepName.CLERK_APPROVAL_PROCESSED)
+                    if step_data:
+                        await sio_events.progress_update(sid, step_data)
+                return await super().handle(request, db, current_user, ldap_service, sid)
         
         #*#################################################################################
         #*#################################################################################
@@ -309,7 +350,7 @@ class ClerkAdminHandler(Handler):
 
         if not row:
             logger.error(f"CLERK ADMIN HANDLER: Could not find approval UUID for {request.uuid}")
-            return await super().handle(request, db, current_user, ldap_service)
+            return await super().handle(request, db, current_user, ldap_service, sid)
             
         approvals_uuid = row[0]
         logger.debug(f"APPROVAL UUID RETRIEVED: {approvals_uuid}")
@@ -320,7 +361,11 @@ class ClerkAdminHandler(Handler):
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_UUID_RETRIEVED)
-        
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_UUID_RETRIEVED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
+                    
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark request as APPROVED
         logger.debug("MARKING FINAL APPROVAL AS APPROVED")
@@ -330,7 +375,12 @@ class ClerkAdminHandler(Handler):
             
         if not row:
             logger.error(f"CLERK ADMIN HANDLER: Could not find approval/task data for {request.uuid}")
-            return await super().handle(request, db, current_user, ldap_service)
+            return await super().handle(request, db, current_user, ldap_service, sid)
+            
+        if sid:
+            step_data = approval_tracker.mark_step_done(ApprovalStepName.REQUEST_MARKED_APPROVED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
             
         approvals_uuid, pending_approval_id = row
         await dbas.update_final_approval_status(
@@ -352,7 +402,11 @@ class ClerkAdminHandler(Handler):
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.REQUEST_MARKED_APPROVED)
-            
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.REQUEST_MARKED_APPROVED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
+                    
         # Send email to requester that their request has been approved
         logger.debug(f"CLERK ADMIN HANDLER: Sending email to requester that their request has been approved for {request.uuid}")
         
@@ -370,7 +424,11 @@ class ClerkAdminHandler(Handler):
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_EMAIL_SENT)
-            
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_EMAIL_SENT)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
+                    
         logger.debug(f"CLERK ADMIN HANDLER: Inserted final approval for {request.uuid}")
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
@@ -379,8 +437,12 @@ class ClerkAdminHandler(Handler):
         if tracker and tracker.active_tracker == ProgressTrackerType.APPROVAL:
             approval_tracker = get_approval_tracker()
             approval_tracker.mark_step_done(ApprovalStepName.CLERK_APPROVAL_PROCESSED)
-        
+            if sid:
+                step_data = approval_tracker.mark_step_done(ApprovalStepName.CLERK_APPROVAL_PROCESSED)
+                if step_data:
+                    await sio_events.progress_update(sid, step_data)
+                    
         # Pass the request to the next handler
         if self._next:
-            return await self._next.handle(request, db, current_user, ldap_service)
+            return await self._next.handle(request, db, current_user, ldap_service, sid)
         return request
