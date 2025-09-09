@@ -1021,7 +1021,17 @@ async def approve_deny_request(
             result = await router.route(approval_request, db, current_user, ldap_service)
             logger.info(f"Result: {result}")
             
-            logger.debug(f"IPC STATUS: {ipc_status.read()}")
+            ipc_data = await ipc_status.read()
+            logger.debug(f"IPC STATUS: {ipc_data}")
+            
+            # Approval only made it to PENDING, send flag to progress bar to complete any remaining step to prevent it from hanging
+            if ((ipc_data.request_pending and not ipc_data.request_approved) and ipc_data.approval_email_sent):
+                await sio.emit("PROGRESS_UPDATE", {
+                    "event": "PROGRESS_UPDATE",
+                    "percent_complete": 100,
+                    "complete_steps": [ApprovalStepName.REQUEST_MARKED_APPROVED.value, ApprovalStepName.APPROVAL_EMAIL_SENT.value]
+                })
+            await ipc_status.reset_progress_state()
             
             #################################################################################################
             # END CHAIN

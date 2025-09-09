@@ -90,7 +90,7 @@ class IPCSharedMemory:
     #-------------------------------------------------------------
     # READ
     #-------------------------------------------------------------
-    def read(self) -> IPCState:
+    async def read(self) -> IPCState:
         packed_data = bytes(self.shm.buf[:self.STRUCT_SIZE])
         np_array = np.frombuffer(packed_data, dtype=np.uint8)
         return self.from_bytes(np_array)
@@ -98,33 +98,23 @@ class IPCSharedMemory:
     #-------------------------------------------------------------
     # UPDATE
     #-------------------------------------------------------------
-    async def update(self, field: str, value: bool | int) -> None:
-        current_state = self.read()
+    async def update(self, field: str, value: bool | int) -> dict:
+        current_state = await self.read()
         
         self.value = value
         
         if hasattr(current_state, field):
             setattr(current_state, field, value)
             self.write(current_state)
-            current_state = self.read()
+            current_state = await self.read()
             
             # Convert current_state to dict
-            progress_dict = asdict(current_state) 
-            send_data = progress_dict
-            logger.debug(f"SEND DATA: {send_data}")
+            progress_dict = asdict(current_state)
+            logger.debug(f"IPC DATA: {progress_dict}")
+            
+            return progress_dict
         else:
             logger.error(f"Field {field} does not exist")
-            
-    # def on_steps_updated(self, completed: list[ApprovalStepName]):
-    #     percent = self.calc_download_progress(completed)
-    #     logger.success(f"Percent: {percent}")
-        
-    #     # broadcast to front end
-    #     asyncio.create_task(sio.emit("PROGRESS_UPDATE", {
-	# 		"event": "PROGRESS_UPDATE",
-	# 		"percent_complete": percent,
-	# 		"complete_steps": completed
-	# 	}))
 
     #-------------------------------------------------------------
     # TO BYTES
@@ -159,7 +149,7 @@ class IPCSharedMemory:
     #-------------------------------------------------------------
     async def reset_progress_state(self):
         """Reset all progress flags to False"""
-        current_state = self.read()
+        current_state = await self.read()
         for field in vars(current_state):
             if isinstance(getattr(current_state, field), bool):
                 setattr(current_state, field, False)
@@ -171,7 +161,7 @@ class IPCSharedMemory:
     #-------------------------------------------------------------
     async def check_and_clear_stale_state(self):
         """Check if progress state is stale and clear if needed"""
-        current_state = self.read()
+        current_state = await self.read()
         # If all flags are False, state is already clean
         if not any(vars(current_state).values()):
             return

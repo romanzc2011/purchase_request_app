@@ -1,6 +1,7 @@
 from enum import Enum, auto
 from dataclasses import dataclass
 from typing import List
+from loguru import logger
 
 # -----------------------------------------------------------------------------
 # APPROVAL STEPS
@@ -80,3 +81,6 @@ APPROVAL_STEPS: List[ApprovalStep] = [
     ApprovalStep(ApprovalStepName.RESULT_OBJECT_BUILT, 3),
     ApprovalStep(ApprovalStepName.FINAL_RESULTS_RETURNED, 3),
 ]
+
+def get_approval_steps():
+    return APPROVAL_STEPS
