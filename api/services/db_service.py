@@ -795,7 +795,7 @@ async def update_final_approval_status(
             FinalApproval.pending_approval_id == pending_approval_id
         )
     )
-    updated_obj = result.scalar_one_or_none()
+    updated_obj = result.first()
     
     if not updated_obj:
         raise ValueError(f"Line item final approval not found: {approvals_uuid}, {line_item_uuid}, {pending_approval_id}")
@@ -877,9 +877,12 @@ async def get_final_approved_by_id(db: AsyncSession, ID: str) -> Optional[FinalA
         .where(FinalApproval.purchase_request_id == ID)
     )
     result = await db.execute(stmt)
-    row = result.one_or_none()
-    if row is None:
+    rows = result.all()
+    if not rows:
         return None
+    
+    # If multiple rows, use the first one (most recent)
+    row = rows[0]
     return row.final_approved_by, row.final_approved_at
     
 ###################################################################################################

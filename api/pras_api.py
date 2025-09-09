@@ -167,13 +167,21 @@ async def download_statement_of_need_form(
     """
     This endpoint is used to download the statement of need form for a given ID.
     """
+    # Get user sid
+    sid = sio_events.get_user_sid(current_user)
+    
     #!-PROGRESS TRACKING --------------------------------------------------------------
-    sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
+    await sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
     logger.debug("PROGRESS BAR: START TOAST EMITTED")
     
     download_tracker = create_download_tracker()
     download_tracker.start_download_tracking = True
-    download_tracker.send_start_msg()
+    
+    if sid:
+        download_tracker.send_start_msg(sid)
+        step_data = download_tracker.mark_step_done(DownloadStepName.VERIFY_FILE_EXISTS)
+        if step_data:
+            await sio_events.progress_update(sid, step_data)
     #!---------------------------------------------------------------------------------
     
     ID = payload.get("ID")
@@ -195,7 +203,10 @@ async def download_statement_of_need_form(
             raise HTTPException(status_code=404, detail="Statement of need form not found")
 
         # File does exists 
-        download_tracker.mark_step_done(DownloadStepName.VERIFY_FILE_EXISTS)
+        if sid:
+            step_data = download_tracker.mark_step_done(DownloadStepName.VERIFY_FILE_EXISTS)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         return FileResponse(
             path=str(output_path),
