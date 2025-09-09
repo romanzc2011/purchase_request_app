@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.schemas.ldap_schema import LDAPUser
 from api.dependencies.pras_dependencies import auth_service
 from api.services.ldap_service import LDAPService
+import api.services.socketio_server.sio_events as sio_events
 from loguru import logger
 
 class ApprovalRouter:
@@ -35,4 +36,16 @@ class ApprovalRouter:
         current_user: LDAPUser,
         ldap_service: LDAPService
     ) -> ApprovalRequest:
+        # Update ALL handlers in the chain with current_user if they don't have it
+        self._update_handlers_with_user(current_user)
+        
         return await self._head.handle(request, db, current_user, ldap_service)
+    
+    def _update_handlers_with_user(self, current_user: LDAPUser):
+        """Update all handlers in the chain with current_user"""
+        handler = self._head
+        while handler:
+            if not hasattr(handler, 'current_user') or handler.current_user is None:
+                handler.current_user = current_user
+                handler.sid = sio_events.get_user_sid(current_user)
+            handler = handler._next

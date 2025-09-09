@@ -1132,10 +1132,12 @@ async def approve_deny_request(
             logger.debug(f"SID: {sid}")
             start_msg_data = approval_tracker.send_start_msg(sid)
             await sio_events.start_toast(sid, start_msg_data.get("percent_complete", 0))
+            
             step_data = approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_STARTED)
             if step_data:
                 await sio_events.progress_update(sid, step_data)
             await asyncio.sleep(1)  # ✅ don't block the event loop
+            
             step_data = approval_tracker.mark_step_done(ApprovalStepName.PAYLOAD_VALIDATED)
             if step_data:
                 await sio_events.progress_update(sid, step_data)
@@ -1187,7 +1189,18 @@ async def approve_deny_request(
                 PendingApproval.line_item_uuid == item_uuid,
                 PendingApproval.purchase_request_id == payload.ID
             )
-            row = (await db.execute(stmt)).first()
+            result = await db.execute(stmt)
+            rows = result.all()
+            
+            if not rows:
+                logger.error(f"No PendingApproval found for item_uuid: {item_uuid}, purchase_request_id: {payload.ID}")
+                raise HTTPException(status_code=404, detail=f"No pending approval found for item {item_uuid}")
+            
+            if len(rows) > 1:
+                logger.warning(f"Multiple PendingApproval records found for item_uuid: {item_uuid}, purchase_request_id: {payload.ID}. Using the first one.")
+            
+            # Use the first row if multiple are found
+            row = rows[0]
             pending_approval_id = row.pending_approval_id
             assigned_group = row.assigned_group
 

@@ -69,16 +69,7 @@ class ApproverPolicy:
         result = await db.execute(stmt)
         row = result.first()
         return bool(row and row.deputy_can_approve)
-    
-    # async def _is_test_user_active(self, db: AsyncSession) -> bool:
-    #     stmt = select(dbas.WorkflowUser.active).where(
-    #         dbas.WorkflowUser.username == CueClerk.TEST_USER.value
-    #     )
-    #     result = await db.execute(stmt)
-    #     row = result.first()
-    #     #return format_username(self.username) == CueClerk.TEST_USER.value and bool(row and row.active)
-    #     return False # TESTING
-    
+
     # ----------------------------------------------------------------------------------    
     # MANAGEMENT HANDLER APPROVAL LOGIC (LELA, EDMUND)
     # ----------------------------------------------------------------------------------
