@@ -1,10 +1,45 @@
 from api.services.socketio_server.sio_instance import sio
 from loguru import logger
+from typing import Any, Dict
+from api.services.auth_service import AuthService
+from api.services.ldap_service import LDAPService
+from api.schemas.ldap_schema import LDAPUser
+from api.settings import settings
+from api.services.socketio_server.socket_state import user_sids, sid_user as sid_user_map
+
+# Create auth service instance locally to prevent the circular import issue
+ldap_service = LDAPService(
+    ldap_url=settings.ldap_server,
+    bind_dn=settings.ldap_service_user,
+    bind_password=settings.ldap_service_password,
+    group_dns=[
+        settings.it_group_dns,
+        settings.cue_group_dns,
+        settings.access_group_dns,
+    ],
+)
+auth_service = AuthService(ldap_service=ldap_service)
+
+async def decode_and_validate_token(token: str) -> LDAPUser:
+    return await auth_service.get_current_user(token)
 
 # SocketIO events
 @sio.event
-async def connect(sid, environ):
-    logger.debug("socketio: connect", sid)
+async def connect(sid, environ, auth):
+    token = (auth or {}).get("token")
+    if not token:
+        return False
+    
+    # verify the token
+    user = await decode_and_validate_token(token)
+    if not user:
+        return False
+    
+    # Map username -> sid
+    user_sids.setdefault(user.username, set()).add(sid)
+    sid_user_map[sid] = user.username
+    logger.debug(f"socketio: connect {sid} {user.username}")
+    
     
 @sio.event
 async def disconnect(sid):
@@ -18,14 +53,12 @@ async def ping_from_client(sid, data):
 async def reset_data(sid):
     logger.debug("socketio: reset_data", sid)
     
-@sio.on("PROGRESS_UPDATE")
-async def progress_update(sid, data):
-    logger.debug("socketio: progress_update", sid)
+async def progress_update(sid: str, payload: Dict[str, Any]) -> None:
+    await sio.emit("PROGRESS_UPDATE", payload, to=sid)
     
-@sio.on("START_TOAST")
-async def start_toast(sid, data):
-    logger.debug("socketio: start_toast", sid)
-
+async def start_toast(sid: str, percent: int = 0) -> None:
+    await sio.emit("START_TOAST", {"percent_complete": percent}, to=sid)
+    
 @sio.on("NO_USER_FOUND")
 async def no_user_found(sid, data):
     logger.debug("socketio: no_user_found", sid)

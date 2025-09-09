@@ -14,6 +14,10 @@ import {
 export const socketioInstance: Socket = io(window.location.origin, {
     path: "/progress_bar_bridge/communicate",
     transports: ["polling"],
+    auth: (cb) => {
+        const token = localStorage.getItem("access_token");
+        cb({ token });
+    },
 });
 
 export const isIOConnectedSig = signal<boolean>(false);

@@ -1070,48 +1070,48 @@ async def approve_deny_request(
     
     try:
         logger.debug("APPROVE/DENY REQUEST")
-        #!-PROGRESS TRACKING --------------------------------------------------------------
         approval_tracker = create_approval_tracker()
-        approval_tracker.send_start_msg()
-        approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_STARTED)
-        time.sleep(1)
-        approval_tracker.mark_step_done(ApprovalStepName.PAYLOAD_VALIDATED)
-        #!---------------------------------------------------------------------------------
-        # Process each item in the payload
+
+        # Start toast once
+        await sio_events.start_toast(sid, percent=0)
+
+        # Mark steps (these functions should RETURN a dict, not emit)
+        await sio_events.progress_update(sid, approval_tracker.send_start_msg())
+        await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_STARTED))
+        await asyncio.sleep(1)  # ✅ don't block the event loop
+        await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.PAYLOAD_VALIDATED))
+
         results = []
-        for i, (item_uuid, item_fund, total_price, target_status) in enumerate(zip(
+        for item_uuid, item_fund, total_price, target_status in zip(
             payload.UUID, payload.item_funds, payload.totalPrice, payload.target_status
-        )):
-            # Check if item is already in the chain
+        ):
+            # Chain status checked
             stmt = select(PendingApproval.status).where(
                 PendingApproval.line_item_uuid == item_uuid,
                 PendingApproval.purchase_request_id == payload.ID
             )
-            #! - PROGRESS TRACKING --------------------------------------------------------
-            approval_tracker.mark_step_done(ApprovalStepName.CHAIN_STATUS_CHECKED)
-            
+            await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.CHAIN_STATUS_CHECKED))
+
             result = await db.execute(stmt)
             status_row = result.scalar_one_or_none()
             already_in_chain = status_row == ItemStatus.PENDING_APPROVAL
-            
-            # Decide which chain to use as in the request is already in approval chain
+
             if already_in_chain:
                 router = ApprovalRouter().start_handler(ClerkAdminHandler())
-                # Mark the steps that were ignored
-                approval_tracker.mark_step_done(ApprovalStepName.IT_HANDLER_INITIALIZED)
-                approval_tracker.mark_step_done(ApprovalStepName.IT_APPROVAL_PROCESSED)
-                approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED)
-                approval_tracker.mark_step_done(ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED)
-                
-                
+                # Mark skipped steps explicitly
+                for step in (
+                    ApprovalStepName.IT_HANDLER_INITIALIZED,
+                    ApprovalStepName.IT_APPROVAL_PROCESSED,
+                    ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED,
+                    ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED,
+                ):
+                    await sio_events.progress_update(sid, approval_tracker.mark_step_done(step))
             else:
-                router = ApprovalRouter() # Defaults to full chain: IT -> Finance -> ClerkAdmin
-                
-            # Mark router configured
-            approval_tracker.mark_step_done(ApprovalStepName.ROUTER_CONFIGURED)
-            #################################################################################################
-            # START CHAIN
-            # Get assigned group from pending_approvals via line_item_uuid/purchase_request_id
+                router = ApprovalRouter()  # full chain
+
+            await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.ROUTER_CONFIGURED))
+
+            # Data retrieval
             stmt = select(
                 PendingApproval.pending_approval_id,
                 PendingApproval.assigned_group
@@ -1119,18 +1119,12 @@ async def approve_deny_request(
                 PendingApproval.line_item_uuid == item_uuid,
                 PendingApproval.purchase_request_id == payload.ID
             )
-            result = await db.execute(stmt)
-            row = result.first()
+            row = (await db.execute(stmt)).first()
             pending_approval_id = row.pending_approval_id
             assigned_group = row.assigned_group
-            
-            # Mark data retrieval steps as done
-            approval_tracker.mark_step_done(ApprovalStepName.PENDING_APPROVAL_DATA_RETRIEVED)
-            
-            logger.info(f"Assigned group: {assigned_group}")
-            logger.info(f"Pending approval ID: {pending_approval_id}")
-            
-            # Create approval request for the router
+
+            await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.PENDING_APPROVAL_DATA_RETRIEVED))
+
             approval_request = ApprovalRequest(
                 id=payload.ID,
                 uuid=item_uuid,
@@ -1142,36 +1136,36 @@ async def approve_deny_request(
                 action=payload.action,
                 approver=current_user.username
             )
-            
-            # Mark approval request built
-            approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_BUILT)
-            result = await router.route(approval_request, db, current_user, ldap_service)
-            logger.info(f"Result: {result}")
-            
+
+            await sio_events.progress_update(sid, approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_BUILT))
+            router_result = await router.route(approval_request, db, current_user, ldap_service)
+
             ipc_data = await ipc_status.read()
             logger.debug(f"IPC STATUS: {ipc_data}")
-            
-            # Approval only made it to PENDING, send flag to progress bar to complete any remaining step to prevent it from hanging
-            if ((ipc_data.request_pending and not ipc_data.request_approved) and ipc_data.approval_email_sent):
-                await sio.emit("PROGRESS_UPDATE", {
+
+            # If pending but email sent, finish progress UI
+            if (ipc_data.request_pending and not ipc_data.request_approved) and ipc_data.approval_email_sent:
+                await sio_events.progress_update(sid, {
                     "event": "PROGRESS_UPDATE",
                     "percent_complete": 100,
-                    "complete_steps": [ApprovalStepName.REQUEST_MARKED_APPROVED.value, ApprovalStepName.APPROVAL_EMAIL_SENT.value]
+                    "complete_steps": [
+                        ApprovalStepName.REQUEST_MARKED_APPROVED.value,
+                        ApprovalStepName.APPROVAL_EMAIL_SENT.value
+                    ]
                 })
             await ipc_status.reset_progress_state()
-            
-            #################################################################################################
-            # END CHAIN
-            #################################################################################################
+
             results.append({
                 "uuid": item_uuid,
-                "status": result.status.value if hasattr(result, 'status') else "processed",
+                "status": getattr(router_result, "status", "processed").value if hasattr(router_result, "status") else "processed",
                 "action": payload.action
             })
+
         return results
+
     except Exception as e:
         logger.error(f"Error approving/denying request: {e}")
-        reset_signals() # Send reset flag to front end to reset the approving/processing signals
+        reset_signals()
         raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")
     
 ##########################################################################

@@ -79,14 +79,14 @@ class ProgressTracker:
         for step in self.download_steps:
             step.done = False
             
-    def send_start_msg(self):
+    def send_start_msg(self, sid):
         asyncio.create_task(sio.emit("START_TOAST", {
             "event": "START_TOAST",
             "percent_complete": 0
-        }));
+        }, to=sid));
         logger.debug("Sent start toast message")
     
-    def mark_step_done(self, step_name):
+    def mark_step_done(self, step_name, sid):
         
         """Mark a step as done and update progress"""
         if self.start_download_tracking:
@@ -111,7 +111,7 @@ class ProgressTracker:
             asyncio.create_task(sio.emit("PROGRESS_UPDATE", {
                 "event": "PROGRESS_UPDATE",
                 "percent_complete": self._percent_complete
-            }))
+            }, to=sid))
     
     def remaining_steps(self) -> List[DownloadStep | ApprovalStep | SubmitRequestStep]:
         active = self.active_tracker
