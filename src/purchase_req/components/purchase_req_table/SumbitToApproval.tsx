@@ -44,7 +44,6 @@ interface SubmitApprovalTableProps {
 function SubmitApprovalTable({
     dataBuffer,
     onDelete,
-    fileInfo,
     setDataBuffer,
     setFileInfo,
     setID
@@ -89,43 +88,6 @@ function SubmitApprovalTable({
             setDataBuffer([]);
         }
     }, [isSubmittedSig.value, setDataBuffer]);
-
-    /************************************************************************************ */
-    /* FILE UPLOAD */
-    /************************************************************************************ */
-    const handleFileUpload = async (ID: string) => {
-        // Check if there are any files to attach
-        const formFileData = new FormData();
-        formFileData.append("ID", ID);
-
-        fileInfo.forEach(file => {
-            if (file.file && file.status === "ready") {
-                formFileData.append("file", file.file);
-            }
-        });
-
-        // Debug: Log what we're sending
-        console.log("File upload FormData contents:");
-        for (let [key, value] of formFileData.entries()) {
-            console.log(key, value);
-        }
-
-        try {
-            const fileUploadRequest = await fetch(computeHTTPURL("/api/uploadFile"), {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-                },
-                body: formFileData
-            });
-
-            if (!fileUploadRequest.ok) {
-                throw new Error(`HTTP error! status: ${fileUploadRequest.status}`);
-            }
-        } catch (error) {
-            console.error("Error submitting data:", error);
-        }
-    }
 
     /************************************************************************************ */
     /* SUBMIT DATA --- send to backend to add to database */

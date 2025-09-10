@@ -43,8 +43,6 @@ interface AddItemsProps {
 function AddItemsForm({
     ID,
     setDataBuffer,
-    fileInfo,
-    setFileInfo,
 }: AddItemsProps) {
     const { setUUID } = useUUIDStore();
     const form = usePurchaseForm();
@@ -58,7 +56,7 @@ function AddItemsForm({
         trigger,
         handleAssignCO,
     } = form;
-    const { errors, isValid, isSubmitted } = formState;
+    const { errors, isValid } = formState;
     const [showSuccess, setShowSuccess] = useState(false);
     const [selectedCO, setSelectedCO] = useState<number | "">("");
 

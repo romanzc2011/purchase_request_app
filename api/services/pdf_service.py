@@ -361,14 +361,14 @@ class PDFService:
             canvas.setFont("Play-Bold", 9)
             text_x = 0.2*inch
             text_y = y_logo - img_h - 20
-            date_val = first.get("dateneed")
+            date_val = first.get("datereq")
             
             # Use the function argument or fallback to row value
             order_type_val_local = order_type if order_type else first.get("orderType")
             date_str = None
 
             # ----------------------------------------------------------------------------
-            # Format date needed
+            # Format date
             if isinstance(date_val, (datetime, date)):
                 date_str = date_val.strftime("%Y-%m-%d")
                 
@@ -396,7 +396,7 @@ class PDFService:
                 ("RQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", format_username(first.get("requester","") or "")),
                 ("CO:", contracting_officer or "None"),
-                ("Date Needed:", date_str),
+                ("Date:", date_str),
                 ("Status:", ItemStatus(first.get("status","")).value),
                 ("Approved By:", approved_text),
             ]
