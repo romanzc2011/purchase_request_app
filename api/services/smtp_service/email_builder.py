@@ -94,7 +94,7 @@ class ApproverEmailBuilder(EmailBuilder):
         logger.debug(f"Email builder - current_user: {self.current_user}")
         if self.current_user is None:
             logger.error("Email builder has None current_user!")
-        pdf_path = await pdf_service.create_pdf(self.request.id, self.db)
+        pdf_path = await pdf_service.create_pdf(self.request.id, self.db, current_user=self.current_user)
         
         attachments.append(str(pdf_path))
         for r in rows:

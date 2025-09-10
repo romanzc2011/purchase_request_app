@@ -195,7 +195,6 @@ async def download_statement_of_need_form(
             db=db,
             payload=payload,
             current_user=current_user,
-            sid=sid
         )
         
         # Convert to Path object if it's a string
