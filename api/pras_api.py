@@ -192,7 +192,8 @@ async def download_statement_of_need_form(
         output_path = await pdf_service.create_pdf(
             ID=ID,
             db=db,
-            payload=payload
+            payload=payload,
+            current_user=current_user
         )
         
         # Convert to Path object if it's a string

@@ -17,6 +17,7 @@ from reportlab.lib.units import inch
 from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
+from fastapi import Depends
 from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
 from datetime import datetime
@@ -25,9 +26,27 @@ from sqlalchemy import select
 from api.utils.misc_utils import get_justifications_and_comments
 from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import AsyncSession
+from api.services.auth_service import AuthService
+from api.services.ldap_service import LDAPService
+from api.schemas.ldap_schema import LDAPUser
 from api.services.progress_tracker.steps.download_steps import DownloadStepName
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
 from api.services.progress_tracker.progress_manager import get_active_tracker, get_approval_tracker, get_download_tracker, get_submit_request_tracker, ProgressTrackerType
+import api.services.socketio_server.sio_events as sio_events
+from api.settings import settings
+
+# Create auth service instance locally to prevent the circular import issue
+ldap_service = LDAPService(
+    ldap_url=settings.ldap_server,
+    bind_dn=settings.ldap_service_user,
+    bind_password=settings.ldap_service_password,
+    group_dns=[
+        settings.it_group_dns,
+        settings.cue_group_dns,
+        settings.access_group_dns,
+    ],
+)
+auth_service = AuthService(ldap_service=ldap_service)
 
 class PDFService:
     def __init__(self):
@@ -52,6 +71,7 @@ class PDFService:
         payload: dict | None = None,
         comments: list[str] | None = None,
         is_cyber: bool = False,
+        current_user: LDAPUser = None
     ) -> Path:
         logger.info(f"#####################################################")
         logger.info("create_pdf()")
@@ -61,17 +81,14 @@ class PDFService:
             raise HTTPException(status_code=400, detail="ID is required")
         
         tracker = get_active_tracker()
+        sid = sio_events.get_user_sid(current_user)
         
         # Init local trackers to prevent error
         download_tracker = None
         approval_tracker = None
         submit_request_tracker = None
 
-        # Get download tracker
-        if tracker and tracker.active_tracker == ProgressTrackerType.DOWNLOAD:
-            download_tracker = get_download_tracker()
-        
-        # Try to get submit request tracker, but don't fail if it doesn't exist
+        # Get appropriate tracker based on active tracker type
         if tracker:
             match tracker.active_tracker:
                 case ProgressTrackerType.DOWNLOAD:
@@ -83,8 +100,16 @@ class PDFService:
                 case ProgressTrackerType.APPROVAL:
                     approval_tracker = get_approval_tracker()
         
+        if sid and download_tracker:
+            download_tracker.send_start_msg(sid)
+            step_data = download_tracker.mark_step_done(DownloadStepName.VERIFY_FILE_EXISTS)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
+        
         if submit_request_tracker:
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         # Fetch the flattened approval rows, and final approve data with timestamps
         rows = await dbas.fetch_flat_approvals(db, ID=ID)
@@ -99,8 +124,13 @@ class PDFService:
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Only run if this is from the download pdf signal
         if download_tracker:
-            download_tracker.mark_step_done(DownloadStepName.FETCH_APPROVAL_DATA)
-            download_tracker.mark_step_done(DownloadStepName.FETCH_FLAT_APPROVALS)
+            step_data = download_tracker.mark_step_done(DownloadStepName.FETCH_APPROVAL_DATA)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
+                
+            step_data = download_tracker.mark_step_done(DownloadStepName.FETCH_FLAT_APPROVALS)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         if not rows:
             raise HTTPException(status_code=404, detail="No approvals found for this ID")
@@ -116,11 +146,15 @@ class PDFService:
         # Fetch additional comment fr   om database if present
         additional_comments = await get_justifications_and_comments(db, ID)
         if download_tracker:
-            download_tracker.mark_step_done(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
+            step_data = download_tracker.mark_step_done(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         contracting_officer = await dbas.get_contracting_officer_by_id(db, ID)
         if download_tracker:
-            download_tracker.mark_step_done(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
+            step_data = download_tracker.mark_step_done(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         # ------------------------------------------------------------------------
         # 3️⃣ Load SonComments via async select
@@ -137,7 +171,9 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
-            download_tracker.mark_step_done(DownloadStepName.GET_LINE_ITEMS)
+            step_data = download_tracker.mark_step_done(DownloadStepName.GET_LINE_ITEMS)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         # Get SonComments by line_item_uuid (more reliable)
         son_comments_stmt = (
@@ -164,7 +200,9 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
-            download_tracker.mark_step_done(DownloadStepName.GET_SON_COMMENTS)
+            step_data = download_tracker.mark_step_done(DownloadStepName.GET_SON_COMMENTS)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         # Build your comment arrayrrr
         comment_arr: list[str] = []
@@ -180,14 +218,20 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
-            download_tracker.mark_step_done(DownloadStepName.GET_ORDER_TYPES)
+            step_data = download_tracker.mark_step_done(DownloadStepName.GET_ORDER_TYPES)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
-            download_tracker.mark_step_done(DownloadStepName.LOAD_PDF_TEMPLATE)
+            step_data = download_tracker.mark_step_done(DownloadStepName.LOAD_PDF_TEMPLATE)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
             
         if submit_request_tracker:
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
+            if step_data:
+                await sio_events.progress_update(sid, step_data)
         
         # 5️⃣ Render the PDF
         output_path = self.output_dir / f"statement_of_need-{ID}.pdf"
@@ -208,14 +252,24 @@ class PDFService:
         
         # Progress tracking after PDF generation is complete
         if download_tracker:
-            download_tracker.mark_step_done(DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
-            download_tracker.mark_step_done(DownloadStepName.RENDER_PDF_BINARY)
-            download_tracker.mark_step_done(DownloadStepName.SAVE_PDF_TO_DISK)
+            step_data = download_tracker.mark_step_done(DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
+            await sio_events.progress_update(sid, step_data)
+                
+            step_data = download_tracker.mark_step_done(DownloadStepName.RENDER_PDF_BINARY)
+            await sio_events.progress_update(sid, step_data)
+                
+            step_data = download_tracker.mark_step_done(DownloadStepName.SAVE_PDF_TO_DISK)
+            await sio_events.progress_update(sid, step_data)
         
         if submit_request_tracker:
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
-            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
+            await sio_events.progress_update(sid, step_data)
+            
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
+            await sio_events.progress_update(sid, step_data)
+            
+            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
+            await sio_events.progress_update(sid, step_data)
         
         return result
             

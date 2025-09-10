@@ -24,22 +24,6 @@ auth_service = AuthService(ldap_service=ldap_service)
 async def decode_and_validate_token(token: str) -> LDAPUser:
     return await auth_service.get_current_user(token)
 
-# Extract sid helper function
-def get_user_sid(current_user: LDAPUser = Depends(auth_service.get_current_user)):
-    user_sid_set = user_sids.get(current_user.username, set())
-    
-    # Extract specific sid from the user_sid_set
-    if not user_sid_set:
-        logger.warning(f"No SocketIO session found for user {current_user.username}")
-        # Continue without progress tracking if no session
-        sid = None
-        return sid
-    else:
-        # Use the first available session ID
-        sid = next(iter(user_sid_set))
-        logger.debug(f"SID: {sid}")
-        return sid
-
 # SocketIO events
 @sio.event
 async def connect(sid, environ, auth):
