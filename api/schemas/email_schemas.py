@@ -26,7 +26,6 @@ class EmailPayloadRequest(BaseModel):
     requester: str
     requester_email: str
     datereq: date
-    dateneed: Optional[date] = None
     orderType: Optional[str] = None 
     additional_comments: Optional[List[str]] = None
     approval_date: Optional[str] = None

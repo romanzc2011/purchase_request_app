@@ -1131,6 +1131,11 @@ async def approve_deny_request(
     """
     try:
         logger.debug("APPROVE/DENY REQUEST")
+        logger.debug(f"Current user: {current_user}")
+        if current_user is None:
+            logger.error("Current user is None - authentication failed")
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
         approval_tracker = create_approval_tracker()
 
         # Get the SocketIO session ID for the current user
@@ -1212,6 +1217,7 @@ async def approve_deny_request(
                 logger.warning(f"Multiple PendingApproval records found for item_uuid: {item_uuid}, purchase_request_id: {payload.ID}. Using the first one.")
             
             # Use the first row if multiple are found
+            
             row = rows[0]
             pending_approval_id = row.pending_approval_id
             assigned_group = row.assigned_group
@@ -1221,12 +1227,17 @@ async def approve_deny_request(
                 if step_data:
                     await sio_events.progress_update(sid, step_data)
 
+            # Debug current_user before using it
+            logger.debug(f"Creating approval request - current_user: {current_user}")
+            if current_user is None:
+                logger.error("Current user is None when creating approval request")
+                raise HTTPException(status_code=401, detail="Authentication required")
+            
             approval_request = ApprovalRequest(
                 id=payload.ID,
                 uuid=item_uuid,
                 pending_approval_id=pending_approval_id,
                 fund=item_fund,
-                assigned_group=assigned_group,
                 status=target_status,
                 total_price=total_price,
                 action=payload.action,
@@ -1237,7 +1248,18 @@ async def approve_deny_request(
                 step_data = approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_BUILT)
                 if step_data:
                     await sio_events.progress_update(sid, step_data)
-            router_result = await router.route(approval_request, db, current_user, ldap_service)
+            
+            # Debug current_user before router call
+            logger.debug(f"Before router.route - current_user: {current_user}")
+            if current_user is None:
+                logger.error("Current user is None before router.route call")
+                raise HTTPException(status_code=401, detail="Authentication required")
+            
+            try:
+                router_result = await router.route(approval_request, db, current_user, ldap_service)
+            except Exception:
+                logger.exception("router.route(...) failed: likely attempted .username on None or similar")
+                raise
 
             ipc_data = await ipc_status.read()
             logger.debug(f"IPC STATUS: {ipc_data}")
@@ -1253,7 +1275,6 @@ async def approve_deny_request(
                             ApprovalStepName.APPROVAL_EMAIL_SENT.value
                         ]
                     })
-            await ipc_status.reset_progress_state()
 
             results.append({
                 "uuid": item_uuid,
@@ -1264,9 +1285,9 @@ async def approve_deny_request(
         return results
 
     except Exception as e:
-        logger.error(f"Error approving/denying request: {e}")
+        logger.exception("approve_deny_request failed")  # full traceback
         reset_signals()
-        raise HTTPException(status_code=500, detail=f"Error approving/denying request: {e}")
+        raise HTTPException(status_code=500, detail="Internal error while approving/denying request")
     
 ##########################################################################
 ## REFRESH TOKEN

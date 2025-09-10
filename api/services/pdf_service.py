@@ -105,12 +105,14 @@ class PDFService:
                     approval_tracker = get_approval_tracker()
         
         if sid and download_tracker:
+            logger.debug("Line 107: Starting download tracker")
             download_tracker.send_start_msg(sid)
             step_data = download_tracker.mark_step_done(DownloadStepName.VERIFY_FILE_EXISTS)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
         
         if submit_request_tracker:
+            logger.debug("Line 114: Submit request tracker - PDF generation started")
             step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
@@ -128,10 +130,12 @@ class PDFService:
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Only run if this is from the download pdf signal
         if download_tracker:
+            logger.debug("Line 130: Download tracker - fetch approval data")
             step_data = download_tracker.mark_step_done(DownloadStepName.FETCH_APPROVAL_DATA)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
                 
+            logger.debug("Line 135: Download tracker - fetch flat approvals")
             step_data = download_tracker.mark_step_done(DownloadStepName.FETCH_FLAT_APPROVALS)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
@@ -150,12 +154,14 @@ class PDFService:
         # Fetch additional comment fr   om database if present
         additional_comments = await get_justifications_and_comments(db, ID)
         if download_tracker:
+            logger.debug("Line 152: Download tracker - get justifications and comments")
             step_data = download_tracker.mark_step_done(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
         
         contracting_officer = await dbas.get_contracting_officer_by_id(db, ID)
         if download_tracker:
+            logger.debug("Line 163: Download tracker - get contracting officer by ID")
             step_data = download_tracker.mark_step_done(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
@@ -175,6 +181,7 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
+            logger.debug("Line 178: Download tracker - get line items")
             step_data = download_tracker.mark_step_done(DownloadStepName.GET_LINE_ITEMS)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
@@ -204,6 +211,7 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
+            logger.debug("Line 207: Download tracker - get SON comments")
             step_data = download_tracker.mark_step_done(DownloadStepName.GET_SON_COMMENTS)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
@@ -222,17 +230,20 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
+            logger.debug("Line 230: Download tracker - get order types")
             step_data = download_tracker.mark_step_done(DownloadStepName.GET_ORDER_TYPES)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
+            logger.debug("Line 239: Download tracker - load PDF template")
             step_data = download_tracker.mark_step_done(DownloadStepName.LOAD_PDF_TEMPLATE)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
             
         if submit_request_tracker:
+            logger.debug("Line 245: Submit request tracker - PDF template loaded")
             step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
             if step_data:
                 await get_sio_events().progress_update(sid, step_data)
@@ -256,22 +267,28 @@ class PDFService:
         
         # Progress tracking after PDF generation is complete
         if download_tracker:
+            logger.debug("Line 269: Download tracker - merge data into template")
             step_data = download_tracker.mark_step_done(DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
             await get_sio_events().progress_update(sid, step_data)
                 
+            logger.debug("Line 273: Download tracker - render PDF binary")
             step_data = download_tracker.mark_step_done(DownloadStepName.RENDER_PDF_BINARY)
             await get_sio_events().progress_update(sid, step_data)
                 
+            logger.debug("Line 276: Download tracker - save PDF to disk")
             step_data = download_tracker.mark_step_done(DownloadStepName.SAVE_PDF_TO_DISK)
             await get_sio_events().progress_update(sid, step_data)
         
         if submit_request_tracker:
+            logger.debug("Line 282: Submit request tracker - PDF data merged")
             step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
             await get_sio_events().progress_update(sid, step_data)
             
+            logger.debug("Line 285: Submit request tracker - PDF rendered")
             step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
             await get_sio_events().progress_update(sid, step_data)
             
+            logger.debug("Line 288: Submit request tracker - PDF saved to disk")
             step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
             await get_sio_events().progress_update(sid, step_data)
         

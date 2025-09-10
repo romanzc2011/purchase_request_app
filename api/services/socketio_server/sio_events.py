@@ -1,10 +1,11 @@
 from api.services.socketio_server.sio_instance import sio
 from loguru import logger
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 from api.schemas.ldap_schema import LDAPUser
 from api.services.socketio_server.socket_state import user_sids, sid_user as sid_user_map
 from fastapi import Depends
 from api.dependencies.pras_dependencies import auth_service
+from api.utils.misc_utils import format_username
 
 async def decode_and_validate_token(token: str) -> LDAPUser:
     return await auth_service.get_current_user(token)
@@ -38,28 +39,55 @@ async def progress_update(sid: str, payload: Dict[str, Any]) -> None:
 async def start_toast(sid: str, percent: int = 0) -> None:
     await sio.emit("START_TOAST", {"percent_complete": percent}, to=sid)
 
-def get_user_sid(current_user) -> str | None:
+def get_user_sid(user_or_name: Union[str, "LDAPUser", None]) -> Optional[str]:
     """
     Get the SocketIO session ID for the current user.
     Returns None if no session is found.
     """
     from api.services.socketio_server.socket_state import user_sids
-    user_sid_set = user_sids.get(current_user.username, set())
-    if not user_sid_set:
-        logger.warning(f"No SocketIO session found for user {current_user.username}")
+    
+    if user_or_name is None:
+        logger.warning("get_user_sid called with None user")
         return None
-    else:
-        # Use the first available session ID
-        return next(iter(user_sid_set))
     
-    
+    # accept either LDAPUser or raw username
+    username = getattr(user_or_name, "username", user_or_name)
+    if not isinstance(username, str) or not username:
+        logger.warning(f"get_user_sid: invalid username payload: {user_or_name!r}")
+        return None
+
+    sid_set = user_sids.get(username, set())
+    if not sid_set:
+        logger.warning(f"No SocketIO session found for user {username}")
+        return None
+
+    sid = next(iter(sid_set))
+    logger.debug(f"Found SocketIO session {sid} for user {username}")
+    return sid
+
 @sio.event
 async def disconnect(sid):
-    logger.debug("socketio: disconnect ", sid)
+    logger.debug(f"socketio: disconnect {sid}")
+    
+    # Clean up user session mappings
+    if sid in sid_user_map:
+        username = sid_user_map[sid]
+        if username in user_sids:
+            user_sids[username].discard(sid)
+            # Remove empty user entries
+            if not user_sids[username]:
+                del user_sids[username]
+        del sid_user_map[sid]
+        logger.debug(f"Cleaned up session mappings for user {username}")
     
 @sio.event
 async def ping_from_client(sid, data):
     await sio.emit("pong_from_server", {"got": data}, to=sid)
+
+@sio.event
+async def connection_timeout(sid):
+    logger.debug(f"socketio: connection_timeout {sid}")
+    await sio.emit("CONNECTION_TIMEOUT", {"message": "Connection timed out. Reconnecting..."}, to=sid)
     
 @sio.on("reset_data")
 async def reset_data(sid):

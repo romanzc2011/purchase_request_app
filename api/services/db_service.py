@@ -869,6 +869,7 @@ async def get_final_approved_by_id(db: AsyncSession, ID: str) -> Optional[FinalA
     result = await db.execute(stmt)
     rows = result.all()
     if not rows:
+        logger.error(f"No final approved by ID: {ID}")
         return None
     
     # If multiple rows, use the first one (most recent)

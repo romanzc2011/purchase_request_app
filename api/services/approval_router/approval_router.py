@@ -43,6 +43,12 @@ class ApprovalRouter:
     
     def _update_handlers_with_user(self, current_user: LDAPUser):
         """Update all handlers in the chain with current_user"""
+        from loguru import logger
+        logger.debug(f"Router _update_handlers_with_user - current_user: {current_user}")
+        if current_user is None:
+            logger.error("Router received None current_user")
+            return
+            
         handler = self._head
         while handler:
             if not hasattr(handler, 'current_user') or handler.current_user is None:

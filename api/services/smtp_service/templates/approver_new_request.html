@@ -76,15 +76,13 @@
             <strong>CO:</strong> {{ CO or 'None' }}
           </p>
           <p style="margin: 4px 0; font-size: 14px;">
-            <strong>Date Needed:</strong>
-            {% if dateneed %}
-              {{ dateneed.strftime("%Y-%m-%d") if dateneed else dateneed }}
-            {% elif orderType == 'QUARTERLY_ORDER' %}
+            <strong>Order Type:</strong>
+            {% if orderType == 'QUARTERLY_ORDER' %}
               Quarterly Order
             {% elif orderType == 'NO_RUSH' %}
               No Rush
             {% else %}
-              Not specified
+              Standard
             {% endif %}
           </p>
         </td>

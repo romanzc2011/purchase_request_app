@@ -33,7 +33,6 @@ approval_schema = Schema(
     CO            = TEXT(stored=True),
     requester     = TEXT(stored=True, analyzer=StemmingAnalyzer()),
     datereq       = TEXT(stored=True),
-    dateneed      = TEXT(stored=True),
     orderType     = TEXT(stored=True),
     itemDescription = TEXT(stored=True),
     justification = TEXT(stored=True),
@@ -52,7 +51,7 @@ approval_schema = Schema(
 
 # Fields used for full-text/prefix searching
 searchable_fields = [
-    'ID', 'IRQ1_ID', 'CO', 'requester', 'dateneed', 'datereq', 'budgetObjCode',
+    'ID', 'IRQ1_ID', 'CO', 'requester', 'datereq', 'budgetObjCode',
     'fund', 'itemDescription', 'justification', 'trainNotAval', 'needsNotMeet',
     'quantity', 'totalPrice', 'priceEach', 'location', 'status', 'createdTime'
 ]
@@ -133,7 +132,7 @@ class SearchService:
                         elif isinstance(value, datetime):
                             # Store datetime as string in YYYY-MM-DD format
                             doc[key] = value.strftime('%Y-%m-%d')
-                        elif isinstance(value, str) and key in ['datereq', 'dateneed', 'createdTime']:
+                        elif isinstance(value, str) and key in ['datereq', 'createdTime']:
                             # Handle string dates - try to parse and reformat
                             try:
                                 dt = datetime.fromisoformat(value.replace('Z', '+00:00'))

@@ -24,6 +24,7 @@ from api.utils.misc_utils import get_justifications_and_comments
 from api.schemas.enums import AssignedGroup
 from api.services.ipc_status import ipc_status
 from api.services.socketio_server.sio_instance import sio
+from api.services.ipc_status import ipc_status
 
 class SMTP_Service:
     def __init__(
@@ -67,7 +68,6 @@ class SMTP_Service:
                 "ID": payload.ID,
                 "requester": payload.requester,
                 "datereq": payload.datereq,
-                "dateneed": payload.dateneed,
                 "approval_date": payload.approval_date,
                 "orderType": payload.orderType,
                 "additional_comments": additional_comments,
@@ -280,6 +280,7 @@ class SMTP_Service:
         
         logger.info(f"SENDING TO: {to_address} :: {to_username}")
         logger.info(f"CC TO:     {cc_address} :: {cc_username}")
+        await ipc_status.update(field="approval_email_sent", value=True)  # To inform progress bar that email has been sent
         await self._send_mail_async(
             payload,
             db=db,

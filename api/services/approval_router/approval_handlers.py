@@ -21,8 +21,8 @@ from api.services.approval_router.approver_policy import ApproverPolicy
 from api.services.smtp_service.email_builder import ApproverEmailBuilder
 from api.services.ldap_service import LDAPService
 from api.utils.misc_utils import reset_signals
-from api.services.ipc_status import ipc_status
 import api.services.socketio_server.sio_events as sio_events
+from api.services.ipc_status import ipc_status
 
 
 # Approval Router to determine the routing of requests
@@ -285,6 +285,9 @@ class ClerkAdminHandler(Handler):
         
         current_status = row[0]
         logger.debug(f"CURRENT STATUS: {current_status}")
+        
+        if current_status == ItemStatus.PENDING_APPROVAL:
+            await ipc_status.update(field="request_pending", value=True)
         
         logger.debug("CLERK ADMIN HANDLER PROCESSING REQUEST")
         can_approve_now = await approver_policy.can_fully_approve(

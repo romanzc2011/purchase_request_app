@@ -48,7 +48,6 @@ class ApproverEmailBuilder(EmailBuilder):
 			select(
 				PurchaseRequestHeader.requester,
 				PurchaseRequestHeader.datereq,
-				PurchaseRequestHeader.dateneed,
 				PurchaseRequestHeader.orderType,
 				PurchaseRequestHeader.pdf_output_path,
 				PurchaseRequestLineItem.budgetObjCode,
