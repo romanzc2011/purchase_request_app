@@ -86,6 +86,7 @@ class LDAPService:
             )
             return self._service_conn
         except (LDAPSocketOpenError, LDAPExceptionError, ssl.SSLError, OSError) as e:
+            # Send error message to frontend to show user
             logger.warning(f"LDAP socket error or SSL failure detected: {e}. Rebinding...")
             try:
                 self._service_conn = self._bind(self.bind_dn, self.bind_password, use_tls=True)

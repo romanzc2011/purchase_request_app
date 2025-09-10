@@ -283,6 +283,7 @@ async def generate_pdf(
     payload: PurchaseRequestPayload, 
     ID: str, 
     db: AsyncSession,
+    current_user: LDAPUser = None,
     uploaded_files: Optional[List[str]] = None) -> str:
     try:
         # Make sure dir exists
@@ -293,7 +294,8 @@ async def generate_pdf(
         pdf_path = await pdf_service.create_pdf(
             ID=ID,
             db=db,
-            payload=jsonable_encoder(payload)
+            payload=jsonable_encoder(payload),
+            current_user=current_user
         )
         
         # Convert to absolute path and verify it exists
@@ -458,9 +460,7 @@ async def send_purchase_request(
 			.values(
 				IRQ1_ID=payload.irq1_id,
 				requester=format_username(current_user.username),
-				phoneext=payload.items[0].phoneext,
 				datereq=payload.items[0].datereq,
-				dateneed=payload.items[0].dateneed,
 				orderType=payload.items[0].order_type,
 				submission_status="SUBMITTED",
 				created_time=utc_now_truncated()
@@ -575,9 +575,7 @@ async def send_purchase_request(
                 purchase_request_id=purchase_req_id,
                 requester=format_username(payload.requester),
                 CO=contracting_officer_username,
-                phoneext=item.phoneext,
                 datereq=item.datereq,
-                dateneed=item.dateneed,
                 orderType=item.order_type,
                 itemDescription=item.item_description,
                 justification=item.justification,
@@ -644,7 +642,7 @@ async def send_purchase_request(
                 step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
                 if step_data:
                     await sio_events.progress_update(sid, step_data)
-            pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
+            pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, current_user, uploaded_files)
             
             
             #! PROGRESS TRACKING ----------------------------------------------------------
@@ -681,7 +679,6 @@ async def send_purchase_request(
         "requester": payload.requester,
         "requester_email": requester_email,
         "datereq": payload.items[0].datereq,
-        "dateneed": payload.items[0].dateneed,
         "orderType": payload.items[0].order_type,
         "subject": f"Purchase Request #{purchase_req_id}",
         "sender": settings.smtp_email_addr,

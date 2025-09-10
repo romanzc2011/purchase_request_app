@@ -11,7 +11,6 @@ import { TextField, Typography } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import LocationPicker from "./LocationPicker";
 import { PurchaseItem, OrderType } from "../../schemas/purchaseSchema";
-import FileUpload from "./FileUpload";
 import FundPicker from "./FundPicker";
 import PriceInput from "./PriceInput";
 import QuantityInput from "./QuantityInput";
@@ -93,9 +92,8 @@ function AddItemsForm({
     }, [showSuccess]);
 
     // Keep these header values between add items
-    const [requester, phoneext, datereq, dateneed, orderType] = watch([
+    const [requester, datereq, dateneed, orderType] = watch([
         "requester",
-        "phoneext",
         "datereq",
         "dateneed",
         "orderType"
@@ -126,16 +124,9 @@ function AddItemsForm({
                 orderType: data.orderType || "",
                 priceEach: data.priceEach,
                 status: "NEW REQUEST" as any,
-                dateneed: data.dateneed === "" ? "" : (data.dateneed || ""),
                 trainNotAval: data.trainNotAval || false,
                 needsNotMeet: data.needsNotMeet || false,
                 totalPrice: data.totalPrice || (data.priceEach * data.quantity),
-                fileAttachments: data.fileAttachments?.map(f => ({
-                    attachment: f.attachment || null,
-                    name: f.name,
-                    type: f.type,
-                    size: f.size
-                })) || []
             };
 
             // Store the UUID in the UUID store AFTER we have the ID
@@ -155,7 +146,6 @@ function AddItemsForm({
             if (!isSubmittedSig.value) {
                 reset({
                     requester,
-                    phoneext,
                     datereq,
                     dateneed,
                     orderType,
@@ -199,7 +189,6 @@ function AddItemsForm({
             // Clear form state completely
             reset({
                 requester: "",
-                phoneext: "",
                 datereq: formattedToday,
                 dateneed: null,
                 orderType: OrderType.STANDARD,
@@ -286,33 +275,6 @@ function AddItemsForm({
                                 label=""
                                 freeSolo
                                 rules={{ required: "Name of requester is required" }}
-                            />
-                        </Grid>
-                    </Grid>
-
-                    {/******************************************************************************************* */}
-                    {/** PHONE EXT ****************************************************************************** */}
-                    {/******************************************************************************************* */}
-                    <Grid container spacing={1} alignItems="center" sx={{ mt: 4 }}>
-                        <Grid size={{ xs: 2 }}>
-                            <Typography
-                                variant="button"
-                                component="label"
-                                htmlFor="phoneext"
-                            >
-                                <strong>Phone Extension</strong>
-                            </Typography>
-                        </Grid>
-                        <Grid size={{ xs: 6, sm: 3 }}>
-                            <TextField
-                                id="phoneext"
-                                className="form-control"
-                                fullWidth
-                                variant="outlined"
-                                size="small"
-                                {...register("phoneext")}
-                                error={!!errors.phoneext}
-                                helperText={errors.phoneext?.message}
                             />
                         </Grid>
                     </Grid>

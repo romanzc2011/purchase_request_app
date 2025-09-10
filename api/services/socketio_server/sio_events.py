@@ -1,28 +1,15 @@
 from api.services.socketio_server.sio_instance import sio
 from loguru import logger
 from typing import Any, Dict
-from api.services.auth_service import AuthService
-from api.services.ldap_service import LDAPService
 from api.schemas.ldap_schema import LDAPUser
-from api.settings import settings
 from api.services.socketio_server.socket_state import user_sids, sid_user as sid_user_map
 from fastapi import Depends
-
-# Create auth service instance locally to prevent the circular import issue
-ldap_service = LDAPService(
-    ldap_url=settings.ldap_server,
-    bind_dn=settings.ldap_service_user,
-    bind_password=settings.ldap_service_password,
-    group_dns=[
-        settings.it_group_dns,
-        settings.cue_group_dns,
-        settings.access_group_dns,
-    ],
-)
-auth_service = AuthService(ldap_service=ldap_service)
+from api.dependencies.pras_dependencies import auth_service
 
 async def decode_and_validate_token(token: str) -> LDAPUser:
     return await auth_service.get_current_user(token)
+
+# Extract sid helper function - removed duplicate definition
 
 # SocketIO events
 @sio.event

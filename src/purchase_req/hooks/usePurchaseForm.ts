@@ -12,7 +12,6 @@ export const usePurchaseForm = () => {
 	resolver: zodResolver(purchaseItemSchema),
 	defaultValues: {
 		requester: "",
-		phoneext: "",
 		datereq: today,
 		dateneed: null,
 		orderType: OrderType.STANDARD,

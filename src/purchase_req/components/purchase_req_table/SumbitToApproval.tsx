@@ -161,13 +161,9 @@ function SubmitApprovalTable({
                 UUID: item.UUID || uuidv4(),
                 IRQ1_ID: item.IRQ1_ID || null,
                 requester: item.requester,
-                phoneext: String(item.phoneext),
                 datereq: item.datereq instanceof Date
                     ? item.datereq.toISOString().split('T')[0]
                     : item.datereq || null,
-                dateneed: item.dateneed instanceof Date
-                    ? item.dateneed.toISOString().split('T')[0]
-                    : item.dateneed || null,
                 orderType: item.orderType || OrderType.STANDARD,
                 itemDescription: item.itemDescription,
                 justification: item.justification,
@@ -215,11 +211,6 @@ function SubmitApprovalTable({
             if (setID) {
                 setID(requestId);
             }
-
-            // Upload files if any exist
-            // if (fileInfo.length > 0) {
-            //     await handleFileUpload(requestId);
-            // }
 
         } catch (error) {
             console.error("Error submitting data:", error);

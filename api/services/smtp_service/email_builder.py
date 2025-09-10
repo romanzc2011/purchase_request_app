@@ -109,7 +109,6 @@ class ApproverEmailBuilder(EmailBuilder):
             requester=format_username(rows[0].requester),
             requester_email=requester_email,
             datereq=rows[0].datereq,
-            dateneed=rows[0].dateneed,
             orderType=rows[0].orderType,
             approval_date=dbas.utc_now_truncated().strftime("%Y-%m-%d"),
             subject=f"Purchase Request #{self.request.id}",

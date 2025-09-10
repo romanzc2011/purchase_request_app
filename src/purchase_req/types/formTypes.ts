@@ -9,16 +9,8 @@ export type FormValues = {
   ID: string;
   IRQ1_ID: string;
   requester: string;
-  phoneext: string;
   datereq: Date | string;
-  dateneed: Date | string;
   orderType: string;
-  fileAttachments: {
-    attachment: File | null;
-    name?: string;
-    type?: string;
-    size?: number;
-  }[];
   itemDescription: string;
   justification: string;
   trainNotAval: boolean;
@@ -87,7 +79,6 @@ export const locations = [
 /********************************************************/
 export type Globals = {
 	requester: string;
-	phoneext: string;
 	datereq: Date | string;
 	dateneed?: Date | string;
 	orderType?: string;

@@ -27,9 +27,7 @@ class BasePurchaseItem(BaseModel):
     irq1_id: Optional[str] = Field(alias="IRQ1_ID", default=None)
     co: Optional[str] = Field(alias="CO", default=None)
     requester: str
-    phoneext: str
     datereq: str
-    dateneed: Optional[str] = None
     order_type: Optional[str] = Field(alias="orderType", default=None)
     item_description: str = Field(alias="itemDescription")
     justification: str
@@ -82,11 +80,6 @@ class PurchaseResponse(BaseModel):
     message: str
     request_id: Optional[str]
 
-# ────────────────────────────────────────────────
-# INDIVIDUAL ITEM SCHEMA (ALIAS FOR BACKWARD COMPATIBILITY)
-# Used for processing individual purchase items
-# Now inherits from BasePurchaseItem for consistency
-# ────────────────────────────────────────────────
 class PurchaseItem(BasePurchaseItem):
     # This is now just an alias for backward compatibility
     # All functionality is inherited from BasePurchaseItem
@@ -101,9 +94,7 @@ class PurchaseRequestHeader(BaseModel):
     irq1_id: Optional[str] = None
     co: Optional[str] = None
     requester: str
-    phoneext: Optional[int] = None
     datereq: str
-    dateneed: Optional[str] = None
     order_type: Optional[str] = None
     status: ItemStatus
     created_time: Optional[datetime] = None

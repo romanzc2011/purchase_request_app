@@ -14,7 +14,6 @@ export const purchaseItemSchema = z
     IRQ1_ID:         z.string().optional(),
 
     requester:       z.string().min(1, "Requester is required"),
-    phoneext:        z.string().min(1, "Phone extension is required"),
 	
     datereq:         z.string().nonempty("Date requested is required"),
     dateneed: z

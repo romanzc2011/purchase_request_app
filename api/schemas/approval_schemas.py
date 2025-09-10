@@ -57,11 +57,8 @@ class ApprovalSchema(BaseModel):
     IRQ1_ID: Optional[str] = None
     requester: str
     CO: Optional[str] = None
-    phoneext: int
     datereq: str
-    dateneed: Optional[str] = None
     orderType: Optional[str] = None
-    fileAttachments: Optional[bytes] = None
     itemDescription: str
     justification: str
     trainNotAval: Optional[bool] = False
@@ -94,9 +91,7 @@ class ApprovalView(BaseModel):
     irq1_id:           Optional[str]
     co:                Optional[str]
     requester:         str
-    phoneext:          int
     datereq:           str
-    dateneed:          Optional[str]
     order_type:        Optional[str]
 
     # line-item fields

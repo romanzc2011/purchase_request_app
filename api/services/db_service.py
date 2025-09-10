@@ -76,9 +76,7 @@ class PurchaseRequestHeader(Base):
     IRQ1_ID                : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
     CO                     : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     requester              : Mapped[str] = mapped_column(String, nullable=False)
-    phoneext               : Mapped[int] = mapped_column(Integer, nullable=False)
     datereq                : Mapped[str] = mapped_column(String)
-    dateneed               : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     orderType              : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     pdf_output_path        : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     contracting_officer_id : Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("contracting_officers.id"), nullable=True)
@@ -191,11 +189,8 @@ class Approval(Base):
     IRQ1_ID                : Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
     requester              : Mapped[str] = mapped_column(String, nullable=False)
     CO                     : Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    phoneext               : Mapped[int] = mapped_column(Integer, nullable=False)
     datereq                : Mapped[str] = mapped_column(String)
-    dateneed               : Mapped[Optional[str]] = mapped_column(String, nullable=True)
     orderType              : Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    fileAttachments        : Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     itemDescription        : Mapped[str] = mapped_column(Text)
     justification          : Mapped[str] = mapped_column(Text)
     trainNotAval           : Mapped[bool] = mapped_column(Boolean, nullable=True)
@@ -436,7 +431,6 @@ async def set_purchase_req_id(db: AsyncSession) -> str:
     new_req = PurchaseRequestHeader(
         ID="",
         requester="PENDING",
-        phoneext=0,
         datereq=utc_now_truncated().strftime("%Y-%m-%d"),
     )
     db.add(new_req)
@@ -607,11 +601,8 @@ async def fetch_flat_approvals(
             hdr.IRQ1_ID.label("IRQ1_ID"),
             hdr.requester.label("requester"),
             hdr.CO.label("CO"),
-            hdr.phoneext.label("phoneext"),
             hdr.datereq.label("datereq"),
-            hdr.dateneed.label("dateneed"),
             hdr.orderType.label("orderType"),
-            literal(None).label("fileAttachments"),  # Set to None for now
             li.itemDescription.label("itemDescription"),
             li.justification.label("justification"),
             li.trainNotAval.label("trainNotAval"),
@@ -870,7 +861,6 @@ async def mark_final_approval_as_approved(
 ###################################################################################################
 # GET FINAL APPROVED
 ###################################################################################################
-
 async def get_final_approved_by_id(db: AsyncSession, ID: str) -> Optional[FinalApproval]:
     stmt = (
         select(FinalApproval.final_approved_by, FinalApproval.final_approved_at)

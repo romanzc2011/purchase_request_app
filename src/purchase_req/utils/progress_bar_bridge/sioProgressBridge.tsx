@@ -117,6 +117,13 @@ export function setupSocketProgressBridge() {
         }
     };
 
+    /****************************************************************************************/
+    /* CONNECTION TIMEOUT */
+    /****************************************************************************************/
+    const onConnectionTimeout = (payload: { message: string }) => {
+        toast.error(payload.message);
+    };
+
     const onNoUserFound = (payload: { message: string }) => {
         toast.error(payload.message);
     };
@@ -141,6 +148,7 @@ export function setupSocketProgressBridge() {
     socketioInstance.on("connect_error", onConnectError);
     socketioInstance.on("START_TOAST", onStartToast);
     socketioInstance.on("PROGRESS_UPDATE", onProgressUpdate);
+    socketioInstance.on("CONNECTION_TIMEOUT", onConnectionTimeout);
     socketioInstance.on("NO_USER_FOUND", onNoUserFound);
     socketioInstance.on("USER_FOUND", onUserFound);
     socketioInstance.on("SIGNAL_RESET", onSignalReset);
@@ -154,6 +162,7 @@ export function setupSocketProgressBridge() {
         socketioInstance.off("connect_error", onConnectError);
         socketioInstance.off("START_TOAST", onStartToast);
         socketioInstance.off("PROGRESS_UPDATE", onProgressUpdate);
+        socketioInstance.off("CONNECTION_TIMEOUT", onConnectionTimeout);
         socketioInstance.off("NO_USER_FOUND", onNoUserFound);
         socketioInstance.off("USER_FOUND", onUserFound);
         socketioInstance.off("SIGNAL_RESET", onSignalReset);
