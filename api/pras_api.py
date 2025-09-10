@@ -171,7 +171,8 @@ async def download_statement_of_need_form(
     sid = sio_events.get_user_sid(current_user)
     
     #!-PROGRESS TRACKING --------------------------------------------------------------
-    await sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
+    if sid:
+        await sio_events.start_toast(sid, 0)
     logger.debug("PROGRESS BAR: START TOAST EMITTED")
     
     download_tracker = create_download_tracker()
@@ -193,7 +194,8 @@ async def download_statement_of_need_form(
             ID=ID,
             db=db,
             payload=payload,
-            current_user=current_user
+            current_user=current_user,
+            sid=sid
         )
         
         # Convert to Path object if it's a string
@@ -283,7 +285,6 @@ async def generate_pdf(
     payload: PurchaseRequestPayload, 
     ID: str, 
     db: AsyncSession,
-    current_user: LDAPUser = None,
     uploaded_files: Optional[List[str]] = None) -> str:
     try:
         # Make sure dir exists
@@ -294,8 +295,7 @@ async def generate_pdf(
         pdf_path = await pdf_service.create_pdf(
             ID=ID,
             db=db,
-            payload=jsonable_encoder(payload),
-            current_user=current_user
+            payload=jsonable_encoder(payload)
         )
         
         # Convert to absolute path and verify it exists
@@ -642,7 +642,7 @@ async def send_purchase_request(
                 step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
                 if step_data:
                     await sio_events.progress_update(sid, step_data)
-            pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, current_user, uploaded_files)
+            pdf_path: str = await generate_pdf(payload, orm_pr_header.ID, db, uploaded_files)
             
             
             #! PROGRESS TRACKING ----------------------------------------------------------

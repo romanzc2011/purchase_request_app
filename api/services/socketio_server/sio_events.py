@@ -40,17 +40,12 @@ async def start_toast(sid: str, percent: int = 0) -> None:
     await sio.emit("START_TOAST", {"percent_complete": percent}, to=sid)
 
 def get_user_sid(user_or_name: Union[str, "LDAPUser", None]) -> Optional[str]:
-    """
-    Get the SocketIO session ID for the current user.
-    Returns None if no session is found.
-    """
     from api.services.socketio_server.socket_state import user_sids
-    
+
     if user_or_name is None:
         logger.warning("get_user_sid called with None user")
         return None
-    
-    # accept either LDAPUser or raw username
+
     username = getattr(user_or_name, "username", user_or_name)
     if not isinstance(username, str) or not username:
         logger.warning(f"get_user_sid: invalid username payload: {user_or_name!r}")

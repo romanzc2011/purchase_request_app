@@ -409,6 +409,9 @@ class ClerkAdminHandler(Handler):
         logger.debug(f"CLERK ADMIN HANDLER: Sending email to requester that their request has been approved for {request.uuid}")
         
         logger.debug("BUILDING EMAIL PAYLOAD")
+        logger.debug(f"Approval handler - current_user: {current_user}")
+        if current_user is None:
+            logger.error("Approval handler has None current_user!")
         approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)
         email_payload = await approver_email_builder.build_email_payload()
         logger.debug("EMAIL PAYLOAD BUILT")

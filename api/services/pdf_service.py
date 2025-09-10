@@ -17,7 +17,6 @@ from reportlab.lib.units import inch
 from datetime import datetime, date
 from loguru import logger
 from pathlib import Path
-from fastapi import Depends
 from api.schemas.comment_schemas import SonCommentSchema
 import api.services.db_service as dbas
 from datetime import datetime
@@ -26,31 +25,9 @@ from sqlalchemy import select
 from api.utils.misc_utils import get_justifications_and_comments
 from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import AsyncSession
-from api.services.auth_service import AuthService
-from api.services.ldap_service import LDAPService
-from api.schemas.ldap_schema import LDAPUser
 from api.services.progress_tracker.steps.download_steps import DownloadStepName
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
 from api.services.progress_tracker.progress_manager import get_active_tracker, get_approval_tracker, get_download_tracker, get_submit_request_tracker, ProgressTrackerType
-# Lazy import to avoid circular dependency
-from api.settings import settings
-
-def get_sio_events():
-    import api.services.socketio_server.sio_events as sio_events
-    return sio_events
-
-# Create auth service instance locally to prevent the circular import issue
-ldap_service = LDAPService(
-    ldap_url=settings.ldap_server,
-    bind_dn=settings.ldap_service_user,
-    bind_password=settings.ldap_service_password,
-    group_dns=[
-        settings.it_group_dns,
-        settings.cue_group_dns,
-        settings.access_group_dns,
-    ],
-)
-auth_service = AuthService(ldap_service=ldap_service)
 
 class PDFService:
     def __init__(self):
@@ -75,7 +52,6 @@ class PDFService:
         payload: dict | None = None,
         comments: list[str] | None = None,
         is_cyber: bool = False,
-        current_user: LDAPUser = None
     ) -> Path:
         logger.info(f"#####################################################")
         logger.info("create_pdf()")
@@ -85,14 +61,17 @@ class PDFService:
             raise HTTPException(status_code=400, detail="ID is required")
         
         tracker = get_active_tracker()
-        sid = get_sio_events().get_user_sid(current_user)
         
         # Init local trackers to prevent error
         download_tracker = None
         approval_tracker = None
         submit_request_tracker = None
 
-        # Get appropriate tracker based on active tracker type
+        # Get download tracker
+        if tracker and tracker.active_tracker == ProgressTrackerType.DOWNLOAD:
+            download_tracker = get_download_tracker()
+        
+        # Try to get submit request tracker, but don't fail if it doesn't exist
         if tracker:
             match tracker.active_tracker:
                 case ProgressTrackerType.DOWNLOAD:
@@ -104,18 +83,8 @@ class PDFService:
                 case ProgressTrackerType.APPROVAL:
                     approval_tracker = get_approval_tracker()
         
-        if sid and download_tracker:
-            logger.debug("Line 107: Starting download tracker")
-            download_tracker.send_start_msg(sid)
-            step_data = download_tracker.mark_step_done(DownloadStepName.VERIFY_FILE_EXISTS)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
-        
         if submit_request_tracker:
-            logger.debug("Line 114: Submit request tracker - PDF generation started")
-            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_GENERATION_STARTED)
         
         # Fetch the flattened approval rows, and final approve data with timestamps
         rows = await dbas.fetch_flat_approvals(db, ID=ID)
@@ -130,15 +99,8 @@ class PDFService:
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Only run if this is from the download pdf signal
         if download_tracker:
-            logger.debug("Line 130: Download tracker - fetch approval data")
-            step_data = download_tracker.mark_step_done(DownloadStepName.FETCH_APPROVAL_DATA)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
-                
-            logger.debug("Line 135: Download tracker - fetch flat approvals")
-            step_data = download_tracker.mark_step_done(DownloadStepName.FETCH_FLAT_APPROVALS)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            download_tracker.mark_step_done(DownloadStepName.FETCH_APPROVAL_DATA)
+            download_tracker.mark_step_done(DownloadStepName.FETCH_FLAT_APPROVALS)
         
         if not rows:
             raise HTTPException(status_code=404, detail="No approvals found for this ID")
@@ -154,17 +116,11 @@ class PDFService:
         # Fetch additional comment fr   om database if present
         additional_comments = await get_justifications_and_comments(db, ID)
         if download_tracker:
-            logger.debug("Line 152: Download tracker - get justifications and comments")
-            step_data = download_tracker.mark_step_done(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            download_tracker.mark_step_done(DownloadStepName.GET_JUSTIFICATIONS_AND_COMMENTS)
         
         contracting_officer = await dbas.get_contracting_officer_by_id(db, ID)
         if download_tracker:
-            logger.debug("Line 163: Download tracker - get contracting officer by ID")
-            step_data = download_tracker.mark_step_done(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            download_tracker.mark_step_done(DownloadStepName.GET_CONTRACTING_OFFICER_BY_ID)
         
         # ------------------------------------------------------------------------
         # 3️⃣ Load SonComments via async select
@@ -181,10 +137,7 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
-            logger.debug("Line 178: Download tracker - get line items")
-            step_data = download_tracker.mark_step_done(DownloadStepName.GET_LINE_ITEMS)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            download_tracker.mark_step_done(DownloadStepName.GET_LINE_ITEMS)
         
         # Get SonComments by line_item_uuid (more reliable)
         son_comments_stmt = (
@@ -211,10 +164,7 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
-            logger.debug("Line 207: Download tracker - get SON comments")
-            step_data = download_tracker.mark_step_done(DownloadStepName.GET_SON_COMMENTS)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            download_tracker.mark_step_done(DownloadStepName.GET_SON_COMMENTS)
         
         # Build your comment arrayrrr
         comment_arr: list[str] = []
@@ -230,23 +180,14 @@ class PDFService:
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
-            logger.debug("Line 230: Download tracker - get order types")
-            step_data = download_tracker.mark_step_done(DownloadStepName.GET_ORDER_TYPES)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            download_tracker.mark_step_done(DownloadStepName.GET_ORDER_TYPES)
         
         #!-PROGRESS TRACKING --------------------------------------------------------------
         if download_tracker:
-            logger.debug("Line 239: Download tracker - load PDF template")
-            step_data = download_tracker.mark_step_done(DownloadStepName.LOAD_PDF_TEMPLATE)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            download_tracker.mark_step_done(DownloadStepName.LOAD_PDF_TEMPLATE)
             
         if submit_request_tracker:
-            logger.debug("Line 245: Submit request tracker - PDF template loaded")
-            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
-            if step_data:
-                await get_sio_events().progress_update(sid, step_data)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_TEMPLATE_LOADED)
         
         # 5️⃣ Render the PDF
         output_path = self.output_dir / f"statement_of_need-{ID}.pdf"
@@ -267,30 +208,14 @@ class PDFService:
         
         # Progress tracking after PDF generation is complete
         if download_tracker:
-            logger.debug("Line 269: Download tracker - merge data into template")
-            step_data = download_tracker.mark_step_done(DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
-            await get_sio_events().progress_update(sid, step_data)
-                
-            logger.debug("Line 273: Download tracker - render PDF binary")
-            step_data = download_tracker.mark_step_done(DownloadStepName.RENDER_PDF_BINARY)
-            await get_sio_events().progress_update(sid, step_data)
-                
-            logger.debug("Line 276: Download tracker - save PDF to disk")
-            step_data = download_tracker.mark_step_done(DownloadStepName.SAVE_PDF_TO_DISK)
-            await get_sio_events().progress_update(sid, step_data)
+            download_tracker.mark_step_done(DownloadStepName.MERGE_DATA_INTO_TEMPLATE)
+            download_tracker.mark_step_done(DownloadStepName.RENDER_PDF_BINARY)
+            download_tracker.mark_step_done(DownloadStepName.SAVE_PDF_TO_DISK)
         
         if submit_request_tracker:
-            logger.debug("Line 282: Submit request tracker - PDF data merged")
-            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
-            await get_sio_events().progress_update(sid, step_data)
-            
-            logger.debug("Line 285: Submit request tracker - PDF rendered")
-            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
-            await get_sio_events().progress_update(sid, step_data)
-            
-            logger.debug("Line 288: Submit request tracker - PDF saved to disk")
-            step_data = submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
-            await get_sio_events().progress_update(sid, step_data)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_DATA_MERGED)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_RENDERED)
+            submit_request_tracker.mark_step_done(SubmitRequestStepName.PDF_SAVED_TO_DISK)
         
         return result
             
@@ -396,14 +321,14 @@ class PDFService:
             canvas.setFont("Play-Bold", 9)
             text_x = 0.2*inch
             text_y = y_logo - img_h - 20
+            date_val = first.get("dateneed")
             
             # Use the function argument or fallback to row value
             order_type_val_local = order_type if order_type else first.get("orderType")
-            date_val = first.get("datereq")  # Use datereq instead of dateneed
             date_str = None
 
             # ----------------------------------------------------------------------------
-            # Format date requested
+            # Format date needed
             if isinstance(date_val, (datetime, date)):
                 date_str = date_val.strftime("%Y-%m-%d")
                 
@@ -431,7 +356,7 @@ class PDFService:
                 ("RQ1:", first.get("IRQ1_ID","")),
                 ("Requester:", format_username(first.get("requester","") or "")),
                 ("CO:", contracting_officer or "None"),
-                ("Date:", date_str),
+                ("Date Needed:", date_str),
                 ("Status:", ItemStatus(first.get("status","")).value),
                 ("Approved By:", approved_text),
             ]

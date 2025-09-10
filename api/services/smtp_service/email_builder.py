@@ -90,6 +90,10 @@ class ApproverEmailBuilder(EmailBuilder):
         
         # Build flat list of attachments from every row
         attachments: list[str] = []
+        from loguru import logger
+        logger.debug(f"Email builder - current_user: {self.current_user}")
+        if self.current_user is None:
+            logger.error("Email builder has None current_user!")
         pdf_path = await pdf_service.create_pdf(self.request.id, self.db)
         
         attachments.append(str(pdf_path))
