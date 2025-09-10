@@ -11,14 +11,44 @@ import {
 } from "../PrasSignals";
 
 // Create and export a single socket instance you use everywhere
+// export const socketioInstance: Socket = io(window.location.origin, {
+//     path: "/progress_bar_bridge/communicate",
+//     transports: ["polling"],
+//     auth: (cb) => {
+//         const token = localStorage.getItem("access_token");
+//         cb({ token });
+//     },
+// });
+
 export const socketioInstance: Socket = io(window.location.origin, {
     path: "/progress_bar_bridge/communicate",
     transports: ["polling"],
-    auth: (cb) => {
-        const token = localStorage.getItem("access_token");
-        cb({ token });
-    },
+    auth: cb => cb({ token: localStorage.getItem("access_token") }),
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 300,
+    reconnectionDelayMax: 3000,
+    timeout: 15000,
 });
+
+// Wait for socket to connect once, return current socket.id
+let connectPromise: Promise<string> | null = null;
+export function waitForSocketReady(): Promise<string> {
+    if (socketioInstance.connected) {
+        return Promise.resolve(socketioInstance.id!);
+    }
+    if (!connectPromise) {
+        connectPromise = new Promise<string>(resolve => {
+            socketioInstance.once("connect", () => resolve(socketioInstance.id!));
+        }).finally(() => (connectPromise = null));
+    }
+    return connectPromise;
+}
+
+// For debugging
+socketioInstance.onAny((ev, ...args) => console.log("[sio]", ev, args));
+socketioInstance.on("connect_error", err => console.warn("[sio] connect_error", err));
+
 
 export const isIOConnectedSig = signal<boolean>(false);
 export const transportSig = signal<string>(socketioInstance.io.engine.transport.name);

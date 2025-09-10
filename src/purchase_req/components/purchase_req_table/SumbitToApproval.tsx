@@ -25,6 +25,7 @@ import { ItemStatus } from "../../types/approvalTypes";
 import { OrderType } from "../../schemas/purchaseSchema";
 import { isRequestSubmitted, isSubmittedSig } from "../../utils/PrasSignals";
 import { computeHTTPURL } from "../../utils/misc_utils";
+import { waitForSocketReady } from "../../utils/progress_bar_bridge/sioProgressBridge";
 
 const API_URL = computeHTTPURL("/api/sendToPurchaseReq");
 
@@ -94,6 +95,8 @@ function SubmitApprovalTable({
     /************************************************************************************ */
     const handleSubmitData = async (processedData: FormValues[]) => {
         try {
+            const sid = await waitForSocketReady();
+
             // Get a proper ID from the backend
             const idRequest = await fetch(computeHTTPURL("/api/createNewID"), {
                 method: "POST",
@@ -151,6 +154,7 @@ function SubmitApprovalTable({
 
             const formData = new FormData();
             formData.append("payload_json", JSON.stringify(requestData));
+            formData.append("sid", sid);
 
             // Send the data to the backend
             const response = await fetch(API_URL, {

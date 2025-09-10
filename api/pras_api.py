@@ -314,12 +314,14 @@ async def generate_pdf(
 @api_router.post("/sendToPurchaseReq", response_model=PurchaseResponse)
 async def send_purchase_request(
     payload_json: str = Form(..., description="JSON payload as string"),
+    sid: str | None = Form(None),
     current_user: LDAPUser = Depends(auth_service.get_current_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     logger.debug(f"PAYLOAD JSON: {payload_json}")
     # Get user sid
-    sid = sio_events.get_user_sid(current_user)
+    if not sid:
+        sid = sio_events.get_user_sid(current_user)
     
     #! PROGRESS TRACKING ---------------------------------------------------------
     await sio.emit("PROGRESS_UPDATE", {"event": "START_TOAST", "percent_complete": 0})
