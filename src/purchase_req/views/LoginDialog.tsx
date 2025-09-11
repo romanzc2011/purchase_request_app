@@ -10,6 +10,7 @@ import { Box, CircularProgress } from "@mui/material";
 import BKSeal from "../../assets/seal_no_border.png";
 import { toast } from "react-toastify";
 import { computeHTTPURL } from "../utils/misc_utils";
+import { socketioInstance } from "../utils/progress_bar_bridge/sioProgressBridge";
 
 interface LoginDialogProps {
     open: boolean;
@@ -86,6 +87,17 @@ export default function LoginDialog({
         console.log("Login successful");
         toast.success("Login successful");
 
+        socketioInstance.auth = { token: access_token };
+        if (socketioInstance.connected) {
+            socketioInstance.disconnect();
+        }
+
+        socketioInstance.connect();
+        if (socketioInstance.connected) {
+            toast.success("Socket connected");
+        } else {
+            toast.error("Socket connection failed");
+        }
         onClose();
 
         return data;

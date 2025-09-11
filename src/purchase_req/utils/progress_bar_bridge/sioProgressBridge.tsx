@@ -10,20 +10,11 @@ import {
     messageSig,
 } from "../PrasSignals";
 
-// Create and export a single socket instance you use everywhere
-// export const socketioInstance: Socket = io(window.location.origin, {
-//     path: "/progress_bar_bridge/communicate",
-//     transports: ["polling"],
-//     auth: (cb) => {
-//         const token = localStorage.getItem("access_token");
-//         cb({ token });
-//     },
-// });
-
 export const socketioInstance: Socket = io(window.location.origin, {
     path: "/progress_bar_bridge/communicate",
     transports: ["polling"],
-    auth: cb => cb({ token: localStorage.getItem("access_token") }),
+    autoConnect: false,
+    auth: cb => cb({ token: localStorage.getItem("access_token") || "" }),
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 300,
@@ -49,9 +40,8 @@ export function waitForSocketReady(): Promise<string> {
 socketioInstance.onAny((ev, ...args) => console.log("[sio]", ev, args));
 socketioInstance.on("connect_error", err => console.warn("[sio] connect_error", err));
 
-
 export const isIOConnectedSig = signal<boolean>(false);
-export const transportSig = signal<string>(socketioInstance.io.engine.transport.name);
+export const transportSig = signal<string>("(disconnected)");
 
 // Call this ONCE at app startup
 export function setupSocketProgressBridge() {
@@ -92,8 +82,12 @@ export function setupSocketProgressBridge() {
     // --- CONNECTION LIFECYCLE ---
     const onConnect = () => {
         isIOConnectedSig.value = true;
-        transportSig.value = socketioInstance.io.engine.transport.name;
+        transportSig.value = socketioInstance.io.engine?.transport?.name ?? "(unknown)";
     };
+
+    socketioInstance.io.on("open", () => {
+        transportSig.value = socketioInstance.io.engine?.transport?.name ?? "(unknown)";
+    })
 
     const onUpgrade = (t: any) => {
         transportSig.value = t.name;
