@@ -18,10 +18,17 @@ export const socketioInstance: Socket = io(window.location.origin, {
         const token = localStorage.getItem("access_token");
         cb({ token });
     },
+    autoConnect: false, // Don't connect automatically
 });
 
 export const isIOConnectedSig = signal<boolean>(false);
-export const transportSig = signal<string>(socketioInstance.io.engine.transport.name);
+export const transportSig = signal<string>("disconnected");
+
+// Function to connect SocketIO after login
+export function connectSocketIO() {
+    console.log("🔌 Connecting SocketIO...");
+    socketioInstance.connect();
+}
 
 // Call this ONCE at app startup
 export function setupSocketProgressBridge() {
@@ -61,8 +68,9 @@ export function setupSocketProgressBridge() {
 
     // --- CONNECTION LIFECYCLE ---
     const onConnect = () => {
+        console.log("🔌 SocketIO connected successfully!");
         isIOConnectedSig.value = true;
-        transportSig.value = socketioInstance.io.engine.transport.name;
+        transportSig.value = socketioInstance.io.engine?.transport?.name || "connected";
     };
 
     const onUpgrade = (t: any) => {
@@ -73,7 +81,8 @@ export function setupSocketProgressBridge() {
         isIOConnectedSig.value = false;
     };
 
-    const onConnectError = () => {
+    const onConnectError = (error: any) => {
+        console.error("🔌 SocketIO connection error:", error);
         isIOConnectedSig.value = false;
     };
 
@@ -125,10 +134,12 @@ export function setupSocketProgressBridge() {
     };
 
     const onNoUserFound = (payload: { message: string }) => {
+        console.log("❌ NO_USER_FOUND event received:", payload);
         toast.error(payload.message);
     };
 
     const onUserFound = (payload: { message: string }) => {
+        console.log("🎉 USER_FOUND event received:", payload);
         toast.success(payload.message);
     };
 
@@ -137,7 +148,8 @@ export function setupSocketProgressBridge() {
         handleReset();
     };
 
-    const onErrorEvents = (payload: { message: string }) => {
+    const onError = (payload: { message: string }) => {
+        console.log("🚨 ERROR received:", payload);
         toast.error(payload.message);
     };
 
@@ -152,7 +164,12 @@ export function setupSocketProgressBridge() {
     socketioInstance.on("NO_USER_FOUND", onNoUserFound);
     socketioInstance.on("USER_FOUND", onUserFound);
     socketioInstance.on("SIGNAL_RESET", onSignalReset);
-    socketioInstance.on("ERROR_EVENT", onErrorEvents);
+    socketioInstance.on("ERROR", onError);
+
+    // Debug: Log all SocketIO events
+    socketioInstance.onAny((eventName, ...args) => {
+        console.log(`📡 SocketIO event received: ${eventName}`, args);
+    });
 
     return () => {
         stopEffect();
@@ -166,6 +183,6 @@ export function setupSocketProgressBridge() {
         socketioInstance.off("NO_USER_FOUND", onNoUserFound);
         socketioInstance.off("USER_FOUND", onUserFound);
         socketioInstance.off("SIGNAL_RESET", onSignalReset);
-        socketioInstance.off("ERROR_EVENT", onErrorEvents);
+        socketioInstance.off("ERROR", onError);
     };
 }

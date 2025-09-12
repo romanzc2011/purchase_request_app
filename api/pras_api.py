@@ -915,9 +915,8 @@ async def assign_IRQ1_ID(
     user = format_username(current_user.username)
     
     try:
-        # Only lela or TEST USER can assign RQ1 IDs
-        if (user == CueClerk.MANAGER.value and current_user.has_group(LDAPGroup.CUE_GROUP.value)) \
-        or user == CueClerk.TEST_USER.value: # TODO: REMOVE TEST USER FOR PROD
+        # Only lela can assign RQ1 IDs
+        if (user == CueClerk.MANAGER.value and current_user.has_group(LDAPGroup.CUE_GROUP.value)):
             logger.debug("AUTHORIZATION SUCCESSFUL")
             pass
         else:

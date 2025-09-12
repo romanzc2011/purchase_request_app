@@ -10,17 +10,20 @@ import { Box, CircularProgress } from "@mui/material";
 import BKSeal from "../../assets/seal_no_border.png";
 import { toast } from "react-toastify";
 import { computeHTTPURL } from "../utils/misc_utils";
+import { socketioInstance, connectSocketIO } from "../utils/progress_bar_bridge/sioProgressBridge";
 
 interface LoginDialogProps {
     open: boolean;
     onClose: () => void;
     onLoginSuccess: (ACCESS_GROUP: boolean, CUE_GROUP: boolean, IT_GROUP: boolean) => void;
+    onLoginFailure?: () => void;
 }
 
 export default function LoginDialog({
     open,
     onClose,
     onLoginSuccess,
+    onLoginFailure,
 }: LoginDialogProps) {
     const [username, setUsername] = useState<string>("");
     const [password, setPassword] = useState<string>("");
@@ -28,6 +31,8 @@ export default function LoginDialog({
     const [loading, setLoading] = useState<boolean>(false);
 
     const API_URL = computeHTTPURL("/api/login");
+
+    socketioInstance.onAny((ev, ...args) => console.log("[sio]", ev, args));
 
     /***********************************************************************/
     /* VALIDATE INPUT */
@@ -82,6 +87,11 @@ export default function LoginDialog({
         localStorage.setItem("access_token", access_token);
         localStorage.setItem("token_type", token_type);
         localStorage.setItem("user", JSON.stringify(user));
+
+        // Connect SocketIO with the new token
+        console.log("Connecting SocketIO with token:", access_token);
+        connectSocketIO();
+
         onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
         console.log("Login successful");
         toast.success("Login successful");
@@ -101,11 +111,17 @@ export default function LoginDialog({
 
         setLoading(true);
         try {
-            const { access_token, user } = await handleLogin(username, password);
-            localStorage.setItem("access_token", access_token);
-            onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
-        } catch (error) {
+            await handleLogin(username, password);
+            // Login successful - onLoginSuccess will be called from handleLogin
+            console.log("Login successful, YAYYA");
             setLoading(false);
+        } catch (error) {
+            console.error("Login error:", error);
+            setLoading(false);
+            // Call onLoginFailure if provided
+            if (onLoginFailure) {
+                onLoginFailure();
+            }
         }
     };
 

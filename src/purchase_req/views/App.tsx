@@ -65,9 +65,16 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
         );
     };
 
-    const handleLoginSuccess = () => {
-        // Handle login success
+    const handleLoginSuccess = (access: boolean, cue: boolean, it: boolean) => {
+        // Handle login success - this should be called from the parent component
         setLoginOpen(false);
+        // The parent component (main.tsx) will handle setting isLoggedIn to true
+    };
+
+    const handleLoginFailure = () => {
+        // Handle login failure - keep the dialog open
+        setLoginOpen(true);
+        // Don't close the dialog, let user try again
     };
 
     /* *********************************************************************************** */
@@ -93,6 +100,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
                 open={loginOpen}
                 onClose={() => setLoginOpen(false)}
                 onLoginSuccess={handleLoginSuccess}
+                onLoginFailure={handleLoginFailure}
             />
         );
     }

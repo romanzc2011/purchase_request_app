@@ -229,18 +229,29 @@ class LDAPService:
                     
             # Find any login that has all false, then reject their login and explain they are not allowed login to submit request
             if not any(results.values()):
+                # Find sid for the user to target the specific user
+                target_sid = None
+                if username and username in user_sids:
+                    target_sid = next(iter(user_sids[username]), None)
+                
                 emit_async("ERROR", {
                     "event": "ERROR",
                     "status_code": "403",
                     "message": "You are not allowed to login to submit request"
-                })
+                }, to=target_sid)
                 return { LDAPGroup.IT_GROUP: False, LDAPGroup.CUE_GROUP: False, LDAPGroup.ACCESS_GROUP: False }
             else:
+                # Find sid for the user to target the specific user
+                target_sid = None
+                if username and username in user_sids:
+                    target_sid = next(iter(user_sids[username]), None)
+                
+                logger.info(f"MEMBERSHIP CHECK: target_sid={target_sid}, username={username}, user_sids={dict(user_sids)}")
                 emit_async("USER_FOUND", {
                     "event": "USER_FOUND",
                     "status_code": "200",
                     "message": "You are allowed to login to submit request",
-                })
+                }, to=target_sid)
             
             logger.info(f"RESULTS OF MEMBERSHIP SEARCH: {results}")
             return results
@@ -282,6 +293,7 @@ class LDAPService:
                     # Get the first sid for this user
                     target_sid = next(iter(user_sids[username]), None)
                 
+                logger.info(f"USER_FOUND: target_sid={target_sid}, username={username}, user_sids={dict(user_sids)}")
                 emit_async("USER_FOUND", {
                     "event": "USER_FOUND",
                     "status_code": "200",
@@ -295,7 +307,7 @@ class LDAPService:
                     # Get the first sid for this user
                     target_sid = next(iter(user_sids[username]), None)
                 
-                emit_async("NO_USER_FOUND", {
+                emit_async("NO_USER_FOUND", {   
                     "event": "NO_USER_FOUND",
                     "status_code": "404",
                     "message": "No user found for query",

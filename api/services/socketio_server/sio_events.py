@@ -15,20 +15,14 @@ async def decode_and_validate_token(token: str) -> LDAPUser:
 # SocketIO events
 @sio.event
 async def connect(sid, environ, auth):
-    token = (auth or {}).get("token")
-    if not token:
-        return False
-    
-    # verify the token
-    user = await decode_and_validate_token(token)
+    user = await decode_and_validate_token((auth or {}).get("token"))
     if not user:
-        return False
-    
-    # Map username -> sid
-    user_sids.setdefault(user.username, set()).add(sid)
-    sid_user_map[sid] = user.username
-    logger.debug(f"socketio: connect {sid} {user.username}")
-    
+        return None
+    username = user.username
+    user_sids.setdefault(username, set())
+    user_sids[username].add(sid)
+    sid_user_map[sid] = username
+    logger.debug(f"socketio: connect {sid} {username}")
     return sid_user_map
 
 @sio.event
