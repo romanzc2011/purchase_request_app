@@ -137,7 +137,7 @@ export function setupSocketProgressBridge() {
         handleReset();
     };
 
-    const onError = (payload: { message: string }) => {
+    const onErrorEvents = (payload: { message: string }) => {
         toast.error(payload.message);
     };
 
@@ -152,7 +152,7 @@ export function setupSocketProgressBridge() {
     socketioInstance.on("NO_USER_FOUND", onNoUserFound);
     socketioInstance.on("USER_FOUND", onUserFound);
     socketioInstance.on("SIGNAL_RESET", onSignalReset);
-    socketioInstance.on("ERROR", onError);
+    socketioInstance.on("ERROR_EVENT", onErrorEvents);
 
     return () => {
         stopEffect();
@@ -166,6 +166,6 @@ export function setupSocketProgressBridge() {
         socketioInstance.off("NO_USER_FOUND", onNoUserFound);
         socketioInstance.off("USER_FOUND", onUserFound);
         socketioInstance.off("SIGNAL_RESET", onSignalReset);
-        socketioInstance.off("ERROR", onError);
+        socketioInstance.off("ERROR_EVENT", onErrorEvents);
     };
 }

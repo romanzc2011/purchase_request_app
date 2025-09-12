@@ -87,9 +87,12 @@ async def connection_timeout(sid):
 @sio.on("reset_data")
 async def reset_data(sid):
     logger.debug("socketio: reset_data", sid)
-    
 
-    
+@sio.on("ERROR")
+async def error_event(sid, data):
+    logger.debug("socketio: error_event", sid)
+    await sio.emit("ERROR_EVENT", {"message": data}, to=sid)
+
 @sio.on("NO_USER_FOUND")
 async def no_user_found(sid, data):
     logger.debug("socketio: no_user_found", sid)

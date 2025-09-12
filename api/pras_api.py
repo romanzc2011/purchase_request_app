@@ -111,6 +111,11 @@ lock = threading.Lock()
 P = ParamSpec("P")
 R = TypeVar("R")
 
+@app.on_event("startup")
+async def _capture_loop():
+    from api.services.socketio_server.sio_instance import set_server_loop
+    set_server_loop(asyncio.get_event_loop())
+    
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
 ##########################################################################
@@ -1415,11 +1420,14 @@ async def get_uuid_by_id_endpoint(
 ## FETCH USERNAMES
 ##########################################################################
 @api_router.get("/usernames", response_model=List[str])
-async def get_usernames(q: str = Query(..., min_length=1, description="Prefix to search")):
+async def get_usernames(
+    q: str = Query(..., min_length=1, description="Prefix to search"),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
     """
     Return a list of username strings that start with the given prefix `q`.
     """
-    return await ldap_service.fetch_usernames(q)
+    return await ldap_service.fetch_usernames(q, current_user.username)
 
 ##########################################################################
 ## ADD COMMENTS BULK

@@ -1,5 +1,6 @@
 # Socket.IO setup
 import socketio
+import asyncio
 
 allowed = [
     "https://10.234.198.113:5002",   # IIS TLS origin you’re using
@@ -16,3 +17,30 @@ sio = socketio.AsyncServer(
     ping_timeout=60,
     max_http_buffer_size=1_000_000,
 )
+
+socketio_app = socketio.ASGIApp(sio, socketio_path="communicate")
+
+# Remember server loop so worker threads can schedule emits on it
+_server_loop: asyncio.AbstractEventLoop | None = None
+
+def set_server_loop(loop: asyncio.AbstractEventLoop) -> None:
+    global _server_loop
+    _server_loop = loop
+    
+def get_server_loop() -> asyncio.AbstractEventLoop:
+    return _server_loop
+
+def emit_async(event: str, data: dict, to: str | None = None) -> None:
+    # Fire and forget
+    async def _emit():
+        await sio.emit(event, data, to=to)
+        
+    try:
+        loop = get_server_loop()
+        loop.create_task(_emit())
+    except RuntimeError:
+        loop = get_server_loop()
+        if loop is None:
+            raise RuntimeError("Server loop not set; call set_server_loop() at startup")
+        asyncio.run_coroutine_threadsafe(_emit(), loop)
+        

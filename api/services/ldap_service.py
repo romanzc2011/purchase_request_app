@@ -15,6 +15,8 @@ from api.schemas.ldap_schema import LDAPUser
 from api.settings import settings 
 from api.utils.logging_utils import logger_init_ok
 from api.services.socketio_server.sio_instance import sio
+from api.services.socketio_server.sio_instance import emit_async
+from api.services.socketio_server.socket_state import user_sids
 
 def run_in_thread(fn):
     async def wrapper(*args, **kwargs):
@@ -111,15 +113,15 @@ class LDAPService:
     # SEARCH
     #-------------------------------------------------------------------------------------
     def _search(
-    self,
-    conn: Connection,
-    search_base: str,
-    search_filter: str,
-    attributes: List[str],
-    search_scope=SUBTREE,
-    size_limit: int | None = None,
-    time_limit: int | None = None,
-):
+        self,
+        conn: Connection,
+        search_base: str,
+        search_filter: str,
+        attributes: List[str],
+        search_scope=SUBTREE,
+        size_limit: int | None = None,
+        time_limit: int | None = None,
+    ):
         params: dict[str,int] = {}
         if size_limit  is not None: params["size_limit"]  = size_limit
         if time_limit  is not None: params["time_limit"]  = time_limit
@@ -224,6 +226,21 @@ class LDAPService:
                     if user_dn.lower() in [m.lower() for m in members]:
                         results[key] = True
                         break
+                    
+            # Find any login that has all false, then reject their login and explain they are not allowed login to submit request
+            if not any(results.values()):
+                emit_async("ERROR", {
+                    "event": "ERROR",
+                    "status_code": "403",
+                    "message": "You are not allowed to login to submit request"
+                })
+                return { LDAPGroup.IT_GROUP: False, LDAPGroup.CUE_GROUP: False, LDAPGroup.ACCESS_GROUP: False }
+            else:
+                emit_async("USER_FOUND", {
+                    "event": "USER_FOUND",
+                    "status_code": "200",
+                    "message": "You are allowed to login to submit request",
+                })
             
             logger.info(f"RESULTS OF MEMBERSHIP SEARCH: {results}")
             return results
@@ -244,12 +261,10 @@ class LDAPService:
     #-------------------------------------------------------------------------------------
     # FETCH USERNAMES SYNCHRONOUSLY
     #-------------------------------------------------------------------------------------
-    def _fetch_usernames_sync(self, query: str) -> List[str]:
+    def _fetch_usernames_sync(self, query: str, username: str = None) -> List[str]:
         # LDAP structure to search for
         # OU=LAWB,OU=USCOURTS,DC=ADU,DC=DCN
         conn = self.get_service_connection()
-
-        # Perform subtree search
         try:
             query = query.replace(" ", "")
             conn.search(
@@ -257,27 +272,46 @@ class LDAPService:
                 search_filter=f'(sAMAccountName={query}*)',
                 search_scope=SUBTREE,
                 attributes=['sAMAccountName'],
-                size_limit=10  # Limit to 10 results
+                size_limit=10
             )
-            
+
             if conn.entries:
-                # Inform frontend that user was found
-                asyncio.run(sio.emit("USER_FOUND", {"event": "USER_FOUND", 
-                                              "status_code": "200",
-                                              "message": "User found for query"}))
-                return [entry.sAMAccountName.value for entry in conn.entries]
-            else:
-                logger.error(f"No user found for query: {query}")
+                # Find sid for the user if username is provided
+                target_sid = None
+                if username and username in user_sids:
+                    # Get the first sid for this user
+                    target_sid = next(iter(user_sids[username]), None)
                 
-                # Inform frontend that no user was found
-                asyncio.run(sio.emit("NO_USER_FOUND", {"event": "NO_USER_FOUND", 
-                                              "status_code": "404",
-                                              "message": "No user found for query"}))
-            #     return ["Error"]
+                emit_async("USER_FOUND", {
+                    "event": "USER_FOUND",
+                    "status_code": "200",
+                    "message": "User found for query",
+                }, to=target_sid)  # target specific user if sid found
+                return [e.sAMAccountName.value for e in conn.entries]
+            else:
+                # Find sid for the user if username is provided
+                target_sid = None
+                if username and username in user_sids:
+                    # Get the first sid for this user
+                    target_sid = next(iter(user_sids[username]), None)
+                
+                emit_async("NO_USER_FOUND", {
+                    "event": "NO_USER_FOUND",
+                    "status_code": "404",
+                    "message": "No user found for query",
+                }, to=target_sid)  # target specific user if sid found
+                return []
         except Exception as e:
             logger.error(f"Error getting username: {e}")
+            # Find sid for the user if username is provided
+            target_sid = None
+            if username and username in user_sids:
+                # Get the first sid for this user
+                target_sid = next(iter(user_sids[username]), None)
+            
+            emit_async("ERROR", {"message": f"LDAP error: {e}", "status_code": "500"}, to=target_sid)
             return ["Error"]
-    
+        
     ########################################################################################
     # FETCH USERNAMES SYNCHRONOUSLY
     ########################################################################################
@@ -286,8 +320,8 @@ class LDAPService:
         return self._get_email_sync(username)
     
     @run_in_thread
-    def fetch_usernames(self, query: str) -> list[str]:
-        return self._fetch_usernames_sync(query)
+    def fetch_usernames(self, query: str, username: str = None) -> list[str]:
+        return self._fetch_usernames_sync(query, username)
     
     @run_in_thread
     def check_user_membership(self, username: str) -> dict[str, bool]:
