@@ -3,6 +3,7 @@ import { Controller, useFormContext } from "react-hook-form";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
 import { useUsernames } from "../../purchase_req_table/useUsernames";
+import { useDebounce } from "../../../hooks/useDebounce";
 interface RequesterAutocompleteProps {
     name: string;
     label: string;
@@ -18,7 +19,8 @@ export default function RequesterAutocomplete({
 }: RequesterAutocompleteProps) {
     const { control, formState: { errors } } = useFormContext();
     const [inputValue, setInputValue] = React.useState("");
-    const { data: options = [], isLoading, error } = useUsernames(inputValue);
+    const debouncedInputValue = useDebounce(inputValue, 300);
+    const { data: options = [], isLoading, error } = useUsernames(debouncedInputValue);
 
     return (
         <Controller

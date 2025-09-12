@@ -15,7 +15,13 @@ export function computeHTTPURL(path: string) {
 
 export async function fetchUsernames(query: string): Promise<string[]> {
     try {
-        const response = await fetch(`${computeHTTPURL("/api/usernames")}?q=${encodeURIComponent(query)}`);
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(`${computeHTTPURL("/api/usernames")}?q=${encodeURIComponent(query)}`, {
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            }
+        });
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
