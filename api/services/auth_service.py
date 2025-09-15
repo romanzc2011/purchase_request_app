@@ -97,7 +97,7 @@ class AuthService:
         
         if not await self.ldap_service.verify_credentials(username, password):
             logger.error(f"Failed to bind user: {username}")
-            return None
+            return username
         
         return await LDAPUser.from_ldap(username, self.ldap_service)
             

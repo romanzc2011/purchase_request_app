@@ -11,6 +11,7 @@ import BKSeal from "../../assets/seal_no_border.png";
 import { toast } from "react-toastify";
 import { computeHTTPURL } from "../utils/misc_utils";
 import { socketioInstance, connectSocketIO } from "../utils/progress_bar_bridge/sioProgressBridge";
+import { handleAPIError, APIError } from "../utils/errorHandler";
 
 interface LoginDialogProps {
     open: boolean;
@@ -54,51 +55,68 @@ export default function LoginDialog({
         form.append("username", username);
         form.append("password", password);
 
-        const response = await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: form.toString(),
-        });
-
-        if (!response.ok) {
-            const err = await response.text();
-            toast.error("Login failed: " + err);
-            throw new Error(`Login status ${response.status}`);
-        }
-
-        const text = await response.text();
-        if (!text) {
-            throw new Error("No data received from server");
-        }
-
-        let data;
         try {
-            data = JSON.parse(text);
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: form.toString(),
+            });
+
+            // Use handleAPIError to check for HTTP errors
+            await handleAPIError(response);
+
+            const text = await response.text();
+            if (!text) {
+                throw new APIError("No data received from server", 204);
+            }
+
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (error) {
+                throw new APIError("Invalid JSON data received from server", 422);
+            }
+
+            if (!data || !data.access_token || !data.user) {
+                throw new APIError("Login response is missing required fields", 422);
+            }
+
+            const { access_token, token_type, user } = data;
+
+            localStorage.setItem("access_token", access_token);
+            localStorage.setItem("token_type", token_type);
+            localStorage.setItem("user", JSON.stringify(user));
+
+            // Connect SocketIO with the new token
+            console.log("Connecting SocketIO with token:", access_token);
+            connectSocketIO();
+
+            onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
+            console.log("Login successful");
+            toast.success("Login successful");
+
+            onClose();
+
+            return data;
         } catch (error) {
-            throw new Error("Invalid JSON data received from server");
+            // Handle different types of errors
+            if (error instanceof APIError) {
+                // Handle specific API errors
+                if (error.statusCode === 401) {
+                    toast.error("Invalid username or password");
+                } else if (error.statusCode === 403) {
+                    toast.error("Access denied. Please contact administrator.");
+                } else if (error.statusCode >= 500) {
+                    toast.error("Server error. Please try again later.");
+                } else {
+                    toast.error(`Login failed: ${error.message}`);
+                }
+            } else {
+                // Handle network errors, timeouts, etc.
+                toast.error("Network error. Please check your connection.");
+            }
+            throw error; // Re-throw so handleSubmit can catch it
         }
-
-        if (!data || !data.access_token || !data.user) {
-            throw new Error("Login response is missing required fields");
-        }
-
-        const { access_token, token_type, user } = data;
-
-        localStorage.setItem("access_token", access_token);
-        localStorage.setItem("token_type", token_type);
-        localStorage.setItem("user", JSON.stringify(user));
-
-        // Connect SocketIO with the new token
-        console.log("Connecting SocketIO with token:", access_token);
-        connectSocketIO();
-
-        onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
-        console.log("Login successful");
-        toast.success("Login successful");
-
-        onClose();
-
-        return data;
     }
 
     /***********************************************************************/

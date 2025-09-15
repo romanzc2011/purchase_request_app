@@ -125,24 +125,46 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     Expects:
       POST /api/login
       Content-Type: application/x-www-form-urlencoded
-
       username=...&password=...
     """
     logger.info("☑️ Login()")
-    
-    # 1. Authenticate user and fetch LDAPUser
-    user = await auth_service.authenticate_user(form_data)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    try:
+        user = await auth_service.authenticate_user(form_data)
         
-    # 2. Create JWT token
-    token = await auth_service.create_access_token(user)
+        # Check if user is a string (invalid credentials) or None
+        if isinstance(user, str) or user is None:
+            logger.info(f"INVALID CREDENTIALS: {user}")
+            
+            sid = sio_events.get_user_sid(user)
+            await sio_events.error_event(sid, "Invalid username or password")
+            
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # User is valid LDAPUser object
+        token = await auth_service.create_access_token(user)
+        logger.info(f"TOKEN: {token}")
+        logger.success("SUCCESSFULLY AUTHENTICATED USER")
+        logger.debug(f"USER: {user}")
+        
+    except HTTPException:
+        # Allow the to pass through to get more detailed error message
+        raise
+        
+    except Exception as e:
+        logger.error(f"EXCEPTION: {e}")
+        sid = sio_events.get_user_sid(user)
+        sio_events.error_event(sid, f"Unexpected error during login {e}")
+        
+        logger.exception(f"Unexpected error during login: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
     
-    # 3. Return token and user details
     return {
         "access_token": token,
         "token_type": "Bearer",

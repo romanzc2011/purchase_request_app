@@ -4,6 +4,7 @@ import { ContractingOfficer } from '../../types/approvalTypes';
 import Buttons from './Buttons';
 import { toast } from "react-toastify";
 import { computeHTTPURL } from '../../utils/misc_utils';
+import { handleAPIError, APIError } from '../../utils/errorHandler';
 
 type Props = {
     value: number | "";
@@ -30,14 +31,29 @@ function ContractingOfficerDropdown({ value, requestID, onChange, onClickOK }: P
                     "Authorization": `Bearer ${localStorage.getItem('access_token')}`
                 }
             });
-            if (!response.ok) {
-                throw new Error('Failed to fetch contracting officers');
-            }
+
+            // Use handleAPIError to check for HTTP errors
+            await handleAPIError(response);
+
             const data: ContractingOfficer[] = await response.json();
             setContractingOfficers(data);
-
             console.log(data);
         } catch (error) {
+            if (error instanceof APIError) {
+                // Handle specific API errors
+                if (error.statusCode === 401) {
+                    toast.error("Session expired. Please log in again.");
+                } else if (error.statusCode === 403) {
+                    toast.error("You don't have permission to view contracting officers.");
+                } else if (error.statusCode >= 500) {
+                    toast.error("Server error. Please try again later.");
+                } else {
+                    toast.error(`Failed to load contracting officers: ${error.message}`);
+                }
+            } else {
+                // Handle network errors
+                toast.error("Network error. Please check your connection.");
+            }
             console.error('Error fetching contracting officers:', error);
         }
     }
