@@ -202,7 +202,7 @@ function SubmitApprovalTable({
                     }}
                 >
                     <TableRow sx={{ fontFamily: "Tahoma !important", fontSize: "1.1rem" }}>
-                        <TableCell sx={{ width: 40 }} /> {/* expand/collapse */}
+                        <TableCell sx={{ width: 40 }} />
                         <TableCell>ID</TableCell>
                         <TableCell>Budget Object Code</TableCell>
                         <TableCell>Fund</TableCell>
@@ -216,7 +216,6 @@ function SubmitApprovalTable({
                 <TableBody>
                     {Object.entries(groupedItems).map(([id, items]) => (
                         <React.Fragment key={id}>
-                            {/* Main row with expand/collapse button */}
                             <TableRow>
                                 <TableCell>
                                     {items.length > 1 && (
@@ -296,7 +295,6 @@ function SubmitApprovalTable({
                                     </Button>
                                 </TableCell></TableRow>
 
-                            {/* Collapsible rows for additional items */}
                             {items.length > 1 && (
                                 <TableRow>
                                     <TableCell

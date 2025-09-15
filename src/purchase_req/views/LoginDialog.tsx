@@ -10,7 +10,7 @@ import { Box, CircularProgress } from "@mui/material";
 import BKSeal from "../../assets/seal_no_border.png";
 import { toast } from "react-toastify";
 import { computeHTTPURL } from "../utils/misc_utils";
-import { socketioInstance, connectSocketIO } from "../utils/progress_bar_bridge/sioProgressBridge";
+import { connectSocketIO } from "../utils/progress_bar_bridge/sioProgressBridge";
 import { handleAPIError, APIError } from "../utils/errorHandler";
 
 interface LoginDialogProps {
@@ -33,8 +33,6 @@ export default function LoginDialog({
 
     const API_URL = computeHTTPURL("/api/login");
 
-    socketioInstance.onAny((ev, ...args) => console.log("[sio]", ev, args));
-
     /***********************************************************************/
     /* VALIDATE INPUT */
     /***********************************************************************/
@@ -51,72 +49,43 @@ export default function LoginDialog({
     /* HANDLE LOGIN */
     /***********************************************************************/
     async function handleLogin(username: string, password: string) {
-        const form = new URLSearchParams();
-        form.append("username", username);
-        form.append("password", password);
+        const form = new URLSearchParams({ username, password });
 
-        try {
-            const response = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: form.toString(),
-            });
+        const res = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: form.toString(),
+        });
 
-            // Use handleAPIError to check for HTTP errors
-            await handleAPIError(response);
-
-            const text = await response.text();
-            if (!text) {
-                throw new APIError("No data received from server", 204);
-            }
-
-            let data;
+        if (!res.ok) {
+            // read body ONCE here
+            let message = res.statusText;
             try {
-                data = JSON.parse(text);
-            } catch (error) {
-                throw new APIError("Invalid JSON data received from server", 422);
-            }
-
-            if (!data || !data.access_token || !data.user) {
-                throw new APIError("Login response is missing required fields", 422);
-            }
-
-            const { access_token, token_type, user } = data;
-
-            localStorage.setItem("access_token", access_token);
-            localStorage.setItem("token_type", token_type);
-            localStorage.setItem("user", JSON.stringify(user));
-
-            // Connect SocketIO with the new token
-            console.log("Connecting SocketIO with token:", access_token);
-            connectSocketIO();
-
-            onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
-            console.log("Login successful");
-            toast.success("Login successful");
-
-            onClose();
-
-            return data;
-        } catch (error) {
-            // Handle different types of errors
-            if (error instanceof APIError) {
-                // Handle specific API errors
-                if (error.statusCode === 401) {
-                    toast.error("Invalid username or password");
-                } else if (error.statusCode === 403) {
-                    toast.error("Access denied. Please contact administrator.");
-                } else if (error.statusCode >= 500) {
-                    toast.error("Server error. Please try again later.");
-                } else {
-                    toast.error(`Login failed: ${error.message}`);
-                }
-            } else {
-                // Handle network errors, timeouts, etc.
-                toast.error("Network error. Please check your connection.");
-            }
-            throw error; // Re-throw so handleSubmit can catch it
+                const err = await res.json();
+                message = err?.detail ?? message;
+            } catch { }
+            throw new APIError(message, res.status);
         }
+
+        // success path: read body ONCE here
+        const data = await res.json();
+        if (!data?.access_token || !data?.user) {
+            throw new APIError("Login response is missing required fields", 422);
+        }
+
+        const { access_token, token_type, user } = data;
+
+        localStorage.setItem("access_token", access_token);
+        localStorage.setItem("token_type", token_type);
+        localStorage.setItem("user", JSON.stringify(user));
+
+        // If Socket.IO connect might fail, wrap it so it doesn’t flip toasts:
+        try { connectSocketIO(); } catch (e) { console.warn("Socket connect failed:", e); }
+
+        onLoginSuccess(user.ACCESS_GROUP, user.CUE_GROUP, user.IT_GROUP);
+        toast.success("Login successful", { toastId: "login-ok" });
+        onClose();
+        return data;
     }
 
     /***********************************************************************/
@@ -130,11 +99,38 @@ export default function LoginDialog({
         setLoading(true);
         try {
             await handleLogin(username, password);
+
             // Login successful - onLoginSuccess will be called from handleLogin
-            console.log("Login successful, YAYYA");
             setLoading(false);
         } catch (error) {
-            console.error("Login error:", error);
+            console.error("🔍 Login error in handleSubmit:", error);
+
+            if (error instanceof APIError) {
+                console.error("🔍 APIError statusCode:", error.statusCode);
+                console.error("🔍 APIError message:", error.message);
+                // Show appropriate toast based on error type
+                if (error.statusCode === 401) {
+                    console.log("🔍 Showing 401 toast from handleSubmit");
+                    toast.error("Invalid username or password");
+
+                } else if (error.statusCode === 403) {
+                    console.log("🔍 Showing 403 toast from handleSubmit");
+                    toast.error("Access denied. Please contact administrator.");
+
+                } else if (error.statusCode >= 500) {
+                    console.log("🔍 Showing 500+ toast from handleSubmit");
+                    toast.error("Server error. Please try again later.");
+
+                } else {
+                    console.log("🔍 Showing generic API error toast from handleSubmit");
+                    toast.error(`Login failed: ${error.message}`);
+
+                }
+            } else {
+                console.log("🔍 Showing network error toast from handleSubmit");
+                toast.error("Network error. Please check your connection.");
+
+            }
             setLoading(false);
             // Call onLoginFailure if provided
             if (onLoginFailure) {

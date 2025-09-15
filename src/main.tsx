@@ -14,6 +14,7 @@ import App from "./purchase_req/views/App";
 import LoginDialog from "./purchase_req/views/LoginDialog";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import { prasStore } from "./store/prasStore";
+import { ToastContainer } from "react-toastify";
 
 const queryClient = new QueryClient();
 
@@ -43,8 +44,19 @@ function Root() {
     return (
         <QueryClientProvider client={queryClient}>
 
+
             <StrictMode>
                 <Router>
+                    <ToastContainer
+                        position="top-right"
+                        autoClose={1000}
+                        theme="dark"
+                        newestOnTop
+                        pauseOnFocusLoss
+                        pauseOnHover
+                        draggable
+                        closeOnClick
+                    />
                     <Routes>
                         <Route path="/" element={<Navigate to="/purchase-request" />} />
                         {/*************************************************************/}
@@ -75,12 +87,14 @@ function Root() {
                             element={
                                 <ProtectedRoute isLoggedIn={isLoggedIn}>
                                     <Provider store={prasStore}>
+
                                         <App
                                             isLoggedIn={isLoggedIn}
                                             ACCESS_GROUP={ACCESS_GROUP}
                                             CUE_GROUP={CUE_GROUP}
                                             IT_GROUP={IT_GROUP}
                                         />
+
                                     </Provider>
                                 </ProtectedRoute>
                             }

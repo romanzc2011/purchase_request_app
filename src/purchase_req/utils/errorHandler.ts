@@ -1,3 +1,9 @@
+import { toast } from "react-toastify";
+
+export function handleError(error: Error) {
+    toast.error(error.message);
+}
+
 export class APIError extends Error { 
     constructor(
         message: string,
