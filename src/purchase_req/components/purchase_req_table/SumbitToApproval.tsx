@@ -12,6 +12,7 @@ import {
     IconButton,
     Collapse,
     Typography,
+    CircularProgress
 } from "@mui/material";
 import { tableHeaderStyles } from "../../styles/DataGridStyles";
 import { FormValues } from "../../types/formTypes";
@@ -45,12 +46,12 @@ function SubmitApprovalTable({
     dataBuffer,
     onDelete,
     setDataBuffer,
-    setFileInfo,
     setID
 }: SubmitApprovalTableProps) {
 
     // State for expanded rows
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+    const [submitting, setSubmitting] = useState(false);
 
     // Optimize expensive calculations with useMemo
     const calculatePrice = useCallback((item: FormValues): number => {
@@ -93,6 +94,7 @@ function SubmitApprovalTable({
     /* SUBMIT DATA --- send to backend to add to database */
     /************************************************************************************ */
     const handleSubmitData = async (processedData: FormValues[]) => {
+        setSubmitting(true);
         try {
             // Get a proper ID from the backend
             const idRequest = await fetch(computeHTTPURL("/api/createNewID"), {
@@ -415,17 +417,22 @@ function SubmitApprovalTable({
                             {/* BUTTONS: SUBMIT */}
                             {/************************************************************************************ */}
                             {/* Submit data to proper destination, email to supervisor or notify sup that there's a request for them to approve */}
-                            <Buttons
-                                label="Submit Form"
+                            <Button
+                                variant="contained"
                                 className="me-3 btn btn-maroon"
-                                disabled={dataBuffer.length === 0}
+                                sx={{ backgroundColor: "maroon", color: "white" }}
                                 onClick={async () => {
+                                    setSubmitting(true);
                                     isRequestSubmitted.value = true;
                                     await handleSubmitData(processedData);
                                     isSubmittedSig.value = true;
-                                    setFileInfo([]);
+                                    setSubmitting(false);
                                 }}
-                            />
+                                disabled={submitting}
+                            >
+                                {submitting && <CircularProgress size={20} sx={{ mr: 1 }} />}
+                                Submit Form
+                            </Button>
 
                         </TableCell>
 
