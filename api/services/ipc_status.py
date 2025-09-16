@@ -2,6 +2,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum, auto
 from multiprocessing import shared_memory, Lock
 from typing import List, Any
+from api.utils.logging_utils import logger_init_ok
 from loguru import logger
 import struct
 import asyncio
@@ -45,7 +46,7 @@ class IPCSharedMemory:
 
         try:
             self.shm = shared_memory.SharedMemory(name=name, create=True, size=self.STRUCT_SIZE)
-            logger.info(f"Shared memory initialized: {self.shm}")
+            logger_init_ok(f"Shared memory initialized: {self.shm}")
         except FileExistsError:
             self.shm = shared_memory.SharedMemory(name=name)
         self.name = name

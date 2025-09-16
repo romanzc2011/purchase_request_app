@@ -21,6 +21,7 @@ uvicorn pras_api:app --port 5004
 """
 from datetime import datetime
 import json
+import signal
 import socketio
 from pathlib import Path
 from typing import Awaitable, Callable, ParamSpec, TypeVar
@@ -30,7 +31,7 @@ from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
 from api.services.progress_tracker.steps.download_steps import DownloadStepName
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
-from api.utils.misc_utils import format_username, reset_signals
+from api.utils.misc_utils import format_username, reset_signals, error_handler
 from pydantic import ValidationError
 from fastapi import (
     FastAPI, APIRouter, Depends, Form, 
@@ -40,6 +41,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from api.utils.logging_utils import logger_init_ok
 
 # SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,6 +86,10 @@ import api.services.db_service as dbas
 import tracemalloc
 tracemalloc.start(10)
 
+# Set up signal handlers
+signal.signal(signal.SIGTERM, error_handler)
+signal.signal(signal.SIGINT, error_handler)
+
 # Initialize FastAPI app
 app = FastAPI(title="PRAS API")
 
@@ -115,6 +121,25 @@ R = TypeVar("R")
 async def _capture_loop():
     from api.services.socketio_server.sio_instance import set_server_loop
     set_server_loop(asyncio.get_event_loop())
+    
+# Start LDAP heartbeat to prevent connection timeout
+@app.on_event("startup")
+async def start_keepalive_ldap():
+    logger_init_ok("LDAP keepalive starting")
+    # Start the keepalive task in the background
+    asyncio.create_task(ldap_service.start_keepalive_ldap())
+    
+@app.on_event("startup")
+async def _install_loop_exception_handler():
+    loop = asyncio.get_running_loop()
+    logger_init_ok("Installing loop exception handler")
+    def handler(loop, context):
+        exc = context.get("exception")
+        if isinstance(exc, asyncio.CancelledError):
+            logger.debug("Loop exception handler: CancelledError")
+            return
+        loop.default_exception_handler(context)
+    loop.set_exception_handler(handler)
     
 ##########################################################################
 ## LOGIN -- auth users and return JWTs

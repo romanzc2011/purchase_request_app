@@ -122,3 +122,8 @@ class AuthService:
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+            
+        except ExpiredSignatureError:
+            # Request new token
+            new_token = await self.create_access_token(self.get_current_user())
+            return new_token

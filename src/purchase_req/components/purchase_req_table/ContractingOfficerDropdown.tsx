@@ -37,7 +37,6 @@ function ContractingOfficerDropdown({ value, requestID, onChange, onClickOK }: P
 
             const data: ContractingOfficer[] = await response.json();
             setContractingOfficers(data);
-            console.log(data);
         } catch (error) {
             if (error instanceof APIError) {
                 // Handle specific API errors

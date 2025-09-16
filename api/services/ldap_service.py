@@ -261,13 +261,30 @@ class LDAPService:
             return { LDAPGroup.IT_GROUP: False, LDAPGroup.CUE_GROUP: False, LDAPGroup.ACCESS_GROUP: False }
     
     #-------------------------------------------------------------------------------------
-    # GET APPROVERS
+    # PING SYNC --- keepalive strategy
     #-------------------------------------------------------------------------------------
-    def _get_approvers_sync(self, group_name: str) -> List[str]:
-        """
-        Sync method to fetch all members of group
-        """
-        pass
+    def _ping_sync(self):
+        conn = self.get_service_connection()
+        conn.search(
+            search_base=settings.search_base,
+            search_filter="(objectClass=*)",
+            attributes=["cn"],
+            size_limit=1
+        )
+        
+    #-------------------------------------------------------------------------------------
+    # KEEP ALIVE
+    #-------------------------------------------------------------------------------------
+    async def start_keepalive_ldap(self, interval_sec: int = 300):
+        """Start LDAP keepalive in background task"""
+        logger.info(f"Starting LDAP keepalive with {interval_sec}s interval")
+        while True:
+            try:
+                await asyncio.to_thread(self._ping_sync)
+                logger.debug("LDAP keepalive ping successful")
+            except Exception as e:
+                logger.error(f"Error keeping LDAP alive: {e}")
+            await asyncio.sleep(interval_sec)
         
     #-------------------------------------------------------------------------------------
     # FETCH USERNAMES SYNCHRONOUSLY

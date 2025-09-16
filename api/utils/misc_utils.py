@@ -1,4 +1,7 @@
 import asyncio
+import signal
+import time
+import sys
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 import api.services.db_service as dbas
@@ -12,6 +15,9 @@ format_username: Formats the username to remove the ADU\ prefix.
 run_in_thread: Runs a function in a thread @decorator.
 """
 
+def error_handler(signum, frame):
+    logger.warning("Services shutting down...")
+    sys.exit(0)
 #--------------------------------------------------------------------------------------------------
 # FORMAT USERNAME
 #--------------------------------------------------------------------------------------------------
@@ -24,7 +30,6 @@ def format_username(username: str) -> str:
     return raw_name
 
 def reset_signals():
-        # Broadcast progress update
     pass
 #--------------------------------------------------------------------------------------------------
 # RUN IN THREAD
