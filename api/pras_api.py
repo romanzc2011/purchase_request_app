@@ -21,6 +21,7 @@ uvicorn pras_api:app --port 5004
 """
 from datetime import datetime
 import json
+import time
 import signal
 import socketio
 from pathlib import Path
@@ -170,7 +171,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             )
         
         # User is valid LDAPUser object
-        token = await auth_service.create_access_token(user)
+        token = auth_service.create_access_token(user)
         logger.info(f"TOKEN: {token}")
         logger.success("SUCCESSFULLY AUTHENTICATED USER")
         logger.debug(f"USER: {user}")
@@ -182,7 +183,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     except Exception as e:
         logger.error(f"EXCEPTION: {e}")
         sid = sio_events.get_user_sid(user)
-        sio_events.error_event(sid, f"Unexpected error during login {e}")
+        await sio_events.error_event(sid, f"Unexpected error during login {e}")
         
         logger.exception(f"Unexpected error during login: {e}")
         raise HTTPException(
