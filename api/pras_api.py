@@ -959,6 +959,8 @@ async def assign_IRQ1_ID(
     to the purchase request. It also updates the UUID in the approval table.
     IRQ number that is retrieved from JFIMS by Lela
     """
+    sid = sio_events.get_user_sid(current_user.username)
+    
     logger.info(f"Assigning requisition ID: {data.get('IRQ1_ID')}")
     user = format_username(current_user.username)
     
@@ -969,26 +971,23 @@ async def assign_IRQ1_ID(
             pass
         else:
             logger.debug("AUTHORIZATION FAILED")
-            await sio.emit("ERROR", {"event": "ERROR", 
-                                        "status_code": "403",
-                                        "message": "You are not authorized to assign requisition IDs"})
+            await sio_events.error_event(sid, "You are not authorized to assign requisition IDs")
+            
             raise HTTPException(status_code=403, detail="You are not authorized to assign requisition IDs")
+        
     except Exception as e:
         logger.error(f"Error assigning requisition ID: {e}")
         # Send error to frontend
-        await sio.emit("ERROR", {"event": "ERROR", 
-                                    "status_code": "500",
-                                    "message": f"Error assigning requisition ID: {e}"})
+        await sio_events.error_event(sid, f"Error assigning requisition ID: {e}")
         raise HTTPException(status_code=500, detail=f"Error assigning requisition ID: {e}")
     
     # Get the original ID from the request
     irq1_id = data.get('IRQ1_ID')
     original_id = data.get('ID')
+    
+    # Send error to frontend
     if not original_id or not irq1_id:
-        # Send error to frontend
-        await sio.emit("ERROR", {"event": "ERROR", 
-                                    "status_code": "400",
-                                    "message": "Missing ID in request"})
+        await sio_events.error_event(sid, "Missing ID in request")
         raise HTTPException(status_code=400, detail="Missing ID in request")
     
     # Verify PurchaseRequestHeader exists
@@ -998,9 +997,7 @@ async def assign_IRQ1_ID(
     
     if not pr_header:
         # Send error to frontend
-        await sio.emit("ERROR", {"event": "ERROR", 
-                                    "status_code": "400",
-                                    "message": "PurchaseRequestHeader not found"})
+        await sio_events.error_event(sid, "PurchaseRequestHeader not found")
         raise HTTPException(status_code=400, detail="PurchaseRequestHeader not found")
     
     # Check if IRQ1_ID already exists in PurchaseRequestHeader table
@@ -1008,11 +1005,9 @@ async def assign_IRQ1_ID(
     existing_pr_result = await db.execute(existing_pr_stmt)
     existing_pr = existing_pr_result.scalar_one_or_none()
     
+    # Send error to frontend--------------------------------------------------------------------------------------------
     if existing_pr and existing_pr.ID != original_id:
-        # Send error to frontend
-        await sio.emit("ERROR", {"event": "ERROR", 
-                                    "status_code": "409",
-                                    "message": f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_pr.ID}"})
+        await sio_events.error_event(sid, f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_pr.ID}")
         logger.warning(f"IRQ1_ID {irq1_id} already exists for purchase request {existing_pr.ID}")
         raise HTTPException(status_code=409, detail=f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_pr.ID}")
     
@@ -1021,11 +1016,9 @@ async def assign_IRQ1_ID(
     existing_approval_result = await db.execute(existing_approval_stmt)
     existing_approval = existing_approval_result.scalar_one_or_none()
     
+    # Send error to frontend--------------------------------------------------------------------------------------------
     if existing_approval and existing_approval.purchase_request_id != original_id:
-        # Send error to frontend
-        await sio.emit("ERROR", {"event": "ERROR", 
-                                    "status_code": "409",
-                                    "message": f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_approval.purchase_request_id}"})
+        await sio_events.error_event(sid, f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_approval.purchase_request_id}")
         logger.warning(f"IRQ1_ID {irq1_id} already exists in approvals for purchase request {existing_approval.purchase_request_id}")
         raise HTTPException(status_code=409, detail=f"IRQ1_ID {irq1_id} is already assigned to purchase request {existing_approval.purchase_request_id}")
     
@@ -1038,10 +1031,15 @@ async def assign_IRQ1_ID(
         )
         await db.commit()
         await db.refresh(pr_header)
-        logger.info(f"Successfully assigned IRQ1_ID {irq1_id} to purchase request {original_id}")
+        
+        # Send success to frontend
+        logger.success(f"Successfully assigned IRQ1_ID {irq1_id} to purchase request {original_id}")
+        await sio_events.message_event(sid, f"Successfully assigned IRQ1_ID {irq1_id} to purchase request {original_id}")
+        
     except Exception as e:
         await db.rollback()
         logger.error(f"Database error while assigning IRQ1_ID {irq1_id} to {original_id}: {e}")
+        await sio_events.error_event(sid, f"Database error while assigning IRQ1_ID {irq1_id} to {original_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Database error while assigning IRQ1_ID: {str(e)}")
     
     return {"IRQ1_ID_ASSIGNED": True}

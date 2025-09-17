@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../styles/App.css";
 import { Routes, Route } from "react-router-dom";
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import AddItemsForm from "../components/purchase_req_table/AddItemsForm";
 import SubmitApprovalTable from "../components/purchase_req_table/SumbitToApproval";
 import { Layout } from "../components/approval_table/app_layout";
 import { Box } from "@mui/material";
 import { FormValues } from "../types/formTypes";
-//import { ProgressBar } from "../utils/ProgressBar";
 import ApprovalPageMain from "../components/approval_table/containers/ApprovalPageMain";
 import { IFile } from "../types/IFile";
 import LoginDialog from "./LoginDialog";
@@ -65,7 +64,7 @@ function App({ isLoggedIn, ACCESS_GROUP, CUE_GROUP, IT_GROUP }: AppProps) {
         );
     };
 
-    const handleLoginSuccess = (access: boolean, cue: boolean, it: boolean) => {
+    const handleLoginSuccess = () => {
         // Handle login success - this should be called from the parent component
         setLoginOpen(false);
         // The parent component (main.tsx) will handle setting isLoggedIn to true

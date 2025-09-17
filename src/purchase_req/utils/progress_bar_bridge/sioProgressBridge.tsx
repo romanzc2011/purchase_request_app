@@ -1,7 +1,8 @@
 import { effect, signal } from "@preact/signals-react";
 import { Socket, io } from "socket.io-client";
-import { Id, toast } from "react-toastify";
+import { toast } from "react-toastify";
 import { ProgressToast } from "../../components/ProgressToast";
+import { useDebounce } from "../../hooks/useDebounce";
 import {
     isApprovalSig,
     isDownloadSig,
@@ -16,9 +17,6 @@ import {
 export const SIOEvents = {
     START_TOAST: "START_TOAST",
     PROGRESS_UPDATE: "PROGRESS_UPDATE",
-    CONNECTION_TIMEOUT: "CONNECTION_TIMEOUT",
-    NO_USER_FOUND: "NO_USER_FOUND",
-    USER_FOUND: "USER_FOUND",
     SIGNAL_RESET: "SIGNAL_RESET",
     ERROR_EVENT: "ERROR_EVENT",
     SEND_ORIGINAL_PRICE: "SEND_ORIGINAL_PRICE",
@@ -29,6 +27,9 @@ export const SIOEvents = {
     CONNECT_ERROR: "connect_error",
     UPGRADE: "upgrade",
 }
+
+// Custom ToastID to prevent duplicates
+const TOAST_ID = "PRAS_TOASTID" as const;
 
 // Create and export a single socket instance you use everywhere
 export const socketioInstance: Socket = io(window.location.origin, {
@@ -60,8 +61,6 @@ export function setupSocketProgressBridge() {
         w.__PRAS_BRIDGE_INIT__ = true;
     }
 
-    let toastId: Id | null = null;
-
     const handleReset = () => {
         isIOConnectedSig.value = socketioInstance.connected;
         // (your next line set it to true again; keep the one you intend)
@@ -72,9 +71,8 @@ export function setupSocketProgressBridge() {
         sioMessageSig.value = null;
         sioErrorSig.value = null;
         sioOriginalPriceSig.value = null;
-        if (toastId !== null) {
-            toast.dismiss(toastId);
-            toastId = null;
+        if (toast.isActive(TOAST_ID)) {
+            toast.dismiss(TOAST_ID);
         }
     };
 
@@ -112,13 +110,12 @@ export function setupSocketProgressBridge() {
     // --- SERVER EVENTS ---
     // Starting Toast which is the progress bar to keep up with progress
     const onStartToast = (payload: { percent_complete: number }) => {
-        toastId = toast.loading(
-            <ProgressToast
-                percent={payload.percent_complete ?? 0}
-                message={messageSig.value}
-            />,
-            { position: "top-center", autoClose: false }
-        );
+        if (!toast.isActive(TOAST_ID)) {
+            toast.loading(
+                <ProgressToast percent={payload.percent_complete ?? 0} message={messageSig.value} />,
+                { position: "top-center", autoClose: false, toastId: TOAST_ID }
+            );
+        }
     };
 
     /****************************************************************************************/
@@ -128,13 +125,13 @@ export function setupSocketProgressBridge() {
         const percent = payload.percent_complete ?? 0;
 
         if ((isDownloadSig.value || isRequestSubmitted.value || isApprovalSig.value) && percent != null) {
-            if (toastId === null) {
-                toastId = toast.loading(
+            if (!toast.isActive(TOAST_ID)) {
+                toast.loading(
                     <ProgressToast percent={percent} message={messageSig.value} />,
-                    { position: "top-center", autoClose: false }
+                    { position: "top-center", autoClose: false, toastId: TOAST_ID }
                 );
             } else {
-                toast.update(toastId, {
+                toast.update(TOAST_ID, {
                     render: <ProgressToast percent={percent} message={messageSig.value} />,
                     type: percent === 100 ? "success" : "info",
                     isLoading: percent !== 100,
@@ -142,28 +139,8 @@ export function setupSocketProgressBridge() {
                     position: "top-center",
                 });
             }
-
-            if (percent === 100) {
-                handleReset();
-            }
+            if (percent === 100) handleReset();
         }
-    };
-
-    /****************************************************************************************/
-    /* CONNECTION TIMEOUT */
-    /****************************************************************************************/
-    const onConnectionTimeout = (payload: { message: string }) => {
-        toast.error(payload.message);
-    };
-
-    const onNoUserFound = (payload: { message: string }) => {
-        console.log("❌ NO_USER_FOUND event received:", payload);
-        toast.error(payload.message);
-    };
-
-    const onUserFound = (payload: { message: string }) => {
-        console.log("🎉 USER_FOUND event received:", payload);
-        toast.success(payload.message);
     };
 
     const onSignalReset = (payload: { message: string }) => {
@@ -172,8 +149,10 @@ export function setupSocketProgressBridge() {
     };
 
     const onErrorEvent = (payload: { message: string }) => {
+        if (!toast.isActive(TOAST_ID)) {
+            toast.error(payload.message, { toastId: TOAST_ID });
+        }
         console.log("🚨 ERROR received:", payload);
-        toast.error(payload.message);
     };
 
     const onSendOriginalPrice = (payload: { message: number }) => {
@@ -184,7 +163,7 @@ export function setupSocketProgressBridge() {
     const onMessageEvent = (payload: { message: string }) => {
         console.log("💬 MESSAGE received:", payload);
         sioMessageSig.value = payload.message;
-        toast.success(payload.message);
+        toast.success(payload.message, { toastId: TOAST_ID });
     };
 
     const onResetData = (payload: { message: string }) => {
@@ -199,8 +178,6 @@ export function setupSocketProgressBridge() {
     socketioInstance.on(SIOEvents.CONNECT_ERROR, onConnectError);
     socketioInstance.on(SIOEvents.START_TOAST, onStartToast);
     socketioInstance.on(SIOEvents.PROGRESS_UPDATE, onProgressUpdate);
-    socketioInstance.on(SIOEvents.NO_USER_FOUND, onNoUserFound);
-    socketioInstance.on(SIOEvents.USER_FOUND, onUserFound);
     socketioInstance.on(SIOEvents.SIGNAL_RESET, onSignalReset);
     socketioInstance.on(SIOEvents.ERROR_EVENT, onErrorEvent);
     socketioInstance.on(SIOEvents.SEND_ORIGINAL_PRICE, onSendOriginalPrice);
@@ -208,9 +185,9 @@ export function setupSocketProgressBridge() {
     socketioInstance.on(SIOEvents.RESET_DATA, onResetData);
 
     // Debug: Log all SocketIO events
-    socketioInstance.onAny((eventName, ...args) => {
-        console.log(`📡 SocketIO event received: ${eventName}`, args);
-    });
+    // socketioInstance.onAny((eventName, ...args) => {
+    //     console.log(`📡 SocketIO event received: ${eventName}`, args);
+    // });
 
     return () => {
         stopEffect();
@@ -220,9 +197,6 @@ export function setupSocketProgressBridge() {
         socketioInstance.off(SIOEvents.CONNECT_ERROR, onConnectError);
         socketioInstance.off(SIOEvents.START_TOAST, onStartToast);
         socketioInstance.off(SIOEvents.PROGRESS_UPDATE, onProgressUpdate);
-        socketioInstance.off(SIOEvents.CONNECTION_TIMEOUT, onConnectionTimeout);
-        socketioInstance.off(SIOEvents.NO_USER_FOUND, onNoUserFound);
-        socketioInstance.off(SIOEvents.USER_FOUND, onUserFound);
         socketioInstance.off(SIOEvents.SIGNAL_RESET, onSignalReset);
         socketioInstance.off(SIOEvents.ERROR_EVENT, onErrorEvent);
         socketioInstance.off(SIOEvents.SEND_ORIGINAL_PRICE, onSendOriginalPrice);

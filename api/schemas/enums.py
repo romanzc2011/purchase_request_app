@@ -49,7 +49,7 @@ class CueClerk(Enum):
     MANAGER = "lelarobichaux"
     TEST_USER = "romancampbell"
     
-TEST_USER_ACTIVE = False
+TEST_USER_ACTIVE = True
 
 def is_test_user_active(username: str) -> bool:
     return username == CueClerk.TEST_USER.value and TEST_USER_ACTIVE

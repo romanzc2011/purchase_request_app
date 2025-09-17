@@ -11,7 +11,7 @@ import BKSeal from "../../assets/seal_no_border.png";
 import { toast } from "react-toastify";
 import { computeHTTPURL } from "../utils/misc_utils";
 import { connectSocketIO } from "../utils/progress_bar_bridge/sioProgressBridge";
-import { handleAPIError, APIError } from "../utils/errorHandler";
+import { APIError } from "../utils/errorHandler";
 
 interface LoginDialogProps {
     open: boolean;

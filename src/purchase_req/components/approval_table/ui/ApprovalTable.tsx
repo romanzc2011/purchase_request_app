@@ -633,8 +633,6 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
                                         toast.success("IRQ1 assigned successfully");
                                     },
                                     onError: () => {
-                                        toast.error("Failed to assign IRQ1");
-
                                         const ref = irq1InputRef.current[id];
                                         if (ref) {
                                             ref.value = "";

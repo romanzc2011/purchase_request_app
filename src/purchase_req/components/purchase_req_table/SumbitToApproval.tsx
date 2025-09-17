@@ -1,4 +1,3 @@
-import Buttons from "./Buttons";
 import {
     Table,
     TableBody,
