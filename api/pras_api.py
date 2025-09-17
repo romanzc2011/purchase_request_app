@@ -1666,6 +1666,17 @@ async def update_prices(
     allowed_increase = min(originalPriceEach * 0.1, 100)
     price_allowance_ok = (new_price_each - originalPriceEach) <= allowed_increase
     
+    # Debug logging to help troubleshoot
+    logger.info(f"PRICE UPDATE DEBUG:")
+    logger.info(f"  Original Price Each: ${originalPriceEach}")
+    logger.info(f"  New Price Each: ${new_price_each}")
+    logger.info(f"  Price Difference: ${new_price_each - originalPriceEach}")
+    logger.info(f"  Allowed Increase (10% or $100): ${allowed_increase}")
+    logger.info(f"  Price Allowance OK: {price_allowance_ok}")
+    logger.info(f"  Item Status: {payload.status}")
+        
+    logger.debug(f"UPDATED PRICES: {price_allowance_ok}")
+    
     # Only allow updating prices for NEW_REQUEST or PENDING_APPROVAL statuses, not APPROVED or DENIED
     if (payload.status is not ItemStatus.DENIED) and price_allowance_ok:
         logger.info(f"payload: {payload}")
@@ -1678,11 +1689,21 @@ async def update_prices(
         
         await db.execute(stmt)
         await db.commit()
-    else:
-        raise HTTPException(status_code=400, detail="Cannot update prices for items with status: APPROVED or DENIED")
+        logger.debug(f"Prices updated successfully")
+        
+        sid = sio_events.get_user_sid(current_user.username)
+        await sio_events.message_event(sid, "Prices updated successfully")
+        return {"message": "Prices updated successfully"}
     
-    return {"message": "Prices updated successfully"}
-
+    # If the price is too much or status is wrong, inform frontend
+    sid = sio_events.get_user_sid(current_user.username)
+    logger.debug(f"SID: {sid}")
+    
+    if not price_allowance_ok:
+        await sio_events.error_event(sid, "Price allowance exceeded, must be less than or equal to original price each + 10% or $100")
+        await sio_events.send_original_price(sid, originalPriceEach)
+        
+  
 ##########################################################################
 ## HANDLE FILE UPLOAD
 ##########################################################################
@@ -1751,19 +1772,7 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
     return {"delete": True}
 
 ##########################################################################
-## WEBSOCKET PROGRESS
-##########################################################################
-
-##########################################################################
 ## MAIN CONTROL FLOW
 ##########################################################################
 if __name__ == "__main__":
-    #     uvicorn.run(
-    #     "pras_api:app",
-    #     host="0.0.0.0",
-    #     port=5004,
-    #     reload=True,
-    #     ssl_certfile=pras_cert,
-    #     ssl_keyfile=pras_key,
-    # )
     uvicorn.run("pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004, reload=True)

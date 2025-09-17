@@ -1042,6 +1042,11 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
                     checkboxSelection
                     columns={allColumns}
                     processRowUpdate={handleEditPriceEach}
+                    onProcessRowUpdateError={(error) => {
+                        console.error("Price update error:", error);
+                        // The DataGrid should automatically revert the cell value when processRowUpdate throws an error
+                        // If it's not working, we might need to manually revert using the DataGrid API
+                    }}
                     rowSelectionModel={rowSelectionModel}
                     isCellEditable={(params) => {
                         // Only allow editing priceEach field

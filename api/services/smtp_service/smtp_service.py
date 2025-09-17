@@ -278,6 +278,12 @@ class SMTP_Service:
                     # Default case, most likely testing
                     logger.debug(f"Unknown recipient role: {role}")
         
+        # Deduplicate email addresses and usernames
+        to_address = list(dict.fromkeys(to_address))  # Preserves order, removes duplicates
+        to_username = list(dict.fromkeys(to_username))
+        cc_address = list(dict.fromkeys(cc_address))
+        cc_username = list(dict.fromkeys(cc_username))
+        
         logger.info(f"SENDING TO: {to_address} :: {to_username}")
         logger.info(f"CC TO:     {cc_address} :: {cc_username}")
         await ipc_status.update(field="approval_email_sent", value=True)  # To inform progress bar that email has been sent

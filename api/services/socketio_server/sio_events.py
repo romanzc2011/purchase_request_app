@@ -10,8 +10,6 @@ from api.utils.misc_utils import format_username
 async def decode_and_validate_token(token: str) -> LDAPUser:
     return await auth_service.get_current_user(token)
 
-# Extract sid helper function - removed duplicate definition
-
 # SocketIO events
 @sio.event
 async def connect(sid, environ, auth):
@@ -68,6 +66,19 @@ async def disconnect(sid):
                 del user_sids[username]
         del sid_user_map[sid]
         logger.debug(f"Cleaned up session mappings for user {username}")
+
+# --------------------------------------------------------------
+# MESSAGE EVENT
+# --------------------------------------------------------------
+"""
+# MESSAGE EVENT
+# This event sends regular data messages to client. Data to send will include non specific/general messages 
+ and/or status updates, etc. 
+"""
+@sio.on("MESSAGE_EVENT")
+async def message_event(sid, data):
+    logger.debug("socketio: message_event", sid)
+    await sio.emit("MESSAGE_EVENT", {"message": data}, to=sid)
     
 @sio.event
 async def ping_from_client(sid, data):
@@ -81,7 +92,7 @@ async def connection_timeout(sid):
 @sio.on("reset_data")
 async def reset_data(sid):
     logger.debug("socketio: reset_data", sid)
-
+    
 @sio.on("ERROR")
 async def error_event(sid, data):
     logger.debug("socketio: error_event", sid)
@@ -102,3 +113,8 @@ async def signal_reset(sid, data):
 @sio.on("EMAIL_SENT")
 async def email_sent(sid, data):
     logger.debug(f"Email sent, progress is complete if approval === PENDING: {sid}: {data}")
+    
+@sio.on("SEND_ORGINAL_PRICE")
+async def send_original_price(sid, data):
+    logger.debug("socketio: send_original_price", sid)
+    await sio.emit("SEND_ORGINAL_PRICE", {"message": data}, to=sid)

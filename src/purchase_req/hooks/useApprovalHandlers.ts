@@ -117,7 +117,12 @@ async function updatePriceEachTotalPrice(
 			status
 		})
 	});
-	if (!response.ok) throw new Error(`HTTP ${response.status}`);
+	
+	if (!response.ok) {
+		const errorData = await response.json().catch(() => ({}));
+		const errorMessage = errorData.detail || `HTTP ${response.status}`;
+		throw new Error(errorMessage);
+	}
 	
 	return response.json();
 }

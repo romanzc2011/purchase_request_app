@@ -106,9 +106,9 @@ class AuthService:
             raise InvalidTokenError("wrong token type")
         return payload["sub"]
     
-    #####################################################################################
-    ## TEST OVERRIDE - FOR TESTING ONLY
-    #####################################################################################
+    # ----------------------------------------------------------------------------------
+    # TEST USER OVERRIDE
+    # ----------------------------------------------------------------------------------
     def set_test_user_override(self, username: str, email: str = None, groups: list = None):
         """
         Override the current user for testing purposes
@@ -127,8 +127,9 @@ class AuthService:
         logger.warning("🔧 TEST USER OVERRIDE CLEARED")
 
 
-    #####################################################################################
-    ## AUTHENTICATE USER
+    # ----------------------------------------------------------------------------------
+    # AUTHENTICATE USER
+    # ----------------------------------------------------------------------------------
     async def authenticate_user(
         self,
         form_data: OAuth2PasswordRequestForm
@@ -152,8 +153,9 @@ class AuthService:
         
         return await LDAPUser.from_ldap(username, self.ldap_service)
             
-    #####################################################################################
-    ## Get Current LDAPUser
+    # ----------------------------------------------------------------------------------
+    # GET CURRENT LDAPUSER
+    # ----------------------------------------------------------------------------------
     async def get_current_user(self, token: str = Depends(oauth2_scheme)) -> LDAPUser:
         # Check for test override first
         if self.set_test_user_override:
