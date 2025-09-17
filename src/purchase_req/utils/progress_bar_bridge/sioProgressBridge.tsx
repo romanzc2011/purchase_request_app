@@ -149,6 +149,11 @@ export function setupSocketProgressBridge() {
     };
 
     const onErrorEvent = (payload: { message: string }) => {
+        // This is for RQ1 assign failure, close with button
+        if (payload.message.includes("You are not authorized to assign requisition IDs")) {
+            toast.error(payload.message, { toastId: TOAST_ID, autoClose: false });
+            return;
+        }
         if (!toast.isActive(TOAST_ID)) {
             toast.error(payload.message, { toastId: TOAST_ID });
         }
