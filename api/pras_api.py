@@ -1662,9 +1662,13 @@ async def update_prices(
     # Calculate 10% and $100 allowances
     price_allowance_ok = False
     
+    try:
     # Allowance is ok if new price each is less than or equal to original price each + 10% or $100
-    allowed_increase = min(originalPriceEach * 0.1, 100)
-    price_allowance_ok = (new_price_each - originalPriceEach) <= allowed_increase
+        allowed_increase = min(originalPriceEach * 0.1, 100)
+        price_allowance_ok = (new_price_each - originalPriceEach) <= allowed_increase
+    except Exception as e:
+        logger.error(f"Error calculating price allowance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     
     # Debug logging to help troubleshoot
     logger.info(f"PRICE UPDATE DEBUG:")
@@ -1702,6 +1706,8 @@ async def update_prices(
     if not price_allowance_ok:
         await sio_events.error_event(sid, "Price allowance exceeded, must be less than or equal to original price each + 10% or $100")
         await sio_events.send_original_price(sid, originalPriceEach)
+        
+    raise HTTPException(status_code=500, detail="PRICE_ALLOWANCE_EXCEEDED")
         
   
 ##########################################################################

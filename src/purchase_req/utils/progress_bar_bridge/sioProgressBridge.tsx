@@ -8,7 +8,27 @@ import {
     isRequestSubmitted,
     isSubmittedSig,
     messageSig,
+    sioErrorSig,
+    sioMessageSig,
+    sioOriginalPriceSig,
 } from "../PrasSignals";
+
+export const SIOEvents = {
+    START_TOAST: "START_TOAST",
+    PROGRESS_UPDATE: "PROGRESS_UPDATE",
+    CONNECTION_TIMEOUT: "CONNECTION_TIMEOUT",
+    NO_USER_FOUND: "NO_USER_FOUND",
+    USER_FOUND: "USER_FOUND",
+    SIGNAL_RESET: "SIGNAL_RESET",
+    ERROR_EVENT: "ERROR_EVENT",
+    SEND_ORIGINAL_PRICE: "SEND_ORIGINAL_PRICE",
+    MESSAGE_EVENT: "MESSAGE_EVENT",
+    RESET_DATA: "RESET_DATA",
+    DISCONNECT: "disconnect",
+    CONNECT: "connect",
+    CONNECT_ERROR: "connect_error",
+    UPGRADE: "upgrade",
+}
 
 // Create and export a single socket instance you use everywhere
 export const socketioInstance: Socket = io(window.location.origin, {
@@ -49,6 +69,9 @@ export function setupSocketProgressBridge() {
         isSubmittedSig.value = false;
         isRequestSubmitted.value = false;
         isApprovalSig.value = false;
+        sioMessageSig.value = null;
+        sioErrorSig.value = null;
+        sioOriginalPriceSig.value = null;
         if (toastId !== null) {
             toast.dismiss(toastId);
             toastId = null;
@@ -148,23 +171,41 @@ export function setupSocketProgressBridge() {
         handleReset();
     };
 
-    const onError = (payload: { message: string }) => {
+    const onErrorEvent = (payload: { message: string }) => {
         console.log("🚨 ERROR received:", payload);
         toast.error(payload.message);
     };
 
+    const onSendOriginalPrice = (payload: { message: number }) => {
+        console.log("💰 ORIGINAL PRICE received:", payload);
+        sioOriginalPriceSig.value = payload.message;
+    };
+
+    const onMessageEvent = (payload: { message: string }) => {
+        console.log("💬 MESSAGE received:", payload);
+        sioMessageSig.value = payload.message;
+        toast.success(payload.message);
+    };
+
+    const onResetData = (payload: { message: string }) => {
+        console.log("🔄 RESET DATA received:", payload);
+        handleReset();
+    };
+
     // ---- register listeners ONCE ----
-    socketioInstance.on("connect", onConnect);
+    socketioInstance.on(SIOEvents.CONNECT, onConnect);
     socketioInstance.io.engine.on("upgrade", onUpgrade);
-    socketioInstance.on("disconnect", onDisconnect);
-    socketioInstance.on("connect_error", onConnectError);
-    socketioInstance.on("START_TOAST", onStartToast);
-    socketioInstance.on("PROGRESS_UPDATE", onProgressUpdate);
-    socketioInstance.on("CONNECTION_TIMEOUT", onConnectionTimeout);
-    socketioInstance.on("NO_USER_FOUND", onNoUserFound);
-    socketioInstance.on("USER_FOUND", onUserFound);
-    socketioInstance.on("SIGNAL_RESET", onSignalReset);
-    socketioInstance.on("ERROR_EVENT", onError);  // Fixed: Listen for ERROR_EVENT, not ERROR
+    socketioInstance.on(SIOEvents.DISCONNECT, onDisconnect);
+    socketioInstance.on(SIOEvents.CONNECT_ERROR, onConnectError);
+    socketioInstance.on(SIOEvents.START_TOAST, onStartToast);
+    socketioInstance.on(SIOEvents.PROGRESS_UPDATE, onProgressUpdate);
+    socketioInstance.on(SIOEvents.NO_USER_FOUND, onNoUserFound);
+    socketioInstance.on(SIOEvents.USER_FOUND, onUserFound);
+    socketioInstance.on(SIOEvents.SIGNAL_RESET, onSignalReset);
+    socketioInstance.on(SIOEvents.ERROR_EVENT, onErrorEvent);
+    socketioInstance.on(SIOEvents.SEND_ORIGINAL_PRICE, onSendOriginalPrice);
+    socketioInstance.on(SIOEvents.MESSAGE_EVENT, onMessageEvent);
+    socketioInstance.on(SIOEvents.RESET_DATA, onResetData);
 
     // Debug: Log all SocketIO events
     socketioInstance.onAny((eventName, ...args) => {
@@ -173,16 +214,19 @@ export function setupSocketProgressBridge() {
 
     return () => {
         stopEffect();
-        socketioInstance.off("connect", onConnect);
+        socketioInstance.off(SIOEvents.CONNECT, onConnect);
         socketioInstance.io.engine.off("upgrade", onUpgrade);
-        socketioInstance.off("disconnect", onDisconnect);
-        socketioInstance.off("connect_error", onConnectError);
-        socketioInstance.off("START_TOAST", onStartToast);
-        socketioInstance.off("PROGRESS_UPDATE", onProgressUpdate);
-        socketioInstance.off("CONNECTION_TIMEOUT", onConnectionTimeout);
-        socketioInstance.off("NO_USER_FOUND", onNoUserFound);
-        socketioInstance.off("USER_FOUND", onUserFound);
-        socketioInstance.off("SIGNAL_RESET", onSignalReset);
-        socketioInstance.off("ERROR_EVENT", onError);  // Fixed: Clean up ERROR_EVENT listener
+        socketioInstance.off(SIOEvents.DISCONNECT, onDisconnect);
+        socketioInstance.off(SIOEvents.CONNECT_ERROR, onConnectError);
+        socketioInstance.off(SIOEvents.START_TOAST, onStartToast);
+        socketioInstance.off(SIOEvents.PROGRESS_UPDATE, onProgressUpdate);
+        socketioInstance.off(SIOEvents.CONNECTION_TIMEOUT, onConnectionTimeout);
+        socketioInstance.off(SIOEvents.NO_USER_FOUND, onNoUserFound);
+        socketioInstance.off(SIOEvents.USER_FOUND, onUserFound);
+        socketioInstance.off(SIOEvents.SIGNAL_RESET, onSignalReset);
+        socketioInstance.off(SIOEvents.ERROR_EVENT, onErrorEvent);
+        socketioInstance.off(SIOEvents.SEND_ORIGINAL_PRICE, onSendOriginalPrice);
+        socketioInstance.off(SIOEvents.MESSAGE_EVENT, onMessageEvent);
+        socketioInstance.off(SIOEvents.RESET_DATA, onResetData);
     };
 }

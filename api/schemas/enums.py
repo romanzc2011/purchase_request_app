@@ -53,3 +53,19 @@ TEST_USER_ACTIVE = False
 
 def is_test_user_active(username: str) -> bool:
     return username == CueClerk.TEST_USER.value and TEST_USER_ACTIVE
+
+#-------------------------------------------------------------------------------------
+# SOCKETIO EVENTS   (These are the events that are sent to the frontend)
+#-------------------------------------------------------------------------------------
+class SIOEvents(Enum):
+    SEND_ORIGINAL_PRICE = "SEND_ORIGINAL_PRICE"
+    MESSAGE_EVENT = "MESSAGE_EVENT"
+    ERROR_EVENT = "ERROR_EVENT"
+    START_TOAST = "START_TOAST"
+    PROGRESS_UPDATE = "PROGRESS_UPDATE"
+    CONNECTION_TIMEOUT = "CONNECTION_TIMEOUT"
+    NO_USER_FOUND = "NO_USER_FOUND"
+    USER_FOUND = "USER_FOUND"
+    SIGNAL_RESET = "SIGNAL_RESET"
+    RESET_DATA = "RESET_DATA"
+    PING_FROM_SERVER = "PING_FROM_SERVER"

@@ -6,6 +6,7 @@ from api.services.socketio_server.socket_state import user_sids, sid_user as sid
 from fastapi import Depends
 from api.dependencies.pras_dependencies import auth_service
 from api.utils.misc_utils import format_username
+from api.schemas.enums import SIOEvents
 
 async def decode_and_validate_token(token: str) -> LDAPUser:
     return await auth_service.get_current_user(token)
@@ -25,11 +26,11 @@ async def connect(sid, environ, auth):
 
 @sio.event
 async def progress_update(sid: str, payload: Dict[str, Any]) -> None:
-    await sio.emit("PROGRESS_UPDATE", payload, to=sid)
+    await sio.emit(SIOEvents.PROGRESS_UPDATE.value, payload, to=sid)
 
 @sio.event
 async def start_toast(sid: str, percent: int = 0) -> None:
-    await sio.emit("START_TOAST", {"percent_complete": percent}, to=sid)
+    await sio.emit(SIOEvents.START_TOAST.value, {"percent_complete": percent}, to=sid)
 
 def get_user_sid(user_or_name: Union[str, "LDAPUser", None]) -> Optional[str]:
     from api.services.socketio_server.socket_state import user_sids
@@ -75,25 +76,23 @@ async def disconnect(sid):
 # This event sends regular data messages to client. Data to send will include non specific/general messages 
  and/or status updates, etc. 
 """
-@sio.on("MESSAGE_EVENT")
+@sio.on(SIOEvents.MESSAGE_EVENT.value)
 async def message_event(sid, data):
     logger.debug("socketio: message_event", sid)
-    await sio.emit("MESSAGE_EVENT", {"message": data}, to=sid)
+    await sio.emit(SIOEvents.MESSAGE_EVENT.value, {"message": data}, to=sid)
     
-@sio.event
-async def ping_from_client(sid, data):
-    await sio.emit("pong_from_server", {"got": data}, to=sid)
-    
-@sio.on("reset_data")
+@sio.on(SIOEvents.RESET_DATA.value)
 async def reset_data(sid):
     logger.debug("socketio: reset_data", sid)
 
-@sio.on("ERROR")
+@sio.on(SIOEvents.ERROR_EVENT.value)
 async def error_event(sid, data):
     logger.debug("socketio: error_event", sid)
-    await sio.emit("ERROR_EVENT", {"message": data}, to=sid)
+    await sio.emit(SIOEvents.ERROR_EVENT.value, {"message": data}, to=sid)
     
-@sio.on("SEND_ORGINAL_PRICE")
+@sio.on(SIOEvents.SEND_ORIGINAL_PRICE.value)
 async def send_original_price(sid, data):
     logger.debug("socketio: send_original_price", sid)
-    await sio.emit("SEND_ORGINAL_PRICE", {"message": data}, to=sid)
+    await sio.emit(SIOEvents.SEND_ORIGINAL_PRICE.value, {"message": data}, to=sid)
+    
+    

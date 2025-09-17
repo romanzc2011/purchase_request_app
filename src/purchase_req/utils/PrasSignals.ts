@@ -7,7 +7,10 @@ export const isApprovalSig          = signal<boolean>(false);
 export const messageSig             = signal<string>("");
 export const isRequestSubmitted     = signal<boolean>(false);
 export const userFoundSig           = signal<boolean>(false);
-export const toastIdSignal          = signal<Id | null>(null);
+export const toastIdSignal = signal<Id | null>(null);
+export const sioMessageSig = signal<string | null>(null);
+export const sioErrorSig = signal<string | null>(null);
+export const sioOriginalPriceSig = signal<number | null>(null);
 
 export const reset_signals = () => {
 	isSubmittedSig.value = false;
@@ -17,4 +20,7 @@ export const reset_signals = () => {
 	isRequestSubmitted.value = false;
 	userFoundSig.value = false;
 	toastIdSignal.value = null;
+	sioMessageSig.value = null;
+	sioErrorSig.value = null;
+	sioOriginalPriceSig.value = null;
 }

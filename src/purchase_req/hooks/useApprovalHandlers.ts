@@ -8,6 +8,7 @@ import { useApprovalService } from "./useApprovalService";
 import { GridRowId } from "@mui/x-data-grid";
 import { DataRow, ItemStatus } from "../types/approvalTypes";
 import { computeHTTPURL } from "../utils/misc_utils";
+import { sioOriginalPriceSig } from "../utils/PrasSignals";
 
 // API URLs
 const API_URL_STATEMENT_OF_NEED_FORM = computeHTTPURL("/api/downloadStatementOfNeedForm");
@@ -97,41 +98,37 @@ try {
 // UPDATE PRICE EACH/ TOTAL PRICE
 // #########################################################################################
 async function updatePriceEachTotalPrice(
-	purchase_request_id: string, 
-	item_uuid: string, 
-	newPriceEach: number, 
-	newTotalPrice: number,
-	status: ItemStatus
-) {
-	const response = await fetch(API_URL_UPDATE_PRICES, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${localStorage.getItem("access_token")}`
-		},
-		body: JSON.stringify({
-			purchase_request_id,
-			item_uuid,
-			new_price_each: newPriceEach,
-			new_total_price: newTotalPrice,
-			status
-		})
-	});
-	
-    console.log("response", response);
-    console.log("HELLO");
-    
-	if (!response.ok) {
-		const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.detail || `HTTP ${response.status}`;
-        
-        console.log("response", response);
-        console.log("errorData", errorData);
-        console.log("errorMessage", errorMessage);
-	}
-	
-	return response.json();
-}
+    purchase_request_id: string,
+    item_uuid: string,
+    newPriceEach: number,
+    newTotalPrice: number,
+    status: ItemStatus
+  ) {
+    const res = await fetch(API_URL_UPDATE_PRICES, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      },
+      body: JSON.stringify({
+        purchase_request_id,
+        item_uuid,
+        new_price_each: newPriceEach,
+        new_total_price: newTotalPrice,
+        status,
+      }),
+    });
+  
+    if (!res.ok) {
+      let detail: any = {};
+      try { detail = await res.json(); } catch {}
+      const code = detail?.code || detail?.detail || `HTTP_${res.status}`;
+      const msg  = detail?.message || detail?.detail?.message || `HTTP ${res.status}`;
+      throw Object.assign(new Error(msg), { code, detail });
+    }
+    return res.json(); // optional
+  }
+  
 
 // #########################################################################################
 // APPROVAL HANDLERS HOOK
@@ -193,9 +190,9 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 			return newRow;
 		}
 		
-		const newPriceEach = newRow.priceEach;
+		let newPriceEach = newRow.priceEach;
 		const quantity = newRow.quantity;
-		const newTotalPrice = newPriceEach * quantity;
+		let newTotalPrice = newPriceEach * quantity;
 		const status = newRow.status;
 
 		// Extract the actual UUID and ID from the row data
@@ -204,9 +201,15 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 
 
 		// update the price each and total price on backend
-		await updatePriceEachTotalPrice(purchase_request_id, item_uuid, newPriceEach, newTotalPrice, status);
-
-		return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
+		try {
+			await updatePriceEachTotalPrice(purchase_request_id, item_uuid, newPriceEach, newTotalPrice, status);
+			// If successful, return the new values
+			return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
+		} catch (error) {
+			// If price allowance exceeded, revert to original price
+			console.log("Price update failed, reverting to original price:", oldRow.priceEach);
+			return { ...oldRow, priceEach: oldRow.priceEach, totalPrice: oldRow.totalPrice };
+		}
 	};
 
 	//####################################################################
