@@ -17,7 +17,6 @@ sio = socketio.AsyncServer(
     ping_timeout=60,
     max_http_buffer_size=1_000_000,
 )
-
 socketio_app = socketio.ASGIApp(sio, socketio_path="communicate")
 
 # Remember server loop so worker threads can schedule emits on it
@@ -43,4 +42,5 @@ def emit_async(event: str, data: dict, to: str | None = None) -> None:
         if loop is None:
             raise RuntimeError("Server loop not set; call set_server_loop() at startup")
         asyncio.run_coroutine_threadsafe(_emit(), loop)
+
         

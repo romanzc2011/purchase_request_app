@@ -83,36 +83,15 @@ async def message_event(sid, data):
 @sio.event
 async def ping_from_client(sid, data):
     await sio.emit("pong_from_server", {"got": data}, to=sid)
-
-@sio.event
-async def connection_timeout(sid):
-    logger.debug(f"socketio: connection_timeout {sid}")
-    await sio.emit("CONNECTION_TIMEOUT", {"message": "Connection timed out. Reconnecting..."}, to=sid)
     
 @sio.on("reset_data")
 async def reset_data(sid):
     logger.debug("socketio: reset_data", sid)
-    
+
 @sio.on("ERROR")
 async def error_event(sid, data):
     logger.debug("socketio: error_event", sid)
     await sio.emit("ERROR_EVENT", {"message": data}, to=sid)
-
-@sio.on("NO_USER_FOUND")
-async def no_user_found(sid, data):
-    logger.debug("socketio: no_user_found", sid)
-    
-@sio.on("USER_FOUND")
-async def user_found(sid, data):
-    logger.debug("socketio: user_found", sid)
-    
-@sio.on("SIGNAL_RESET")
-async def signal_reset(sid, data):
-    logger.debug("socketio: signal_reset", sid)
-    
-@sio.on("EMAIL_SENT")
-async def email_sent(sid, data):
-    logger.debug(f"Email sent, progress is complete if approval === PENDING: {sid}: {data}")
     
 @sio.on("SEND_ORGINAL_PRICE")
 async def send_original_price(sid, data):

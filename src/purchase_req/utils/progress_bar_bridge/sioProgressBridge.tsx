@@ -138,10 +138,6 @@ export function setupSocketProgressBridge() {
         toast.error(payload.message);
     };
 
-    const onMessageEvent = (payload: { message: string }) => {
-        toast.success(payload.message);
-    }
-
     const onUserFound = (payload: { message: string }) => {
         console.log("🎉 USER_FOUND event received:", payload);
         toast.success(payload.message);
@@ -157,12 +153,6 @@ export function setupSocketProgressBridge() {
         toast.error(payload.message);
     };
 
-    const onSendOriginalPrice = (payload: { message: number }) => {
-        console.log("💰 ORIGINAL PRICE received:", payload);
-        // This will be handled by the DataGrid's processRowUpdate error handling
-        // The original price will be restored when the update fails
-    };
-
     // ---- register listeners ONCE ----
     socketioInstance.on("connect", onConnect);
     socketioInstance.io.engine.on("upgrade", onUpgrade);
@@ -172,11 +162,9 @@ export function setupSocketProgressBridge() {
     socketioInstance.on("PROGRESS_UPDATE", onProgressUpdate);
     socketioInstance.on("CONNECTION_TIMEOUT", onConnectionTimeout);
     socketioInstance.on("NO_USER_FOUND", onNoUserFound);
-    socketioInstance.on("MESSAGE_EVENT", onMessageEvent);
     socketioInstance.on("USER_FOUND", onUserFound);
     socketioInstance.on("SIGNAL_RESET", onSignalReset);
     socketioInstance.on("ERROR_EVENT", onError);  // Fixed: Listen for ERROR_EVENT, not ERROR
-    socketioInstance.on("SEND_ORGINAL_PRICE", onSendOriginalPrice);
 
     // Debug: Log all SocketIO events
     socketioInstance.onAny((eventName, ...args) => {
@@ -193,10 +181,8 @@ export function setupSocketProgressBridge() {
         socketioInstance.off("PROGRESS_UPDATE", onProgressUpdate);
         socketioInstance.off("CONNECTION_TIMEOUT", onConnectionTimeout);
         socketioInstance.off("NO_USER_FOUND", onNoUserFound);
-        socketioInstance.off("MESSAGE_EVENT", onMessageEvent);
         socketioInstance.off("USER_FOUND", onUserFound);
         socketioInstance.off("SIGNAL_RESET", onSignalReset);
         socketioInstance.off("ERROR_EVENT", onError);  // Fixed: Clean up ERROR_EVENT listener
-        socketioInstance.off("SEND_ORGINAL_PRICE", onSendOriginalPrice);
     };
 }

@@ -118,10 +118,16 @@ async function updatePriceEachTotalPrice(
 		})
 	});
 	
+    console.log("response", response);
+    console.log("HELLO");
+    
 	if (!response.ok) {
 		const errorData = await response.json().catch(() => ({}));
-		const errorMessage = errorData.detail || `HTTP ${response.status}`;
-		throw new Error(errorMessage);
+        const errorMessage = errorData.detail || `HTTP ${response.status}`;
+        
+        console.log("response", response);
+        console.log("errorData", errorData);
+        console.log("errorMessage", errorMessage);
 	}
 	
 	return response.json();
