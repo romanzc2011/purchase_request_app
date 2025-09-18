@@ -2,7 +2,6 @@ import { effect, signal } from "@preact/signals-react";
 import { Socket, io } from "socket.io-client";
 import { toast } from "react-toastify";
 import { ProgressToast } from "../../components/ProgressToast";
-import { useDebounce } from "../../hooks/useDebounce";
 import {
     isApprovalSig,
     isDownloadSig,
@@ -13,7 +12,9 @@ import {
     sioMessageSig,
     sioOriginalPriceSig,
 } from "../PrasSignals";
+import { RQ1WarningToast } from "../../components/approval_table/ui/custom_toast/CustomToast";
 
+/* Using SocketIO Events as a form of message passing ipc to get data flowing between client and server */
 export const SIOEvents = {
     START_TOAST: "START_TOAST",
     PROGRESS_UPDATE: "PROGRESS_UPDATE",
@@ -29,7 +30,7 @@ export const SIOEvents = {
 }
 
 // Custom ToastID to prevent duplicates
-const TOAST_ID = "PRAS_TOASTID" as const;
+const TOAST_ID = "PRAS_TOASTID";
 
 // Create and export a single socket instance you use everywhere
 export const socketioInstance: Socket = io(window.location.origin, {
@@ -48,7 +49,10 @@ export const transportSig = signal<string>("disconnected");
 // Function to connect SocketIO after login
 export function connectSocketIO() {
     console.log("🔌 Connecting SocketIO...");
+    console.log("🔌 SocketIO instance:", socketioInstance);
+    console.log("🔌 Current connection state:", socketioInstance.connected);
     socketioInstance.connect();
+    console.log("🔌 Connection attempt made");
 }
 
 // Call this ONCE at app startup
@@ -90,6 +94,11 @@ export function setupSocketProgressBridge() {
     // --- CONNECTION LIFECYCLE ---
     const onConnect = () => {
         console.log("🔌 SocketIO connected successfully!");
+        console.log("🔌 Connection details:", {
+            connected: socketioInstance.connected,
+            id: socketioInstance.id,
+            transport: socketioInstance.io.engine?.transport?.name
+        });
         isIOConnectedSig.value = true;
         transportSig.value = socketioInstance.io.engine?.transport?.name || "connected";
     };
@@ -110,6 +119,7 @@ export function setupSocketProgressBridge() {
     // --- SERVER EVENTS ---
     // Starting Toast which is the progress bar to keep up with progress
     const onStartToast = (payload: { percent_complete: number }) => {
+        console.log("🚀 Start toast received:", payload);
         if (!toast.isActive(TOAST_ID)) {
             toast.loading(
                 <ProgressToast percent={payload.percent_complete ?? 0} message={messageSig.value} />,
@@ -122,6 +132,7 @@ export function setupSocketProgressBridge() {
     /* PROGRESS BAR */
     /****************************************************************************************/
     const onProgressUpdate = (payload: { percent_complete: number }) => {
+        console.log("📊 Progress update received:", payload);
         const percent = payload.percent_complete ?? 0;
 
         if ((isDownloadSig.value || isRequestSubmitted.value || isApprovalSig.value) && percent != null) {
@@ -151,7 +162,7 @@ export function setupSocketProgressBridge() {
     const onErrorEvent = (payload: { message: string }) => {
         // This is for RQ1 assign failure, close with button
         if (payload.message.includes("You are not authorized to assign requisition IDs")) {
-            toast.error(payload.message, { toastId: TOAST_ID, autoClose: false });
+            RQ1WarningToast(payload.message, TOAST_ID);
             return;
         }
         if (!toast.isActive(TOAST_ID)) {

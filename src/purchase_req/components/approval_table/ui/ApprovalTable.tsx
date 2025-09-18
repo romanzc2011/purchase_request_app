@@ -3,19 +3,21 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import 'react-toastify/dist/ReactToastify.css';
 import { Box, Typography, Button, Modal, TextField } from "@mui/material";
 import { DataGrid, GridColDef, GridRowId } from "@mui/x-data-grid";
-import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+
 import { fetchSearchData } from "./SearchBar";
 import Buttons from "../../purchase_req_table/Buttons";
 import { useAssignIRQ1 } from "../../../hooks/useAssignIRQ1";
 import { useCommentModal } from "../../../hooks/useCommentModal";
+import CommentModal from "../modals/CommentModal";
+
 import CommentIcon from '@mui/icons-material/Comment';
 import CheckIcon from "@mui/icons-material/Check";
 import MemoryIcon from '@mui/icons-material/Memory';
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
-import CommentModal from "../modals/CommentModal";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import "../../../styles/ApprovalTable.css"
 
 import { GroupCommentPayload, CommentEntry, STATUS_CONFIG, type DataRow, type FlatRow, ApprovalData, ItemStatus, DenialData } from "../../../types/approvalTypes";
@@ -623,24 +625,31 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
                             disabled={!!assignedIRQ1s[id]}
                             label={assignedIRQ1s[id] ? "Assigned" : "Assign"}
                             onClick={() => {
-                                assignIRQ1Mutation.mutate({
-                                    ID: id,
-                                    newIRQ1ID: currentDraftIRQ1
-                                }, {
-                                    onSuccess: () => {
-                                        // Invalidate the query to refresh the data
-                                        queryClient.invalidateQueries({ queryKey: ["approvalData"] });
-                                        toast.success("IRQ1 assigned successfully");
-                                    },
-                                    onError: () => {
-                                        const ref = irq1InputRef.current[id];
-                                        if (ref) {
-                                            ref.value = "";
+                                try {
+                                    console.log("🔄 Attempting to assign IRQ1:", { ID: id, newIRQ1ID: currentDraftIRQ1 });
+                                    assignIRQ1Mutation.mutate({
+                                        ID: id,
+                                        newIRQ1ID: currentDraftIRQ1
+                                    }, {
+                                        onSuccess: () => {
+                                            console.log("✅ IRQ1 assigned successfully");
+                                            // Invalidate the query to refresh the data
+                                            queryClient.invalidateQueries({ queryKey: ["approvalData"] });
+                                            toast.success("IRQ1 assigned successfully");
+                                        },
+                                        onError: (error) => {
+                                            // console.error("❌ IRQ1 assignment failed:", error);
+                                            const ref = irq1InputRef.current[id];
+                                            if (ref) {
+                                                ref.value = "";
+                                            }
+                                            // Also clear the draft state
+                                            setDraftIRQ1(prev => ({ ...prev, [id]: "" }));
                                         }
-                                        // Also clear the draft state
-                                        setDraftIRQ1(prev => ({ ...prev, [id]: "" }));
-                                    }
-                                });
+                                    });
+                                } catch (error) {
+                                    console.error("❌ Error in assignment click handler:", error);
+                                }
                             }}
                         />
                         <TextField
