@@ -1775,8 +1775,10 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 
     return {"delete": True}
 
-##########################################################################
-## MAIN CONTROL FLOW
-##########################################################################
+# Function to run pras from the build system
+def cli():
+    import uvicorn
+    uvicorn.run("api.pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004)
+    
 if __name__ == "__main__":
-    uvicorn.run("pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004, reload=True)
+    cli()
