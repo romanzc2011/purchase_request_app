@@ -51,13 +51,20 @@ class IPCSharedMemory:
             self.shm = shared_memory.SharedMemory(name=name)
         self.name = name
         
-        # Start cleanup task
-        self.start_cleanup_task()
+        # Don't start cleanup task during initialization - will be started in FastAPI startup
         
     def start_cleanup_task(self):
         """Start periodic cleanup of stale progress state"""
         if self.cleanup_task is None:
             self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+            
+    def ensure_cleanup_task_started(self):
+        """Ensure cleanup task is started (called from FastAPI startup)"""
+        try:
+            self.start_cleanup_task()
+        except RuntimeError:
+            # Event loop not running yet, will be called again from FastAPI startup
+            pass
             
     async def _cleanup_loop(self):
         """Periodically check and clear stale progress state"""

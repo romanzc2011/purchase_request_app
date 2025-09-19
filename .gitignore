@@ -49,3 +49,4 @@ pytest.ini
 tests/*
 api/web.config
 api/db/pras_dblite_project
+.venv/*

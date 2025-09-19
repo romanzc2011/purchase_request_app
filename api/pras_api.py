@@ -123,6 +123,10 @@ async def _capture_loop():
     from api.services.socketio_server.sio_instance import set_server_loop
     set_server_loop(asyncio.get_event_loop())
     
+    # Start IPC cleanup task now that event loop is running
+    from api.services.ipc_status import ipc_status
+    ipc_status.ensure_cleanup_task_started()
+    
 # Start LDAP heartbeat to prevent connection timeout
 @app.on_event("startup")
 async def start_keepalive_ldap():
@@ -1778,6 +1782,7 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 # Function to run pras from the build system
 def cli():
     import uvicorn
+    import socket
     uvicorn.run("api.pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004)
     
 if __name__ == "__main__":
