@@ -33,14 +33,14 @@ export const SIOEvents = {
 const TOAST_ID = "PRAS_TOASTID";
 
 // Create and export a single socket instance you use everywhere
-export const socketioInstance: Socket = io(window.location.origin, {
+export const socketioInstance: Socket = io("http://127.0.0.1:5004", {
     path: "/progress_bar_bridge/communicate",
-    transports: ["polling"],
+    transports: ["websocket"],
+    autoConnect: false,
     auth: (cb) => {
         const token = localStorage.getItem("access_token");
         cb({ token });
     },
-    autoConnect: false, // Don't connect automatically
 });
 
 export const isIOConnectedSig = signal<boolean>(false);

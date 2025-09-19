@@ -17,7 +17,11 @@ sio = socketio.AsyncServer(
     ping_timeout=60,
     max_http_buffer_size=1_000_000,
 )
-socketio_app = socketio.ASGIApp(sio, socketio_path="communicate")
+
+socketio_app = socketio.ASGIApp(
+    sio, 
+    socketio_path="progress_bar_bridge/communicate"
+)
 
 # Remember server loop so worker threads can schedule emits on it
 _server_loop: asyncio.AbstractEventLoop | None = None

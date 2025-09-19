@@ -51,13 +51,16 @@ class IPCSharedMemory:
             self.shm = shared_memory.SharedMemory(name=name)
         self.name = name
         
-        # Start cleanup task
-        self.start_cleanup_task()
+        # Don't start cleanup task during import - will be started later
         
     def start_cleanup_task(self):
         """Start periodic cleanup of stale progress state"""
         if self.cleanup_task is None:
-            self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+            try:
+                self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+            except RuntimeError:
+                # No event loop running yet, will be started later
+                pass
             
     async def _cleanup_loop(self):
         """Periodically check and clear stale progress state"""
@@ -183,6 +186,11 @@ class IPCSharedMemory:
     #-------------------------------------------------------------
     def unlink(self):
         self.shm.unlink()
+    
+    def ensure_cleanup_task_started(self):
+        """Ensure cleanup task is started when event loop is running"""
+        if self.cleanup_task is None:
+            self.start_cleanup_task()
 
 # Create the global instance outside the class
 ipc_status = IPCSharedMemory()
