@@ -10,14 +10,19 @@ allowed = [
 sio = socketio.AsyncServer(
     async_mode="asgi",
     cors_allowed_origins="*",
-    transports=["polling"],
+    transports=["polling", "websocket"],
     logger=True,
     engineio_logger=True,
     ping_interval=25,
     ping_timeout=60,
     max_http_buffer_size=1_000_000,
+    allow_upgrades=True,
 )
 socketio_app = socketio.ASGIApp(sio, socketio_path="communicate")
+
+# Debug: Print SocketIO configuration
+print(f"SocketIO configured with path: /progress_bar_bridge/communicate")
+print(f"SocketIO transports: {sio.transport}")
 
 # Remember server loop so worker threads can schedule emits on it
 _server_loop: asyncio.AbstractEventLoop | None = None
@@ -42,5 +47,3 @@ def emit_async(event: str, data: dict, to: str | None = None) -> None:
         if loop is None:
             raise RuntimeError("Server loop not set; call set_server_loop() at startup")
         asyncio.run_coroutine_threadsafe(_emit(), loop)
-
-        

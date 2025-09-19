@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SocketIO Connection Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>SocketIO Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="logs"></div>
+    <button onclick="testBackendConnection()">Test Backend Connection</button>
+    <div id="backend-status"></div>
+    
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logsDiv = document.getElementById('logs');
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logsDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            console.log(message);
+        }
+        
+        // Test SocketIO connection
+        const socket = io(window.location.origin, {
+            path: "/progress_bar_bridge/communicate",
+            transports: ["polling", "websocket"],
+            auth: {
+                token: localStorage.getItem("access_token") || "test-token"
+            },
+            timeout: 20000,
+            forceNew: true,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+        });
+        
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Connected!';
+            statusDiv.style.color = 'green';
+            log('✅ Connected successfully');
+            log(`Transport: ${socket.io.engine.transport.name}`);
+        });
+        
+        socket.on('connect_error', (error) => {
+            statusDiv.textContent = 'Connection Error';
+            statusDiv.style.color = 'red';
+            log(`❌ Connection error: ${error.message}`);
+            log(`Error type: ${error.type}`);
+            log(`Error description: ${error.description}`);
+        });
+        
+        socket.on('disconnect', (reason) => {
+            statusDiv.textContent = 'Disconnected';
+            statusDiv.style.color = 'orange';
+            log(`🔌 Disconnected: ${reason}`);
+        });
+        
+        socket.on('error', (error) => {
+            log(`🚨 Socket error: ${error}`);
+        });
+        
+        // Test authentication
+        socket.on('connect', () => {
+            log('Testing authentication...');
+            // The server should handle auth in the connect event
+        });
+        
+        // Listen for any server events
+        socket.onAny((event, ...args) => {
+            log(`📨 Received event '${event}': ${JSON.stringify(args)}`);
+        });
+        
+        // Test backend connection
+        async function testBackendConnection() {
+            const backendStatusDiv = document.getElementById('backend-status');
+            try {
+                log('Testing backend connection...');
+                const response = await fetch('/api/test-socketio');
+                if (response.ok) {
+                    const data = await response.json();
+                    backendStatusDiv.innerHTML = `<div style="color: green;">✅ Backend OK: ${data.message}</div>`;
+                    log(`✅ Backend test successful: ${data.message}`);
+                } else {
+                    backendStatusDiv.innerHTML = `<div style="color: red;">❌ Backend Error: ${response.status} ${response.statusText}</div>`;
+                    log(`❌ Backend test failed: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                backendStatusDiv.innerHTML = `<div style="color: red;">❌ Backend Connection Failed: ${error.message}</div>`;
+                log(`❌ Backend connection failed: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

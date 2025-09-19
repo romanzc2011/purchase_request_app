@@ -66,7 +66,6 @@ from api.services.db_service import utc_now_truncated
 from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
 from api.services.socketio_server.sio_instance import sio
-from api.services.socketio_server.sio_events import sio
 import api.services.socketio_server.sio_events as sio_events
 from api.services.ipc_status import ipc_status
 import time
@@ -97,16 +96,16 @@ app = FastAPI(title="PRAS API")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://10.222.49.26:5002", "http://localhost:5002", "http://127.0.0.1:5002", "https://10.234.198.113:5002", "https://LAWB-SHCOL-7920.adu.dcn:5002"],  # Your frontend domain
+    allow_origins=["https://10.222.49.26:5002", "http://localhost:5002", "http://127.0.0.1:5002", "https://10.234.198.113:5002", "https://LAWB-SHCOL-7920.adu.dcn:5002", "https://LAWB-SHCOL-7920.adu.dcn"],  # Your frontend domain
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With", "Upgrade", "Connection"],
 )
 
 api_router = APIRouter(prefix="/api", tags=["API Endpoints"])
 
 # Create socketio server
-app.mount("/progress_bar_bridge", socketio.ASGIApp(sio, app, socketio_path="communicate"))
+app.mount("/progress_bar_bridge", socketio.ASGIApp(sio, socketio_path="communicate"))
 
 # OAuth2 scheme for JWT token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -122,10 +121,6 @@ R = TypeVar("R")
 async def _capture_loop():
     from api.services.socketio_server.sio_instance import set_server_loop
     set_server_loop(asyncio.get_event_loop())
-    
-    # Start IPC cleanup task now that event loop is running
-    from api.services.ipc_status import ipc_status
-    ipc_status.ensure_cleanup_task_started()
     
 # Start LDAP heartbeat to prevent connection timeout
 @app.on_event("startup")
@@ -146,6 +141,14 @@ async def _install_loop_exception_handler():
         loop.default_exception_handler(context)
     loop.set_exception_handler(handler)
     
+##########################################################################
+## SOCKETIO TEST ENDPOINT
+##########################################################################
+@api_router.get("/test-socketio")
+async def test_socketio():
+    """Test endpoint to verify SocketIO server is accessible"""
+    return {"message": "SocketIO server is running", "status": "ok"}
+
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
 ##########################################################################
@@ -1782,7 +1785,6 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
 # Function to run pras from the build system
 def cli():
     import uvicorn
-    import socket
     uvicorn.run("api.pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004)
     
 if __name__ == "__main__":

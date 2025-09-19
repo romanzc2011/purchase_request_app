@@ -33,14 +33,20 @@ export const SIOEvents = {
 const TOAST_ID = "PRAS_TOASTID";
 
 // Create and export a single socket instance you use everywhere
-export const socketioInstance: Socket = io(window.location.origin, {
+export const socketioInstance: Socket = io("http://127.0.0.1:5004", {
     path: "/progress_bar_bridge/communicate",
-    transports: ["polling"],
+    transports: ["websocket"],
     auth: (cb) => {
         const token = localStorage.getItem("access_token");
         cb({ token });
     },
     autoConnect: false, // Don't connect automatically
+    timeout: 20000,
+    forceNew: true,
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
 });
 
 export const isIOConnectedSig = signal<boolean>(false);
@@ -113,7 +119,19 @@ export function setupSocketProgressBridge() {
 
     const onConnectError = (error: any) => {
         console.error("🔌 SocketIO connection error:", error);
+        console.error("🔌 Error details:", {
+            type: error.type,
+            description: error.description,
+            context: error.context,
+            transport: error.transport
+        });
         isIOConnectedSig.value = false;
+        transportSig.value = "error";
+
+        // Show user-friendly error message
+        if (error.type === "TransportError") {
+            console.warn("🔌 Transport error - this might be due to network or proxy issues");
+        }
     };
 
     // --- SERVER EVENTS ---

@@ -14,15 +14,24 @@ async def decode_and_validate_token(token: str) -> LDAPUser:
 # SocketIO events
 @sio.event
 async def connect(sid, environ, auth):
-    user = await decode_and_validate_token((auth or {}).get("token"))
-    if not user:
-        return None
-    username = user.username
-    user_sids.setdefault(username, set())
-    user_sids[username].add(sid)
-    sid_user_map[sid] = username
-    logger.debug(f"socketio: connect {sid} {username}")
-    return sid_user_map
+    try:
+        logger.debug(f"socketio: attempting connection for sid {sid}")
+        logger.debug(f"socketio: auth data: {auth}")
+        
+        user = await decode_and_validate_token((auth or {}).get("token"))
+        if not user:
+            logger.warning(f"socketio: authentication failed for sid {sid}")
+            return False
+        
+        username = user.username
+        user_sids.setdefault(username, set())
+        user_sids[username].add(sid)
+        sid_user_map[sid] = username
+        logger.success(f"socketio: successfully connected {sid} for user {username}")
+        return True
+    except Exception as e:
+        logger.error(f"socketio: connection error for sid {sid}: {e}")
+        return False
 
 @sio.event
 async def progress_update(sid: str, payload: Dict[str, Any]) -> None:
@@ -68,6 +77,20 @@ async def disconnect(sid):
         del sid_user_map[sid]
         logger.debug(f"Cleaned up session mappings for user {username}")
 
+@sio.event
+async def connect_error(sid, data):
+    logger.error(f"socketio: connection error for sid {sid}: {data}")
+
+@sio.event
+async def error(sid, data):
+    logger.error(f"socketio: error for sid {sid}: {data}")
+
+@sio.event
+async def ping(sid):
+    """Handle ping from client"""
+    logger.debug(f"socketio: ping received from {sid}")
+    await sio.emit('pong', to=sid)
+
 # --------------------------------------------------------------
 # MESSAGE EVENT
 # --------------------------------------------------------------
@@ -94,5 +117,3 @@ async def error_event(sid, data):
 async def send_original_price(sid, data):
     logger.debug("socketio: send_original_price", sid)
     await sio.emit(SIOEvents.SEND_ORIGINAL_PRICE.value, {"message": data}, to=sid)
-    
-    

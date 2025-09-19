@@ -637,7 +637,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
                                             queryClient.invalidateQueries({ queryKey: ["approvalData"] });
                                             toast.success("IRQ1 assigned successfully");
                                         },
-                                        onError: (error) => {
+                                        onError: () => {
                                             // console.error("❌ IRQ1 assignment failed:", error);
                                             const ref = irq1InputRef.current[id];
                                             if (ref) {
