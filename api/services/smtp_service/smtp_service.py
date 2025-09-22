@@ -25,6 +25,7 @@ from api.schemas.enums import AssignedGroup
 from api.services.ipc_status import ipc_status
 from api.services.socketio_server.sio_instance import sio
 from api.services.ipc_status import ipc_status
+from api.utils.misc_utils import format_username
 
 class SMTP_Service:
     def __init__(
@@ -86,7 +87,7 @@ class SMTP_Service:
                     items.append((desc, comment))
             context = {
                 "groupKey": payload.ID,
-                "requestor_name": payload.requester,
+                "requestor_name": format_username(payload.requester),
                 "items": items,
             }
             

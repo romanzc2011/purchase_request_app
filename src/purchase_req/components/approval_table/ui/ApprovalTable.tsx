@@ -28,6 +28,9 @@ import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 import { toast } from "react-toastify";
 import { isDownloadSig } from "../../../utils/PrasSignals";
 import { computeHTTPURL } from "../../../utils/misc_utils";
+import BudgetCodePicker from "../../purchase_req_table/BudgetCodePicker";
+import FundPicker from "../../purchase_req_table/FundPicker";
+import LocationPicker from "../../purchase_req_table/LocationPicker";
 
 /***********************************************************************************/
 // PROPS
@@ -150,7 +153,7 @@ async function downloadStatementOfNeedForm(ID: string) {
 /***********************************************************************************/
 // APPROVAL TABLE
 /***********************************************************************************/
-export default function ApprovalTableDG({ searchQuery, onClearSearch }: ApprovalTableProps) {
+export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTableProps) {
     const queryClient = useQueryClient();
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
     const { data: searchData } = useQuery({ queryKey: ["search", searchQuery], queryFn: () => fetchSearchData(searchQuery) });
@@ -186,6 +189,7 @@ export default function ApprovalTableDG({ searchQuery, onClearSearch }: Approval
     const irq1InputRef = useRef<Record<string, HTMLInputElement | null>>({});
 
     // Get handleEditPriceEach from useApprovalHandlers
+    // Will also handle other changes like fund, budget_code, location.
     const { handleEditPriceEach } = useApprovalHandlers(rowSelectionModel);
 
     const {

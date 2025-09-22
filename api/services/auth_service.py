@@ -169,12 +169,6 @@ class AuthService:
                 email=payload.get("email"),
                 groups=payload.get("groups", [])
             )
-        except InvalidTokenError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
             
         except ExpiredSignatureError:
             raise HTTPException(
@@ -182,3 +176,12 @@ class AuthService:
                 detail="Token has expired",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+            
+        except InvalidTokenError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        

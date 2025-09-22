@@ -6,7 +6,7 @@ import { useAssignIRQ1 } from "./useAssignIRQ1";
 import { useCommentModal } from "./useCommentModal";
 import { useApprovalService } from "./useApprovalService";
 import { GridRowId } from "@mui/x-data-grid";
-import { DataRow, ItemStatus } from "../types/approvalTypes";
+import { DataRow, ItemStatus, ErrorDetail } from "../types/approvalTypes";
 import { computeHTTPURL } from "../utils/misc_utils";
 
 // API URLs
@@ -14,6 +14,7 @@ const API_URL_STATEMENT_OF_NEED_FORM = computeHTTPURL("/api/downloadStatementOfN
 const API_URL_ASSIGN_CO = computeHTTPURL("/api/assignCO");
 const API_URL_UPDATE_PRICES = computeHTTPURL("/api/updatePrices");
 const API_URL_APPROVAL_DATA = computeHTTPURL("/api/getApprovalData");
+const API_URL_BOCLOCFUND = computeHTTPURL("/api/boclocfund");
 
 // #########################################################################################
 // FETCH APPROVAL DATA
@@ -91,6 +92,33 @@ try {
 		console.error("Error downloading statement of need form:", error);
 		toast.error("Failed to download statement of need form. Please try again.");
 	}
+}
+
+// #########################################################################################
+// UPDATE ROWS: BOC, LOC, FUND
+// #########################################################################################
+async function updateBOCLOCFUND(
+    prasData: FormData
+    
+) {
+    // Build BOCLOCFUND FormData based on if empyt or not
+    const res = await fetch(API_URL_BOCLOCFUND, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body: JSON.stringify({ prasData: prasData }),
+    });
+
+    if (!res.ok) {
+        let detail: ErrorDetail = {};
+        try { detail = await res.json(); } catch { console.log(detail); }
+        const code = detail?.code || detail?.detail || `HTTP_${res.status}`;
+        const msg = detail?.message || detail?.detail?.message || `HTTP ${res.status}`;
+        throw Object.assign(new Error(msg), { code, detail });
+    }
+    return res.json();
 }
 
 // #########################################################################################
@@ -198,7 +226,6 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 		const item_uuid = newRow.UUID;
 		const purchase_request_id = newRow.ID;
 
-
 		// update the price each and total price on backend
 		try {
 			await updatePriceEachTotalPrice(purchase_request_id, item_uuid, newPriceEach, newTotalPrice, status);
@@ -209,7 +236,31 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 			console.log("Price update failed, reverting to original price:", oldRow.priceEach);
 			return { ...oldRow, priceEach: oldRow.priceEach, totalPrice: oldRow.totalPrice };
 		}
-	};
+    };
+    
+    //####################################################################
+	// HANDLE EDIT FUND ROW
+    //####################################################################
+    async function handleEditRow(newRow: DataRow, oldRow: DataRow) {
+        console.log("Processing fund update", { newRow, oldRow });
+
+        if (newRow.UUID && newRow.UUID.startsWith("header-")) { 
+            console.log("Skipping group header row update");
+            return newRow;
+        }
+
+        let newFUND = newRow.fund;
+        let newBOC  = newRow.budgetObjCode;
+        let newLOC = newRow.location;
+        const status = newRow.status;  // This is needed to protect what can or cannot be edited based on status
+        
+        // Extract id and uuid
+        const item_uuid = newRow.UUID;
+        const purchase_request_id = newRow.ID;
+
+
+     }
+
 
 	//####################################################################
 	// HANDLE CONTRACTING OFFICER
