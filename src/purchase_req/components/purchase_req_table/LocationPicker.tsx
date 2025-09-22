@@ -2,12 +2,17 @@ import { Controller } from "react-hook-form";
 import { UseFormRegister, FieldErrors } from "react-hook-form";
 import { FormValues, locations } from "../../types/formTypes";
 import { Box, MenuItem, FormControl, InputLabel, Select, FormHelperText } from "@mui/material";
+import { GridRenderCellParams } from "@mui/x-data-grid";
 
 interface LocationProps {
     onSelectLocation: (location: string) => void;
     register: ReturnType<UseFormRegister<FormValues>>;
     errors: FieldErrors<FormValues>;
     control: any;
+}
+
+interface LocationEditProps {
+    onSelectLocation: (location: string) => void;
 }
 
 const LocationFilter = ({
@@ -71,5 +76,27 @@ const LocationFilter = ({
         </Box>
     );
 };
+
+export const LocationEditCell = (params: GridRenderCellParams) => {
+    return (
+        <Select
+            value={params.value}
+            onChange={(e) => params.api.setEditCellValue({
+                id: params.id,
+                field: params.field,
+                value: e.target.value
+            })}
+            size="small"
+            variant="standard"
+            sx={{ width: "100%" }}
+        >
+            {locations.map((location, index) => (
+                <MenuItem key={index} value={location} sx={{ fontFamily: "Tahoma", fontWeight: "bold" }}>
+                    {location}
+                </MenuItem>
+            ))}
+        </Select>
+    )
+}
 
 export default LocationFilter;

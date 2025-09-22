@@ -242,25 +242,62 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 	// HANDLE EDIT FUND ROW
     //####################################################################
     async function handleEditRow(newRow: DataRow, oldRow: DataRow) {
-        console.log("Processing fund update", { newRow, oldRow });
+        console.log("Processing row update", { newRow, oldRow });
 
         if (newRow.UUID && newRow.UUID.startsWith("header-")) { 
             console.log("Skipping group header row update");
             return newRow;
         }
 
+        // Check if priceEach was changed
+        if (newRow.priceEach !== oldRow.priceEach) {
+            console.log("Price update detected");
+            return await handleEditPriceEach(newRow, oldRow);
+        }
+
+        // Handle other field updates (fund, budgetObjCode, location)
+        console.log("Processing other field update", { newRow, oldRow });
+
+        let prasData = new FormData();
         let newFUND = newRow.fund;
         let newBOC  = newRow.budgetObjCode;
         let newLOC = newRow.location;
-        const status = newRow.status;  // This is needed to protect what can or cannot be edited based on status
-        
+        const status = newRow.status;
+
         // Extract id and uuid
         const item_uuid = newRow.UUID;
         const purchase_request_id = newRow.ID;
 
+        /* Here we are building prasData 'dynamically' to we can send data that has been altered
+        and just forget or leave data that hasnt been altered, we cant have optional fields in body of
+        API call */
+        prasData.append("item_uuid", item_uuid);
+        prasData.append("purchase_request_id", purchase_request_id);
+        prasData.append("status", status);
 
+        let dataRowArray: Array<string> = [newFUND, newBOC, newLOC];
+        dataRowArray.forEach(item => {
+            if (item) {
+                console.log("UPDATE: ", item);
+                prasData.append(item, item);
+            }
+        });
+
+        // Send to API to update row if it has been altered
+        try {
+            await updateBOCLOCFUND(prasData);
+            // Dynamically return used values in each row
+            return {
+                ...newRow,
+                ...(newFUND ? { fund: newFUND } : {}),
+                ...(newBOC ? { budgetObjCode: newBOC } : {}),
+                ...(newLOC ? { location: newLOC } : {})
+              };
+        } catch {
+            console.error("Error updating new row.");
+            return { ...oldRow, fund: oldRow.fund, budgetObjCode: oldRow.budgetObjCode, location: oldRow.location };
+        }
      }
-
 
 	//####################################################################
 	// HANDLE CONTRACTING OFFICER
@@ -313,7 +350,8 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 		handleOpenJust,
 		handleCloseJust,
 		handleDownload,
-		handleEditPriceEach,
+        handleEditPriceEach,
+        handleEditRow,
 		assignIRQ1Mutation,
 		processPayload,
 		setApprovalPayload,

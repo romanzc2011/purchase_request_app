@@ -11,6 +11,7 @@ import {
     FormHelperText,
     Typography,
 } from "@mui/material";
+import { GridRenderCellParams } from "@mui/x-data-grid";
 
 interface BudgetPickerProps {
     onSelectBudgetCode: (budgetObjCode: string, fund: string) => void;
@@ -20,7 +21,7 @@ interface BudgetPickerProps {
     fund: string;
 }
 
-const BudgetCodePicker = ({
+export const BudgetCodePicker = ({
     onSelectBudgetCode,
     control,
     fund,
@@ -125,4 +126,88 @@ const BudgetCodePicker = ({
     );
 };
 
-export default BudgetCodePicker;
+// -------------------------------------------------------------------
+// BOC - for Approval Table in case user needs to change the BOC
+// -------------------------------------------------------------------
+export const BOCEditCell = (params: GridRenderCellParams) => {
+    return (
+        <Box sx={{ width: "100%" }}>
+            <FormControl
+                fullWidth
+                variant="outlined"
+                size="small"
+                sx={{
+                    backgroundColor: "white",
+                    fontWeight: "bold",
+                    color: "blue",
+                    "&.Mui-focused": {
+                        color: "blue",
+                    },
+                    "&.MuiInputLabel-shrink": {
+                        color: "blue",
+                        fontWeight: "bold",
+                    },
+                }}
+            >
+                <InputLabel
+                    id="budgetObjCode-label"
+                    sx={{
+                        fontWeight: "bold",
+                        color: "blue",
+                        "&.Mui-focused": {
+                            color: "blue",
+                        },
+                        "&.MuiInputLabel-shrink": {
+                            color: "blue",
+                            fontWeight: "bold",
+                        },
+                    }}
+                >
+                    Budget Object Code (BOC)
+                </InputLabel>
+                <Select
+                    labelId="budgetObjCode-label"
+                    label="Budget Object Code (BOC)"
+                    value={params.value}
+                    onChange={(e) => params.api.setEditCellValue({
+                        id: params.id,
+                        field: params.field,
+                        value: e.target.value
+                    })}
+                >
+                    {getBOCOptions(params.row.fund)?.map((option) => {
+                        if (option.disabled) {
+                            return (
+                                <ListSubheader
+                                    key={option.value}
+                                    disableSticky
+                                    sx={{
+                                        fontFamily: "Tahoma",
+                                        fontWeight: "bold", color: "blue"
+                                    }}
+                                >
+                                    {option.label}
+                                </ListSubheader>
+                            );
+                        }
+                        const [code, ...rest] = option.label.split(" - ");
+                        const description = rest.join(" - ");
+                        return (
+                            <MenuItem key={option.value} value={option.value}>
+                                <Typography component="span" fontWeight="bold">
+                                    {code}
+                                </Typography>
+                                {description && (
+                                    <Typography component="span">
+                                        {" - "}
+                                        {description}
+                                    </Typography>
+                                )}
+                            </MenuItem>
+                        );
+                    }) || []}
+                </Select>
+            </FormControl>
+        </Box>
+    )
+}

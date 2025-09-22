@@ -8,6 +8,7 @@ import {
     Select,
     FormHelperText,
 } from "@mui/material";
+import { GridRenderCellParams } from "@mui/x-data-grid";
 
 interface FundPickerProps {
     onSelectFund: (fund: string) => void;
@@ -71,6 +72,27 @@ const FundPicker = ({
                 )}
             />
         </Box>
+    );
+};
+
+// DataGrid-compatible Fund edit cell
+export const FundEditCell = (params: GridRenderCellParams) => {
+    return (
+        <Select
+            value={params.value}
+            onChange={(e) => params.api.setEditCellValue({
+                id: params.id,
+                field: params.field,
+                value: e.target.value
+            })}
+            size="small"
+            variant="standard"
+            sx={{ width: "100%" }}
+        >
+            <MenuItem value={"51140X"} sx={{ fontFamily: "Tahoma", fontWeight: "bold" }}>51140X</MenuItem>
+            <MenuItem value={"51140E"} sx={{ fontFamily: "Tahoma", fontWeight: "bold" }}>51140E</MenuItem>
+            <MenuItem value={"092000"} sx={{ fontFamily: "Tahoma", fontWeight: "bold" }}>092000</MenuItem>
+        </Select>
     );
 };
 

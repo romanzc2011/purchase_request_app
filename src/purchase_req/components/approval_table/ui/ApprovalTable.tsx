@@ -28,9 +28,9 @@ import { useApprovalHandlers } from "../../../hooks/useApprovalHandlers";
 import { toast } from "react-toastify";
 import { isDownloadSig } from "../../../utils/PrasSignals";
 import { computeHTTPURL } from "../../../utils/misc_utils";
-import BudgetCodePicker from "../../purchase_req_table/BudgetCodePicker";
-import FundPicker from "../../purchase_req_table/FundPicker";
-import LocationPicker from "../../purchase_req_table/LocationPicker";
+import { BOCEditCell } from "../../purchase_req_table/BudgetCodePicker";
+import { FundEditCell } from "../../purchase_req_table/FundPicker";
+import LocationPicker, { LocationEditCell } from "../../purchase_req_table/LocationPicker";
 
 /***********************************************************************************/
 // PROPS
@@ -190,7 +190,7 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
 
     // Get handleEditPriceEach from useApprovalHandlers
     // Will also handle other changes like fund, budget_code, location.
-    const { handleEditPriceEach } = useApprovalHandlers(rowSelectionModel);
+    const { handleEditPriceEach, handleEditRow } = useApprovalHandlers(rowSelectionModel);
 
     const {
         data: approvalData = [],
@@ -706,10 +706,8 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
             field: "budgetObjCode",
             headerName: "Budget Object Code",
             width: 150,
-            renderCell: params => {
-                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                return params.value;
-            }
+            editable: true,
+            renderEditCell: BOCEditCell,
         },
 
         /***********************************************************************************/
@@ -720,10 +718,8 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
             headerName: "Fund",
             width: 130,
             sortable: true,
-            renderCell: params => {
-                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                return params.value;
-            }
+            editable: true,
+            renderEditCell: FundEditCell,
         },
 
         /***********************************************************************************/
@@ -734,10 +730,8 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
             headerName: "Location",
             width: 130,
             sortable: true,
-            renderCell: params => {
-                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                return params.value;
-            }
+            editable: true,
+            renderEditCell: LocationEditCell,
         },
 
         /***********************************************************************************/
@@ -1052,7 +1046,7 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
 
                     checkboxSelection
                     columns={allColumns}
-                    processRowUpdate={handleEditPriceEach}
+                    processRowUpdate={handleEditRow}
                     onProcessRowUpdateError={(error) => {
                         console.error("Price update error:", error);
                         // The DataGrid should automatically revert the cell value when processRowUpdate throws an error
@@ -1060,8 +1054,10 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
                     }}
                     rowSelectionModel={rowSelectionModel}
                     isCellEditable={(params) => {
-                        // Only allow editing priceEach field
-                        if (params.field !== 'priceEach') return false;
+                        // Allow editing priceEach and budgetObjCode fields
+                        if (params.field !== 'priceEach' && params.field !== 'budgetObjCode' && params.field !== 'fund' && params.field !== 'location') {
+                            return false;
+                        }
 
                         // Don't allow editing group headers
                         if (params.row.isGroup) return false;
