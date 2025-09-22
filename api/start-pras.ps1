@@ -9,7 +9,7 @@ $procs = @()
 
 # API on 5004 (FASTAPI)
 $procs += Start-Process -FilePath $venvPy `
-  -ArgumentList @('-m','uvicorn','api.pras_api:app','--host','127.0.0.1','--port','5004') `
+  -ArgumentList @('-m','uvicorn','api.pras_api:app','--host','127.0.0.1','--port','5004','--no-access-log') `
   -WorkingDirectory $root -PassThru `
   -RedirectStandardOutput "$root\logs\api.out.log" `
   -RedirectStandardError  "$root\logs\api.err.log"

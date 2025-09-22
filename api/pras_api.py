@@ -15,9 +15,11 @@ EXPLANATION OF COMMENT COLORS:
 	# ? (BLUE)
 	# // General note (GRAY)
 	# TODO:
+ 
+ # TODO: To remove socketio logging go to Line 10 of sio_instance.py and set logger and engineio_logger to False
 
 TO LAUNCH SERVER:
-uvicorn pras_api:app --port 5004
+uvicorn pras_api:app --host 127.0.0.1 --port 5004
 """
 from datetime import datetime
 import json
@@ -121,14 +123,24 @@ R = TypeVar("R")
 @app.on_event("startup")
 async def _capture_loop():
     from api.services.socketio_server.sio_instance import set_server_loop
-    set_server_loop(asyncio.get_event_loop())
+    try:
+        set_server_loop(asyncio.get_event_loop())
+    except Exception as e:
+        logger.error(f"Error setting server loop: {e}")
+        logger_init_ok("Server loop failed to set")
+        raise e
     
 # Start LDAP heartbeat to prevent connection timeout
 @app.on_event("startup")
 async def start_keepalive_ldap():
     logger_init_ok("LDAP keepalive starting")
     # Start the keepalive task in the background
-    asyncio.create_task(ldap_service.start_keepalive_ldap())
+    try:
+        asyncio.create_task(ldap_service.start_keepalive_ldap())
+    except Exception as e:
+        logger.error(f"Error starting LDAP keepalive: {e}")
+        logger_init_ok("LDAP keepalive failed to start")
+        raise e
     
 @app.on_event("startup")
 async def _install_loop_exception_handler():
@@ -141,6 +153,11 @@ async def _install_loop_exception_handler():
             return
         loop.default_exception_handler(context)
     loop.set_exception_handler(handler)
+    
+@app.on_event("startup")
+async def setup_logging():
+    logger.add("logs/error.log", level="ERROR", rotation="10 MB", retention="10 days")
+    logger_init_ok("Logging setup complete")
     
 ##########################################################################
 ## LOGIN -- auth users and return JWTs
@@ -933,14 +950,14 @@ async def log_requests(request: Request, call_next):
             )
             return response
 
-    else:
-        logger.bind(
-            request_id=request_id,
-            path=request.url.path,
-            method=request.method,
-            status_code=response.status_code,
-            elapsed=elapsed,
-        ).info("Request processed")
+    # else:
+    #     logger.bind(
+    #         request_id=request_id,
+    #         path=request.url.path,
+    #         method=request.method,
+    #         status_code=response.status_code,
+    #         elapsed=elapsed,
+    #     ).info("Request processed")
 
     response.headers["X-Request-ID"] = request_id
     return response
