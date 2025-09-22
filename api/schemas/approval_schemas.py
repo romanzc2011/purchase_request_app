@@ -13,6 +13,17 @@ class UpdatePricesPayload(BaseModel):
     new_price_each: float
     new_total_price: float
     status: ItemStatus
+    
+# --------------------------------------------------------------
+#  UPDATE BOC, Location, Fund
+# --------------------------------------------------------------
+class UpdateBocLocFundPayload(BaseModel):
+    purchase_request_id: str
+    item_uuid: str
+    status: ItemStatus
+    budgetObjCode: Optional[str]
+    location: Optional[str]
+    fund: Optional[str]
 
 # --------------------------------------------------------------
 #  REQUEST APPROVAL PAYLOAD SCHEMAS

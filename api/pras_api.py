@@ -28,7 +28,7 @@ import signal
 import socketio
 from pathlib import Path
 from typing import Awaitable, Callable, ParamSpec, TypeVar
-from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload
+from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload, UpdateBocLocFundPayload
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
@@ -1723,7 +1723,41 @@ async def update_prices(
         await sio_events.send_original_price(sid, originalPriceEach)
         
     raise HTTPException(status_code=500, detail="PRICE_ALLOWANCE_EXCEEDED")
+   
+##########################################################################
+## UPDATE BOC, Location, or Fund
+##########################################################################
+@api_router.post("/boclocfund")
+async def update_boclocfund(
+    payload: UpdateBocLocFundPayload,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: LDAPUser = Depends(auth_service.get_current_user)
+):
+    """
+    Update the BOC, Location, or Fund for a purchase request line item.
+    """
+    logger.info(f"Updating BOC, Location, or Fund for purchase request line item: {payload.purchase_request_id}")
+    logger.debug(f"Payload: {payload}")
+    sid = sio_events.get_user_sid(current_user.username)
+    
+    # Update the BOC, Location, or Fund for the purchase request line item
+    try:
+        stmt = (update(PurchaseRequestLineItem)
+                .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
+                .values(boc=payload.boc, location=payload.location, fund=payload.fund)
+                .execution_options(synchronize_session="fetch")
+            )
         
+        await db.execute(stmt)
+        await db.commit()
+        
+        await sio_events.message_event(sid, "BOC, Location, or Fund updated successfully")
+        return {"message": "BOC, Location, or Fund updated successfully"}
+            
+    except Exception as e:
+        await sio_events.error_event(sid, f"Error updating BOC, Location, or Fund: {e}")
+        logger.error(f"Error updating BOC, Location, or Fund: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
   
 ##########################################################################
 ## HANDLE FILE UPLOAD

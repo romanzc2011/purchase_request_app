@@ -270,7 +270,7 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 
         /* Here we are building prasData 'dynamically' to we can send data that has been altered
         and just forget or leave data that hasnt been altered, we cant have optional fields in body of
-        API call */
+        API call     */
         prasData.append("item_uuid", item_uuid);
         prasData.append("purchase_request_id", purchase_request_id);
         prasData.append("status", status);
@@ -285,6 +285,7 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 
         // Send to API to update row if it has been altered
         try {
+            console.log("Updating BOC, LOC, FUND", { prasData });
             await updateBOCLOCFUND(prasData);
             // Dynamically return used values in each row
             return {

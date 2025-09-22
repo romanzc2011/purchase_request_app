@@ -160,12 +160,18 @@ export function setupSocketProgressBridge() {
     };
 
     const onErrorEvent = (payload: { message: string }) => {
+        console.log("🚨 ERROR_EVENT received:", payload);
+        console.log("🚨 Message content:", payload.message);
+        console.log("🚨 Contains authorization text:", payload.message.includes("You are not authorized to assign requisition IDs"));
+
         // This is for RQ1 assign failure, close with button
         if (payload.message.includes("You are not authorized to assign requisition IDs")) {
+            console.log("🚨 Calling RQ1WarningToast");
             RQ1WarningToast(payload.message, TOAST_ID);
             return;
         }
         if (!toast.isActive(TOAST_ID)) {
+            console.log("🚨 Calling regular toast.error");
             toast.error(payload.message, { toastId: TOAST_ID });
         }
         console.log("🚨 ERROR received:", payload);
@@ -200,10 +206,10 @@ export function setupSocketProgressBridge() {
     socketioInstance.on(SIOEvents.MESSAGE_EVENT, onMessageEvent);
     socketioInstance.on(SIOEvents.RESET_DATA, onResetData);
 
-    // Debug: Log all SocketIO events
-    // socketioInstance.onAny((eventName, ...args) => {
-    //     console.log(`📡 SocketIO event received: ${eventName}`, args);
-    // });
+    // Keep alive on all listeners
+    socketioInstance.onAny((eventName, ...args) => {
+        console.log(`📡 SocketIO event received: ${eventName}`, args);
+    });
 
     return () => {
         stopEffect();
