@@ -215,7 +215,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         
         # User is valid LDAPUser object
         token = auth_service.create_access_token(user)
-        logger.info(f"TOKEN: {token}")
         logger.success("SUCCESSFULLY AUTHENTICATED USER")
         logger.debug(f"USER: {user}")
         
