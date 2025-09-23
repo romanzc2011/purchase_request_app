@@ -26,6 +26,21 @@ BEGIN
 END;
 
 ----------------------------------------------------------
+/* Trigger to auto update BOC, Fund, Location if altered
+	in PurchaseRequestLineItems: update approvals, */
+----------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS sync_bocloclfund
+AFTER UPDATE OF budgetObjCode, location, fund ON pr_line_items
+FOR EACH ROW
+BEGIN
+	UPDATE approvals
+	SET
+		budgetObjCode 	= coalesce(NEW.budgetObjCode, budgetObjCode),
+		location		= coalesce(NEW.location, location),
+		fund			= coalesce(NEW.fund, fund)
+	WHERE purchase_request_id = NEW.purchase_request_id;
+END;
+----------------------------------------------------------
 /* UPDATE all statuses to APPROVED, DENIED */
 ----------------------------------------------------------
 CREATE TRIGGER IF NOT EXISTS sync_status_on_final_approval_update
@@ -127,7 +142,6 @@ BEGIN
 	SET IRQ1_ID = NEW.IRQ1_ID
 	WHERE purchase_request_id = NEW.ID;
 END;
-		
 
 ----------------------------------------------------------
 /* INSERT CONTRACTING OFFICERS 
