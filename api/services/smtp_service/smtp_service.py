@@ -249,11 +249,17 @@ class SMTP_Service:
                     # Send to Management
                     to, to_users = await self.get_toaddr(department=AssignedGroup.MANAGEMENT.value, db=db)
                     deputy_clerk_addresses, deputy_clerk_username = await self.get_toaddr(department=AssignedGroup.DEPUTY_CLERK.value, db=db)
+                    chief_clerk_addresses, chief_clerk_username = await self.get_toaddr(department=AssignedGroup.CHIEF_CLERK.value, db=db)
+                    
                     to_address.extend(to)
                     to_address.extend(deputy_clerk_addresses)  # Because deputy_clerk is also in management team
+                    to_address.extend(chief_clerk_addresses)  # Because chief_clerk is also in management team
+                    
                     cc, cc_users = await self.get_toaddr(department=AssignedGroup.FINANCE.value, db=db)
+                    
                     to_username.extend(to_users)
                     to_username.extend(deputy_clerk_username)
+                    to_username.extend(chief_clerk_username)
                     cc_address.extend(cc)
                     cc_username.extend(cc_users)
                     

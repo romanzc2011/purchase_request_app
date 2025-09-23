@@ -35,7 +35,7 @@ from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
 from api.services.progress_tracker.steps.download_steps import DownloadStepName
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
-from api.utils.misc_utils import format_username, reset_signals, error_handler
+from api.utils.misc_utils import format_username, error_handler
 from pydantic import ValidationError
 from fastapi import (
     FastAPI, APIRouter, Depends, Form, 
@@ -66,7 +66,14 @@ from api.dependencies.pras_dependencies import search_service
 from api.dependencies.pras_dependencies import settings
 from api.schemas.email_schemas import LineItemsPayload, EmailPayloadRequest, EmailPayloadComment
 from api.services.db_service import utc_now_truncated
-from api.services.progress_tracker.progress_manager import create_approval_tracker, create_download_tracker, create_submit_request_tracker, get_submit_request_tracker
+from api.services.progress_tracker.progress_manager import (
+    create_approval_tracker, 
+    create_download_tracker, 
+    create_submit_request_tracker, 
+    get_submit_request_tracker,
+    get_approval_tracker,
+    get_download_tracker,
+)
 from api.services.progress_tracker.steps.approval_steps import ApprovalStepName
 from api.services.socketio_server.sio_instance import sio
 from api.services.socketio_server.sio_events import sio
@@ -1219,24 +1226,23 @@ async def approve_deny_request(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
+    # Get the SocketIO session ID for the current user
+    sid = sio_events.get_user_sid(current_user)
     """
     Each step is going to enolve returning what step was completed and wrapped in sid to ensure sid is available 
     """
+    approval_count = await dbas.get_approval_row_count(payload.ID, db)
+    
     try:
-        logger.debug("APPROVE/DENY REQUEST")
-        logger.debug(f"Current user: {current_user}")
         if current_user is None:
             logger.error("Current user is None - authentication failed")
             raise HTTPException(status_code=401, detail="Authentication required")
         
+        # Create approval tracker once for the entire process
         approval_tracker = create_approval_tracker()
-
-        # Get the SocketIO session ID for the current user
-        sid = sio_events.get_user_sid(current_user)
-
+        
         # Mark steps (these functions should RETURN a dict, not emit)
         if sid:
-            logger.debug(f"SID: {sid}")
             start_msg_data = approval_tracker.send_start_msg(sid)
             await sio_events.start_toast(sid, start_msg_data.get("percent_complete", 0))
             
@@ -1250,9 +1256,28 @@ async def approve_deny_request(
                 await sio_events.progress_update(sid, step_data)
 
         results = []
-        for item_uuid, item_fund, total_price, target_status in zip(
+        total_items = len(payload.UUID)
+        
+        for item_index, (item_uuid, item_fund, total_price, target_status) in enumerate(zip(
             payload.UUID, payload.item_funds, payload.totalPrice, payload.target_status
-        ):
+        )):
+            # Progress update for current item
+            if sid:
+                item_progress = int((item_index / total_items) * 100)
+                await sio_events.progress_update(sid, {
+                    "event": "PROGRESS_UPDATE",
+                    "percent_complete": item_progress,
+                    "message": f"Processing item {item_index + 1} of {total_items}"
+                })
+            
+            # Add progress updates for each major step within the item processing
+            if sid:
+                await sio_events.progress_update(sid, {
+                    "event": "PROGRESS_UPDATE",
+                    "percent_complete": item_progress + 10,
+                    "message": f"Checking chain status for item {item_index + 1}"
+                })
+            
             # Chain status checked
             # Check if already in approval chain with PENDING_APPROVAL status
             exists_stmt = select(
@@ -1264,33 +1289,22 @@ async def approve_deny_request(
             )
 
             already_in_chain = await db.scalar(exists_stmt)
-            
-            if sid:
-                step_data = approval_tracker.mark_step_done(ApprovalStepName.CHAIN_STATUS_CHECKED)
-                if step_data:
-                    await sio_events.progress_update(sid, step_data)
 
             if already_in_chain:
                 router = ApprovalRouter().start_handler(ClerkAdminHandler())
-                # Mark skipped steps explicitly
-                if sid:
-                    for step in (
-                        ApprovalStepName.IT_HANDLER_INITIALIZED,
-                        ApprovalStepName.IT_APPROVAL_PROCESSED,
-                        ApprovalStepName.MANAGEMENT_HANDLER_INITIALIZED,
-                        ApprovalStepName.MANAGEMENT_APPROVAL_PROCESSED,
-                    ):
-                        step_data = approval_tracker.mark_step_done(step)
-                        if step_data:
-                            await sio_events.progress_update(sid, step_data)
+
             else:
                 router = ApprovalRouter()  # full chain
 
-            if sid:
-                step_data = approval_tracker.mark_step_done(ApprovalStepName.ROUTER_CONFIGURED)
-                if step_data:
-                    await sio_events.progress_update(sid, step_data)
 
+            # Progress update for data retrieval
+            if sid:
+                await sio_events.progress_update(sid, {
+                    "event": "PROGRESS_UPDATE",
+                    "percent_complete": item_progress + 20,
+                    "message": f"Retrieving data for item {item_index + 1}"
+                })
+            
             # Data retrieval
             stmt = select(
                 PendingApproval.pending_approval_id,
@@ -1310,21 +1324,24 @@ async def approve_deny_request(
                 logger.warning(f"Multiple PendingApproval records found for item_uuid: {item_uuid}, purchase_request_id: {payload.ID}. Using the first one.")
             
             # Use the first row if multiple are found
-            
             row = rows[0]
             pending_approval_id = row.pending_approval_id
             assigned_group = row.assigned_group
 
-            if sid:
-                step_data = approval_tracker.mark_step_done(ApprovalStepName.PENDING_APPROVAL_DATA_RETRIEVED)
-                if step_data:
-                    await sio_events.progress_update(sid, step_data)
 
             # Debug current_user before using it
             logger.debug(f"Creating approval request - current_user: {current_user}")
             if current_user is None:
                 logger.error("Current user is None when creating approval request")
                 raise HTTPException(status_code=401, detail="Authentication required")
+            
+            # Progress update for approval request creation
+            if sid:
+                await sio_events.progress_update(sid, {
+                    "event": "PROGRESS_UPDATE",
+                    "percent_complete": item_progress + 30,
+                    "message": f"Creating approval request for item {item_index + 1}"
+                })
             
             approval_request = ApprovalRequest(
                 id=payload.ID,
@@ -1337,16 +1354,20 @@ async def approve_deny_request(
                 approver=current_user.username
             )
 
-            if sid:
-                step_data = approval_tracker.mark_step_done(ApprovalStepName.APPROVAL_REQUEST_BUILT)
-                if step_data:
-                    await sio_events.progress_update(sid, step_data)
             
             # Debug current_user before router call
             logger.debug(f"Before router.route - current_user: {current_user}")
             if current_user is None:
                 logger.error("Current user is None before router.route call")
                 raise HTTPException(status_code=401, detail="Authentication required")
+                
+            # Progress update for router processing
+            if sid:
+                await sio_events.progress_update(sid, {
+                    "event": "PROGRESS_UPDATE",
+                    "percent_complete": item_progress + 40,
+                    "message": f"Processing approval for item {item_index + 1}"
+                })
             
             try:
                 router_result = await router.route(approval_request, db, current_user, ldap_service)
@@ -1357,29 +1378,32 @@ async def approve_deny_request(
             ipc_data = await ipc_status.read()
             logger.debug(f"IPC STATUS: {ipc_data}")
 
-            # If pending but email sent, finish progress UI
-            if (ipc_data.request_pending and not ipc_data.request_approved) and ipc_data.approval_email_sent:
-                if sid:
-                    await sio_events.progress_update(sid, {
-                        "event": "PROGRESS_UPDATE",
-                        "percent_complete": 100,
-                        "complete_steps": [
-                            ApprovalStepName.REQUEST_MARKED_APPROVED.value,
-                            ApprovalStepName.APPROVAL_EMAIL_SENT.value
-                        ]
-                    })
-
+            # Progress update for item completion
+            if sid:
+                await sio_events.progress_update(sid, {
+                    "event": "PROGRESS_UPDATE",
+                    "percent_complete": item_progress + 50,
+                    "message": f"Completed processing item {item_index + 1} of {total_items}"
+                })
+            
             results.append({
                 "uuid": item_uuid,
                 "status": getattr(router_result, "status", "processed").value if hasattr(router_result, "status") else "processed",
                 "action": payload.action
             })
-
+        
+        # Final progress update - all items processed
+        if sid:
+            await sio_events.progress_update(sid, {
+                "event": "PROGRESS_UPDATE",
+                "percent_complete": 100,
+                "message": f"All {total_items} items processed successfully"
+            })
+                
         return results
 
     except Exception as e:
         logger.exception("approve_deny_request failed")  # full traceback
-        reset_signals()
         raise HTTPException(status_code=500, detail="Internal error while approving/denying request")
     
 ##########################################################################

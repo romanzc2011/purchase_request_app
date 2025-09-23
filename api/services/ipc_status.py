@@ -49,9 +49,8 @@ class IPCSharedMemory:
             logger_init_ok(f"Shared memory initialized: {self.shm}")
         except FileExistsError:
             self.shm = shared_memory.SharedMemory(name=name)
+            
         self.name = name
-        
-        # Start cleanup task
         self.start_cleanup_task()
         
     def start_cleanup_task(self):

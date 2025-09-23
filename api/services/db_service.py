@@ -1073,3 +1073,11 @@ async def reset_purchase_request(purchase_request_id: str, db: AsyncSession):
     stmt = (
 		update(PurchaseRequestHeader)
 	)
+    
+###################################################################################################
+# GET APPROVAL ROW COUNT
+###################################################################################################
+async def get_approval_row_count(purchase_request_id: str, db: AsyncSession) -> int:
+    stmt = select(func.count(PendingApproval.purchase_request_id)).where(PendingApproval.purchase_request_id == purchase_request_id)
+    result = await db.execute(stmt)
+    return result.scalar_one()

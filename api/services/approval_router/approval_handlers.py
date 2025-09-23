@@ -20,7 +20,6 @@ from api.schemas.ldap_schema import LDAPUser
 from api.services.approval_router.approver_policy import ApproverPolicy
 from api.services.smtp_service.email_builder import ApproverEmailBuilder
 from api.services.ldap_service import LDAPService
-from api.utils.misc_utils import reset_signals
 import api.services.socketio_server.sio_events as sio_events
 from api.services.ipc_status import ipc_status
 
@@ -61,7 +60,6 @@ class Handler(ABC):
             return await self._next.handle(request, db, current_user, ldap_service)
         
         # Reset progress bar/signals, everything
-        reset_signals()
         return "No handler could process the request."
 
 # ----------------------------------------------------------------------------------------

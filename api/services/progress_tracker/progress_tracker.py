@@ -74,9 +74,21 @@ class ProgressTracker:
         
         return None
         
-    def reset(self):
+    def reset_progress(self):
         for step in self.download_steps:
             step.done = False
+            
+        for step in self.approval_steps:
+            step.done = False
+            
+        for step in self.submit_request_steps:
+            step.done = False
+            
+        self.percent_complete = 0
+        
+        self.start_download_tracking = False
+        self.start_approval_tracking = False
+        self.start_submit_request_tracking = False
             
     def send_start_msg(self, sid):
         logger.debug("Sent start toast message")
