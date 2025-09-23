@@ -1761,12 +1761,24 @@ async def update_boclocfund(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
-    #TODO: Update works just need to sync all the tables
     """
     Update the BOC, Location, or Fund for a purchase request line item.
     """
     logger.debug(f"Payload: {payload}")
     sid = sio_events.get_user_sid(current_user.username)
+    
+    budget_obj_code = payload.budgetObjCode
+    fund = payload.fund
+    
+    # if updating fund or budgetobjcode, first check if compatible by checking budget_object_code table
+    if budget_obj_code or fund:
+        stmt = select(BudgetObjCode).where(BudgetObjCode.boc_code == budget_obj_code, BudgetObjCode.fund_code == fund)
+        result = await db.execute(stmt)
+        budget_obj_code_result = result.scalar_one_or_none()
+        
+        if not budget_obj_code_result:
+            await sio_events.error_event(sid, "Budget Object Code or Fund is not compatible")
+            raise HTTPException(status_code=400, detail="Budget Object Code or Fund is not compatible")
     
     # Update the BOC, Location, or Fund for the purchase request line item
     try:
@@ -1778,8 +1790,8 @@ async def update_boclocfund(
         
         await db.execute(stmt)
         await db.commit()
-        
         await sio_events.message_event(sid, "BOC, Location, or Fund updated successfully")
+        
         return {"message": "BOC, Location, or Fund updated successfully"}
             
     except Exception as e:
@@ -1853,9 +1865,3 @@ async def delete_file(data: dict, current_user: LDAPUser = Depends(auth_service.
         raise HTTPException(status_code=404, detail="File not found")
 
     return {"delete": True}
-
-##########################################################################
-## MAIN CONTROL FLOW
-##########################################################################
-if __name__ == "__main__":
-    uvicorn.run("pras_api:app", host=socket.gethostbyname(socket.gethostname()), port=5004, reload=True)
