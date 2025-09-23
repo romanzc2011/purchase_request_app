@@ -28,7 +28,7 @@ import signal
 import socketio
 from pathlib import Path
 from typing import Awaitable, Callable, ParamSpec, TypeVar
-from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload, UpdateBocLocFundPayload
+from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload, UpdateBocLocFundPayload, BocLocFundPayload
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
@@ -1733,10 +1733,10 @@ async def update_boclocfund(
     db: AsyncSession = Depends(get_async_session),
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
+    #TODO: Update works just need to sync all the tables
     """
     Update the BOC, Location, or Fund for a purchase request line item.
     """
-    logger.info(f"Updating BOC, Location, or Fund for purchase request line item: {payload.purchase_request_id}")
     logger.debug(f"Payload: {payload}")
     sid = sio_events.get_user_sid(current_user.username)
     
@@ -1744,7 +1744,7 @@ async def update_boclocfund(
     try:
         stmt = (update(PurchaseRequestLineItem)
                 .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
-                .values(boc=payload.boc, location=payload.location, fund=payload.fund)
+                .values(budgetObjCode=payload.budgetObjCode, location=payload.location, fund=payload.fund)
                 .execution_options(synchronize_session="fetch")
             )
         

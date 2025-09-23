@@ -101,14 +101,21 @@ async function updateBOCLOCFUND(
     prasData: FormData
     
 ) {
-    // Build BOCLOCFUND FormData based on if empyt or not
+    // Convert FormData to JSON object for the API
+    const jsonPayload: any = {};
+    for (const [key, value] of prasData.entries()) {
+        jsonPayload[key] = value;
+    }
+    
+    console.log("Sending JSON payload:", jsonPayload);
+    
     const res = await fetch(API_URL_BOCLOCFUND, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
         },
-        body: JSON.stringify({ prasData: prasData }),
+        body: JSON.stringify(jsonPayload),
     });
 
     if (!res.ok) {
@@ -271,21 +278,27 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
         /* Here we are building prasData 'dynamically' to we can send data that has been altered
         and just forget or leave data that hasnt been altered, we cant have optional fields in body of
         API call     */
-        prasData.append("item_uuid", item_uuid);
-        prasData.append("purchase_request_id", purchase_request_id);
-        prasData.append("status", status);
-
-        let dataRowArray: Array<string> = [newFUND, newBOC, newLOC];
-        dataRowArray.forEach(item => {
-            if (item) {
-                console.log("UPDATE: ", item);
-                prasData.append(item, item);
+        let dataRowArray: Map<string, string> = new Map(
+            [
+                ["item_uuid", item_uuid],
+                ["purchase_request_id", purchase_request_id],
+                ["status", status],
+                ["fund", newFUND],
+                ["budgetObjCode", newBOC],
+                ["location", newLOC]]);
+        
+        dataRowArray.forEach((item, key) => {
+            if (item && key) {
+                prasData.append(key, item);
             }
         });
 
         // Send to API to update row if it has been altered
         try {
-            console.log("Updating BOC, LOC, FUND", { prasData });
+            console.log("FormData contents:");
+            for (const [key, value] of prasData.entries()) {
+                console.log(`${key}: ${value}`);
+            }
             await updateBOCLOCFUND(prasData);
             // Dynamically return used values in each row
             return {

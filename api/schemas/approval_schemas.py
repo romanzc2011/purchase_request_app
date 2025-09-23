@@ -3,10 +3,21 @@ from typing import List, Optional
 from datetime import datetime
 from api.schemas.purchase_schemas import ItemStatus
 from api.utils.pydantic_utils import to_camel_case
+from dataclasses import dataclass
+from fastapi import Form
 
 # --------------------------------------------------------------
 #  UPDATE PRICE EACH/ TOTAL PRICE PAYLOAD SCHEMAS
 # --------------------------------------------------------------
+@dataclass
+class BocLocFundPayload:
+    item_uuid: str              = Form(...)
+    purchase_request_id: str    = Form(...)
+    status: ItemStatus          = Form(...)
+    fund: str                   = Form(...)
+    budgetObjCode: str          = Form(...)
+    location: str               = Form(...)
+
 class UpdatePricesPayload(BaseModel):
     purchase_request_id: str
     item_uuid: str
