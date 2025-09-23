@@ -49,7 +49,15 @@ uuid_service = UUIDService()
 # -----------------------------------------------------
 # Search Service
 # -----------------------------------------------------
-search_service = SearchService()
+# Defer search service initialization until database is ready
+search_service = None
+
+def get_search_service():
+    """Get or create the search service instance"""
+    global search_service
+    if search_service is None:
+        search_service = SearchService()
+    return search_service
 
 # -----------------------------------------------------
 # Auth Service

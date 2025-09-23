@@ -167,31 +167,21 @@ INSERT OR IGNORE INTO contracting_officers
 VALUES
 ("Lela Robichaux", "lela_robichaux@lawb.uscourts.gov");
 
+----------------------------------------------------------
+-- Fill out fund
+
 -- Court Clerks: Edmund, Ted
+INSERT OR IGNORE INTO budget_fund
+(fund_code)
+VALUES
+("51140X");
 
--- DELETE FROM final_approvals;
--- DELETE FROM pending_approvals;
--- DELETE FROM approvals;
--- DELETE FROM pr_line_items;
--- DELETE FROM purchase_request_headers;
--- DELETE FROM son_comments
--- DELETE FROM justification_templates;
--- DELETE FROM contracting_officers;
+INSERT OR IGNORE INTO budget_fund
+(fund_code)
+VALUES
+("51140E");
 
--- SELECT con.username 
--- FROM contracting_officers con
--- INNER JOIN purchase_request_headers prhdr ON con.id = prhdr.contracting_officer_id
--- WHERE 1=1
--- AND prhdr.purchase_request_seq_id = 1;
-
--- UPDATE final_approvals
--- SET status = 'NEW REQUEST'
--- WHERE UUID = '60735e02-9679-406f-89ba-241e33e769fa';
--- 
--- DELETE FROM final_approvals WHERE UUID = '60735e02-9679-406f-89ba-241e33e769fa';
-
-
--- CHANGE REQUEST BACK TO NEW REQUEST
--- UPDATE approvals
--- SET status = 'NEW REQUEST'
--- WHERE UUID = 'd4bc97bd-852e-44a1-988b-11b4a647165a';
+INSERT OR IGNORE INTO budget_fund
+(fund_code)
+VALUES
+("092000");

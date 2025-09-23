@@ -7,11 +7,12 @@ from api.utils.misc_utils import format_username
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from loguru import logger
 from aiocache import Cache, cached
-from sqlalchemy import select, update
+from sqlalchemy import select, update, insert
 from sqlalchemy import (create_engine, String, Integer, Float, Boolean, Text, LargeBinary, ForeignKey, DateTime,
-                        Enum , JSON, func, Enum as SQLEnum, literal, func, select, text)
+                        Enum , JSON, func, Enum as SQLEnum, literal, func, select, text, UniqueConstraint)
 from sqlalchemy.orm import declarative_base, selectinload, aliased
 from sqlalchemy.orm import sessionmaker, relationship, Session
+from api.schemas.boc_fund_mapping.boc_to_fund_mapping import BocMapping092000, BocMapping51140X, BocMapping51140E
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import select
 from sqlalchemy.orm import aliased
@@ -376,6 +377,42 @@ class SonComment(Base):
         back_populates="son_comments",
         foreign_keys=[line_item_uuid]
     )
+
+# ────────────────────────────────────────────────────────────────────────────────
+# Budget Funds
+# ────────────────────────────────────────────────────────────────────────────────
+class BudgetFund(Base):
+    __tablename__ = "budget_fund"
+    id:         Mapped[int]  = mapped_column(Integer, primary_key=True, autoincrement=True)
+    fund_code:  Mapped[str]  = mapped_column(String, unique=True, nullable=False, index=True)
+    active:     Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("1"))
+
+    # one fund -> many BOCs
+    bocs: Mapped[list["BudgetObjCode"]] = relationship(
+        back_populates="fund",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+# ────────────────────────────────────────────────────────────────────────────────
+# Budget Object Code
+# ────────────────────────────────────────────────────────────────────────────────
+class BudgetObjCode(Base):
+    __tablename__ = "budget_object_code"
+    id:        Mapped[int]  = mapped_column(Integer, primary_key=True, autoincrement=True)
+    boc_code:  Mapped[str]  = mapped_column(String, nullable=False, index=True)
+    boc_name:  Mapped[str]  = mapped_column(String, nullable=False)
+    active:    Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("1"))
+
+    # FK points to the FUND the BOC belongs to
+    fund_code: Mapped[str]  = mapped_column(ForeignKey("budget_fund.fund_code"), nullable=False)
+    
+    # Composite unique constraint on boc_code + fund_code combination
+    __table_args__ = (
+        UniqueConstraint('boc_code', 'fund_code', name='uq_boc_fund'),
+    )
+
+    fund: Mapped["BudgetFund"] = relationship(back_populates="bocs")
 
 # ────────────────────────────────────────────────────────────────────────────────
 # CONTRACTING OFFICER
@@ -892,7 +929,7 @@ async def get_contracting_officer_by_id(db: AsyncSession, ID: str) -> str:
 ###################################################################################################
 # Initialize database
 ###################################################################################################
-def init_db():
+async def init_db():
     """Initialize the database by creating all tables."""
     #! ------------------------------------------------------------------------
     #! THIS IS PRODUCTION WORKFLOW USERS
@@ -930,29 +967,61 @@ def init_db():
                 
         logger_init_ok("SQL script executed successfully")
                 
-        # Seed justification templates
-        with SessionLocal() as session:
-            if not session.query(JustificationTemplate).first():
-                logger_init_ok("Seeding justification templates")
-                
-                session.add_all([
-                    JustificationTemplate(
-                        code="NOT_AVAILABLE",
-                        description="No comparable programs listed on approved sites."
-                    ),
-                    JustificationTemplate(
-                        code="NEEDS_NOT_MEET",
-                        description="Current offerings do not meet the needs of the requester."
-                    ),
-                ])
-            if not session.query(WorkflowUser).first():
-                logger_init_ok("Seeding workflow users")
-                session.add_all(users)
-                session.commit()
+        # Seed workflow users
+        async for session in get_async_session():
+            try:
+                # Check if any workflow users exist
+                result = await session.execute(select(WorkflowUser).limit(1))
+                existing_user = result.scalar_one_or_none()
+                if not existing_user:
+                    logger_init_ok("Seeding workflow users")
+                    session.add_all(users)
+                    await session.commit()
+                break  # Exit the async generator after first iteration
+            except Exception as e:
+                logger.error(f"Error seeding workflow users: {e}")
+                await session.rollback()
+                break
         logger_init_ok("Database initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing database: {e}")
         raise
+    
+    boc_mapping092000 = BocMapping092000()
+    boc_mapping51140X = BocMapping51140X()
+    boc_mapping51140E = BocMapping51140E()
+    
+    async for session in get_async_session():
+        try:
+            # Insert 092000 BOC mappings
+            for boc_code, boc_name in boc_mapping092000.get_mapping_dict().items():
+                # Use INSERT OR IGNORE to handle existing records
+                await session.execute(
+                    text("INSERT OR IGNORE INTO budget_object_code (boc_code, boc_name, fund_code) VALUES (:boc_code, :boc_name, :fund_code)"),
+                    {"boc_code": boc_code, "boc_name": boc_name, "fund_code": "092000"}
+                )
+            
+            # Insert 51140X BOC mappings
+            for boc_code, boc_name in boc_mapping51140X.get_mapping_dict().items():
+                await session.execute(
+                    text("INSERT OR IGNORE INTO budget_object_code (boc_code, boc_name, fund_code) VALUES (:boc_code, :boc_name, :fund_code)"),
+                    {"boc_code": boc_code, "boc_name": boc_name, "fund_code": "51140X"}
+                )
+            
+            # Insert 51140E BOC mappings
+            for boc_code, boc_name in boc_mapping51140E.get_mapping_dict().items():
+                await session.execute(
+                    text("INSERT OR IGNORE INTO budget_object_code (boc_code, boc_name, fund_code) VALUES (:boc_code, :boc_name, :fund_code)"),
+                    {"boc_code": boc_code, "boc_name": boc_name, "fund_code": "51140E"}
+                )
+                
+            await session.commit()
+            logger_init_ok("BOC mappings inserted successfully")
+        except Exception as e:
+            logger.error(f"Error inserting BOC mappings: {e}")
+            await session.rollback()
+        finally:
+            await session.close()
 
 ###################################################################################################
 # DEBUG: CHECK WORKFLOW USER STATUS
@@ -1004,5 +1073,3 @@ async def reset_purchase_request(purchase_request_id: str, db: AsyncSession):
     stmt = (
 		update(PurchaseRequestHeader)
 	)
-
-init_db()

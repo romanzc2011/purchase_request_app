@@ -29,6 +29,7 @@ import socketio
 from pathlib import Path
 from typing import Awaitable, Callable, ParamSpec, TypeVar
 from api.schemas.approval_schemas import ApprovalRequest, ApprovalSchema, DenyPayload, UpdatePricesPayload, UpdateBocLocFundPayload, BocLocFundPayload
+from api.schemas.boc_fund_mapping.boc_to_fund_mapping import BocMapping092000, BocMapping51140X, BocMapping51140E
 from api.schemas.purchase_schemas import AssignCOPayload
 from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
@@ -48,7 +49,7 @@ from api.utils.logging_utils import logger_init_ok
 
 # SQLAlchemy
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update, select, text, func, exists
+from sqlalchemy import update, select, text, func, exists, insert 
 from api.services.db_service import get_async_session
 from api.schemas.enums import AssignedGroup, CueClerk, ItemStatus, LDAPGroup
 import asyncio
@@ -80,7 +81,9 @@ from api.services.db_service import (
     Approval,
     PendingApproval,
     SonComment,
-    ContractingOfficer
+    ContractingOfficer,
+    BudgetObjCode,
+    BudgetFund
 )
 # Schemas
 from api.dependencies.pras_schemas import *
@@ -119,6 +122,29 @@ lock = threading.Lock()
 # Set generic return type/ arg types
 P = ParamSpec("P")
 R = TypeVar("R")
+    
+@app.on_event("startup")
+async def initialize_database():
+    """Initialize the database on startup"""
+    from api.services.db_service import init_db
+    try:
+        await init_db()
+        logger_init_ok("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+        raise e
+
+@app.on_event("startup")
+async def initialize_search_service():
+    """Initialize the search service after database is ready"""
+    from api.dependencies.pras_dependencies import get_search_service
+    try:
+        # This will create the search service and build the index
+        get_search_service()
+        logger_init_ok("Search service initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing search service: {e}")
+        # Don't raise here as search service is not critical for startup
 
 @app.on_event("startup")
 async def _capture_loop():
@@ -298,7 +324,8 @@ async def get_search_data(
     current_user: LDAPUser = Depends(auth_service.get_current_user)
 ):
     # Use the standard execute_search method
-    results = search_service.execute_search(query, db=None)
+    from api.dependencies.pras_dependencies import get_search_service
+    results = get_search_service().execute_search(query, db=None)
     logger.debug(f"RESULTS: {results}")
     
     logger.info(f"Search results for query '{query}': {len(results) if results else 0} items found")
@@ -313,7 +340,8 @@ async def rebuild_search_index(
 ):
     """Rebuild the search index from scratch."""
     try:
-        search_service.rebuild_index()
+        from api.dependencies.pras_dependencies import get_search_service
+        get_search_service().rebuild_index()
         return {"message": "Search index rebuilt successfully"}
     except Exception as e:
         logger.error(f"Error rebuilding search index: {e}")
