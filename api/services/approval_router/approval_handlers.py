@@ -295,7 +295,6 @@ class ClerkAdminHandler(Handler):
             db=db
         )
         logger.warning(f"CAN APPROVE NOW: {can_approve_now}")
-        
         # If the user is not allowed to approve, return to the next handler
         if not can_approve_now:
             await sio_events.error_event(sid, "Current user is not allowed to approve this request")

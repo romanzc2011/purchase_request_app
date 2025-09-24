@@ -2,7 +2,7 @@ from api.schemas.ldap_schema import LDAPUser
 from api.utils.misc_utils import format_username
 from api.schemas.misc_schemas import ItemStatus
 from api.schemas.approval_schemas import ApprovalRequest
-from api.schemas.enums import AssignedGroup, CueClerk, LDAPGroup, is_test_user_active
+from api.schemas.enums import AssignedGroup, CueClerk, LDAPGroup, is_test_user_active, TEST_USER_ACTIVE
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ class ApproverPolicy:
         request: ApprovalRequest,
         db: AsyncSession
     ):
-        if not self.user.has_group(LDAPGroup.CUE_GROUP.value):
+        if not self.user.has_group(LDAPGroup.CUE_GROUP.value) or TEST_USER_ACTIVE:
             return False
         
         if await self._is_chief_clerk_active(db):
@@ -77,7 +77,7 @@ class ApproverPolicy:
         if current_status != ItemStatus.NEW_REQUEST:
             logger.debug(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False
-        return self.user.has_group(LDAPGroup.CUE_GROUP.value) and fund.startswith("092")
+        return self.user.has_group(LDAPGroup.CUE_GROUP.value) or TEST_USER_ACTIVE and fund.startswith("092")
 
     # ----------------------------------------------------------------------------------
     # IT HANDLER APPROVAL LOGIC
@@ -86,7 +86,7 @@ class ApproverPolicy:
         if current_status != ItemStatus.NEW_REQUEST:
             logger.warning(f"Request status is not NEW_REQUEST ({current_status}), skipping")
             return False
-        return self.user.has_group(LDAPGroup.IT_GROUP.value) and fund.startswith("511")
+        return self.user.has_group(LDAPGroup.IT_GROUP.value) or TEST_USER_ACTIVE and fund.startswith("511")
     
     # ----------------------------------------------------------------------------------
     # CAN FULL APPROVE
@@ -101,7 +101,7 @@ class ApproverPolicy:
         logger.warning(f"DEBUG: {self.username}")
         logger.warning(f"DEBUG {format_username(self.username)}")
         
-        if not self.user.has_group(LDAPGroup.CUE_GROUP.value):
+        if not (self.user.has_group(LDAPGroup.CUE_GROUP.value) or TEST_USER_ACTIVE):
             logger.warning("User is not a member of CUE")
             return False
         

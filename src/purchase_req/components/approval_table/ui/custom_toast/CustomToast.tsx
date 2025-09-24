@@ -36,10 +36,10 @@ export function ProgressToastMaroon(message: string, customId: string) {
     toast.success(message, {
         closeButton: <CloseButton />,
         toastId: customId,
-        position: "top-center",
+        position: "bottom-right",
         style: {
             width: "500px"
         },
-        autoClose: 1000
+        autoClose: 3000
     });
 }
