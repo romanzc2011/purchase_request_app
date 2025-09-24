@@ -30,7 +30,8 @@ import { isDownloadSig } from "../../../utils/PrasSignals";
 import { computeHTTPURL } from "../../../utils/misc_utils";
 import { BOCEditCell } from "../../purchase_req_table/BudgetCodePicker";
 import { FundEditCell } from "../../purchase_req_table/FundPicker";
-import LocationPicker, { LocationEditCell } from "../../purchase_req_table/LocationPicker";
+import { LocationEditCell } from "../../purchase_req_table/LocationPicker";
+import { ProgressToastMaroon } from "./custom_toast/CustomToast";
 
 /***********************************************************************************/
 // PROPS
@@ -205,9 +206,13 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
 
     // Filter approval data based on search results - EXCLUSIVE SEARCH
     const filteredApprovalData = useMemo(() => {
+        console.log("🔍 DEBUG: searchQuery:", searchQuery);
+        console.log("🔍 DEBUG: searchData length:", searchData?.length);
+        console.log("🔍 DEBUG: approvalData length:", approvalData?.length);
 
         // If no search query, show all data
         if (!searchQuery || !searchData || searchData.length === 0) {
+            console.log("🔍 DEBUG: No search active, showing all data");
             return approvalData;
         }
 
@@ -225,10 +230,12 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
         return filtered;
     }, [approvalData, searchData, searchQuery]);
 
-    const rowsWithUUID = useMemo(() =>
-        filteredApprovalData.map((r, i) =>
+    const rowsWithUUID = useMemo(() => {
+        console.log("🔍 DEBUG: Creating rowsWithUUID, filteredApprovalData length:", filteredApprovalData.length);
+        return filteredApprovalData.map((r, i) =>
             r.UUID ? r : { ...r, UUID: `row-${i}` }
-        ), [filteredApprovalData]);
+        );
+    }, [filteredApprovalData]);
 
     const grouped = useMemo(() => {
         return rowsWithUUID.reduce((acc, row) => {
@@ -240,6 +247,7 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
     /* Flatten the rows so the data can be displayed as a list for
     for expand/collapsed functionality */
     const flatRows = React.useMemo<FlatRow[]>(() => {
+        console.log("🔍 DEBUG: Creating flatRows, grouped entries:", Object.keys(grouped).length);
         return Object.entries(grouped).flatMap(([groupKey, items]) => {
             // If there's only one item, emit it as a normal row (no header)
             if (items.length === 1) {
@@ -422,7 +430,7 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
         // Calling the processPayload function to send the payload to the backend
         try {
             await processPayload(apiPayload);
-            toast.success("Batch approval successful");
+            ProgressToastMaroon(`Processing request for ${itemsToProcessForApproval[0].ID} complete.`, "ProgressToastMaroon");
 
             // Invalidate the query to refresh the data, updates local
             // state and re-renders the table
@@ -1032,7 +1040,7 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
             <div style={{ height: '70vh', overflowX: 'auto', overflowY: 'auto' }}>
                 <DataGrid
                     rows={flatRows}
-                    disableVirtualization={false}
+                    disableVirtualization={true}
                     getRowId={r => {
                         const row = r as FlatRow;
                         return row.isGroup ? `header-${row.groupKey}` : row.UUID;

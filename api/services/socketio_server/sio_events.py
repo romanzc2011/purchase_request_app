@@ -29,12 +29,12 @@ async def connect(sid, environ, auth):
 @sio.event
 async def progress_update(sid: str, payload: Dict[str, Any]) -> None:
     await sio.emit(SIOEvents.PROGRESS_UPDATE.value, payload, to=sid)
-    
 
 @sio.event
 async def start_toast(sid: str, percent: int = 0) -> None:
     await sio.emit(SIOEvents.START_TOAST.value, {"percent_complete": percent}, to=sid)
     if percent == 100:
+        logger.debug("socketio: start_toast: percent == 100")
         RESET_PROGRESS_BAR = True
         
 def get_reset_progress_bar() -> bool:
@@ -89,12 +89,15 @@ async def message_event(sid, data):
     logger.debug("socketio: message_event", sid)
     if get_reset_progress_bar():
         await sio.emit(SIOEvents.RESET_DATA.value, {"message": "Resetting progress bar"}, to=sid)
+        logger.debug("socketio: message_event: resetting progress bar")
         RESET_PROGRESS_BAR = False
     await sio.emit(SIOEvents.MESSAGE_EVENT.value, {"message": data}, to=sid)
     
 @sio.on(SIOEvents.RESET_DATA.value)
 async def reset_data(sid):
     logger.debug("socketio: reset_data", sid)
+    await sio.emit(SIOEvents.RESET_DATA.value, {"message": "Resetting progress bar"}, to=sid)
+    logger.debug("socketio: reset_data: resetting progress bar")
     
 @sio.on(SIOEvents.ERROR_EVENT.value)
 async def error_event(sid, data):

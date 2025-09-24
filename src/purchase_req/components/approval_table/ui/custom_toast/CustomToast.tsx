@@ -30,3 +30,16 @@ export function RQ1WarningToast(message: string, customId: string) {
         autoClose: 10000
     });
 }
+
+/* Standard Maroon Toast */
+export function ProgressToastMaroon(message: string, customId: string) {
+    toast.success(message, {
+        closeButton: <CloseButton />,
+        toastId: customId,
+        position: "top-center",
+        style: {
+            width: "500px"
+        },
+        autoClose: 1000
+    });
+}

@@ -277,6 +277,7 @@ class ClerkAdminHandler(Handler):
         result = await db.execute(stmt)		
         row = result.first()
         
+        # Theres no pending approval, return to the next handler
         if not row:
             logger.warning(f"CLERK ADMIN HANDLER: No pending approval found for {request.uuid}")
             return await super().handle(request, db, current_user, ldap_service)
@@ -295,6 +296,15 @@ class ClerkAdminHandler(Handler):
         )
         logger.warning(f"CAN APPROVE NOW: {can_approve_now}")
         
+        # If the user is not allowed to approve, return to the next handler
+        if not can_approve_now:
+            await sio_events.error_event(sid, "Current user is not allowed to approve this request")
+            logger.debug("CLERK ADMIN HANDLER: Current user is not allowed to approve this request")
+            # Reset progress bar
+            if tracker and tracker.is_tracker_active():
+                tracker.reset_progress()
+            return await super().handle(request, db, current_user, ldap_service)
+        
         #!-PROGRESS TRACKING --------------------------------------------------------------
         # Mark Clerk policy checked
         sid = sio_events.get_user_sid(current_user)
@@ -309,6 +319,7 @@ class ClerkAdminHandler(Handler):
                 logger.error(f"CLERK ADMIN HANDLER: Could not mark step done for {ApprovalStepName.CLERK_POLICY_CHECKED}")
             
         if not can_approve_now:
+            await sio_events.error_event(sid, "Current user is not allowed to approve this request")
             logger.debug("CLERK ADMIN HANDLER: Current user is not allowed to approve this request")
             
             approver_email_builder = ApproverEmailBuilder(db, request, current_user, ldap_service)

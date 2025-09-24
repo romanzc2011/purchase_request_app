@@ -160,16 +160,26 @@ export function setupSocketProgressBridge() {
     };
 
     const onErrorEvent = (payload: { message: string }) => {
-        console.log("🚨 ERROR_EVENT received:", payload);
-        console.log("🚨 Message content:", payload.message);
-        console.log("🚨 Contains authorization text:", payload.message.includes("You are not authorized to assign requisition IDs"));
+        // DISMISS any active progress toasts first
+        if (toast.isActive(TOAST_ID)) {
+            console.log("🚨 Dismissing active progress toast");
+            toast.dismiss(TOAST_ID);
+        }
 
         // This is for RQ1 assign failure, close with button
         if (payload.message.includes("You are not authorized to assign requisition IDs")) {
-            console.log("🚨 Calling RQ1WarningToast");
-            RQ1WarningToast(payload.message, TOAST_ID);
+            console.log("🚨 Calling RQ1WarningToast for RQ1 error");
+            RQ1WarningToast(payload.message, `rq1-error-${Date.now()}`);
             return;
         }
+
+        if (payload.message.includes("Current user is not allowed to approve this request")) {
+            console.log("🚨 Calling RQ1WarningToast for approval error");
+            RQ1WarningToast(payload.message, `approval-error-${Date.now()}`);
+            return;
+        }
+
+        console.log("🚨 No matching error type found, using fallback");
         if (!toast.isActive(TOAST_ID)) {
             console.log("🚨 Calling regular toast.error");
             toast.error(payload.message, { toastId: TOAST_ID });

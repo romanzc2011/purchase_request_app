@@ -98,7 +98,6 @@ def get_active_tracker() -> ProgressTracker:
                 return tracker
         except RuntimeError:
             continue
-        
     return None
 
 def print_tracker_statuses():

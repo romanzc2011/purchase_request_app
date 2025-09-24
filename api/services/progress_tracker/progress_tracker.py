@@ -123,7 +123,6 @@ class ProgressTracker:
                 "event": "PROGRESS_UPDATE",
                 "percent_complete": self.percent_complete
             }
-        
         return None
     
     def remaining_steps(self) -> List[DownloadStep | ApprovalStep | SubmitRequestStep]:
@@ -163,3 +162,17 @@ class ProgressTracker:
         done_weight = sum(s.weight for s in steps if s.done)
         self._percent_complete = int((done_weight / total_weight) * 100)
         return self._percent_complete
+    
+    #------------------------------------------------------------------
+    # Is tracker active
+    #------------------------------------------------------------------
+    def is_tracker_active(self) -> bool:
+        if self.start_download_tracking:
+            return True
+        
+        elif self.start_approval_tracking:
+            return True
+        
+        elif self.start_submit_request_tracking:
+            return True
+        return False

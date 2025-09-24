@@ -277,11 +277,11 @@ class LDAPService:
     #-------------------------------------------------------------------------------------
     async def start_keepalive_ldap(self, interval_sec: int = 300):
         """Start LDAP keepalive in background task"""
-        logger.info(f"Starting LDAP keepalive with {interval_sec}s interval")
+        logger_init_ok(f"Starting LDAP keepalive with {interval_sec}s interval")
         while True:
             try:
                 await asyncio.to_thread(self._ping_sync)
-                logger.debug("LDAP keepalive ping successful")
+                logger.info("LDAP keepalive ping successful")
             except Exception as e:
                 logger.error(f"Error keeping LDAP alive: {e}")
             await asyncio.sleep(interval_sec)
