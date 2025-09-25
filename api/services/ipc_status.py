@@ -43,6 +43,7 @@ class IPCSharedMemory:
         self.total_steps: int = 10
         self.last_activity_time = time.time()
         self.cleanup_task = None
+        self._cleanup_initialized = False
 
         try:
             self.shm = shared_memory.SharedMemory(name=name, create=True, size=self.STRUCT_SIZE)
@@ -51,12 +52,24 @@ class IPCSharedMemory:
             self.shm = shared_memory.SharedMemory(name=name)
             
         self.name = name
-        self.start_cleanup_task()
+        # Don't start cleanup task during import - will be started lazily
         
     def start_cleanup_task(self):
         """Start periodic cleanup of stale progress state"""
-        if self.cleanup_task is None:
-            self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+        if self.cleanup_task is None and not self._cleanup_initialized:
+            try:
+                # Only create task if there's a running event loop
+                loop = asyncio.get_running_loop()
+                self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+                self._cleanup_initialized = True
+            except RuntimeError:
+                # No event loop running, will start lazily later
+                pass
+    
+    def _ensure_cleanup_task(self):
+        """Ensure cleanup task is started if not already running"""
+        if not self._cleanup_initialized:
+            self.start_cleanup_task()
             
     async def _cleanup_loop(self):
         """Periodically check and clear stale progress state"""
@@ -99,6 +112,7 @@ class IPCSharedMemory:
     # UPDATE
     #-------------------------------------------------------------
     async def update(self, field: str, value: bool | int) -> dict:
+        self._ensure_cleanup_task()
         current_state = await self.read()
         
         self.value = value
@@ -149,6 +163,7 @@ class IPCSharedMemory:
     #-------------------------------------------------------------
     async def reset_progress_state(self):
         """Reset all progress flags to False"""
+        self._ensure_cleanup_task()
         current_state = await self.read()
         for field in vars(current_state):
             if isinstance(getattr(current_state, field), bool):
@@ -161,6 +176,7 @@ class IPCSharedMemory:
     #-------------------------------------------------------------
     async def check_and_clear_stale_state(self):
         """Check if progress state is stale and clear if needed"""
+        self._ensure_cleanup_task()
         current_state = await self.read()
         # If all flags are False, state is already clean
         if not any(vars(current_state).values()):

@@ -24,11 +24,27 @@ from api.utils.logging_utils import logger_init_ok
 import uuid
 import os
 import sqlite3
+import sys
 
 # Ensure database directory exists
 db_dir = os.path.join(os.path.dirname(__file__), '..', 'db')
 os.makedirs(db_dir, exist_ok=True)
-DATABASE_URL = "sqlite:///api/db/pras.db"
+
+# Use absolute path for PyInstaller compatibility
+if getattr(sys, 'frozen', False):
+    # Running from PyInstaller executable
+    base_path = os.path.dirname(sys.executable)
+    db_path = os.path.join(base_path, 'db', 'pras.db')
+    # Ensure the db directory exists
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    DATABASE_URL = f"sqlite:///{db_path}"
+    print(f"DEBUG: PyInstaller mode - Database path: {db_path}")
+    print(f"DEBUG: Base path: {base_path}")
+    print(f"DEBUG: Database URL: {DATABASE_URL}")
+else:
+    # Running from source
+    DATABASE_URL = "sqlite:///api/db/pras.db"
+    print(f"DEBUG: Source mode - Database URL: {DATABASE_URL}")
 
 # Create engine and base
 engine = create_engine(DATABASE_URL, echo=False)  # PRAS = Purchase Request Approval System
@@ -38,7 +54,20 @@ SessionLocal = sessionmaker(bind=engine)
 # ────────────────────────────────────────────────────────────────────────────────
 # ASYNC DATABASE ENGINE
 # ────────────────────────────────────────────────────────────────────────────────
-DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
+if getattr(sys, 'frozen', False):
+    # Running from PyInstaller executable
+    base_path = os.path.dirname(sys.executable)
+    db_path = os.path.join(base_path, 'db', 'pras.db')
+    # Ensure the db directory exists
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    DATABASE_URL_ASYNC = f"sqlite+aiosqlite:///{db_path}"
+    print(f"DEBUG: PyInstaller mode - Async Database path: {db_path}")
+    print(f"DEBUG: Async Database URL: {DATABASE_URL_ASYNC}")
+else:
+    # Running from source
+    DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
+    print(f"DEBUG: Source mode - Async Database URL: {DATABASE_URL_ASYNC}")
+    
 engine_async = create_async_engine(
     DATABASE_URL_ASYNC, 
     echo=False)
@@ -134,6 +163,7 @@ class PurchaseRequestLineItem(Base):
     quantity               : Mapped[int] = mapped_column(Integer)
     priceEach              : Mapped[float] = mapped_column(Float)
     originalPriceEach      : Mapped[float] = mapped_column(Float)
+    priceUpdated           : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     totalPrice             : Mapped[float] = mapped_column(Float)
     location               : Mapped[str] = mapped_column(String)
     isCyberSecRelated      : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)

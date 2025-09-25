@@ -1,4 +1,6 @@
 import asyncio
+import sys
+import os
 from api.schemas.enums import ItemStatus
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
 from fastapi import HTTPException
@@ -28,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.services.progress_tracker.steps.download_steps import DownloadStepName
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
 from api.services.progress_tracker.progress_manager import get_active_tracker, get_approval_tracker, get_download_tracker, get_submit_request_tracker, ProgressTrackerType
+from api.settings import settings
 
 def get_sio_events():
     import api.services.socketio_server.sio_events as sio_events
@@ -61,6 +64,16 @@ class PDFService:
         logger.info(f"#####################################################")
         logger.info("create_pdf()")
         logger.info(f"#####################################################")
+        
+        # Create directory for seal image if it doesn't exist
+        # Use abs path for PyInstaller compatibility
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+            seal_logo_path = os.path.join(base_path, 'img_assets', 'seal_no_border.png')
+            # Ensure dir exists
+            os.makedirs(os.path.dirname(seal_logo_path), exist_ok=True)
+        else: 
+            seal_logo_path = settings.SEAL_IMAGE_FOLDER
         
         if not ID:
             raise HTTPException(status_code=400, detail="ID is required")
@@ -232,6 +245,7 @@ class PDFService:
             download_tracker=download_tracker,
             final_approved=format_username(final_approved) if final_approved else None,
             final_approved_at=final_approved_at,
+            seal_logo_path=seal_logo_path,
         )
         
         # Progress tracking after PDF generation is complete
@@ -287,6 +301,7 @@ class PDFService:
                                    download_tracker=None,
                                    final_approved: str=None,
                                    final_approved_at: datetime=None,
+                                   seal_logo_path: str=None,
                                    ) -> Path: 
         logger.info(f"#####################################################")
         logger.info("make_purchase_request_pdf()")
@@ -308,7 +323,6 @@ class PDFService:
         pdfmetrics.registerFont(TTFont("Play", str(project_root / "src/assets/fonts/Play-Regular.ttf")))
         pdfmetrics.registerFont(TTFont("Play-Bold", str(project_root / "src/assets/fonts/Play-Bold.ttf")))
 
-        logo_path = project_root / "src/assets/seal_no_border.png"
         img_w, img_h = 0.85 * inch, 0.85 * inch
         gap = 6  # points of breathing room
 
@@ -349,7 +363,7 @@ class PDFService:
             # logo
             x_logo = 0.2*inch
             y_logo = LETTER[1] - 0.2*inch
-            canvas.drawImage(str(logo_path), x_logo, y_logo - img_h, width=img_w, height=img_h, mask='auto')
+            canvas.drawImage(str(seal_logo_path), x_logo, y_logo - img_h, width=img_w, height=img_h, mask='auto')
 
             # ----------------------------------------------------------------------------
             # title
@@ -490,9 +504,11 @@ class PDFService:
         total_data = [
             ["", Paragraph(f"TOTAL: ${total:.2f}", total_style)]
         ]
+        # Calculate actual usable width (page width minus left and right margins)
+        usable_width = LETTER[0]  # LETTER[0] is page width, minus 2 inches for margins
         total_table = Table(
             total_data,
-            colWidths=[doc.width - 1.5 * inch, 1.5 * inch]
+            colWidths=[usable_width - 2 * inch, 2 * inch]
         )
         total_table.setStyle(TableStyle([
             ("LINEABOVE",       (0, 0), (-1, 0), 1, colors.gray),

@@ -30,14 +30,17 @@ END;
 	in PurchaseRequestLineItems: update approvals, */
 ----------------------------------------------------------
 CREATE TRIGGER IF NOT EXISTS sync_bocloclfund
-AFTER UPDATE OF budgetObjCode, location, fund ON pr_line_items
+AFTER UPDATE OF budgetObjCode, location, fund, quantity, priceEach, totalPrice ON pr_line_items
 FOR EACH ROW
 BEGIN
 	UPDATE approvals
 	SET
 		budgetObjCode 	= coalesce(NEW.budgetObjCode, budgetObjCode),
 		location		= coalesce(NEW.location, location),
-		fund			= coalesce(NEW.fund, fund)
+		fund			= coalesce(NEW.fund, fund),
+		quantity		= coalesce(NEW.quantity, quantity),
+		priceEach		= coalesce(NEW.priceEach, priceEach),
+		totalPrice		= coalesce(NEW.totalPrice, totalPrice)
 	WHERE purchase_request_id = NEW.purchase_request_id;
 END;
 ----------------------------------------------------------

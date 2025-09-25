@@ -21,6 +21,7 @@ class BocLocFundPayload:
 class UpdatePricesPayload(BaseModel):
     purchase_request_id: str
     item_uuid: str
+    new_quantity: Optional[int] = None
     new_price_each: float
     new_total_price: float
     status: ItemStatus

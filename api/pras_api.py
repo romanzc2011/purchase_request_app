@@ -35,7 +35,7 @@ from api.services.approval_router.approval_handlers import ClerkAdminHandler
 from api.services.approval_router.approval_router import ApprovalRouter
 from api.services.progress_tracker.steps.download_steps import DownloadStepName
 from api.services.progress_tracker.steps.submit_request_steps import SubmitRequestStepName
-from api.utils.misc_utils import format_username, error_handler
+from api.utils.misc_utils import format_username, error_handler, price_change_allowed
 from pydantic import ValidationError
 from fastapi import (
     FastAPI, APIRouter, Depends, Form, 
@@ -1725,35 +1725,26 @@ async def update_prices(
     originalPriceEach = result.scalar_one_or_none()
     new_price_each = payload.new_price_each
     
-    # Calculate 10% and $100 allowances
-    price_allowance_ok = False
+    price_allowance_ok = price_change_allowed(originalPriceEach, new_price_each)
     
-    try:
-    # Allowance is ok if new price each is less than or equal to original price each + 10% or $100
-        allowed_increase = min(originalPriceEach * 0.1, 100)
-        price_allowance_ok = (new_price_each - originalPriceEach) <= allowed_increase
-    except Exception as e:
-        logger.error(f"Error calculating price allowance: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    
-    # Debug logging to help troubleshoot
-    logger.info(f"PRICE UPDATE DEBUG:")
-    logger.info(f"  Original Price Each: ${originalPriceEach}")
-    logger.info(f"  New Price Each: ${new_price_each}")
-    logger.info(f"  Price Difference: ${new_price_each - originalPriceEach}")
-    logger.info(f"  Allowed Increase (10% or $100): ${allowed_increase}")
-    logger.info(f"  Price Allowance OK: {price_allowance_ok}")
-    logger.info(f"  Item Status: {payload.status}")
-        
-    logger.debug(f"UPDATED PRICES: {price_allowance_ok}")
     
     # Only allow updating prices for NEW_REQUEST or PENDING_APPROVAL statuses, not APPROVED or DENIED
     if (payload.status is not ItemStatus.DENIED) and price_allowance_ok:
         logger.info(f"payload: {payload}")
+        # Build update values dynamically
+        update_values = {
+            "priceEach": payload.new_price_each, 
+            "totalPrice": payload.new_total_price
+        }
+        
+        # Add quantity update if provided
+        if payload.new_quantity is not None:
+            update_values["quantity"] = payload.new_quantity
+            
         stmt = (update(PurchaseRequestLineItem)
                 .where(PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id)
                 .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
-                .values(priceEach=payload.new_price_each, totalPrice=payload.new_total_price)
+                .values(**update_values)
                 .execution_options(synchronize_session="fetch")
         )
         

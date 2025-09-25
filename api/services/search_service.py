@@ -108,7 +108,6 @@ class SearchService:
                 purchase_requests = dbas.get_all_purchase_requests(session)
                 
                 if not purchase_requests:
-                    logger.info("No purchase requests found in database")
                     return
                 
                 # Create a writer for the index

@@ -1,3 +1,5 @@
+import sys
+import os
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
@@ -5,17 +7,32 @@ from pydantic import Field
 class Settings(BaseSettings):
     # -- Application URL
     app_base_url: str = Field(
-        default="http://localhost:5004",  # Default for development
+        default="http://127.0.0.1:5004",  # Default for development
         env="VITE_API_URL",
     )
     link_to_request: str = f"{app_base_url}/approval"
     
     # -- Project directories
-    BASE_DIR: Path = Path(__file__).resolve().parent.parent
-    DATABASE_FILE_PATH: Path = BASE_DIR / "api" / "db" / "pras.db"
-    SQL_SCRIPT_PATH: Path = BASE_DIR / "api" / "db" / "pras_sql_script.sql"
-    PDF_OUTPUT_FOLDER: Path = BASE_DIR / "api" / "pdf_output"
-    UPLOAD_FOLDER: Path = BASE_DIR / "api" / "uploads"
+    def _get_base_dir(self):
+        if getattr(sys, 'frozen', False):
+            # Running from PyInstaller executable
+            return Path(sys.executable).parent
+        else:
+            # Running from source - check if we're in the api directory
+            current_dir = Path(__file__).resolve().parent
+            if current_dir.name == 'api':
+                # We're in the api directory, so db is in current directory
+                return current_dir
+            else:
+                # We're in the project root, so db is in api subdirectory
+                return current_dir / "api"
+    
+    BASE_DIR: Path = _get_base_dir(None)
+    DATABASE_FILE_PATH: Path = BASE_DIR / "db" / "pras.db"
+    SQL_SCRIPT_PATH: Path = BASE_DIR / "db" /"pras_sql_script.sql"
+    PDF_OUTPUT_FOLDER: Path = BASE_DIR / "pdf_output"
+    UPLOAD_FOLDER: Path = BASE_DIR / "uploads"
+    SEAL_IMAGE_FOLDER: Path = BASE_DIR / "img_assets" / "seal_no_border.png"
 
     # -- LDAP configuration
     ldap_server: str

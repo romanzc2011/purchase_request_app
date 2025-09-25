@@ -6,7 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 import api.services.db_service as dbas
 from sqlalchemy import select
-
+from fastapi import HTTPException
+import os
+import sys
+from api.settings import settings
 
 """
 This file contains miscellaneous utility functions that are used throughout the project.
@@ -85,4 +88,25 @@ async def get_justifications_and_comments(db: AsyncSession, ID: str) -> list[str
     
     
     return additional_comments
+
+
+def price_change_allowed(original_price_each: float, new_price_each: float) -> bool:
+    # Calculate 10% and $100 allowances
+    price_allowance_ok = False
+    
+    # A price has not been set yet which finance usually does not set price until after approval
+    if original_price_each == 0:
+        logger.info(f"Original price each is 0, allowing price change")
+        return True
+    
+    try:
+    # Allowance is ok if new price each is less than or equal to original price each + 10% or $100
+        allowed_increase = min(original_price_each * 0.1, 100)
+        price_allowance_ok = (new_price_each - original_price_each) <= allowed_increase
+        logger.info(f"Price allowance is ok: {price_allowance_ok}")
+        return price_allowance_ok
+    
+    except Exception as e:
+        logger.error(f"Error calculating price allowance: {e}")
+        return False
 

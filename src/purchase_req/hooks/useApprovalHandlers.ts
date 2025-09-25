@@ -134,6 +134,7 @@ async function updateBOCLOCFUND(
 async function updatePriceEachTotalPrice(
     purchase_request_id: string,
     item_uuid: string,
+    newQuantity: number,
     newPriceEach: number,
     newTotalPrice: number,
     status: ItemStatus
@@ -147,6 +148,7 @@ async function updatePriceEachTotalPrice(
       body: JSON.stringify({
         purchase_request_id,
         item_uuid,
+        new_quantity: newQuantity,
         new_price_each: newPriceEach,
         new_total_price: newTotalPrice,
         status,
@@ -225,8 +227,8 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 		}
 		
 		let newPriceEach = newRow.priceEach;
-		const quantity = newRow.quantity;
-		let newTotalPrice = newPriceEach * quantity;
+		const newQuantity = newRow.quantity;
+		let newTotalPrice = newPriceEach * newQuantity;
 		const status = newRow.status;
 
 		// Extract the actual UUID and ID from the row data
@@ -235,13 +237,13 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
 
 		// update the price each and total price on backend
 		try {
-			await updatePriceEachTotalPrice(purchase_request_id, item_uuid, newPriceEach, newTotalPrice, status);
+			await updatePriceEachTotalPrice(purchase_request_id, item_uuid, newQuantity, newPriceEach, newTotalPrice, status);
 			// If successful, return the new values
-			return { ...newRow, priceEach: newPriceEach, totalPrice: newTotalPrice };
+			return { ...newRow, quantity: newQuantity, priceEach: newPriceEach, totalPrice: newTotalPrice };
 		} catch (error) {
 			// If price allowance exceeded, revert to original price
 			console.log("Price update failed, reverting to original price:", oldRow.priceEach);
-			return { ...oldRow, priceEach: oldRow.priceEach, totalPrice: oldRow.totalPrice };
+			return { ...oldRow, quantity: oldRow.quantity, priceEach: oldRow.priceEach, totalPrice: oldRow.totalPrice };
 		}
     };
     
@@ -257,7 +259,7 @@ export function useApprovalHandlers(rowSelectionModel?: { ids: Set<GridRowId>, t
         }
 
         // Check if priceEach was changed
-        if (newRow.priceEach !== oldRow.priceEach) {
+        if (newRow.priceEach !== oldRow.priceEach || newRow.quantity !== oldRow.quantity) {
             console.log("Price update detected");
             return await handleEditPriceEach(newRow, oldRow);
         }

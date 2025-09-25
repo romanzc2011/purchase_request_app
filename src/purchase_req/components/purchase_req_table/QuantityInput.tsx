@@ -32,7 +32,7 @@ const QuantityInput = ({ register, errors }: QuantityInputProps) => {
                     error={!!errors.quantity}
                     helperText={errors.quantity?.message}
                     sx={{ backgroundColor: "white", fontFamily: "Tahoma" }}
-                    inputProps={{ min: 1, step: 1 }}
+                    inputProps={{ min: 0, step: 1 }}
                     {...register("quantity", { valueAsNumber: true })}
                 />
             </Grid>

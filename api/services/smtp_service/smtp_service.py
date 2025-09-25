@@ -26,6 +26,8 @@ from api.services.ipc_status import ipc_status
 from api.services.socketio_server.sio_instance import sio
 from api.services.ipc_status import ipc_status
 from api.utils.misc_utils import format_username
+import sys
+import os
 
 class SMTP_Service:
     def __init__(
@@ -33,12 +35,22 @@ class SMTP_Service:
         renderer: TemplateRenderer,
         ldap_service: LDAPService,
     ):
+        # Create directory for seal image if it doesn't exist
+        # Use abs path for PyInstaller compatibility
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+            seal_logo_path = os.path.join(base_path, 'img_assets', 'seal_no_border.png')
+            # Ensure dir exists
+            os.makedirs(os.path.dirname(seal_logo_path), exist_ok=True)
+        else: 
+            seal_logo_path = settings.SEAL_IMAGE_FOLDER
+            
+        self.logo_file_path = seal_logo_path
         self.smtp_server = settings.smtp_server
         self.smtp_port = settings.smtp_port
         self.smtp_email_addr = settings.smtp_email_addr
         self.renderer = renderer
         self.ldap_service = ldap_service
-        self.logo_file_path = os.path.join(settings.BASE_DIR, "src", "assets", "seal_no_border.png")
         
     #-------------------------------------------------------------------------------
     # SEND EMAIL - async

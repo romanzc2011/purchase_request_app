@@ -52,3 +52,4 @@ api/db/pras_dblite_project
 .venv/*
 .venv-debug/*
 priceEach-update-flow.md
+api/dist/*

@@ -751,10 +751,11 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
             type: "number",
             align: "center",
             width: 100,
+            editable: true,
             sortable: true,
             renderCell: params => {
-                if (params.row.isGroup && expandedRows[params.row.groupKey]) return null;
-                return params.value;
+                if (params.row.isGroup && expandedRows[params.row.groupKey]) { return null; }
+                return typeof params.value === "number" ? params.value.toFixed(0) : "0";
             }
         },
 
@@ -1062,8 +1063,8 @@ export default function ApprovalTable({ searchQuery, onClearSearch }: ApprovalTa
                     }}
                     rowSelectionModel={rowSelectionModel}
                     isCellEditable={(params) => {
-                        // Allow editing priceEach and budgetObjCode fields
-                        if (params.field !== 'priceEach' && params.field !== 'budgetObjCode' && params.field !== 'fund' && params.field !== 'location') {
+                        // Allow editing priceEach, budgetObjCode, fund, location, and quantity fields
+                        if (params.field !== 'priceEach' && params.field !== 'budgetObjCode' && params.field !== 'fund' && params.field !== 'location' && params.field !== 'quantity') {
                             return false;
                         }
 

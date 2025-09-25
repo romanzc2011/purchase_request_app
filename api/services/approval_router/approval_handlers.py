@@ -297,7 +297,7 @@ class ClerkAdminHandler(Handler):
         logger.warning(f"CAN APPROVE NOW: {can_approve_now}")
         # If the user is not allowed to approve, return to the next handler
         if not can_approve_now:
-            await sio_events.error_event(sid, "Current user is not allowed to approve this request")
+            await sio_events.error_event(sid, "You do not have final approval authority for this request. The request will be forwarded to the appropriate approver.")
             logger.debug("CLERK ADMIN HANDLER: Current user is not allowed to approve this request")
             # Reset progress bar
             if tracker and tracker.is_tracker_active():
