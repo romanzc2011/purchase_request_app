@@ -66,7 +66,17 @@ BEGIN
 	WHERE line_item_uuid = NEW.line_item_uuid;
 END;
 
-
+----------------------------------------------------------
+/* Trigger to auto update originalPriceEach and priceUpdated on pr_line_items */
+----------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS prli_set_price_updated
+AFTER UPDATE ON pr_line_items
+WHEN NEW.totalPrice <> 0 AND OLD.priceUpdated = 0
+BEGIN
+  UPDATE pr_line_items
+  SET priceUpdated = 1
+  WHERE UUID = NEW.UUID;
+END;
 
 ----------------------------------------------------------
 /* Trigger to auto update status to denied AFTER pr_line_items
@@ -129,6 +139,16 @@ BEGIN
 END;
 
 ----------------------------------------------------------
+/* ORDER PRICE TRACKING TABLE */
+----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS order_price_tracking (
+    purchase_request_id VARCHAR PRIMARY KEY,
+    original_grand_total DECIMAL(10,2),
+    allowed_increase DECIMAL(10,2),
+    baseline_set BOOLEAN DEFAULT FALSE
+);
+
+----------------------------------------------------------
 /* INSERT CONTRACTING OFFICERS 
     - peter_baltz will be peterbaltz in prod
 	PROD:
@@ -154,7 +174,6 @@ VALUES
 
 ----------------------------------------------------------
 -- Fill out fund
-
 -- Court Clerks: Edmund, Ted
 INSERT OR IGNORE INTO budget_fund
 (fund_code)

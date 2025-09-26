@@ -616,12 +616,9 @@ async def send_purchase_request(
             await db.flush() # UUID is now available
             
             # Check if totalPrice is greater than 0, that means a price was sent on submission
-            stmt = select(PurchaseRequestLineItem.totalPrice).where(PurchaseRequestLineItem.purchase_request_id == purchase_req_id)
-            res = await db.execute(stmt)
-            total_price = res.scalar_one_or_none()
-            if total_price > 0:
+            if orm_pr_line_item.totalPrice > 0:
                 orm_pr_line_item.priceUpdated = True
-                orm_pr_line_item.allowedIncreaseTotal = min(total_price * 0.10, 100.0)
+                orm_pr_line_item.allowedIncreaseTotal = min(orm_pr_line_item.totalPrice * 0.10, 100.0)
                 await db.flush()
             
             
@@ -1738,7 +1735,8 @@ async def update_prices(
     #     raise HTTPException(status_code=400, detail="User not authorized to change/set prices.")
     error_message = "Price allowance exceeded, must be ≤ original price each + 10% or $100"
     stmt = select(PurchaseRequestLineItem).where(
-        PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id
+        PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id,
+        PurchaseRequestLineItem.UUID == payload.item_uuid
     )
     res = await db.execute(stmt)
     item = res.scalars().one_or_none()
@@ -1800,14 +1798,13 @@ async def update_prices(
                 raise HTTPException(status_code=400, detail="QUANTITY_CANNOT_BE_0")
 
     # CHECK PRICE ALLOWANCE
-    is_price_change_allowed = await price_change_allowed(db, payload.purchase_request_id, original_total_price, payload.new_total_price)
+    is_price_change_allowed = await price_change_allowed(db, payload.purchase_request_id, payload.item_uuid, original_total_price, payload.new_total_price)
 
     if not update_values:
         return {"message": "No changes to update"}
 
     logger.debug(f"Is price change allowed: {is_price_change_allowed}")
     if not is_price_change_allowed:
-        logger.debug("NOOOOOOOO TOO MUCH")
         raise HTTPException(status_code=400, detail="PRICE_ALLOWANCE_EXCEEDED")
     
     if is_price_change_allowed:
@@ -1815,6 +1812,7 @@ async def update_prices(
             update(PurchaseRequestLineItem)
             .where(
                 PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id,
+                PurchaseRequestLineItem.UUID == payload.item_uuid
             )
             .values(**update_values)
             .execution_options(synchronize_session="fetch")

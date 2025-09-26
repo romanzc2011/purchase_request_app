@@ -95,6 +95,7 @@ from typing import Optional
 async def price_change_allowed(
     db: AsyncSession,
     purchase_request_id: str,
+    line_item_uuid: str,
     original_total_price: float,
     new_total_price: Optional[float] = None,
 ) -> bool:
@@ -102,42 +103,60 @@ async def price_change_allowed(
     logger.debug(f"New total price: {new_total_price}")
 
     try:
-        has_price_updated = await dbas.get_has_price_updated(db, purchase_request_id)
-        logger.debug(f"Has price updated: {has_price_updated}")
+        # Get the total of ALL line items in the purchase request
+        total_order_value = await dbas.get_total_order_value(db, purchase_request_id)
+        logger.debug(f"Total order value: {total_order_value}")
         
-        # If no price has been updated yet, set baseline and allow
-        if not has_price_updated:
-            # Use the new_total_price as the baseline if original is 0
-            baseline_price = original_total_price if original_total_price > 0 else (new_total_price or 0)
-            
-            if baseline_price > 0:
-                # Set the baseline price (first non-zero price)
-                await dbas.set_original_total_price(db, purchase_request_id, baseline_price)
+        # Check if ALL line items have been price updated
+        total_line_items = await dbas.get_line_item_count(db, purchase_request_id)
+        price_updated_count = await dbas.get_price_updated_count(db, purchase_request_id)
+        all_items_updated = (total_line_items > 0 and price_updated_count == total_line_items)
+        
+        logger.debug(f"Total line items: {total_line_items}")
+        logger.debug(f"Price updated count: {price_updated_count}")
+        logger.debug(f"All items updated: {all_items_updated}")
+        
+        # If not all items have been price updated yet, allow any price
+        if not all_items_updated:
+            logger.debug("Not all items price updated yet, allowing any price")
+            return True
+        
+        # Check if baseline has been set yet
+        baseline_exists = await dbas.get_order_baseline_exists(db, purchase_request_id)
+        
+        # If all items updated but no baseline set yet, set it now
+        if not baseline_exists:
+            if total_order_value > 0:
+                logger.debug("Setting order baseline")
+                logger.debug(f"Total order value: {total_order_value}")
+                # Set the baseline for the entire order
+                await dbas.set_order_baseline(db, purchase_request_id, total_order_value)
                 
                 # Calculate and store allowed increase (10% or $100, whichever is smaller)
-                allowed_increase_total = min(baseline_price * 0.10, 100.0)
-                await dbas.set_allowed_increase_total(db, purchase_request_id, allowed_increase_total)
+                allowed_increase_total = min(total_order_value * 0.10, 100.0)
+                await dbas.set_order_allowed_increase(db, purchase_request_id, allowed_increase_total)
                 
-                logger.debug(f"Set baseline: original={baseline_price}, allowed_increase={allowed_increase_total}")
+                logger.debug(f"Set order baseline: original={total_order_value}, allowed_increase={allowed_increase_total}")
                 return True
             else:
                 # No baseline yet, allow any price
                 return True
         
-        # Price has been updated before, check against allowance
-        allowed_increase_total = await dbas.get_allowed_increase_total(db, purchase_request_id)
-        stored_original_price = await dbas.get_original_total_price(db, purchase_request_id)
+        # Price has been updated before, check against order-level allowance
+        allowed_increase_total = await dbas.get_order_allowed_increase(db, purchase_request_id)
+        order_baseline = await dbas.get_order_baseline(db, purchase_request_id)
         
         if new_total_price is None:
             return True  # No new price to validate
             
-        # Use the stored original price as the baseline for comparison
-        baseline_price = stored_original_price or original_total_price
-        price_increase = new_total_price - baseline_price
-        is_within_allowance = price_increase <= allowed_increase_total
+        # Calculate the new total order value with this change
+        new_total_order_value = await dbas.get_new_total_order_value(db, purchase_request_id, line_item_uuid, new_total_price)
+        order_increase = new_total_order_value - order_baseline
+        is_within_allowance = order_increase <= allowed_increase_total
         
-        logger.debug(f"Baseline price: {baseline_price}")
-        logger.debug(f"Price increase: {price_increase}")
+        logger.debug(f"Order baseline: {order_baseline}")
+        logger.debug(f"New total order: {new_total_order_value}")
+        logger.debug(f"Order increase: {order_increase}")
         logger.debug(f"Allowed increase: {allowed_increase_total}")
         logger.debug(f"Within allowance: {is_within_allowance}")
         
