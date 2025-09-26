@@ -605,7 +605,7 @@ async def send_purchase_request(
                 fund=item.fund,
                 quantity=item.quantity,
                 priceEach=item.price_each,
-                originalPriceEach=item.price_each,
+                originalTotalPrice=item.total_price,
                 totalPrice=item.total_price,
                 location=item.location,
                 isCyberSecRelated=item.is_cyber_sec_related,
@@ -614,6 +614,16 @@ async def send_purchase_request(
             )
             db.add(orm_pr_line_item)
             await db.flush() # UUID is now available
+            
+            # Check if totalPrice is greater than 0, that means a price was sent on submission
+            stmt = select(PurchaseRequestLineItem.totalPrice).where(PurchaseRequestLineItem.purchase_request_id == purchase_req_id)
+            res = await db.execute(stmt)
+            total_price = res.scalar_one_or_none()
+            if total_price > 0:
+                orm_pr_line_item.priceUpdated = True
+                orm_pr_line_item.allowedIncreaseTotal = min(total_price * 0.10, 100.0)
+                await db.flush()
+            
             
             #! PROGRESS TRACKING ----------------------------------------------------------
             if sid:
@@ -1718,7 +1728,7 @@ async def update_prices(
     Update the price each and total price for a purchase request line item.
     """
     logger.debug(f"USER GROUPS: {current_user.groups}")
-    logger.info(f"Updating prices for purchase request ID: {payload.purchase_request_id} and item UUID: {payload.item_uuid}")
+    logger.info(f"Updating prices for purchase request ID: {payload.purchase_request_id}")
     logger.debug(f"Payload: {payload}")
     
     # TODO UNCOMMENT FOR PROD
@@ -1728,8 +1738,7 @@ async def update_prices(
     #     raise HTTPException(status_code=400, detail="User not authorized to change/set prices.")
     error_message = "Price allowance exceeded, must be ≤ original price each + 10% or $100"
     stmt = select(PurchaseRequestLineItem).where(
-        PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id,
-        PurchaseRequestLineItem.UUID == payload.item_uuid,
+        PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id
     )
     res = await db.execute(stmt)
     item = res.scalars().one_or_none()
@@ -1737,12 +1746,12 @@ async def update_prices(
         raise HTTPException(status_code=404, detail="Line item not found")
 
     current_price_each   = item.priceEach
-    original_price_each  = item.originalPriceEach
+    original_total_price = item.originalTotalPrice
     current_qty          = item.quantity
     current_status       = item.status
     
     logger.debug(f"Current price each: {current_price_each}")
-    logger.debug(f"Original price each: {original_price_each}")
+    logger.debug(f"Original price each: {original_total_price}")
     logger.debug(f"Current quantity: {current_qty}")
     logger.debug(f"Current status: {current_status}")
 
@@ -1790,30 +1799,30 @@ async def update_prices(
                 await sio_events.error_event(sid, "Quantity cannot be 0")
                 raise HTTPException(status_code=400, detail="QUANTITY_CANNOT_BE_0")
 
-            # CHECK PRICE ALLOWANCE
-            is_price_change_allowed = await price_change_allowed(db, payload.purchase_request_id, payload.item_uuid, original_price_each, new_pe, payload.new_total_price)
-            if not is_price_change_allowed:
-                sid = sio_events.get_user_sid(current_user.username)
-                await sio_events.error_event(sid, error_message)
-                await sio_events.send_original_price(sid, original_price_each)
-                raise HTTPException(status_code=400, detail="PRICE_ALLOWANCE_EXCEEDED")
-        
+    # CHECK PRICE ALLOWANCE
+    is_price_change_allowed = await price_change_allowed(db, payload.purchase_request_id, original_total_price, payload.new_total_price)
+
     if not update_values:
         return {"message": "No changes to update"}
 
-    await db.execute(
-        update(PurchaseRequestLineItem)
-        .where(
-            PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id,
-            PurchaseRequestLineItem.UUID == payload.item_uuid,
+    logger.debug(f"Is price change allowed: {is_price_change_allowed}")
+    if not is_price_change_allowed:
+        logger.debug("NOOOOOOOO TOO MUCH")
+        raise HTTPException(status_code=400, detail="PRICE_ALLOWANCE_EXCEEDED")
+    
+    if is_price_change_allowed:
+        await db.execute(
+            update(PurchaseRequestLineItem)
+            .where(
+                PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id,
+            )
+            .values(**update_values)
+            .execution_options(synchronize_session="fetch")
         )
-        .values(**update_values)
-        .execution_options(synchronize_session="fetch")
-    )
-    await db.commit()
-    sid = sio_events.get_user_sid(current_user.username)
-    await sio_events.message_event(sid, "Prices updated successfully")
-    return {"message": "Prices updated successfully"}
+        await db.commit()
+        sid = sio_events.get_user_sid(current_user.username)
+        await sio_events.message_event(sid, "Prices updated successfully")
+        return {"message": "Prices updated successfully"}
    
 ##########################################################################
 ## UPDATE BOC, Location, or Fund
@@ -1846,7 +1855,7 @@ async def update_boclocfund(
     # Update the BOC, Location, or Fund for the purchase request line item
     try:
         stmt = (update(PurchaseRequestLineItem)
-                .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
+                .where(PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id, PurchaseRequestLineItem.UUID == payload.item_uuid)
                 .values(budgetObjCode=payload.budgetObjCode, location=payload.location, fund=payload.fund)
                 .execution_options(synchronize_session="fetch")
             )

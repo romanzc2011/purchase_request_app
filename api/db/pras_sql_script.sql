@@ -30,8 +30,8 @@ END;
 	in PurchaseRequestLineItems: update approvals, */
 ----------------------------------------------------------
 CREATE TRIGGER IF NOT EXISTS sync_bocloclfund
-AFTER UPDATE OF budgetObjCode, location, fund, quantity, priceEach, totalPrice ON pr_line_items
-FOR EACH ROW
+AFTER UPDATE ON pr_line_items
+WHEN NEW.budgetObjCode IS NOT NULL OR NEW.location IS NOT NULL OR NEW.fund IS NOT NULL OR NEW.quantity IS NOT NULL OR NEW.priceEach IS NOT NULL OR NEW.totalPrice IS NOT NULL
 BEGIN
 	UPDATE approvals
 	SET
@@ -66,43 +66,7 @@ BEGIN
 	WHERE line_item_uuid = NEW.line_item_uuid;
 END;
 
-----------------------------------------------------------
-/* Trigger to auto update originalPriceEach and priceUpdated on pr_line_items */
-----------------------------------------------------------
-CREATE TRIGGER IF NOT EXISTS sync_originalPriceEach_on_update_pr_line_items
-AFTER UPDATE OF priceEach ON pr_line_items
-BEGIN
-	UPDATE pr_line_items
-	SET originalPriceEach = CASE 
-		WHEN NEW.priceUpdated = FALSE THEN NEW.priceEach
-		ELSE originalPriceEach
-	END,
-	priceUpdated = CASE 
-		WHEN NEW.priceUpdated = FALSE THEN 1
-		ELSE priceUpdated
-	END
-	WHERE UUID = NEW.UUID;
-END;
 
-----------------------------------------------------------
-/* Trigger to auto insert approvals uuid after 
-the inital add comment is run */
-----------------------------------------------------------
-CREATE TRIGGER IF NOT EXISTS sync_approvals_uuid_on_first_insert
-AFTER INSERT ON son_comments
-FOR EACH ROW
-BEGIN
-	-- SON COMMENTS
-	UPDATE son_comments
-	SET approvals_uuid = (
-		SELECT approvals.UUID
-		FROM pr_line_items
-		JOIN approvals
-			ON approvals.purchase_request_id = pr_line_items.purchase_request_id
-		WHERE pr_line_items.UUID = son_comments.line_item_uuid
-	)
-	WHERE line_item_uuid = NEW.line_item_uuid;
-END;
 
 ----------------------------------------------------------
 /* Trigger to auto update status to denied AFTER pr_line_items

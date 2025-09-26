@@ -95,44 +95,53 @@ from typing import Optional
 async def price_change_allowed(
     db: AsyncSession,
     purchase_request_id: str,
-    line_item_uuid: str,
-    original_price_each: float,
-    new_price_each: Optional[float] = None,
+    original_total_price: float,
     new_total_price: Optional[float] = None,
 ) -> bool:
-    logger.debug(f"Original price each: {original_price_each}")
-    logger.debug(f"New price each: {new_price_each}")
+    logger.debug(f"Original total price: {original_total_price}")
     logger.debug(f"New total price: {new_total_price}")
 
     try:
-        has_price_updated = await dbas.get_has_price_updated(
-            db, purchase_request_id, line_item_uuid
-        )
+        has_price_updated = await dbas.get_has_price_updated(db, purchase_request_id)
+        logger.debug(f"Has price updated: {has_price_updated}")
+        
+        # If no price has been updated yet, set baseline and allow
         if not has_price_updated:
-            # No prior “original” baseline yet → allow
-            return True
-
-        # Allowance per unit: +10% or $100 (see NOTE below about min vs max)
-        allowed_increase_each = min(original_price_each * 0.10, 100.0)
-
-        # Pull current quantity to evaluate total allowance correctly
-        qty = await dbas.get_line_item_quantity(db, line_item_uuid)
-        original_total = original_price_each * qty
-        allowed_increase_total = allowed_increase_each * qty
-
-        ok_each = (
-            new_price_each is not None
-            and (new_price_each - original_price_each) <= allowed_increase_each
-        )
-
-        ok_total = (
-            new_total_price is not None
-            and (new_total_price - original_total) <= allowed_increase_total
-        )
-
-        price_allowance_ok = ok_each or ok_total
-        logger.info(f"Price allowance is ok: {price_allowance_ok}")
-        return price_allowance_ok
+            # Use the new_total_price as the baseline if original is 0
+            baseline_price = original_total_price if original_total_price > 0 else (new_total_price or 0)
+            
+            if baseline_price > 0:
+                # Set the baseline price (first non-zero price)
+                await dbas.set_original_total_price(db, purchase_request_id, baseline_price)
+                
+                # Calculate and store allowed increase (10% or $100, whichever is smaller)
+                allowed_increase_total = min(baseline_price * 0.10, 100.0)
+                await dbas.set_allowed_increase_total(db, purchase_request_id, allowed_increase_total)
+                
+                logger.debug(f"Set baseline: original={baseline_price}, allowed_increase={allowed_increase_total}")
+                return True
+            else:
+                # No baseline yet, allow any price
+                return True
+        
+        # Price has been updated before, check against allowance
+        allowed_increase_total = await dbas.get_allowed_increase_total(db, purchase_request_id)
+        stored_original_price = await dbas.get_original_total_price(db, purchase_request_id)
+        
+        if new_total_price is None:
+            return True  # No new price to validate
+            
+        # Use the stored original price as the baseline for comparison
+        baseline_price = stored_original_price or original_total_price
+        price_increase = new_total_price - baseline_price
+        is_within_allowance = price_increase <= allowed_increase_total
+        
+        logger.debug(f"Baseline price: {baseline_price}")
+        logger.debug(f"Price increase: {price_increase}")
+        logger.debug(f"Allowed increase: {allowed_increase_total}")
+        logger.debug(f"Within allowance: {is_within_allowance}")
+        
+        return is_within_allowance
 
     except Exception as e:
         logger.error(f"Error calculating price allowance: {e}")

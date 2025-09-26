@@ -166,7 +166,8 @@ class PurchaseRequestLineItem(Base):
     fund                   : Mapped[str] = mapped_column(String)
     quantity               : Mapped[int] = mapped_column(Integer)
     priceEach              : Mapped[float] = mapped_column(Float)
-    originalPriceEach      : Mapped[float] = mapped_column(Float)
+    originalTotalPrice     : Mapped[float] = mapped_column(Float)
+    allowedIncreaseTotal   : Mapped[float] = mapped_column(Float, default=0.0)       
     priceUpdated           : Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     totalPrice             : Mapped[float] = mapped_column(Float)
     location               : Mapped[str] = mapped_column(String)
@@ -496,15 +497,64 @@ async def get_justification_templates(db: AsyncSession) -> dict[str, str]:
     return {r.code: r.description for r in rows}
 
 ###################################################################################################
-# Get if price has been updated
+# Get allowed increase total
 ###################################################################################################
-async def get_has_price_updated(db: AsyncSession, purchase_request_id: str, line_item_uuid: str) -> bool:
-    stmt = select(PurchaseRequestLineItem.priceUpdated).where(
-        PurchaseRequestLineItem.purchase_request_id == purchase_request_id,
-        PurchaseRequestLineItem.UUID == line_item_uuid
+async def get_allowed_increase_total(db: AsyncSession, purchase_request_id: str) -> float:
+    stmt = select(PurchaseRequestLineItem.allowedIncreaseTotal).where(
+        PurchaseRequestLineItem.purchase_request_id == purchase_request_id
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
+
+###################################################################################################
+# Set original total price
+###################################################################################################
+async def set_original_total_price(db: AsyncSession, purchase_request_id: str, original_total_price: float):
+    stmt = update(PurchaseRequestLineItem).where(
+        PurchaseRequestLineItem.purchase_request_id == purchase_request_id,
+    ).values(originalTotalPrice=original_total_price).execution_options(synchronize_session="fetch")
+    await db.execute(stmt)
+    await db.commit()
+
+###################################################################################################
+# Set allowed increase total
+###################################################################################################
+async def set_allowed_increase_total(db: AsyncSession, purchase_request_id: str, allowed_increase_total: float):
+    stmt = update(PurchaseRequestLineItem).where(
+        PurchaseRequestLineItem.purchase_request_id == purchase_request_id
+    ).values(allowedIncreaseTotal=allowed_increase_total).execution_options(synchronize_session="fetch")
+    await db.execute(stmt)
+    await db.commit()
+
+###################################################################################################
+# Get if price has been updated
+###################################################################################################
+async def get_has_price_updated(db: AsyncSession, purchase_request_id: str) -> bool:
+    stmt = select(PurchaseRequestLineItem.priceUpdated).where(
+        PurchaseRequestLineItem.purchase_request_id == purchase_request_id
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+###################################################################################################
+# Get allowed increase total
+###################################################################################################
+async def get_allowed_increase_total(db: AsyncSession, purchase_request_id: str) -> float:
+    stmt = select(PurchaseRequestLineItem.allowedIncreaseTotal).where(
+        PurchaseRequestLineItem.purchase_request_id == purchase_request_id
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none() or 0.0
+
+###################################################################################################
+# Get original total price
+###################################################################################################
+async def get_original_total_price(db: AsyncSession, purchase_request_id: str) -> float:
+    stmt = select(PurchaseRequestLineItem.originalTotalPrice).where(
+        PurchaseRequestLineItem.purchase_request_id == purchase_request_id
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none() or 0.0
 
 ###################################################################################################
 # Get line item quantity
