@@ -42,9 +42,11 @@ if getattr(sys, 'frozen', False):
     print(f"DEBUG: Base path: {base_path}")
     print(f"DEBUG: Database URL: {DATABASE_URL}")
 else:
-    # Running from source
-    DATABASE_URL = "sqlite:///api/db/pras.db"
+    # Running from source - use environment variable if set
+    db_path = os.environ.get('DATABASE_FILE_PATH', 'api/db/pras.db')
+    DATABASE_URL = f"sqlite:///{db_path}"
     print(f"DEBUG: Source mode - Database URL: {DATABASE_URL}")
+    print(f"DEBUG: Database file path: {db_path}")
 
 # Create engine and base
 engine = create_engine(DATABASE_URL, echo=False)  # PRAS = Purchase Request Approval System
@@ -64,9 +66,11 @@ if getattr(sys, 'frozen', False):
     print(f"DEBUG: PyInstaller mode - Async Database path: {db_path}")
     print(f"DEBUG: Async Database URL: {DATABASE_URL_ASYNC}")
 else:
-    # Running from source
-    DATABASE_URL_ASYNC = "sqlite+aiosqlite:///api/db/pras.db"
+    # Running from source - use environment variable if set
+    db_path = os.environ.get('DATABASE_FILE_PATH', 'api/db/pras.db')
+    DATABASE_URL_ASYNC = f"sqlite+aiosqlite:///{db_path}"
     print(f"DEBUG: Source mode - Async Database URL: {DATABASE_URL_ASYNC}")
+    print(f"DEBUG: Async Database file path: {db_path}")
     
 engine_async = create_async_engine(
     DATABASE_URL_ASYNC, 

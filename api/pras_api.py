@@ -9,6 +9,8 @@ EXPLANATION OF THE pending_approvals and final_approvals TABLES: The pending_app
 	status of their ItemStatus.status for future decisions. The final_approvals are used during the actual approval process,
 	the users do not interact with final_approvals, it more of a metadata table
  
+ # * For testing of this app, in the project root, run: python -m api.test_api
+ 
 EXPLANATION OF COMMENT COLORS:
 	# ! Progress tracking (RED)
 	# * (GREEN)
@@ -1718,53 +1720,76 @@ async def update_prices(
     logger.info(f"Updating prices for purchase request ID: {payload.purchase_request_id} and item UUID: {payload.item_uuid}")
     logger.debug(f"Payload: {payload}")
     
-    # Grab original price each for item uuid
-    stmt = select(
-        PurchaseRequestLineItem.originalPriceEach).where(PurchaseRequestLineItem.UUID == payload.item_uuid)
-    result = await db.execute(stmt)
-    originalPriceEach = result.scalar_one_or_none()
+    stmt = select(PurchaseRequestLineItem).where(
+        PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id,
+        PurchaseRequestLineItem.UUID == payload.item_uuid,
+    )
+    res = await db.execute(stmt)
+    item = res.scalars().one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Line item not found")
+
+    current_price_each   = item.priceEach
+    original_price_each  = item.originalPriceEach
+    current_qty          = item.quantity
+    current_status       = item.status
+
+    
+    # Gate by status (deny only when explicitly DENIED; adjust if you want stricter)
+    if payload.status == ItemStatus.DENIED:
+        raise HTTPException(status_code=400, detail="Cannot update a DENIED item")
+    
+     # Decide if priceEach is actually changing
     new_price_each = payload.new_price_each
-    
-    price_allowance_ok = price_change_allowed(originalPriceEach, new_price_each)
-    
-    
-    # Only allow updating prices for NEW_REQUEST or PENDING_APPROVAL statuses, not APPROVED or DENIED
-    if (payload.status is not ItemStatus.DENIED) and price_allowance_ok:
-        logger.info(f"payload: {payload}")
-        # Build update values dynamically
-        update_values = {
-            "priceEach": payload.new_price_each, 
-            "totalPrice": payload.new_total_price
-        }
-        
-        # Add quantity update if provided
-        if payload.new_quantity is not None:
-            update_values["quantity"] = payload.new_quantity
-            
-        stmt = (update(PurchaseRequestLineItem)
-                .where(PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id)
-                .where(PurchaseRequestLineItem.UUID == payload.item_uuid)
-                .values(**update_values)
-                .execution_options(synchronize_session="fetch")
+    price_is_changing = (
+    payload.new_price_each is not None
+    and payload.new_price_each != current_price_each
+    )
+
+    update_values = {}
+
+    # Quantity-only change allowed
+    if payload.new_quantity is not None and payload.new_quantity != current_qty:
+        update_values["quantity"] = payload.new_quantity
+
+    # Price change (enforce allowance)
+    if price_is_changing:
+        new_pe = payload.new_price_each
+        if not price_change_allowed(original_price_each, new_pe):
+            sid = sio_events.get_user_sid(current_user.username)
+            await sio_events.error_event(
+                sid,
+                "Price allowance exceeded, must be ≤ original price each + 10% or $100",
+            )
+            await sio_events.send_original_price(sid, original_price_each)
+            raise HTTPException(status_code=400, detail="PRICE_ALLOWANCE_EXCEEDED")
+        update_values["priceEach"] = new_pe
+
+    # Recompute total if quantity or price changed
+    if "quantity" in update_values or "priceEach" in update_values:
+        qty = update_values.get("quantity", current_qty)
+        pe  = update_values.get("priceEach", current_price_each)
+        update_values["totalPrice"] = (
+            payload.new_total_price if payload.new_total_price is not None else qty * pe
         )
-        
-        await db.execute(stmt)
-        await db.commit()
-        logger.debug(f"Prices updated successfully")
-        
-        sid = sio_events.get_user_sid(current_user.username)
-        await sio_events.message_event(sid, "Prices updated successfully")
-        return {"message": "Prices updated successfully"}
-    
-    # If the price is too much or status is wrong, inform frontend
+
+    if not update_values:
+        return {"message": "No changes to update"}
+
+    await db.execute(
+        update(PurchaseRequestLineItem)
+        .where(
+            PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id,
+            PurchaseRequestLineItem.UUID == payload.item_uuid,
+        )
+        .values(**update_values)
+        .execution_options(synchronize_session="fetch")
+    )
+    await db.commit()
     sid = sio_events.get_user_sid(current_user.username)
-    logger.debug(f"SID: {sid}")
-    
-    if not price_allowance_ok:
-        await sio_events.error_event(sid, "Price allowance exceeded, must be less than or equal to original price each + 10% or $100")
-        await sio_events.send_original_price(sid, originalPriceEach)
-        
-    raise HTTPException(status_code=500, detail="PRICE_ALLOWANCE_EXCEEDED")
+    await sio_events.message_event(sid, "Prices updated successfully")
+    return {"message": "Prices updated successfully"}
+
    
 ##########################################################################
 ## UPDATE BOC, Location, or Fund

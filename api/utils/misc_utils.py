@@ -94,11 +94,6 @@ def price_change_allowed(original_price_each: float, new_price_each: float) -> b
     # Calculate 10% and $100 allowances
     price_allowance_ok = False
     
-    # A price has not been set yet which finance usually does not set price until after approval
-    if original_price_each == 0:
-        logger.info(f"Original price each is 0, allowing price change")
-        return True
-    
     try:
     # Allowance is ok if new price each is less than or equal to original price each + 10% or $100
         allowed_increase = min(original_price_each * 0.1, 100)

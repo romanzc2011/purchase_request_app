@@ -14,9 +14,9 @@ Types if import:
 IMPORTANT: Do NOT post this list to the issue-tracker. Use it as a basis for
             tracking down the missing module yourself. Thanks!
 
-missing module named pwd - imported by shutil (delayed, optional), tarfile (optional), pathlib._local (optional), subprocess (delayed, conditional, optional), posixpath (delayed, conditional, optional), netrc (delayed, conditional), getpass (delayed, optional), setuptools._distutils.util (delayed, conditional, optional), setuptools._vendor.backports.tarfile (optional), setuptools._distutils.archive_util (optional), http.server (delayed, optional)
+missing module named pwd - imported by posixpath (delayed, conditional, optional), shutil (delayed, optional), tarfile (optional), pathlib._local (optional), subprocess (delayed, conditional, optional), netrc (delayed, conditional), getpass (delayed, optional), setuptools._distutils.util (delayed, conditional, optional), setuptools._vendor.backports.tarfile (optional), setuptools._distutils.archive_util (optional), http.server (delayed, optional)
 missing module named grp - imported by shutil (delayed, optional), tarfile (optional), pathlib._local (optional), subprocess (delayed, conditional, optional), setuptools._vendor.backports.tarfile (optional), setuptools._distutils.archive_util (optional)
-missing module named posix - imported by shutil (conditional), importlib._bootstrap_external (conditional), os (conditional, optional), posixpath (optional), _pyrepl.unix_console (delayed, optional)
+missing module named posix - imported by posixpath (optional), shutil (conditional), importlib._bootstrap_external (conditional), os (conditional, optional), _pyrepl.unix_console (delayed, optional)
 missing module named resource - imported by posix (top-level)
 missing module named urllib.urlretrieve - imported by urllib (conditional), whoosh.compat (conditional)
 missing module named urllib.unquote - imported by urllib (optional), ldap3.core.server (optional), ldap3.utils.uri (optional)
@@ -65,9 +65,9 @@ missing module named sqlite3.NotSupportedError - imported by sqlite3 (top-level)
 missing module named sqlite3.IntegrityError - imported by sqlite3 (top-level), aiosqlite (top-level)
 missing module named sqlite3.Error - imported by sqlite3 (top-level), aiosqlite (top-level)
 missing module named sqlite3.DatabaseError - imported by sqlite3 (top-level), aiosqlite (top-level)
-missing module named _suggestions - imported by traceback (delayed, optional)
 missing module named collections.Mapping - imported by collections (optional), ldap3.utils.ciDict (optional)
 missing module named collections.MutableMapping - imported by collections (optional), ldap3.utils.ciDict (optional)
+missing module named _suggestions - imported by traceback (delayed, optional)
 missing module named 'gunicorn.workers' - imported by uvicorn.workers (top-level)
 missing module named gunicorn - imported by uvicorn.workers (top-level)
 missing module named watchfiles - imported by uvicorn.supervisors.watchfilesreload (top-level)

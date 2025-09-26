@@ -67,6 +67,24 @@ BEGIN
 END;
 
 ----------------------------------------------------------
+/* Trigger to auto update originalPriceEach and priceUpdated on pr_line_items */
+----------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS sync_originalPriceEach_on_update_pr_line_items
+AFTER UPDATE OF priceEach ON pr_line_items
+BEGIN
+	UPDATE pr_line_items
+	SET originalPriceEach = CASE 
+		WHEN NEW.priceUpdated = FALSE THEN NEW.priceEach
+		ELSE originalPriceEach
+	END,
+	priceUpdated = CASE 
+		WHEN NEW.priceUpdated = FALSE THEN 1
+		ELSE priceUpdated
+	END
+	WHERE UUID = NEW.UUID;
+END;
+
+----------------------------------------------------------
 /* Trigger to auto insert approvals uuid after 
 the inital add comment is run */
 ----------------------------------------------------------

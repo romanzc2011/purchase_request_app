@@ -295,9 +295,21 @@ class ClerkAdminHandler(Handler):
             db=db
         )
         logger.warning(f"CAN APPROVE NOW: {can_approve_now}")
-        # If the user is not allowed to approve, return to the next handler
-        if not can_approve_now:
+        
+        # ---------------------------------------------------------------------------------
+        # User can approve up to the pending approval status
+        if not can_approve_now and (current_status == ItemStatus.PENDING_APPROVAL):
             await sio_events.error_event(sid, "You do not have final approval authority for this request. The request will be forwarded to the appropriate approver.")
+            logger.debug("CLERK ADMIN HANDLER: Current user is not allowed to approve this request")
+            # Reset progress bar
+            if tracker and tracker.is_tracker_active():
+                tracker.reset_progress()
+            return await super().handle(request, db, current_user, ldap_service)
+        
+        # ---------------------------------------------------------------------------------
+        # If the user is not allowed to approve, return to the next handler
+        if not can_approve_now and (current_status == ItemStatus.NEW_REQUEST):
+            await sio_events.error_event(sid, " Current user is not allowed to approve this request.")
             logger.debug("CLERK ADMIN HANDLER: Current user is not allowed to approve this request")
             # Reset progress bar
             if tracker and tracker.is_tracker_active():
