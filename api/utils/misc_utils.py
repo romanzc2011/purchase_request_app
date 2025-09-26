@@ -10,6 +10,7 @@ from fastapi import HTTPException
 import os
 import sys
 from api.settings import settings
+from typing import Optional
 
 """
 This file contains miscellaneous utility functions that are used throughout the project.
@@ -86,22 +87,53 @@ async def get_justifications_and_comments(db: AsyncSession, ID: str) -> list[str
     result = await db.execute(son_comments_stmt)
     son_comments = result.scalars().all()
     
-    
     return additional_comments
 
 
-def price_change_allowed(original_price_each: float, new_price_each: float) -> bool:
-    # Calculate 10% and $100 allowances
-    price_allowance_ok = False
-    
+from typing import Optional
+
+async def price_change_allowed(
+    db: AsyncSession,
+    purchase_request_id: str,
+    line_item_uuid: str,
+    original_price_each: float,
+    new_price_each: Optional[float] = None,
+    new_total_price: Optional[float] = None,
+) -> bool:
+    logger.debug(f"Original price each: {original_price_each}")
+    logger.debug(f"New price each: {new_price_each}")
+    logger.debug(f"New total price: {new_total_price}")
+
     try:
-    # Allowance is ok if new price each is less than or equal to original price each + 10% or $100
-        allowed_increase = min(original_price_each * 0.1, 100)
-        price_allowance_ok = (new_price_each - original_price_each) <= allowed_increase
+        has_price_updated = await dbas.get_has_price_updated(
+            db, purchase_request_id, line_item_uuid
+        )
+        if not has_price_updated:
+            # No prior “original” baseline yet → allow
+            return True
+
+        # Allowance per unit: +10% or $100 (see NOTE below about min vs max)
+        allowed_increase_each = min(original_price_each * 0.10, 100.0)
+
+        # Pull current quantity to evaluate total allowance correctly
+        qty = await dbas.get_line_item_quantity(db, line_item_uuid)
+        original_total = original_price_each * qty
+        allowed_increase_total = allowed_increase_each * qty
+
+        ok_each = (
+            new_price_each is not None
+            and (new_price_each - original_price_each) <= allowed_increase_each
+        )
+
+        ok_total = (
+            new_total_price is not None
+            and (new_total_price - original_total) <= allowed_increase_total
+        )
+
+        price_allowance_ok = ok_each or ok_total
         logger.info(f"Price allowance is ok: {price_allowance_ok}")
         return price_allowance_ok
-    
+
     except Exception as e:
         logger.error(f"Error calculating price allowance: {e}")
         return False
-

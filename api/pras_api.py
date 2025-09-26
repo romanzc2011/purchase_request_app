@@ -1717,9 +1717,16 @@ async def update_prices(
     """
     Update the price each and total price for a purchase request line item.
     """
+    logger.debug(f"USER GROUPS: {current_user.groups}")
     logger.info(f"Updating prices for purchase request ID: {payload.purchase_request_id} and item UUID: {payload.item_uuid}")
     logger.debug(f"Payload: {payload}")
     
+    # TODO UNCOMMENT FOR PROD
+    # if not current_user.has_group("ACCESS_GROUP"):
+    #     sid = sio_events.get_user_sid(current_user.username)
+    #     await sio_events.error_event(sid, "User not authorized to change/set prices.")
+    #     raise HTTPException(status_code=400, detail="User not authorized to change/set prices.")
+    error_message = "Price allowance exceeded, must be ≤ original price each + 10% or $100"
     stmt = select(PurchaseRequestLineItem).where(
         PurchaseRequestLineItem.purchase_request_id == payload.purchase_request_id,
         PurchaseRequestLineItem.UUID == payload.item_uuid,
@@ -1733,6 +1740,11 @@ async def update_prices(
     original_price_each  = item.originalPriceEach
     current_qty          = item.quantity
     current_status       = item.status
+    
+    logger.debug(f"Current price each: {current_price_each}")
+    logger.debug(f"Original price each: {original_price_each}")
+    logger.debug(f"Current quantity: {current_qty}")
+    logger.debug(f"Current status: {current_status}")
 
     
     # Gate by status (deny only when explicitly DENIED; adjust if you want stricter)
@@ -1745,6 +1757,8 @@ async def update_prices(
     payload.new_price_each is not None
     and payload.new_price_each != current_price_each
     )
+    logger.debug(f"Payload new price each: {payload.new_price_each}")
+    logger.debug(f"Price is changing: {price_is_changing}")
 
     update_values = {}
 
@@ -1752,17 +1766,11 @@ async def update_prices(
     if payload.new_quantity is not None and payload.new_quantity != current_qty:
         update_values["quantity"] = payload.new_quantity
 
-    # Price change (enforce allowance)
+    # Price change (enforce allowance), but first check if price has been updated or not
+    # if it has allow price change but enforce allowance
+    # if it has not allow price change but do not enforce allowance
     if price_is_changing:
         new_pe = payload.new_price_each
-        if not price_change_allowed(original_price_each, new_pe):
-            sid = sio_events.get_user_sid(current_user.username)
-            await sio_events.error_event(
-                sid,
-                "Price allowance exceeded, must be ≤ original price each + 10% or $100",
-            )
-            await sio_events.send_original_price(sid, original_price_each)
-            raise HTTPException(status_code=400, detail="PRICE_ALLOWANCE_EXCEEDED")
         update_values["priceEach"] = new_pe
 
     # Recompute total if quantity or price changed
@@ -1772,7 +1780,24 @@ async def update_prices(
         update_values["totalPrice"] = (
             payload.new_total_price if payload.new_total_price is not None else qty * pe
         )
+        
+        # Before sending (ENFORCE ALLOWANCE)
+        if price_is_changing:
+            # CHECK NON-ZERO QUANTITY
+            # Make sure qty is not 0, if it is return error
+            if qty == 0:
+                sid = sio_events.get_user_sid(current_user.username)
+                await sio_events.error_event(sid, "Quantity cannot be 0")
+                raise HTTPException(status_code=400, detail="QUANTITY_CANNOT_BE_0")
 
+            # CHECK PRICE ALLOWANCE
+            is_price_change_allowed = await price_change_allowed(db, payload.purchase_request_id, payload.item_uuid, original_price_each, new_pe, payload.new_total_price)
+            if not is_price_change_allowed:
+                sid = sio_events.get_user_sid(current_user.username)
+                await sio_events.error_event(sid, error_message)
+                await sio_events.send_original_price(sid, original_price_each)
+                raise HTTPException(status_code=400, detail="PRICE_ALLOWANCE_EXCEEDED")
+        
     if not update_values:
         return {"message": "No changes to update"}
 
@@ -1789,7 +1814,6 @@ async def update_prices(
     sid = sio_events.get_user_sid(current_user.username)
     await sio_events.message_event(sid, "Prices updated successfully")
     return {"message": "Prices updated successfully"}
-
    
 ##########################################################################
 ## UPDATE BOC, Location, or Fund

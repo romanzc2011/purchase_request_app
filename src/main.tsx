@@ -43,8 +43,6 @@ function Root() {
 
     return (
         <QueryClientProvider client={queryClient}>
-
-
             <StrictMode>
                 <Router>
                     <ToastContainer

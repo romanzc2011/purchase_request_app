@@ -496,6 +496,27 @@ async def get_justification_templates(db: AsyncSession) -> dict[str, str]:
     return {r.code: r.description for r in rows}
 
 ###################################################################################################
+# Get if price has been updated
+###################################################################################################
+async def get_has_price_updated(db: AsyncSession, purchase_request_id: str, line_item_uuid: str) -> bool:
+    stmt = select(PurchaseRequestLineItem.priceUpdated).where(
+        PurchaseRequestLineItem.purchase_request_id == purchase_request_id,
+        PurchaseRequestLineItem.UUID == line_item_uuid
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+###################################################################################################
+# Get line item quantity
+###################################################################################################
+async def get_line_item_quantity(db: AsyncSession, line_item_uuid: str) -> int:
+    stmt = select(PurchaseRequestLineItem.quantity).where(
+        PurchaseRequestLineItem.UUID == line_item_uuid
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+###################################################################################################
 # Get next  request id
 ###################################################################################################
 async def set_purchase_req_id(db: AsyncSession) -> str:
